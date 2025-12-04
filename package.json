@@ -1,0 +1,18 @@
+{
+  "name": "holaai-convexo-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:convex": "pnpm --filter @holaai/convex dev",
+    "dev:rnapp": "pnpm --filter @holaai/rnapp start",
+    "ios": "pnpm --filter @holaai/rnapp ios",
+    "android": "pnpm --filter @holaai/rnapp android",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2",
+    "prettier": "^3.5.3"
+  },
+  "packageManager": "pnpm@10.20.0"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@holaai/convex",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "dev": "convex dev",
+    "dev:once": "convex dev --once",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./index.ts",
+    "./_generated/api": "./convex/_generated/api.js",
+    "./_generated/dataModel": "./convex/_generated/dataModel.js",
+    "./schema": "./convex/schema.ts"
+  },
+  "dependencies": {
+    "convex": "^1.29.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  }
+}
