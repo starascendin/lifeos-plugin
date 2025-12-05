@@ -1,11 +1,15 @@
+import { registerGlobals } from '@livekit/react-native';
+registerGlobals();
+
 import { Auth } from '@/components/auth/auth';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/theme/colors';
 import { ThemeProvider } from '@/theme/theme-provider';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
-import { ConvexReactClient } from 'convex/react';
+import { ConvexReactClient, useMutation } from 'convex/react';
 import { ConvexProviderWithClerk } from 'convex/react-clerk';
+import { api } from '@holaai/convex/_generated/api';
 import { osName } from 'expo-device';
 import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -13,7 +17,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { setBackgroundColorAsync } from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, ActivityIndicator, View as RNView } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -67,8 +71,26 @@ export default function RootLayout() {
   );
 }
 
+// Hook to sync Clerk user to Convex on sign in
+function useEnsureUser() {
+  const { isSignedIn } = useAuth();
+  const ensureUser = useMutation(api.users.ensureUser);
+  const [synced, setSynced] = useState(false);
+
+  useEffect(() => {
+    if (isSignedIn && !synced) {
+      ensureUser()
+        .then(() => setSynced(true))
+        .catch((err) => console.error('Failed to sync user:', err));
+    }
+  }, [isSignedIn, synced, ensureUser]);
+
+  return synced;
+}
+
 function AuthGate({ colorScheme }: { colorScheme: 'light' | 'dark' }) {
   const { isLoaded, isSignedIn } = useAuth();
+  const userSynced = useEnsureUser();
 
   if (!isLoaded) {
     return (
@@ -80,6 +102,15 @@ function AuthGate({ colorScheme }: { colorScheme: 'light' | 'dark' }) {
 
   if (!isSignedIn) {
     return <Auth />;
+  }
+
+  // Wait for user to be synced to Convex
+  if (!userSynced) {
+    return (
+      <RNView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </RNView>
+    );
   }
 
   return (

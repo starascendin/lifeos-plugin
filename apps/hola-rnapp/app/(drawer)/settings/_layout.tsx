@@ -16,6 +16,7 @@ export default function SettingsLayout() {
       }}
     >
       <Stack.Screen name='index' options={{ title: 'Settings' }} />
+      <Stack.Screen name='devpage' options={{ title: 'Developer' }} />
     </Stack>
   );
 }

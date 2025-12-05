@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.holaai.rnapp",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "HolaAI needs microphone access for voice conversations with your Spanish tutor."
       }
     },
     "android": {
@@ -31,6 +32,8 @@
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc",
       "expo-asset",
       "expo-router",
       "expo-web-browser",

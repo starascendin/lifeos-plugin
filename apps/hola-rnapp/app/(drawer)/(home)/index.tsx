@@ -26,7 +26,7 @@ export default function HomeScreen() {
           textAlign: 'center',
         }}
       >
-        Built with ❤️ by BNA
+        Built with2 ❤️ by BNA
       </Text>
 
       <View

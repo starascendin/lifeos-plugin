@@ -1,7 +1,17 @@
 import { Drawer } from 'expo-router/drawer';
 import { useColor } from '@/hooks/useColor';
 import { DrawerContent } from '@/components/drawer/DrawerContent';
-import { Home, MessageCircle, Settings, Search } from 'lucide-react-native';
+import {
+  Home,
+  MessageCircle,
+  Settings,
+  Search,
+  BookOpen,
+  MessageSquare,
+  Mic,
+  GraduationCap,
+  Sparkles,
+} from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
 export default function DrawerLayout() {
@@ -42,6 +52,61 @@ export default function DrawerLayout() {
           title: 'Home',
           drawerIcon: ({ color, size }) => (
             <Icon name={Home} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='learn'
+        options={{
+          drawerLabel: 'Learn',
+          title: 'Learn Spanish',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={BookOpen} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='bella'
+        options={{
+          drawerLabel: 'Bella AI',
+          title: 'Bella Conversations',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={MessageSquare} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='voice'
+        options={{
+          drawerLabel: 'Voice Practice',
+          title: 'Voice Practice',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={Mic} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='practice'
+        options={{
+          drawerLabel: 'Practice',
+          title: 'Practice & Quiz',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={GraduationCap} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='ai-lessons'
+        options={{
+          drawerLabel: 'AI Lessons',
+          title: 'AI Lessons',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={Sparkles} color={color} size={size} />
           ),
         }}
       />

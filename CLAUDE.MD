@@ -1,0 +1,3 @@
+
+- this repo has react native
+    - DO NOT UPDATE REACT NATIVE PACKAGE VERSIONS, IT MIGHT BREAK THE APP
