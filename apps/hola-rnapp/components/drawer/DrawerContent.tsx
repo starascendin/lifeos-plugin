@@ -4,40 +4,15 @@ import {
   DrawerContentScrollView,
   DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import { useRouter, usePathname } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { useColor } from '@/hooks/useColor';
 import { Text } from '@/components/ui/text';
-import { Icon } from '@/components/ui/icon';
 import { useUser } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Home,
-  BookOpen,
-  MessageSquare,
-  Mic,
-  GraduationCap,
-  Sparkles,
-  MessageCircle,
-  Settings,
-  Search,
-} from 'lucide-react-native';
-
-// Define the navigation items we want to show
-const navigationItems = [
-  { name: '(home)', label: 'Home', icon: Home, path: '/' },
-  { name: 'learn', label: 'Learn', icon: BookOpen, path: '/learn' },
-  { name: 'bella', label: 'Bella AI', icon: MessageSquare, path: '/bella' },
-  { name: 'voice', label: 'Voice Practice', icon: Mic, path: '/voice' },
-  { name: 'practice', label: 'Practice', icon: GraduationCap, path: '/practice' },
-  { name: 'ai-lessons', label: 'AI Lessons', icon: Sparkles, path: '/ai-lessons' },
-  { name: 'chat', label: 'Chat', icon: MessageCircle, path: '/chat' },
-  { name: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
-  { name: 'search', label: 'Search', icon: Search, path: '/search' },
-];
 
 export function DrawerContent(props: DrawerContentComponentProps) {
+  const { state, descriptors, navigation } = props;
   const { user } = useUser();
-  const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
@@ -47,18 +22,6 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const primary = useColor('primary');
   const foreground = useColor('foreground');
   const textMuted = useColor('textMuted');
-
-  const isActive = (path: string) => {
-    if (path === '/') {
-      return pathname === '/' || pathname === '/(home)';
-    }
-    return pathname.startsWith(path);
-  };
-
-  const handleNavigation = (path: string) => {
-    router.push(path as any);
-    props.navigation.closeDrawer();
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: background }]}>
@@ -87,42 +50,55 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         </Text>
       </View>
 
-      {/* Navigation Items */}
+      {/* Navigation Items - read from drawer state */}
       <DrawerContentScrollView
         {...props}
         contentContainerStyle={styles.scrollContent}
       >
-        {navigationItems.map((item) => {
-          const active = isActive(item.path);
-          const ItemIcon = item.icon;
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label = options.drawerLabel ?? options.title ?? route.name;
+          const isFocused = state.index === index;
+
+          // Get the icon from options
+          const IconComponent = options.drawerIcon;
+
+          const onPress = () => {
+            navigation.navigate(route.name);
+            navigation.closeDrawer();
+          };
 
           return (
             <TouchableOpacity
-              key={item.name}
-              onPress={() => handleNavigation(item.path)}
+              key={route.key}
+              onPress={onPress}
               activeOpacity={0.7}
               style={[
                 styles.navItem,
                 {
-                  backgroundColor: active ? cardBackground : 'transparent',
+                  backgroundColor: isFocused ? cardBackground : 'transparent',
                 },
               ]}
             >
-              <Icon
-                name={ItemIcon}
-                size={22}
-                color={active ? foreground : textMuted}
-              />
+              {IconComponent && (
+                <View style={styles.iconContainer}>
+                  {IconComponent({
+                    color: isFocused ? foreground : textMuted,
+                    size: 22,
+                    focused: isFocused,
+                  })}
+                </View>
+              )}
               <Text
                 style={[
                   styles.navLabel,
                   {
-                    color: active ? foreground : textMuted,
-                    fontWeight: active ? '600' : '500',
+                    color: isFocused ? foreground : textMuted,
+                    fontWeight: isFocused ? '600' : '500',
                   },
                 ]}
               >
-                {item.label}
+                {typeof label === 'string' ? label : route.name}
               </Text>
             </TouchableOpacity>
           );
@@ -168,6 +144,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     marginBottom: 4,
+  },
+  iconContainer: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   navLabel: {
     fontSize: 16,

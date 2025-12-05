@@ -48,8 +48,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name='(home)'
         options={{
-          drawerLabel: 'Home',
-          title: 'Home',
+          drawerLabel: 'Home1',
+          title: 'Home1',
           drawerIcon: ({ color, size }) => (
             <Icon name={Home} color={color} size={size} />
           ),
@@ -60,7 +60,7 @@ export default function DrawerLayout() {
         name='learn'
         options={{
           drawerLabel: 'Learn',
-          title: 'Learn Spanish',
+          title: 'Learn Spanish1',
           drawerIcon: ({ color, size }) => (
             <Icon name={BookOpen} color={color} size={size} />
           ),
@@ -81,7 +81,7 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name='voice'
         options={{
-          drawerLabel: 'Voice Practice',
+          drawerLabel: 'Voice Practice1',
           title: 'Voice Practice',
           drawerIcon: ({ color, size }) => (
             <Icon name={Mic} color={color} size={size} />

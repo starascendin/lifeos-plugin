@@ -319,6 +319,9 @@ PODS:
   - livekit-react-native-webrtc (137.0.2):
     - React-Core
     - WebRTC-SDK (= 137.7151.04)
+  - LiveKitExpoPlugin (1.0.1):
+    - ExpoModulesCore
+    - livekit-react-native
   - RCTDeprecation (0.81.5)
   - RCTRequired (0.81.5)
   - RCTTypeSafety (0.81.5):
@@ -2347,6 +2350,7 @@ DEPENDENCIES:
   - "hermes-engine (from `../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)"
   - "livekit-react-native (from `../../../node_modules/.pnpm/@livekit+react-native@2.9.5_@livekit+react-native-webrtc@137.0.2_react-native@0.81.5_@b_43d2582986c34b85687b8cf4d4e1af0b/node_modules/@livekit/react-native`)"
   - "livekit-react-native-webrtc (from `../../../node_modules/.pnpm/@livekit+react-native-webrtc@137.0.2_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/@livekit/react-native-webrtc`)"
+  - "LiveKitExpoPlugin (from `../../../node_modules/.pnpm/@livekit+react-native-expo-plugin@1.0.1_@livekit+react-native@2.9.5_@livekit+react-nati_b2ec99bce41b01cf0e1b022a92d3ce56/node_modules/@livekit/react-native-expo-plugin/ios`)"
   - "RCTDeprecation (from `../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)"
   - "RCTRequired (from `../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/Libraries/Required`)"
   - "RCTTypeSafety (from `../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/Libraries/TypeSafety`)"
@@ -2502,6 +2506,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/.pnpm/@livekit+react-native@2.9.5_@livekit+react-native-webrtc@137.0.2_react-native@0.81.5_@b_43d2582986c34b85687b8cf4d4e1af0b/node_modules/@livekit/react-native"
   livekit-react-native-webrtc:
     :path: "../../../node_modules/.pnpm/@livekit+react-native-webrtc@137.0.2_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/@livekit/react-native-webrtc"
+  LiveKitExpoPlugin:
+    :path: "../../../node_modules/.pnpm/@livekit+react-native-expo-plugin@1.0.1_@livekit+react-native@2.9.5_@livekit+react-nati_b2ec99bce41b01cf0e1b022a92d3ce56/node_modules/@livekit/react-native-expo-plugin/ios"
   RCTDeprecation:
     :path: "../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2685,6 +2691,7 @@ SPEC CHECKSUMS:
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   livekit-react-native: 4c2a613b3c389c7c94122ad77d5e4e21b76bc8e9
   livekit-react-native-webrtc: c03e72c608fbb8284a99e095dd7835a85bdb0279
+  LiveKitExpoPlugin: 8e0f4bdffa921c27c13e1504ea0e668b6f859278
   RCTDeprecation: 943572d4be82d480a48f4884f670135ae30bf990
   RCTRequired: 8f3cfc90cc25cf6e420ddb3e7caaaabc57df6043
   RCTTypeSafety: 16a4144ca3f959583ab019b57d5633df10b5e97c
