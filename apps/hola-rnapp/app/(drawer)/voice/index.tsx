@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ScrollView, TouchableOpacity, Alert, Animated } from 'react-native';
+import { TouchableOpacity, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from 'convex/react';
@@ -7,11 +7,11 @@ import { useUser } from '@clerk/clerk-expo';
 import { api } from '@holaai/convex/_generated/api';
 import { View } from '@/components/ui/view';
 import { Text } from '@/components/ui/text';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { useColor } from '@/hooks/useColor';
 import { useLiveKitVoice, TranscriptMessage } from '@/hooks/useLiveKitVoice';
+import { VoiceChatLog } from '@/components/voice/VoiceChatLog';
 import {
   Mic,
   MicOff,
@@ -19,12 +19,9 @@ import {
   PhoneOff,
   History,
   Waves,
-  User,
-  Bot,
   AlertTriangle,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
-import * as Speech from 'expo-speech';
 import Constants from 'expo-constants';
 
 // Check if we're in Expo Go (no native modules available)
@@ -144,10 +141,6 @@ export default function VoiceScreen() {
   const insets = useSafeAreaInsets();
 
   const convexUser = useQuery(api.users.currentUser);
-  const voiceStats = useQuery(
-    api.voice.getVoiceStats,
-    convexUser ? { userId: convexUser._id } : 'skip'
-  );
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
@@ -251,7 +244,7 @@ export default function VoiceScreen() {
   if (convexUser === undefined) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: background }}>
-        <Spinner variant='circle' />
+        <Spinner variant="circle" />
       </View>
     );
   }
@@ -260,7 +253,7 @@ export default function VoiceScreen() {
   if (!convexUser) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: background, padding: 20 }}>
-        <Text variant='subtitle' style={{ textAlign: 'center' }}>
+        <Text variant="subtitle" style={{ textAlign: 'center' }}>
           Please sign in to access voice practice
         </Text>
       </View>
@@ -289,306 +282,213 @@ export default function VoiceScreen() {
         </LiveKitRoom>
       )}
 
-      <ScrollView
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: insets.bottom + 16,
+      {/* Header - just History button */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 8,
         }}
       >
-        {/* Expo Go Warning */}
-        {isExpoGo && (
-          <Card style={{ marginBottom: 16, backgroundColor: `${warning}15` }}>
+        <TouchableOpacity
+          onPress={() => router.push('/voice/history')}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            backgroundColor: `${primary}20`,
+            borderRadius: 16,
+          }}
+        >
+          <Icon name={History} size={16} color={primary} />
+          <Text style={{ color: primary, marginLeft: 6, fontSize: 14 }}>History</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Expo Go Warning */}
+      {isExpoGo && (
+        <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+          <Card style={{ backgroundColor: `${warning}15` }}>
             <CardContent>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Icon name={AlertTriangle} size={20} color={warning} />
                 <View style={{ marginLeft: 12, flex: 1 }}>
-                  <Text variant='subtitle' style={{ color: warning, fontSize: 14 }}>
+                  <Text variant="subtitle" style={{ color: warning, fontSize: 14 }}>
                     Running in Expo Go
                   </Text>
-                  <Text variant='caption' style={{ color: textMuted }}>
+                  <Text variant="caption" style={{ color: textMuted }}>
                     Voice chat requires a dev build. Run "npx expo run:ios" to enable.
                   </Text>
                 </View>
               </View>
             </CardContent>
           </Card>
-        )}
+        </View>
+      )}
 
-        {/* Header */}
-        <View style={{ marginBottom: 24 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text variant='body' style={{ color: textMuted, flex: 1 }}>
-              Practice speaking Spanish with AI
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.push('/voice/history')}
+      {/* Chat Area */}
+      <VoiceChatLog messages={voice.transcript} style={{ flex: 1 }} />
+
+      {/* Bottom Control Bar */}
+      <Card
+        style={{
+          marginHorizontal: 0,
+          borderRadius: 0,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingBottom: insets.bottom,
+        }}
+      >
+        <CardContent style={{ paddingTop: 16 }}>
+          {/* Status Row */}
+          {voice.isConnected && (
+            <View
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                backgroundColor: `${primary}20`,
-                borderRadius: 16,
+                justifyContent: 'center',
+                marginBottom: 16,
               }}
             >
-              <Icon name={History} size={16} color={primary} />
-              <Text style={{ color: primary, marginLeft: 6, fontSize: 14 }}>History</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Stats Card */}
-        {voiceStats && (
-          <Card style={{ marginBottom: 24 }}>
-            <CardContent>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: primary }}>
-                    {voiceStats.totalConversations}
-                  </Text>
-                  <Text variant='caption' style={{ color: textMuted }}>
-                    Sessions
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: primary }}>
-                    {Math.round(voiceStats.totalDuration / 60)}
-                  </Text>
-                  <Text variant='caption' style={{ color: textMuted }}>
-                    Minutes
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 24, fontWeight: 'bold', color: primary }}>
-                    {voiceStats.recentConversations}
-                  </Text>
-                  <Text variant='caption' style={{ color: textMuted }}>
-                    This Week
-                  </Text>
-                </View>
-              </View>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Voice Control Card */}
-        <Card style={{ marginBottom: 24 }}>
-          <CardHeader>
-            <CardTitle>
-              {voice.isConnected ? 'Voice Session Active' : 'Voice AI'}
-            </CardTitle>
-            <CardDescription>
-              {voice.isConnected
-                ? voice.isAgentConnected
-                  ? 'Bella is ready to chat!'
-                  : 'Waiting for Bella to join...'
-                : 'Tap to start a voice conversation with Bella'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-              {/* Connection Status Indicators */}
-              {voice.isConnected && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: voice.isAgentConnected ? success : '#fbbf24',
-                      marginRight: 8,
-                    }}
-                  />
-                  <Text variant='caption' style={{ color: textMuted }}>
-                    {voice.isAgentConnected ? 'Connected' : 'Connecting...'}
-                  </Text>
-                  {voice.isAgentSpeaking && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16 }}>
-                      <Animated.View
-                        style={{
-                          opacity: waveAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0.5, 1],
-                          }),
-                        }}
-                      >
-                        <Icon name={Waves} size={16} color={primary} />
-                      </Animated.View>
-                      <Text variant='caption' style={{ color: primary, marginLeft: 4 }}>
-                        Bella is speaking
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Main Control Button */}
-              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                <TouchableOpacity
-                  onPress={voice.isConnected ? handleDisconnect : handleConnect}
-                  disabled={voice.isConnecting}
-                  style={{
-                    width: 100,
-                    height: 100,
-                    borderRadius: 50,
-                    backgroundColor: voice.isConnecting
-                      ? textMuted
-                      : voice.isConnected
-                        ? destructive
-                        : isExpoGo
-                          ? textMuted
-                          : primary,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    shadowColor: voice.isConnected ? destructive : primary,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    elevation: 8,
-                  }}
-                >
-                  {voice.isConnecting ? (
-                    <Spinner variant='circle' size='sm' />
-                  ) : (
-                    <Icon
-                      name={voice.isConnected ? PhoneOff : Phone}
-                      size={40}
-                      color='#fff'
-                    />
-                  )}
-                </TouchableOpacity>
-              </Animated.View>
-
-              <Text
-                variant='caption'
-                style={{ marginTop: 16, color: textMuted, textAlign: 'center' }}
-              >
-                {voice.isConnecting
-                  ? 'Connecting...'
-                  : voice.isConnected
-                    ? 'Tap to end call'
-                    : isExpoGo
-                      ? 'Requires dev build'
-                      : 'Tap to start voice call'}
-              </Text>
-
-              {/* Mic toggle when connected */}
-              {voice.isConnected && (
-                <TouchableOpacity
-                  onPress={voice.toggleMic}
-                  style={{
-                    marginTop: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    backgroundColor: voice.isMicEnabled ? `${primary}20` : `${destructive}20`,
-                    borderRadius: 20,
-                  }}
-                >
-                  <Icon
-                    name={voice.isMicEnabled ? Mic : MicOff}
-                    size={18}
-                    color={voice.isMicEnabled ? primary : destructive}
-                  />
-                  <Text
-                    style={{
-                      marginLeft: 8,
-                      color: voice.isMicEnabled ? primary : destructive,
-                    }}
-                  >
-                    {voice.isMicEnabled ? 'Mute' : 'Unmute'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Error Display */}
-            {voice.error && (
               <View
                 style={{
-                  marginTop: 16,
-                  padding: 12,
-                  backgroundColor: `${destructive}20`,
-                  borderRadius: 8,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: voice.isAgentConnected ? success : warning,
+                  marginRight: 8,
                 }}
-              >
-                <Text style={{ color: destructive, textAlign: 'center' }}>
-                  {voice.error}
-                </Text>
-              </View>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Transcript Card */}
-        {voice.transcript.length > 0 && (
-          <Card style={{ marginBottom: 24 }}>
-            <CardHeader>
-              <CardTitle>Conversation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {voice.transcript.map((msg, index) => (
-                <View
-                  key={index}
-                  style={{
-                    flexDirection: 'row',
-                    marginBottom: 12,
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <View
+              />
+              <Text variant="caption" style={{ color: textMuted }}>
+                {voice.isAgentConnected ? 'Connected' : 'Connecting...'}
+              </Text>
+              {voice.isAgentSpeaking && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16 }}>
+                  <Animated.View
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      backgroundColor: msg.role === 'assistant' ? `${primary}20` : `${textMuted}20`,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      marginRight: 12,
+                      opacity: waveAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.5, 1],
+                      }),
                     }}
                   >
-                    <Icon
-                      name={msg.role === 'assistant' ? Bot : User}
-                      size={16}
-                      color={msg.role === 'assistant' ? primary : textMuted}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      variant='caption'
-                      style={{
-                        color: msg.role === 'assistant' ? primary : textMuted,
-                        marginBottom: 2,
-                      }}
-                    >
-                      {msg.role === 'assistant' ? 'Bella' : 'You'}
-                    </Text>
-                    <Text style={{ lineHeight: 20 }}>{msg.content}</Text>
-                  </View>
+                    <Icon name={Waves} size={16} color={primary} />
+                  </Animated.View>
+                  <Text variant="caption" style={{ color: primary, marginLeft: 4 }}>
+                    Bella is speaking
+                  </Text>
                 </View>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Info Card */}
-        <Card style={{ backgroundColor: `${primary}10` }}>
-          <CardContent>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Icon name={Waves} size={24} color={primary} />
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text variant='subtitle' style={{ color: primary }}>
-                  Powered by LiveKit + Gemini 2.0
-                </Text>
-                <Text variant='caption' style={{ color: textMuted }}>
-                  Real-time voice conversation with AI tutor
-                </Text>
-              </View>
+              )}
             </View>
-          </CardContent>
-        </Card>
-      </ScrollView>
+          )}
+
+          {/* Buttons Row */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 16,
+            }}
+          >
+            {/* Mic toggle - only when connected */}
+            {voice.isConnected && (
+              <TouchableOpacity
+                onPress={voice.toggleMic}
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: voice.isMicEnabled ? `${primary}20` : `${destructive}20`,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Icon
+                  name={voice.isMicEnabled ? Mic : MicOff}
+                  size={22}
+                  color={voice.isMicEnabled ? primary : destructive}
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Main Call Button */}
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <TouchableOpacity
+                onPress={voice.isConnected ? handleDisconnect : handleConnect}
+                disabled={voice.isConnecting}
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: voice.isConnecting
+                    ? textMuted
+                    : voice.isConnected
+                      ? destructive
+                      : isExpoGo
+                        ? textMuted
+                        : primary,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: voice.isConnected ? destructive : primary,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                }}
+              >
+                {voice.isConnecting ? (
+                  <Spinner variant="circle" size="sm" />
+                ) : (
+                  <Icon
+                    name={voice.isConnected ? PhoneOff : Phone}
+                    size={28}
+                    color="#fff"
+                  />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Placeholder for symmetry when not connected */}
+            {!voice.isConnected && <View style={{ width: 48 }} />}
+          </View>
+
+          {/* Status Text */}
+          <Text
+            variant="caption"
+            style={{ marginTop: 12, color: textMuted, textAlign: 'center' }}
+          >
+            {voice.isConnecting
+              ? 'Connecting...'
+              : voice.isConnected
+                ? 'Tap to end call'
+                : isExpoGo
+                  ? 'Requires dev build'
+                  : 'Tap to start voice call'}
+          </Text>
+
+          {/* Error Display */}
+          {voice.error && (
+            <View
+              style={{
+                marginTop: 12,
+                padding: 12,
+                backgroundColor: `${destructive}20`,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: destructive, textAlign: 'center' }}>
+                {voice.error}
+              </Text>
+            </View>
+          )}
+        </CardContent>
+      </Card>
     </View>
   );
 }

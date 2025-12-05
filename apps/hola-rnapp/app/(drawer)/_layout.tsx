@@ -11,6 +11,7 @@ import {
   Mic,
   GraduationCap,
   Sparkles,
+  Video,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
@@ -48,7 +49,7 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name='(home)'
         options={{
-          drawerLabel: 'Home1',
+          drawerLabel: 'Home',
           title: 'Home1',
           drawerIcon: ({ color, size }) => (
             <Icon name={Home} color={color} size={size} />
@@ -85,6 +86,17 @@ export default function DrawerLayout() {
           title: 'Voice Practice',
           drawerIcon: ({ color, size }) => (
             <Icon name={Mic} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='livekit-ai'
+        options={{
+          drawerLabel: 'Livekit AI',
+          title: 'Livekit AI',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={Video} color={color} size={size} />
           ),
         }}
       />

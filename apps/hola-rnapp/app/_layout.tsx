@@ -3,6 +3,7 @@ registerGlobals();
 
 import { Auth } from '@/components/auth/auth';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { ConnectionProvider } from '@/hooks/useLiveKitSandbox';
 import { Colors } from '@/theme/colors';
 import { ThemeProvider } from '@/theme/theme-provider';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
@@ -58,15 +59,17 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} animated />
+      <ConnectionProvider>
+        <ThemeProvider>
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} animated />
 
-        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-          <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-            <AuthGate colorScheme={colorScheme} />
-          </ConvexProviderWithClerk>
-        </ClerkProvider>
-      </ThemeProvider>
+          <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+            <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+              <AuthGate colorScheme={colorScheme} />
+            </ConvexProviderWithClerk>
+          </ClerkProvider>
+        </ThemeProvider>
+      </ConnectionProvider>
     </GestureHandlerRootView>
   );
 }
