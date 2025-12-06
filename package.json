@@ -6,6 +6,8 @@
     "env:setup": "bash scripts/env-setup.sh",
     "env:encrypt": "bash scripts/env-encrypt.sh",
     "env:decrypt": "bash scripts/env-decrypt.sh",
+    "env:verify": "bash scripts/env-verify.sh",
+    "env:verify:clean": "bash scripts/env-verify.sh --clean",
     "predev:convex": "bash scripts/env-decrypt.sh",
     "dev:convex": "pnpm --filter @holaai/convex dev",
     "predev:rnapp": "bash scripts/env-decrypt.sh",

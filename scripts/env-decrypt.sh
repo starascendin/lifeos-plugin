@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/env-decrypt.sh
-# Decrypts all .env.age files in the monorepo
+# Decrypts all .env.age and .env.local.age files in apps/* and packages/*
 
 set -e
 
@@ -33,44 +33,37 @@ fi
 
 echo "=== Decrypting Environment Files ==="
 
-# Define files to decrypt (source .age -> target plaintext)
-declare -a ENV_FILES=(
-    "apps/hola-rnapp/.env.age:apps/hola-rnapp/.env"
-    "apps/hola-rnapp/.env.local.age:apps/hola-rnapp/.env.local"
-    "packages/holaaiconvex/.env.local.age:packages/holaaiconvex/.env.local"
-    "packages/livekit_agent/.env.local.age:packages/livekit_agent/.env.local"
-    "packages/livekit_agent_node/.env.local.age:packages/livekit_agent_node/.env.local"
-)
-
 DECRYPTED=0
 SKIPPED=0
 FAILED=0
 
-for entry in "${ENV_FILES[@]}"; do
-    IFS=':' read -r encrypted_file decrypted_file <<< "$entry"
-    encrypted_path="$REPO_ROOT/$encrypted_file"
-    decrypted_path="$REPO_ROOT/$decrypted_file"
+# Find all .env.age and .env.local.age files in apps/* and packages/*
+for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/packages/*; do
+    [ -d "$dir" ] || continue
 
-    if [ ! -f "$encrypted_path" ]; then
-        echo "  [SKIP] $encrypted_file (not found)"
-        ((SKIPPED++))
-        continue
-    fi
+    for encrypted_file in "$dir/.env.age" "$dir/.env.local.age"; do
+        [ -f "$encrypted_file" ] || continue
 
-    # Check if decrypted file is newer than encrypted
-    if [ -f "$decrypted_path" ] && [ "$decrypted_path" -nt "$encrypted_path" ]; then
-        echo "  [SKIP] $decrypted_file (newer than encrypted)"
-        ((SKIPPED++))
-        continue
-    fi
+        # Remove .age extension to get target path
+        decrypted_file="${encrypted_file%.age}"
+        relative_encrypted="${encrypted_file#$REPO_ROOT/}"
+        relative_decrypted="${decrypted_file#$REPO_ROOT/}"
 
-    if age --decrypt -i "$AGE_KEY_FILE" -o "$decrypted_path" "$encrypted_path" 2>/dev/null; then
-        echo "  [OK]   $decrypted_file"
-        ((DECRYPTED++))
-    else
-        echo "  [FAIL] $decrypted_file (decryption failed)"
-        ((FAILED++))
-    fi
+        # Check if decrypted file is newer than encrypted
+        if [ -f "$decrypted_file" ] && [ "$decrypted_file" -nt "$encrypted_file" ]; then
+            echo "  [SKIP] $relative_decrypted (newer than encrypted)"
+            ((SKIPPED++))
+            continue
+        fi
+
+        if age --decrypt -i "$AGE_KEY_FILE" -o "$decrypted_file" "$encrypted_file" 2>/dev/null; then
+            echo "  [OK]   $relative_decrypted"
+            ((DECRYPTED++))
+        else
+            echo "  [FAIL] $relative_decrypted (decryption failed)"
+            ((FAILED++))
+        fi
+    done
 done
 
 echo ""

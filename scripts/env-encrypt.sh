@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/env-encrypt.sh
-# Encrypts all .env files in the monorepo
+# Encrypts all .env and .env.local files in apps/* and packages/*
 
 set -e
 
@@ -41,37 +41,28 @@ echo "=== Encrypting Environment Files ==="
 echo "Using public key: $PUBLIC_KEY"
 echo ""
 
-# Define files to encrypt (source plaintext -> target .age)
-declare -a ENV_FILES=(
-    "apps/hola-rnapp/.env:apps/hola-rnapp/.env.age"
-    "apps/hola-rnapp/.env.local:apps/hola-rnapp/.env.local.age"
-    "packages/holaaiconvex/.env.local:packages/holaaiconvex/.env.local.age"
-    "packages/livekit_agent/.env.local:packages/livekit_agent/.env.local.age"
-    "packages/livekit_agent_node/.env.local:packages/livekit_agent_node/.env.local.age"
-)
-
 ENCRYPTED=0
 SKIPPED=0
 FAILED=0
 
-for entry in "${ENV_FILES[@]}"; do
-    IFS=':' read -r plaintext_file encrypted_file <<< "$entry"
-    plaintext_path="$REPO_ROOT/$plaintext_file"
-    encrypted_path="$REPO_ROOT/$encrypted_file"
+# Find all .env and .env.local files in apps/* and packages/*
+for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/packages/*; do
+    [ -d "$dir" ] || continue
 
-    if [ ! -f "$plaintext_path" ]; then
-        echo "  [SKIP] $plaintext_file (not found)"
-        ((SKIPPED++))
-        continue
-    fi
+    for env_file in "$dir/.env" "$dir/.env.local"; do
+        [ -f "$env_file" ] || continue
 
-    if age --encrypt -r "$PUBLIC_KEY" -o "$encrypted_path" "$plaintext_path" 2>/dev/null; then
-        echo "  [OK]   $encrypted_file"
-        ((ENCRYPTED++))
-    else
-        echo "  [FAIL] $encrypted_file (encryption failed)"
-        ((FAILED++))
-    fi
+        relative_path="${env_file#$REPO_ROOT/}"
+        encrypted_path="${env_file}.age"
+
+        if age --encrypt -r "$PUBLIC_KEY" -o "$encrypted_path" "$env_file" 2>/dev/null; then
+            echo "  [OK]   ${relative_path}.age"
+            ((ENCRYPTED++))
+        else
+            echo "  [FAIL] ${relative_path}.age (encryption failed)"
+            ((FAILED++))
+        fi
+    done
 done
 
 echo ""
