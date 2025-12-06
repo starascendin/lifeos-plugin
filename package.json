@@ -10,6 +10,8 @@
     "dev:convex": "pnpm --filter @holaai/convex dev",
     "predev:rnapp": "bash scripts/env-decrypt.sh",
     "dev:rnapp": "pnpm --filter @holaai/rnapp start",
+    "dev:web": "pnpm --filter @holaai/web dev",
+    "build:web": "pnpm --filter @holaai/web build",
     "ios": "pnpm --filter @holaai/rnapp ios",
     "android": "pnpm --filter @holaai/rnapp android",
     "lint": "pnpm -r lint",
