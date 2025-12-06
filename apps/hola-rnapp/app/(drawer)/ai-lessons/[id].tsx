@@ -27,9 +27,10 @@ export default function AILessonDetailScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('vocabulary');
 
-  const lesson = useQuery(api.ai.getAiLesson, {
-    lessonId: id as Id<'aiLessons'>,
-  });
+  const lesson = useQuery(
+    api.ai.getAiLesson,
+    id ? { lessonId: id as Id<'aiLessons'> } : "skip"
+  );
   const toggleFavorite = useMutation(api.ai.toggleAiLessonFavorite);
 
   const primary = useColor('primary');
