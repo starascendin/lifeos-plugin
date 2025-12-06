@@ -89,7 +89,7 @@ export default function Dashboard() {
               Your Progress
             </h2>
             <p className="text-muted-foreground">
-              Your! learning statistics will appear here as you complete lessons
+              Your2 learning statistics will appear here as you complete lessons
               and practice sessions.
             </p>
           </div>
