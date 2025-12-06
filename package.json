@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "env:setup": "bash scripts/env-setup.sh",
+    "env:encrypt": "bash scripts/env-encrypt.sh",
+    "env:decrypt": "bash scripts/env-decrypt.sh",
+    "predev:convex": "bash scripts/env-decrypt.sh",
     "dev:convex": "pnpm --filter @holaai/convex dev",
+    "predev:rnapp": "bash scripts/env-decrypt.sh",
     "dev:rnapp": "pnpm --filter @holaai/rnapp start",
     "ios": "pnpm --filter @holaai/rnapp ios",
     "android": "pnpm --filter @holaai/rnapp android",
