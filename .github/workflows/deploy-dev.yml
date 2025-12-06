@@ -26,12 +26,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Deploy Convex to Dev
-        working-directory: packages/holaaiconvex
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_DEV }}
-        run: npx convex deploy --deploy-key "$CONVEX_DEPLOY_KEY"
-
       - name: Deploy to Vercel Preview
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
