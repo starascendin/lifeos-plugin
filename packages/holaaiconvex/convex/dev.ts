@@ -86,3 +86,14 @@ export const getEnvironmentInfo = action({
     };
   },
 });
+
+// Test Convex connection (basic ping)
+export const testConvexConnection = action({
+  handler: async () => {
+    return {
+      success: true,
+      message: "Convex connection successful",
+      timestamp: new Date().toISOString(),
+    };
+  },
+});
