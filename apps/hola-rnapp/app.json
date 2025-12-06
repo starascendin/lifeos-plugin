@@ -13,7 +13,8 @@
       "bundleIdentifier": "com.holaai.rnapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSMicrophoneUsageDescription": "HolaAI needs microphone access for voice conversations with your Spanish tutor."
+        "NSMicrophoneUsageDescription": "HolaAI needs microphone access for voice conversations with your Spanish tutor.",
+        "UIBackgroundModes": ["audio", "voip"]
       }
     },
     "android": {
