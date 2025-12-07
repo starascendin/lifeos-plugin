@@ -33,7 +33,7 @@ jobs:
       - name: Deploy Convex to Production
         working-directory: packages/holaaiconvex
         env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY_PROD }}
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
         run: npx convex deploy
 
       - name: Install Vercel CLI
