@@ -5,6 +5,10 @@ on:
     branches:
       - dev
 
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -26,17 +30,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Create Vercel project link
-        working-directory: apps/holaai-web
-        run: |
-          mkdir -p .vercel
-          echo '{"orgId":"${{ secrets.VERCEL_ORG_ID }}","projectId":"${{ secrets.VERCEL_PROJECT_ID }}"}' > .vercel/project.json
+      - name: Install Vercel CLI
+        run: npm install -g vercel
 
-      - name: Deploy to Vercel Preview
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Pull Vercel Environment
         working-directory: apps/holaai-web
-        run: |
-          npx vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
-          npx vercel build --token=$VERCEL_TOKEN
-          npx vercel deploy --prebuilt --token=$VERCEL_TOKEN
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project
+        working-directory: apps/holaai-web
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        working-directory: apps/holaai-web
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
