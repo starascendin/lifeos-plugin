@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - dev
+    paths:
+      - "apps/holaai-web/**"
+      - "packages/holaaiconvex/**"
+      - ".github/workflows/deploy-dev.yml"
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
