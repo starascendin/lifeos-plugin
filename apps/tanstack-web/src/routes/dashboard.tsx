@@ -72,7 +72,7 @@ function DashboardContent() {
     <div className="space-y-6 p-6">
       {/* Page Header */}
       <div>
-        <h1 className="font-bold text-3xl">Dashboard3</h1>
+        <h1 className="font-bold text-3xl">Dashboard5</h1>
         <p className="text-muted-foreground">
           Welcome back! Here is your account overview.
         </p>
