@@ -1,13 +1,13 @@
-name: Deploy Tanstack Dev Branch
+name: Deploy Tanstack Staging Branch
 
 on:
   push:
     branches:
-      - dev
+      - staging
     paths:
       - "apps/tanstack-web/**"
       - "packages/holaaiconvex/**"
-      - ".github/workflows/deploy-tanstack-dev.yml"
+      - ".github/workflows/deploy-tanstack-staging.yml"
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -34,14 +34,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Deploy Convex to Production
+        working-directory: packages/holaaiconvex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: npx convex deploy
+
       - name: Install Vercel CLI
         run: npm install -g vercel
 
-      - name: Pull Vercel Environment
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Project
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy to Vercel Staging
+        run: vercel deploy --target=staging --token=${{ secrets.VERCEL_TOKEN }}
