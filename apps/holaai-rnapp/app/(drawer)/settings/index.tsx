@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import { SignOutButton } from '@/components/auth/singout';
 import { ModeToggle } from '@/components/ui/mode-toggle';
@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import { Code, Volume2, Smartphone, Cloud, Play } from 'lucide-react-native';
+import { Code, Volume2, Smartphone, Cloud, Play, AlertCircle, CheckCircle } from 'lucide-react-native';
 import { useColor } from '@/hooks/useColor';
 import { useTTSSettings, TTSProvider } from '@/hooks/useTTSSettings';
 import { useSpanishTTS } from '@/hooks/useSpanishTTS';
@@ -26,10 +26,26 @@ export default function SettingsScreen() {
   const background = useColor('background');
   const card = useColor('card');
 
-  const { settings, isLoading: ttsLoading, setProvider, setSpeed } = useTTSSettings();
-  const { speak, isPlaying } = useSpanishTTS();
+  const { settings, isLoading: ttsLoading, setProvider, setSpeed, isGeminiTTS } = useTTSSettings();
+  const { speak, isPlaying, didFallback, providerUsed, clearFallback, error } = useSpanishTTS();
 
   const [testPlaying, setTestPlaying] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'fallback' | 'error' | null>(null);
+
+  // Clear test result after a delay
+  useEffect(() => {
+    if (testResult) {
+      const timer = setTimeout(() => setTestResult(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [testResult]);
+
+  // Track fallback during test
+  useEffect(() => {
+    if (didFallback && testPlaying) {
+      setTestResult('fallback');
+    }
+  }, [didFallback, testPlaying]);
 
   const handleProviderChange = useCallback(async (provider: TTSProvider) => {
     await setProvider(provider);
@@ -42,12 +58,20 @@ export default function SettingsScreen() {
   const handleTestVoice = useCallback(async () => {
     if (testPlaying) return;
     setTestPlaying(true);
+    setTestResult(null);
+    clearFallback();
     try {
       await speak('Hola, como estas? Me llamo Claude.');
+      // If we didn't fall back, mark as success (only for Gemini - on-device is always "success")
+      if (!didFallback) {
+        setTestResult('success');
+      }
+    } catch (err) {
+      setTestResult('error');
     } finally {
       setTestPlaying(false);
     }
-  }, [speak, testPlaying]);
+  }, [speak, testPlaying, didFallback, clearFallback]);
 
   const getSpeedLabel = (speed: number): string => {
     if (speed <= 0.55) return 'Slow';
@@ -204,6 +228,43 @@ export default function SettingsScreen() {
                   {testPlaying || isPlaying ? 'Playing...' : 'Test Voice'}
                 </Text>
               </Button>
+
+              {/* Test Result Feedback */}
+              {testResult === 'fallback' && (
+                <View style={styles.testResultContainer}>
+                  <View style={[styles.testResultBadge, { backgroundColor: '#fef3c7' }]}>
+                    <Icon name={AlertCircle} size={14} color="#f59e0b" />
+                    <Text style={[styles.testResultText, { color: '#92400e' }]}>
+                      Gemini unavailable - used device TTS instead
+                    </Text>
+                  </View>
+                  <Text variant='caption' style={{ color: textMuted, marginTop: 4 }}>
+                    Check your GEMINI_API_KEY configuration in Convex environment.
+                  </Text>
+                </View>
+              )}
+
+              {testResult === 'success' && isGeminiTTS && (
+                <View style={styles.testResultContainer}>
+                  <View style={[styles.testResultBadge, { backgroundColor: '#dcfce7' }]}>
+                    <Icon name={CheckCircle} size={14} color="#22c55e" />
+                    <Text style={[styles.testResultText, { color: '#166534' }]}>
+                      Gemini TTS working correctly
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {testResult === 'error' && (
+                <View style={styles.testResultContainer}>
+                  <View style={[styles.testResultBadge, { backgroundColor: '#fee2e2' }]}>
+                    <Icon name={AlertCircle} size={14} color="#ef4444" />
+                    <Text style={[styles.testResultText, { color: '#991b1b' }]}>
+                      TTS Error: {error || 'Unknown error'}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </>
           )}
         </CardContent>
@@ -278,5 +339,21 @@ const styles = StyleSheet.create({
   slider: {
     flex: 1,
     height: 40,
+  },
+  testResultContainer: {
+    marginTop: 12,
+  },
+  testResultBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    gap: 8,
+  },
+  testResultText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
   },
 });

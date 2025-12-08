@@ -5,11 +5,19 @@ import { useAction } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
 import { useTTSSettings } from './useTTSSettings';
 
+export type TTSProviderUsed = 'ondevice' | 'gemini' | null;
+
 export interface UseSpanishTTSReturn {
   speak: (text: string) => Promise<void>;
   stop: () => Promise<void>;
   isPlaying: boolean;
   error: string | null;
+  /** Which provider actually handled the last audio playback */
+  providerUsed: TTSProviderUsed;
+  /** True if Gemini was selected but fell back to on-device */
+  didFallback: boolean;
+  /** Clear the fallback notice */
+  clearFallback: () => void;
 }
 
 /**
@@ -91,8 +99,14 @@ function pcmToWav(pcmBase64: string, sampleRate: number, channels: number): stri
 export function useSpanishTTS(): UseSpanishTTSReturn {
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [providerUsed, setProviderUsed] = useState<TTSProviderUsed>(null);
+  const [didFallback, setDidFallback] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const { settings, isGeminiTTS } = useTTSSettings();
+
+  const clearFallback = useCallback(() => {
+    setDidFallback(false);
+  }, []);
 
   const generateTTS = useAction(api.common.tts.generateTTS);
 
@@ -137,8 +151,9 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
 
   /**
    * Speak using Gemini cloud TTS
+   * Returns true if Gemini was used successfully, false if fell back to on-device
    */
-  const speakWithGemini = useCallback(async (text: string): Promise<void> => {
+  const speakWithGemini = useCallback(async (text: string): Promise<boolean> => {
     try {
       // Call Convex action to get audio
       const result = await generateTTS({ text });
@@ -158,6 +173,7 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
       );
 
       soundRef.current = sound;
+      setProviderUsed('gemini');
 
       // Wait for playback to complete
       return new Promise((resolve) => {
@@ -166,14 +182,18 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
             setIsPlaying(false);
             sound.unloadAsync();
             soundRef.current = null;
-            resolve();
+            resolve(true); // Gemini succeeded
           }
         });
       });
     } catch (err) {
       console.error('Gemini TTS error, falling back to on-device:', err);
+      // Set fallback notice so UI can show it
+      setDidFallback(true);
+      setProviderUsed('ondevice');
       // Fallback to on-device TTS
-      return speakOnDevice(text);
+      await speakOnDevice(text);
+      return false; // Fell back to on-device
     }
   }, [generateTTS, speakOnDevice]);
 
@@ -188,11 +208,14 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
 
     setIsPlaying(true);
     setError(null);
+    setDidFallback(false);
+    setProviderUsed(null);
 
     try {
       if (isGeminiTTS) {
         await speakWithGemini(text);
       } else {
+        setProviderUsed('ondevice');
         await speakOnDevice(text);
       }
     } catch (err) {
@@ -225,5 +248,8 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
     stop,
     isPlaying,
     error,
+    providerUsed,
+    didFallback,
+    clearFallback,
   };
 }

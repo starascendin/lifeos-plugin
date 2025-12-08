@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { ScrollView, TouchableOpacity } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, TouchableOpacity, View as RNView } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
@@ -10,9 +10,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useColor } from '@/hooks/useColor';
-import { useSpanishTTS } from '@/hooks/useSpanishTTS';
 import { SmallAudioButton } from '@/components/audio';
-import { BookOpen, Languages, MessageSquare, Volume2 } from 'lucide-react-native';
+import { BookOpen, Languages, MessageSquare } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
@@ -32,18 +31,7 @@ function VocabularyCard({
   levelColor: string;
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const textMuted = useColor('textMuted');
-  const { speak } = useSpanishTTS();
-
-  const handleSpeak = useCallback(async (text: string) => {
-    setIsPlaying(true);
-    try {
-      await speak(text);
-    } finally {
-      setIsPlaying(false);
-    }
-  }, [speak]);
 
   return (
     <TouchableOpacity
@@ -66,23 +54,9 @@ function VocabularyCard({
                     </Text>
                   )}
                 </View>
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    handleSpeak(item.spanish);
-                  }}
-                  style={{
-                    padding: 8,
-                    backgroundColor: `${levelColor}20`,
-                    borderRadius: 8,
-                  }}
-                >
-                  {isPlaying ? (
-                    <Spinner size='sm' variant='circle' color={levelColor} />
-                  ) : (
-                    <Icon name={Volume2} color={levelColor} size={20} />
-                  )}
-                </TouchableOpacity>
+                <RNView onStartShouldSetResponder={() => true}>
+                  <SmallAudioButton text={item.spanish} color={levelColor} size={20} />
+                </RNView>
               </View>
               <Text variant='caption' style={{ color: textMuted, marginTop: 8 }}>
                 Tap to reveal translation
@@ -230,18 +204,7 @@ function PhraseCard({
   };
   levelColor: string;
 }) {
-  const [isPlaying, setIsPlaying] = useState(false);
   const textMuted = useColor('textMuted');
-  const { speak } = useSpanishTTS();
-
-  const handleSpeak = useCallback(async () => {
-    setIsPlaying(true);
-    try {
-      await speak(phrase.spanish);
-    } finally {
-      setIsPlaying(false);
-    }
-  }, [speak, phrase.spanish]);
 
   const formalityColors: Record<string, string> = {
     formal: '#3b82f6',
@@ -289,20 +252,7 @@ function PhraseCard({
               </View>
             )}
           </View>
-          <TouchableOpacity
-            onPress={handleSpeak}
-            style={{
-              padding: 8,
-              backgroundColor: `${levelColor}20`,
-              borderRadius: 8,
-            }}
-          >
-            {isPlaying ? (
-              <Spinner size='sm' variant='circle' color={levelColor} />
-            ) : (
-              <Icon name={Volume2} color={levelColor} size={20} />
-            )}
-          </TouchableOpacity>
+          <SmallAudioButton text={phrase.spanish} color={levelColor} size={20} />
         </View>
       </CardContent>
     </Card>

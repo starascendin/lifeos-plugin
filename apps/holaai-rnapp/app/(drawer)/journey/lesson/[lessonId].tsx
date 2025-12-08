@@ -13,16 +13,13 @@ import { useColor } from '@/hooks/useColor';
 import {
   BookOpen,
   CheckCircle,
-  ChevronLeft,
-  ChevronRight,
   FileText,
   Languages,
   MessageSquare,
-  Volume2,
   Target
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
-import { useSpanishTTS } from '@/hooks/useSpanishTTS';
+import { SmallAudioButton } from '@/components/audio/SmallAudioButton';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 type TabType = 'objectives' | 'vocabulary' | 'grammar' | 'phrases' | 'exercises';
@@ -32,7 +29,6 @@ export default function LessonScreen() {
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('objectives');
-  const { speak, isSpeaking } = useSpanishTTS();
 
   const currentUser = useQuery(api.common.users.currentUser);
 
@@ -123,13 +119,9 @@ export default function LessonScreen() {
                   <Text variant='title' style={{ color: primary }}>
                     {item.spanish}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => speak(item.spanish)}
-                    style={{ marginLeft: 8 }}
-                    disabled={isSpeaking}
-                  >
-                    <Icon name={Volume2} color={isSpeaking ? textMuted : primary} size={20} />
-                  </TouchableOpacity>
+                  <View style={{ marginLeft: 8 }}>
+                    <SmallAudioButton text={item.spanish} color={primary} size={20} />
+                  </View>
                 </View>
                 {item.pronunciation && (
                   <Text variant='caption' style={{ color: textMuted, fontStyle: 'italic' }}>
@@ -196,9 +188,7 @@ export default function LessonScreen() {
                       <Text variant='body' style={{ color: primary, flex: 1 }}>
                         {example.spanish}
                       </Text>
-                      <TouchableOpacity onPress={() => speak(example.spanish)}>
-                        <Icon name={Volume2} color={primary} size={16} />
-                      </TouchableOpacity>
+                      <SmallAudioButton text={example.spanish} color={primary} size={16} />
                     </View>
                     <Text variant='caption' style={{ color: textMuted }}>
                       {example.english}
@@ -240,12 +230,9 @@ export default function LessonScreen() {
                   <Text variant='body' style={{ fontWeight: '600', color: primary }}>
                     {phrase.spanish}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => speak(phrase.spanish)}
-                    style={{ marginLeft: 8 }}
-                  >
-                    <Icon name={Volume2} color={primary} size={18} />
-                  </TouchableOpacity>
+                  <View style={{ marginLeft: 8 }}>
+                    <SmallAudioButton text={phrase.spanish} color={primary} size={18} />
+                  </View>
                 </View>
                 <Text variant='body' style={{ marginTop: 2 }}>
                   {phrase.english}
