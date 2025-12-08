@@ -5,7 +5,7 @@ on:
     branches:
       - staging
     paths:
-      - "apps/tanstack-web/**"
+      - "apps/holaai-tanstack-web/**"
       - "packages/holaaiconvex/**"
       - ".github/workflows/deploy-tanstack-staging.yml"
 
