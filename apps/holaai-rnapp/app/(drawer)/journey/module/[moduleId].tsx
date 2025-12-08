@@ -268,7 +268,7 @@ export default function ModuleDetailScreen() {
                           <Text variant='caption' style={{ color: textMuted }}>
                             Pass with 70% to unlock the next module
                           </Text>
-                          {moduleData.progress?.quizScore != null && (
+                          {moduleData.progress?.quizScore !== undefined && moduleData.progress?.quizScore !== null && (
                             <Text
                               variant='caption'
                               style={{
@@ -277,8 +277,7 @@ export default function ModuleDetailScreen() {
                                 fontWeight: '600'
                               }}
                             >
-                              Best score: {moduleData.progress.quizScore}%
-                              {moduleData.progress.quizScore >= 70 ? ' - Passed!' : ' - Try again'}
+                              {`Best score: ${moduleData.progress.quizScore}%${moduleData.progress.quizScore >= 70 ? ' - Passed!' : ' - Try again'}`}
                             </Text>
                           )}
                         </View>
@@ -293,9 +292,9 @@ export default function ModuleDetailScreen() {
                 </TouchableOpacity>
 
                 {/* Quiz attempts info */}
-                {moduleData.progress?.quizAttempts && moduleData.progress.quizAttempts > 0 && (
+                {moduleData.progress?.quizAttempts !== undefined && moduleData.progress.quizAttempts > 0 && (
                   <Text variant='caption' style={{ color: textMuted, textAlign: 'center', marginTop: 8 }}>
-                    {moduleData.progress.quizAttempts} attempt{moduleData.progress.quizAttempts !== 1 ? 's' : ''}
+                    {`${moduleData.progress.quizAttempts} attempt${moduleData.progress.quizAttempts !== 1 ? 's' : ''}`}
                   </Text>
                 )}
               </View>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { SignOutButton } from '@/components/auth/singout';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { ScrollView } from '@/components/ui/scroll-view';
@@ -11,8 +11,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import { Code, Volume2, Smartphone, Cloud, Play, AlertCircle, CheckCircle } from 'lucide-react-native';
+import { BookOpen, Code, Volume2, Smartphone, Cloud, Play, AlertCircle, CheckCircle } from 'lucide-react-native';
 import { useColor } from '@/hooks/useColor';
+import { useJourneySettings } from '@/contexts/JourneySettingsContext';
 import { useTTSSettings, TTSProvider } from '@/contexts/TTSSettingsContext';
 import { useSpanishTTS } from '@/hooks/useSpanishTTS';
 import Slider from '@react-native-community/slider';
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
   const card = useColor('card');
 
   const { settings, isLoading: ttsLoading, setProvider, setSpeed, isGeminiTTS } = useTTSSettings();
+  const { settings: journeySettings, setFreeMode, isLoading: journeyLoading } = useJourneySettings();
   const { speak, isPlaying, didFallback, providerUsed, clearFallback, error } = useSpanishTTS();
 
   const [testPlaying, setTestPlaying] = useState(false);
@@ -117,6 +119,33 @@ export default function SettingsScreen() {
         <CardContent>
           <Text style={styles.sectionTitle}>Appearance</Text>
           <ModeToggle />
+        </CardContent>
+      </Card>
+
+      {/* Learning Mode */}
+      <Card>
+        <CardContent>
+          <View style={styles.sectionHeader}>
+            <Icon name={BookOpen} size={20} color={primary} />
+            <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>
+              Learning Mode
+            </Text>
+          </View>
+
+          <View style={styles.freeModeRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '600', color: foreground }}>Free Mode</Text>
+              <Text variant='caption' style={{ color: textMuted, marginTop: 2 }}>
+                Unlock all modules without completing quizzes
+              </Text>
+            </View>
+            <Switch
+              value={journeySettings.freeMode}
+              onValueChange={setFreeMode}
+              trackColor={{ false: textMuted, true: primary }}
+              thumbColor='#fff'
+            />
+          </View>
         </CardContent>
       </Card>
 
@@ -301,6 +330,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  freeModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   sectionTitle: {
     fontSize: 16,

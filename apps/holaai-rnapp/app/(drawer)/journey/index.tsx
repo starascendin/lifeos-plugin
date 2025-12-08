@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useColor } from '@/hooks/useColor';
+import { useJourneySettings } from '@/contexts/JourneySettingsContext';
 import {
   BookOpen,
   ChevronRight,
@@ -28,6 +29,7 @@ export default function JourneyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { userId } = useAuth();
+  const { settings: journeySettings } = useJourneySettings();
   const [refreshing, setRefreshing] = useState(false);
 
   // Get A1 level first
@@ -105,7 +107,10 @@ export default function JourneyScreen() {
 
   const getModuleStatus = (module: any) => {
     if (module.progress?.completedAt) return 'completed';
-    if (module.progress?.isUnlocked || module.moduleNumber === 1) return 'unlocked';
+    // Free mode unlocks all modules, otherwise check normal unlock logic
+    if (journeySettings.freeMode || module.progress?.isUnlocked || module.moduleNumber === 1) {
+      return 'unlocked';
+    }
     return 'locked';
   };
 

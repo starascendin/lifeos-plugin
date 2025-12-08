@@ -2,6 +2,7 @@ import { registerGlobals } from '@livekit/react-native';
 registerGlobals();
 
 import { Auth } from '@/components/auth/auth';
+import { JourneySettingsProvider } from '@/contexts/JourneySettingsContext';
 import { TTSSettingsProvider } from '@/contexts/TTSSettingsContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ConnectionProvider } from '@/hooks/useLiveKitSandbox';
@@ -66,9 +67,11 @@ export default function RootLayout() {
 
           <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
             <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-              <TTSSettingsProvider>
-                <AuthGate colorScheme={colorScheme} />
-              </TTSSettingsProvider>
+              <JourneySettingsProvider>
+                <TTSSettingsProvider>
+                  <AuthGate colorScheme={colorScheme} />
+                </TTSSettingsProvider>
+              </JourneySettingsProvider>
             </ConvexProviderWithClerk>
           </ClerkProvider>
         </ThemeProvider>
