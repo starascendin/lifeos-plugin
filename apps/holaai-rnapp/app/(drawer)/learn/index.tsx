@@ -17,8 +17,8 @@ import type { Id } from '@holaai/convex/_generated/dataModel';
 export default function LearnScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const levels = useQuery(api.content.listLevels);
-  const seedContent = useMutation(api.seed.seedContent);
+  const levels = useQuery(api.holaai.content.listLevels);
+  const seedContent = useMutation(api.holaai.seed.seedContent);
   const [refreshing, setRefreshing] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
@@ -44,7 +44,7 @@ export default function LearnScreen() {
     setTimeout(() => setRefreshing(false), 500);
   };
 
-  const navigateToLevel = (levelId: Id<'contentLevels'>) => {
+  const navigateToLevel = (levelId: Id<"hola_contentLevels">) => {
     router.push(`/learn/${levelId}`);
   };
 

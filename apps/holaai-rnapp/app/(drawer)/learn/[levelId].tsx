@@ -39,11 +39,11 @@ export default function LevelDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const level = useQuery(api.content.getLevel, {
-    levelId: levelId as Id<'contentLevels'>,
+  const level = useQuery(api.holaai.content.getLevel, {
+    levelId: levelId as Id<"hola_contentLevels">,
   });
-  const categories = useQuery(api.content.listCategories, {
-    levelId: levelId as Id<'contentLevels'>,
+  const categories = useQuery(api.holaai.content.listCategories, {
+    levelId: levelId as Id<"hola_contentLevels">,
   });
 
   const primary = useColor('primary');
@@ -67,7 +67,7 @@ export default function LevelDetailScreen() {
     );
   }
 
-  const navigateToCategory = (categoryId: Id<'contentCategories'>) => {
+  const navigateToCategory = (categoryId: Id<"hola_contentCategories">) => {
     router.push(`/learn/category/${categoryId}`);
   };
 

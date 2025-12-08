@@ -314,17 +314,17 @@ export default function CategoryDetailScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('vocabulary');
 
-  const categoryWithLevel = useQuery(api.content.getCategoryWithLevel, {
-    categoryId: categoryId as Id<'contentCategories'>,
+  const categoryWithLevel = useQuery(api.holaai.content.getCategoryWithLevel, {
+    categoryId: categoryId as Id<"hola_contentCategories">,
   });
-  const vocabulary = useQuery(api.content.listVocabulary, {
-    categoryId: categoryId as Id<'contentCategories'>,
+  const vocabulary = useQuery(api.holaai.content.listVocabulary, {
+    categoryId: categoryId as Id<"hola_contentCategories">,
   });
-  const grammarRules = useQuery(api.content.listGrammarRules, {
-    categoryId: categoryId as Id<'contentCategories'>,
+  const grammarRules = useQuery(api.holaai.content.listGrammarRules, {
+    categoryId: categoryId as Id<"hola_contentCategories">,
   });
-  const phrases = useQuery(api.content.listPhrases, {
-    categoryId: categoryId as Id<'contentCategories'>,
+  const phrases = useQuery(api.holaai.content.listPhrases, {
+    categoryId: categoryId as Id<"hola_contentCategories">,
   });
 
   const primary = useColor('primary');

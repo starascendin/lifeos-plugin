@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 
 // ==================== LEVELS ====================
@@ -7,7 +7,7 @@ export const listLevels = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db
-      .query("contentLevels")
+      .query("hola_contentLevels")
       .withIndex("by_order")
       .order("asc")
       .collect();
@@ -15,7 +15,7 @@ export const listLevels = query({
 });
 
 export const getLevel = query({
-  args: { levelId: v.id("contentLevels") },
+  args: { levelId: v.id("hola_contentLevels") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.levelId);
   },
@@ -29,17 +29,17 @@ export const createLevel = mutation({
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("contentLevels", args);
+    return await ctx.db.insert("hola_contentLevels", args);
   },
 });
 
 // ==================== CATEGORIES ====================
 
 export const listCategories = query({
-  args: { levelId: v.id("contentLevels") },
+  args: { levelId: v.id("hola_contentLevels") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("contentCategories")
+      .query("hola_contentCategories")
       .withIndex("by_level_order", (q) => q.eq("levelId", args.levelId))
       .order("asc")
       .collect();
@@ -47,14 +47,14 @@ export const listCategories = query({
 });
 
 export const getCategory = query({
-  args: { categoryId: v.id("contentCategories") },
+  args: { categoryId: v.id("hola_contentCategories") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.categoryId);
   },
 });
 
 export const getCategoryWithLevel = query({
-  args: { categoryId: v.id("contentCategories") },
+  args: { categoryId: v.id("hola_contentCategories") },
   handler: async (ctx, args) => {
     const category = await ctx.db.get(args.categoryId);
     if (!category) return null;
@@ -66,24 +66,24 @@ export const getCategoryWithLevel = query({
 
 export const createCategory = mutation({
   args: {
-    levelId: v.id("contentLevels"),
+    levelId: v.id("hola_contentLevels"),
     name: v.string(),
     description: v.string(),
     icon: v.optional(v.string()),
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("contentCategories", args);
+    return await ctx.db.insert("hola_contentCategories", args);
   },
 });
 
 // ==================== VOCABULARY ====================
 
 export const listVocabulary = query({
-  args: { categoryId: v.id("contentCategories") },
+  args: { categoryId: v.id("hola_contentCategories") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("vocabularyItems")
+      .query("hola_vocabularyItems")
       .withIndex("by_category_order", (q) => q.eq("categoryId", args.categoryId))
       .order("asc")
       .collect();
@@ -91,7 +91,7 @@ export const listVocabulary = query({
 });
 
 export const getVocabularyItem = query({
-  args: { itemId: v.id("vocabularyItems") },
+  args: { itemId: v.id("hola_vocabularyItems") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.itemId);
   },
@@ -99,7 +99,7 @@ export const getVocabularyItem = query({
 
 export const createVocabularyItem = mutation({
   args: {
-    categoryId: v.id("contentCategories"),
+    categoryId: v.id("hola_contentCategories"),
     spanish: v.string(),
     english: v.string(),
     pronunciation: v.optional(v.string()),
@@ -111,7 +111,7 @@ export const createVocabularyItem = mutation({
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("vocabularyItems", args);
+    return await ctx.db.insert("hola_vocabularyItems", args);
   },
 });
 
@@ -119,7 +119,7 @@ export const createVocabularyBatch = mutation({
   args: {
     items: v.array(
       v.object({
-        categoryId: v.id("contentCategories"),
+        categoryId: v.id("hola_contentCategories"),
         spanish: v.string(),
         english: v.string(),
         pronunciation: v.optional(v.string()),
@@ -135,7 +135,7 @@ export const createVocabularyBatch = mutation({
   handler: async (ctx, args) => {
     const ids = [];
     for (const item of args.items) {
-      const id = await ctx.db.insert("vocabularyItems", item);
+      const id = await ctx.db.insert("hola_vocabularyItems", item);
       ids.push(id);
     }
     return ids;
@@ -145,10 +145,10 @@ export const createVocabularyBatch = mutation({
 // ==================== GRAMMAR RULES ====================
 
 export const listGrammarRules = query({
-  args: { categoryId: v.id("contentCategories") },
+  args: { categoryId: v.id("hola_contentCategories") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("grammarRules")
+      .query("hola_grammarRules")
       .withIndex("by_category_order", (q) => q.eq("categoryId", args.categoryId))
       .order("asc")
       .collect();
@@ -156,7 +156,7 @@ export const listGrammarRules = query({
 });
 
 export const getGrammarRule = query({
-  args: { ruleId: v.id("grammarRules") },
+  args: { ruleId: v.id("hola_grammarRules") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.ruleId);
   },
@@ -164,7 +164,7 @@ export const getGrammarRule = query({
 
 export const createGrammarRule = mutation({
   args: {
-    categoryId: v.id("contentCategories"),
+    categoryId: v.id("hola_contentCategories"),
     title: v.string(),
     explanation: v.string(),
     formula: v.optional(v.string()),
@@ -178,17 +178,17 @@ export const createGrammarRule = mutation({
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("grammarRules", args);
+    return await ctx.db.insert("hola_grammarRules", args);
   },
 });
 
 // ==================== PHRASES ====================
 
 export const listPhrases = query({
-  args: { categoryId: v.id("contentCategories") },
+  args: { categoryId: v.id("hola_contentCategories") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("phrases")
+      .query("hola_phrases")
       .withIndex("by_category_order", (q) => q.eq("categoryId", args.categoryId))
       .order("asc")
       .collect();
@@ -196,7 +196,7 @@ export const listPhrases = query({
 });
 
 export const getPhrase = query({
-  args: { phraseId: v.id("phrases") },
+  args: { phraseId: v.id("hola_phrases") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.phraseId);
   },
@@ -204,7 +204,7 @@ export const getPhrase = query({
 
 export const createPhrase = mutation({
   args: {
-    categoryId: v.id("contentCategories"),
+    categoryId: v.id("hola_contentCategories"),
     spanish: v.string(),
     english: v.string(),
     context: v.optional(v.string()),
@@ -213,7 +213,7 @@ export const createPhrase = mutation({
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("phrases", args);
+    return await ctx.db.insert("hola_phrases", args);
   },
 });
 
@@ -221,7 +221,7 @@ export const createPhraseBatch = mutation({
   args: {
     items: v.array(
       v.object({
-        categoryId: v.id("contentCategories"),
+        categoryId: v.id("hola_contentCategories"),
         spanish: v.string(),
         english: v.string(),
         context: v.optional(v.string()),
@@ -234,7 +234,7 @@ export const createPhraseBatch = mutation({
   handler: async (ctx, args) => {
     const ids = [];
     for (const item of args.items) {
-      const id = await ctx.db.insert("phrases", item);
+      const id = await ctx.db.insert("hola_phrases", item);
       ids.push(id);
     }
     return ids;
@@ -244,10 +244,10 @@ export const createPhraseBatch = mutation({
 // ==================== LESSONS ====================
 
 export const listLessons = query({
-  args: { categoryId: v.id("contentCategories") },
+  args: { categoryId: v.id("hola_contentCategories") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("lessons")
+      .query("hola_lessons")
       .withIndex("by_category_order", (q) => q.eq("categoryId", args.categoryId))
       .order("asc")
       .collect();
@@ -255,14 +255,14 @@ export const listLessons = query({
 });
 
 export const getLesson = query({
-  args: { lessonId: v.id("lessons") },
+  args: { lessonId: v.id("hola_lessons") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.lessonId);
   },
 });
 
 export const getLessonWithContent = query({
-  args: { lessonId: v.id("lessons") },
+  args: { lessonId: v.id("hola_lessons") },
   handler: async (ctx, args) => {
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson) return null;
@@ -289,40 +289,40 @@ export const getLessonWithContent = query({
 
 export const createLesson = mutation({
   args: {
-    categoryId: v.id("contentCategories"),
+    categoryId: v.id("hola_contentCategories"),
     title: v.string(),
     description: v.string(),
-    vocabularyIds: v.array(v.id("vocabularyItems")),
-    grammarIds: v.array(v.id("grammarRules")),
-    phraseIds: v.array(v.id("phrases")),
+    vocabularyIds: v.array(v.id("hola_vocabularyItems")),
+    grammarIds: v.array(v.id("hola_grammarRules")),
+    phraseIds: v.array(v.id("hola_phrases")),
     estimatedMinutes: v.optional(v.number()),
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("lessons", args);
+    return await ctx.db.insert("hola_lessons", args);
   },
 });
 
 // ==================== CATEGORY CONTENT SUMMARY ====================
 
 export const getCategoryContentSummary = query({
-  args: { categoryId: v.id("contentCategories") },
+  args: { categoryId: v.id("hola_contentCategories") },
   handler: async (ctx, args) => {
     const [vocabulary, grammar, phrases, lessons] = await Promise.all([
       ctx.db
-        .query("vocabularyItems")
+        .query("hola_vocabularyItems")
         .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
         .collect(),
       ctx.db
-        .query("grammarRules")
+        .query("hola_grammarRules")
         .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
         .collect(),
       ctx.db
-        .query("phrases")
+        .query("hola_phrases")
         .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
         .collect(),
       ctx.db
-        .query("lessons")
+        .query("hola_lessons")
         .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
         .collect(),
     ]);

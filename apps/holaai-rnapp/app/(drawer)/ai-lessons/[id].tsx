@@ -27,10 +27,10 @@ export default function AILessonDetailScreen() {
   const [activeTab, setActiveTab] = useState('vocabulary');
 
   const lesson = useQuery(
-    api.ai.getAiLesson,
-    id ? { lessonId: id as Id<'aiLessons'> } : "skip"
+    api.holaai.ai.getAiLesson,
+    id ? { lessonId: id as Id<"hola_aiLessons"> } : "skip"
   );
-  const toggleFavorite = useMutation(api.ai.toggleAiLessonFavorite);
+  const toggleFavorite = useMutation(api.holaai.ai.toggleAiLessonFavorite);
 
   const primary = useColor('primary');
   const background = useColor('background');

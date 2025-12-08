@@ -56,8 +56,8 @@ export default function DevPage() {
   const [livekitStatus, setLivekitStatus] = useState<TestResult | null>(null);
   const [livekitTesting, setLivekitTesting] = useState(false);
 
-  const testGemini = useAction(api.dev.testGeminiConnection);
-  const testLiveKit = useAction(api.dev.testLiveKitConnection);
+  const testGemini = useAction(api.common.dev.testGeminiConnection);
+  const testLiveKit = useAction(api.common.dev.testLiveKitConnection);
 
   const primary = useColor('primary');
   const background = useColor('background');

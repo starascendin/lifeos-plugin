@@ -23,7 +23,7 @@ import {
 import { Icon } from '@/components/ui/icon';
 import type { Id, Doc } from '@holaai/convex/_generated/dataModel';
 
-type Exercise = Doc<'exercises'>;
+type Exercise = Doc<"hola_exercises">;
 
 export default function PracticeScreen() {
   const { user } = useUser();
@@ -38,22 +38,22 @@ export default function PracticeScreen() {
   const [answers, setAnswers] = useState<{ correct: boolean; answer: string }[]>([]);
 
   // Convex queries
-  const convexUser = useQuery(api.users.currentUser);
-  const levels = useQuery(api.content.listLevels);
-  const [selectedLevel, setSelectedLevel] = useState<Id<'contentLevels'> | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Id<'contentCategories'> | null>(null);
+  const convexUser = useQuery(api.common.users.currentUser);
+  const levels = useQuery(api.holaai.content.listLevels);
+  const [selectedLevel, setSelectedLevel] = useState<Id<"hola_contentLevels"> | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Id<"hola_contentCategories"> | null>(null);
 
   const categories = useQuery(
-    api.content.listCategories,
-    selectedLevel ? { levelId: selectedLevel } : 'skip'
+    api.holaai.content.listCategories,
+    selectedLevel ? { levelId: selectedLevel } : "skip"
   );
 
   const exercises = useQuery(
-    api.exercises.listExercises,
-    selectedCategory ? { categoryId: selectedCategory } : 'skip'
+    api.holaai.exercises.listExercises,
+    selectedCategory ? { categoryId: selectedCategory } : "skip"
   );
 
-  const recordProgress = useMutation(api.exercises.recordExerciseAttempt);
+  const recordProgress = useMutation(api.holaai.exercises.recordExerciseAttempt);
 
   const primary = useColor('primary');
   const background = useColor('background');

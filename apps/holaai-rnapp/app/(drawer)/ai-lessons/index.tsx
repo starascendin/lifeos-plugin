@@ -37,19 +37,19 @@ export default function AILessonsScreen() {
   const [selectedLevel, setSelectedLevel] = useState<'A1' | 'A2' | 'B1'>('A1');
   const [generating, setGenerating] = useState(false);
 
-  const convexUser = useQuery(api.users.currentUser);
+  const convexUser = useQuery(api.common.users.currentUser);
   const allLessons = useQuery(
-    api.ai.listAiLessons,
-    convexUser ? { userId: convexUser._id } : 'skip'
+    api.holaai.ai.listAiLessons,
+    convexUser ? { userId: convexUser._id } : "skip"
   );
   const favoriteLessons = useQuery(
-    api.ai.listAiLessons,
-    convexUser ? { userId: convexUser._id, favoritesOnly: true } : 'skip'
+    api.holaai.ai.listAiLessons,
+    convexUser ? { userId: convexUser._id, favoritesOnly: true } : "skip"
   );
 
-  const generateLesson = useAction(api.ai.generateLesson);
-  const toggleFavorite = useMutation(api.ai.toggleAiLessonFavorite);
-  const deleteLesson = useMutation(api.ai.deleteAiLesson);
+  const generateLesson = useAction(api.holaai.ai.generateLesson);
+  const toggleFavorite = useMutation(api.holaai.ai.toggleAiLessonFavorite);
+  const deleteLesson = useMutation(api.holaai.ai.deleteAiLesson);
 
   const primary = useColor('primary');
   const background = useColor('background');
@@ -77,7 +77,7 @@ export default function AILessonsScreen() {
     }
   };
 
-  const handleToggleFavorite = async (lessonId: Id<'aiLessons'>) => {
+  const handleToggleFavorite = async (lessonId: Id<"hola_aiLessons">) => {
     try {
       await toggleFavorite({ lessonId });
     } catch (error) {
@@ -85,7 +85,7 @@ export default function AILessonsScreen() {
     }
   };
 
-  const handleDelete = async (lessonId: Id<'aiLessons'>) => {
+  const handleDelete = async (lessonId: Id<"hola_aiLessons">) => {
     Alert.alert(
       'Delete Lesson',
       'Are you sure you want to delete this lesson?',

@@ -1,12 +1,12 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 
 // ==================== EXERCISES ====================
 
 export const listExercises = query({
   args: {
-    categoryId: v.optional(v.id("contentCategories")),
-    grammarRuleId: v.optional(v.id("grammarRules")),
+    categoryId: v.optional(v.id("hola_contentCategories")),
+    grammarRuleId: v.optional(v.id("hola_grammarRules")),
     type: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -14,23 +14,23 @@ export const listExercises = query({
 
     if (args.grammarRuleId) {
       exercises = await ctx.db
-        .query("exercises")
+        .query("hola_exercises")
         .withIndex("by_grammar_rule", (q) =>
           q.eq("grammarRuleId", args.grammarRuleId)
         )
         .collect();
     } else if (args.categoryId) {
       exercises = await ctx.db
-        .query("exercises")
+        .query("hola_exercises")
         .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
         .collect();
     } else if (args.type) {
       exercises = await ctx.db
-        .query("exercises")
+        .query("hola_exercises")
         .withIndex("by_type", (q) => q.eq("type", args.type!))
         .collect();
     } else {
-      exercises = await ctx.db.query("exercises").collect();
+      exercises = await ctx.db.query("hola_exercises").collect();
     }
 
     return exercises.sort((a, b) => a.order - b.order);
@@ -38,21 +38,21 @@ export const listExercises = query({
 });
 
 export const getExercise = query({
-  args: { exerciseId: v.id("exercises") },
+  args: { exerciseId: v.id("hola_exercises") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.exerciseId);
   },
 });
 
 export const getExerciseWithMatching = query({
-  args: { exerciseId: v.id("exercises") },
+  args: { exerciseId: v.id("hola_exercises") },
   handler: async (ctx, args) => {
     const exercise = await ctx.db.get(args.exerciseId);
     if (!exercise) return null;
 
     if (exercise.type === "matching") {
       const pairs = await ctx.db
-        .query("matchingPairs")
+        .query("hola_matchingPairs")
         .withIndex("by_exercise", (q) => q.eq("exerciseId", args.exerciseId))
         .collect();
       return { ...exercise, matchingPairs: pairs.sort((a, b) => a.order - b.order) };
@@ -64,8 +64,8 @@ export const getExerciseWithMatching = query({
 
 export const createExercise = mutation({
   args: {
-    grammarRuleId: v.optional(v.id("grammarRules")),
-    categoryId: v.optional(v.id("contentCategories")),
+    grammarRuleId: v.optional(v.id("hola_grammarRules")),
+    categoryId: v.optional(v.id("hola_contentCategories")),
     type: v.string(),
     question: v.string(),
     questionSpanish: v.optional(v.string()),
@@ -76,7 +76,7 @@ export const createExercise = mutation({
     order: v.number(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("exercises", args);
+    return await ctx.db.insert("hola_exercises", args);
   },
 });
 
@@ -84,8 +84,8 @@ export const createExerciseBatch = mutation({
   args: {
     exercises: v.array(
       v.object({
-        grammarRuleId: v.optional(v.id("grammarRules")),
-        categoryId: v.optional(v.id("contentCategories")),
+        grammarRuleId: v.optional(v.id("hola_grammarRules")),
+        categoryId: v.optional(v.id("hola_contentCategories")),
         type: v.string(),
         question: v.string(),
         questionSpanish: v.optional(v.string()),
@@ -100,7 +100,7 @@ export const createExerciseBatch = mutation({
   handler: async (ctx, args) => {
     const ids = [];
     for (const exercise of args.exercises) {
-      const id = await ctx.db.insert("exercises", exercise);
+      const id = await ctx.db.insert("hola_exercises", exercise);
       ids.push(id);
     }
     return ids;
@@ -111,7 +111,7 @@ export const createExerciseBatch = mutation({
 
 export const createMatchingPairs = mutation({
   args: {
-    exerciseId: v.id("exercises"),
+    exerciseId: v.id("hola_exercises"),
     pairs: v.array(
       v.object({
         spanish: v.string(),
@@ -123,7 +123,7 @@ export const createMatchingPairs = mutation({
   handler: async (ctx, args) => {
     const ids = [];
     for (const pair of args.pairs) {
-      const id = await ctx.db.insert("matchingPairs", {
+      const id = await ctx.db.insert("hola_matchingPairs", {
         exerciseId: args.exerciseId,
         ...pair,
       });
@@ -134,10 +134,10 @@ export const createMatchingPairs = mutation({
 });
 
 export const getMatchingPairs = query({
-  args: { exerciseId: v.id("exercises") },
+  args: { exerciseId: v.id("hola_exercises") },
   handler: async (ctx, args) => {
     const pairs = await ctx.db
-      .query("matchingPairs")
+      .query("hola_matchingPairs")
       .withIndex("by_exercise", (q) => q.eq("exerciseId", args.exerciseId))
       .collect();
     return pairs.sort((a, b) => a.order - b.order);
@@ -149,11 +149,11 @@ export const getMatchingPairs = query({
 export const getUserExerciseProgress = query({
   args: {
     userId: v.id("users"),
-    exerciseId: v.id("exercises"),
+    exerciseId: v.id("hola_exercises"),
   },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("userExerciseProgress")
+      .query("hola_userExerciseProgress")
       .withIndex("by_user_exercise", (q) =>
         q.eq("userId", args.userId).eq("exerciseId", args.exerciseId)
       )
@@ -165,7 +165,7 @@ export const getAllUserExerciseProgress = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("userExerciseProgress")
+      .query("hola_userExerciseProgress")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
   },
@@ -174,13 +174,13 @@ export const getAllUserExerciseProgress = query({
 export const recordExerciseAttempt = mutation({
   args: {
     userId: v.id("users"),
-    exerciseId: v.id("exercises"),
+    exerciseId: v.id("hola_exercises"),
     score: v.number(), // 0-100
     isCorrect: v.boolean(),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("userExerciseProgress")
+      .query("hola_userExerciseProgress")
       .withIndex("by_user_exercise", (q) =>
         q.eq("userId", args.userId).eq("exerciseId", args.exerciseId)
       )
@@ -196,7 +196,7 @@ export const recordExerciseAttempt = mutation({
       });
       return existing._id;
     } else {
-      return await ctx.db.insert("userExerciseProgress", {
+      return await ctx.db.insert("hola_userExerciseProgress", {
         userId: args.userId,
         exerciseId: args.exerciseId,
         attempts: 1,
@@ -213,7 +213,7 @@ export const recordExerciseAttempt = mutation({
 
 export const generateQuiz = query({
   args: {
-    categoryId: v.id("contentCategories"),
+    categoryId: v.id("hola_contentCategories"),
     count: v.optional(v.number()),
     difficulty: v.optional(v.number()),
   },
@@ -221,7 +221,7 @@ export const generateQuiz = query({
     const count = args.count ?? 10;
 
     let exercises = await ctx.db
-      .query("exercises")
+      .query("hola_exercises")
       .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
       .collect();
 
@@ -239,18 +239,18 @@ export const generateQuiz = query({
 export const getQuizStats = query({
   args: {
     userId: v.id("users"),
-    categoryId: v.id("contentCategories"),
+    categoryId: v.id("hola_contentCategories"),
   },
   handler: async (ctx, args) => {
     const exercises = await ctx.db
-      .query("exercises")
+      .query("hola_exercises")
       .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
       .collect();
 
     const exerciseIds = exercises.map((e) => e._id);
 
     const userProgress = await ctx.db
-      .query("userExerciseProgress")
+      .query("hola_userExerciseProgress")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 

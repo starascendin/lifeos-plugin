@@ -77,7 +77,7 @@ export default function RootLayout() {
 // Hook to sync Clerk user to Convex on sign in
 function useEnsureUser() {
   const { isSignedIn } = useAuth();
-  const ensureUser = useMutation(api.users.ensureUser);
+  const ensureUser = useMutation(api.common.users.ensureUser);
   const [synced, setSynced] = useState(false);
 
   useEffect(() => {

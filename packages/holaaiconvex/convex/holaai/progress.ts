@@ -1,56 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
-
-// ==================== SM-2 SPACED REPETITION ALGORITHM ====================
-
-// Calculate next review interval based on SM-2 algorithm
-function calculateNextReview(
-  quality: number, // 0-5 rating (0-2 = incorrect, 3-5 = correct with varying ease)
-  easeFactor: number,
-  interval: number,
-  repetitions: number
-): { newInterval: number; newEaseFactor: number; nextReviewAt: number } {
-  let newEaseFactor = easeFactor;
-  let newInterval = interval;
-
-  if (quality < 3) {
-    // Incorrect answer - reset
-    newInterval = 1;
-  } else {
-    // Correct answer - increase interval
-    if (repetitions === 0) {
-      newInterval = 1;
-    } else if (repetitions === 1) {
-      newInterval = 6;
-    } else {
-      newInterval = Math.round(interval * easeFactor);
-    }
-
-    // Update ease factor
-    newEaseFactor = Math.max(
-      1.3,
-      easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
-    );
-  }
-
-  // Calculate next review timestamp (interval is in days)
-  const nextReviewAt = Date.now() + newInterval * 24 * 60 * 60 * 1000;
-
-  return { newInterval, newEaseFactor, nextReviewAt };
-}
-
-// Convert quality (0-5) to mastery percentage
-function qualityToMastery(quality: number, currentMastery: number): number {
-  if (quality >= 4) {
-    return Math.min(100, currentMastery + 15);
-  } else if (quality === 3) {
-    return Math.min(100, currentMastery + 5);
-  } else if (quality === 2) {
-    return Math.max(0, currentMastery - 5);
-  } else {
-    return Math.max(0, currentMastery - 15);
-  }
-}
+import { calculateNextReview, qualityToMastery } from "../_lib/algorithms/sm2";
 
 // ==================== USER PROGRESS ====================
 
@@ -62,7 +12,7 @@ export const getUserProgress = query({
   },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("userProgress")
+      .query("hola_userProgress")
       .withIndex("by_user_content", (q) =>
         q
           .eq("userId", args.userId)
@@ -98,7 +48,7 @@ export const getUserProgressBatch = query({
 
     for (const contentId of args.contentIds) {
       const progress = await ctx.db
-        .query("userProgress")
+        .query("hola_userProgress")
         .withIndex("by_user_content", (q) =>
           q
             .eq("userId", args.userId)
@@ -125,7 +75,7 @@ export const getItemsDueForReview = query({
     const limit = args.limit ?? 20;
 
     const dueItems = await ctx.db
-      .query("userProgress")
+      .query("hola_userProgress")
       .withIndex("by_user_next_review", (q) =>
         q.eq("userId", args.userId).lte("nextReviewAt", now)
       )
@@ -144,7 +94,7 @@ export const recordPractice = mutation({
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("userProgress")
+      .query("hola_userProgress")
       .withIndex("by_user_content", (q) =>
         q
           .eq("userId", args.userId)
@@ -189,7 +139,7 @@ export const recordPractice = mutation({
 
       const initialMastery = qualityToMastery(args.quality, 0);
 
-      return await ctx.db.insert("userProgress", {
+      return await ctx.db.insert("hola_userProgress", {
         userId: args.userId,
         contentType: args.contentType,
         contentId: args.contentId,
@@ -211,11 +161,11 @@ export const recordPractice = mutation({
 export const getUserLevelProgress = query({
   args: {
     userId: v.id("users"),
-    levelId: v.id("contentLevels"),
+    levelId: v.id("hola_contentLevels"),
   },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("userLevelProgress")
+      .query("hola_userLevelProgress")
       .withIndex("by_user_level", (q) =>
         q.eq("userId", args.userId).eq("levelId", args.levelId)
       )
@@ -227,7 +177,7 @@ export const getAllUserLevelProgress = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("userLevelProgress")
+      .query("hola_userLevelProgress")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
   },
@@ -236,7 +186,7 @@ export const getAllUserLevelProgress = query({
 export const updateLevelProgress = mutation({
   args: {
     userId: v.id("users"),
-    levelId: v.id("contentLevels"),
+    levelId: v.id("hola_contentLevels"),
     vocabMastery: v.number(),
     grammarMastery: v.number(),
     phraseMastery: v.number(),
@@ -245,7 +195,7 @@ export const updateLevelProgress = mutation({
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("userLevelProgress")
+      .query("hola_userLevelProgress")
       .withIndex("by_user_level", (q) =>
         q.eq("userId", args.userId).eq("levelId", args.levelId)
       )
@@ -262,7 +212,7 @@ export const updateLevelProgress = mutation({
       });
       return existing._id;
     } else {
-      return await ctx.db.insert("userLevelProgress", {
+      return await ctx.db.insert("hola_userLevelProgress", {
         userId: args.userId,
         levelId: args.levelId,
         vocabMastery: args.vocabMastery,
@@ -282,7 +232,7 @@ export const getUserStats = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const allProgress = await ctx.db
-      .query("userProgress")
+      .query("hola_userProgress")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 
@@ -345,7 +295,7 @@ export const getStudyStreak = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const allProgress = await ctx.db
-      .query("userProgress")
+      .query("hola_userProgress")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 

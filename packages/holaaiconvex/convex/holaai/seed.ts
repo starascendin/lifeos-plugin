@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 
 // Seed initial learning content for the app
@@ -6,27 +6,27 @@ export const seedContent = mutation({
   args: {},
   handler: async (ctx) => {
     // Check if already seeded
-    const existingLevels = await ctx.db.query("contentLevels").collect();
+    const existingLevels = await ctx.db.query("hola_contentLevels").collect();
     if (existingLevels.length > 0) {
       return { message: "Content already seeded", skipped: true };
     }
 
     // ==================== LEVELS ====================
-    const a1Id = await ctx.db.insert("contentLevels", {
+    const a1Id = await ctx.db.insert("hola_contentLevels", {
       name: "A1",
       displayName: "Beginner",
       description: "Basic phrases, greetings, and simple present tense",
       order: 1,
     });
 
-    const a2Id = await ctx.db.insert("contentLevels", {
+    const a2Id = await ctx.db.insert("hola_contentLevels", {
       name: "A2",
       displayName: "Elementary",
       description: "Common vocabulary, past tense, and everyday situations",
       order: 2,
     });
 
-    const b1Id = await ctx.db.insert("contentLevels", {
+    await ctx.db.insert("hola_contentLevels", {
       name: "B1",
       displayName: "Intermediate",
       description: "Complex grammar, varied vocabulary, and nuanced expression",
@@ -34,7 +34,7 @@ export const seedContent = mutation({
     });
 
     // ==================== A1 CATEGORIES ====================
-    const a1GreetingsId = await ctx.db.insert("contentCategories", {
+    const a1GreetingsId = await ctx.db.insert("hola_contentCategories", {
       levelId: a1Id,
       name: "Greetings",
       description: "Basic greetings and introductions",
@@ -42,7 +42,7 @@ export const seedContent = mutation({
       order: 1,
     });
 
-    const a1NumbersId = await ctx.db.insert("contentCategories", {
+    const a1NumbersId = await ctx.db.insert("hola_contentCategories", {
       levelId: a1Id,
       name: "Numbers",
       description: "Numbers 1-100 and basic counting",
@@ -50,7 +50,7 @@ export const seedContent = mutation({
       order: 2,
     });
 
-    const a1FoodId = await ctx.db.insert("contentCategories", {
+    const a1FoodId = await ctx.db.insert("hola_contentCategories", {
       levelId: a1Id,
       name: "Food & Drinks",
       description: "Basic food vocabulary and ordering",
@@ -58,7 +58,7 @@ export const seedContent = mutation({
       order: 3,
     });
 
-    const a1FamilyId = await ctx.db.insert("contentCategories", {
+    await ctx.db.insert("hola_contentCategories", {
       levelId: a1Id,
       name: "Family",
       description: "Family members and relationships",
@@ -81,7 +81,7 @@ export const seedContent = mutation({
     ];
 
     for (let i = 0; i < greetingsVocab.length; i++) {
-      await ctx.db.insert("vocabularyItems", {
+      await ctx.db.insert("hola_vocabularyItems", {
         categoryId: a1GreetingsId,
         ...greetingsVocab[i],
         order: i + 1,
@@ -89,7 +89,7 @@ export const seedContent = mutation({
     }
 
     // ==================== A1 GREETINGS GRAMMAR ====================
-    await ctx.db.insert("grammarRules", {
+    await ctx.db.insert("hola_grammarRules", {
       categoryId: a1GreetingsId,
       title: "Formal vs Informal 'You'",
       explanation: "Spanish has two ways to say 'you': 'tú' (informal, for friends and family) and 'usted' (formal, for strangers and elders). This affects verb conjugation.",
@@ -106,7 +106,7 @@ export const seedContent = mutation({
       order: 1,
     });
 
-    await ctx.db.insert("grammarRules", {
+    await ctx.db.insert("hola_grammarRules", {
       categoryId: a1GreetingsId,
       title: "Verb 'Estar' - To Be (temporary states)",
       explanation: "Use 'estar' for temporary states, locations, and feelings. It's one of two verbs meaning 'to be' in Spanish.",
@@ -134,7 +134,7 @@ export const seedContent = mutation({
     ];
 
     for (let i = 0; i < greetingsPhrases.length; i++) {
-      await ctx.db.insert("phrases", {
+      await ctx.db.insert("hola_phrases", {
         categoryId: a1GreetingsId,
         ...greetingsPhrases[i],
         order: i + 1,
@@ -158,7 +158,7 @@ export const seedContent = mutation({
     ];
 
     for (let i = 0; i < numbersVocab.length; i++) {
-      await ctx.db.insert("vocabularyItems", {
+      await ctx.db.insert("hola_vocabularyItems", {
         categoryId: a1NumbersId,
         ...numbersVocab[i],
         order: i + 1,
@@ -178,7 +178,7 @@ export const seedContent = mutation({
     ];
 
     for (let i = 0; i < foodVocab.length; i++) {
-      await ctx.db.insert("vocabularyItems", {
+      await ctx.db.insert("hola_vocabularyItems", {
         categoryId: a1FoodId,
         ...foodVocab[i],
         order: i + 1,
@@ -195,7 +195,7 @@ export const seedContent = mutation({
     ];
 
     for (let i = 0; i < foodPhrases.length; i++) {
-      await ctx.db.insert("phrases", {
+      await ctx.db.insert("hola_phrases", {
         categoryId: a1FoodId,
         ...foodPhrases[i],
         formalityLevel: "neutral",
@@ -204,7 +204,7 @@ export const seedContent = mutation({
     }
 
     // ==================== A2 CATEGORIES ====================
-    const a2TravelId = await ctx.db.insert("contentCategories", {
+    const a2TravelId = await ctx.db.insert("hola_contentCategories", {
       levelId: a2Id,
       name: "Travel",
       description: "Vocabulary for traveling and transportation",
@@ -212,7 +212,7 @@ export const seedContent = mutation({
       order: 1,
     });
 
-    const a2ShoppingId = await ctx.db.insert("contentCategories", {
+    await ctx.db.insert("hola_contentCategories", {
       levelId: a2Id,
       name: "Shopping",
       description: "Shopping vocabulary and conversations",
@@ -231,7 +231,7 @@ export const seedContent = mutation({
     ];
 
     for (let i = 0; i < travelVocab.length; i++) {
-      await ctx.db.insert("vocabularyItems", {
+      await ctx.db.insert("hola_vocabularyItems", {
         categoryId: a2TravelId,
         ...travelVocab[i],
         order: i + 1,
@@ -240,7 +240,7 @@ export const seedContent = mutation({
 
     // ==================== EXERCISES ====================
     // A1 Greetings Multiple Choice
-    await ctx.db.insert("exercises", {
+    await ctx.db.insert("hola_exercises", {
       categoryId: a1GreetingsId,
       type: "multiple_choice",
       question: "How do you say 'Good morning' in Spanish?",
@@ -251,7 +251,7 @@ export const seedContent = mutation({
       order: 1,
     });
 
-    await ctx.db.insert("exercises", {
+    await ctx.db.insert("hola_exercises", {
       categoryId: a1GreetingsId,
       type: "multiple_choice",
       question: "Which greeting would you use with your boss?",
@@ -262,7 +262,7 @@ export const seedContent = mutation({
       order: 2,
     });
 
-    await ctx.db.insert("exercises", {
+    await ctx.db.insert("hola_exercises", {
       categoryId: a1GreetingsId,
       type: "fill_blank",
       question: "Complete: ¿Cómo _____ tú? (How are you - informal)",
@@ -273,7 +273,7 @@ export const seedContent = mutation({
     });
 
     // A1 Numbers exercises
-    await ctx.db.insert("exercises", {
+    await ctx.db.insert("hola_exercises", {
       categoryId: a1NumbersId,
       type: "multiple_choice",
       question: "What is 'siete' in English?",
@@ -284,7 +284,7 @@ export const seedContent = mutation({
     });
 
     // A1 Food exercises
-    await ctx.db.insert("exercises", {
+    await ctx.db.insert("hola_exercises", {
       categoryId: a1FoodId,
       type: "translate",
       question: "Translate to Spanish: 'I want water, please'",
@@ -296,7 +296,7 @@ export const seedContent = mutation({
     });
 
     // Matching exercise
-    const matchingExerciseId = await ctx.db.insert("exercises", {
+    const matchingExerciseId = await ctx.db.insert("hola_exercises", {
       categoryId: a1GreetingsId,
       type: "matching",
       question: "Match the Spanish greetings with their English translations",
@@ -314,7 +314,7 @@ export const seedContent = mutation({
     ];
 
     for (let i = 0; i < matchingPairs.length; i++) {
-      await ctx.db.insert("matchingPairs", {
+      await ctx.db.insert("hola_matchingPairs", {
         exerciseId: matchingExerciseId,
         ...matchingPairs[i],
         order: i + 1,
@@ -340,20 +340,20 @@ export const clearContent = mutation({
 
     // Delete in reverse order of dependencies
     const tables = [
-      "matchingPairs",
-      "userExerciseProgress",
-      "exercises",
-      "userProgress",
-      "userLevelProgress",
-      "lessons",
-      "phrases",
-      "grammarRules",
-      "vocabularyItems",
-      "contentCategories",
-      "contentLevels",
-      "voiceConversations",
-      "bellaConversations",
-      "aiLessons",
+      "hola_matchingPairs",
+      "hola_userExerciseProgress",
+      "hola_exercises",
+      "hola_userProgress",
+      "hola_userLevelProgress",
+      "hola_lessons",
+      "hola_phrases",
+      "hola_grammarRules",
+      "hola_vocabularyItems",
+      "hola_contentCategories",
+      "hola_contentLevels",
+      "hola_voiceConversations",
+      "hola_bellaConversations",
+      "hola_aiLessons",
     ] as const;
 
     const counts: Record<string, number> = {};

@@ -1,5 +1,5 @@
-import { QueryCtx, MutationCtx } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { QueryCtx, MutationCtx } from "../_generated/server";
+import { Id } from "../_generated/dataModel";
 
 /**
  * Get the current user's identity from Clerk JWT

@@ -1,5 +1,5 @@
-import { mutation, query } from "./_generated/server";
-import { getOrCreateUser, requireAuth, getAuthUserId } from "./auth";
+import { mutation, query } from "../_generated/server";
+import { getOrCreateUser, getAuthUserId } from "../_lib/auth";
 
 /**
  * Ensure user exists in the database

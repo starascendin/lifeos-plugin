@@ -1,4 +1,4 @@
-import { action, mutation, query } from "./_generated/server";
+import { action, mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 
 // ==================== LIVEKIT INTEGRATION ====================
@@ -9,7 +9,7 @@ export const generateLiveKitToken = action({
     roomName: v.string(),
     participantName: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
     const livekitUrl = process.env.LIVEKIT_URL;
@@ -85,7 +85,7 @@ export const dispatchLiveKitAgent = action({
   args: {
     roomName: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
     const livekitUrl = process.env.LIVEKIT_URL;
@@ -178,7 +178,7 @@ export const listVoiceConversations = query({
     const limit = args.limit ?? 50;
 
     let conversations = await ctx.db
-      .query("voiceConversations")
+      .query("hola_voiceConversations")
       .withIndex("by_user_created", (q) => q.eq("userId", args.userId))
       .order("desc")
       .take(limit);
@@ -192,7 +192,7 @@ export const listVoiceConversations = query({
 });
 
 export const getVoiceConversation = query({
-  args: { conversationId: v.id("voiceConversations") },
+  args: { conversationId: v.id("hola_voiceConversations") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.conversationId);
   },
@@ -205,7 +205,7 @@ export const createVoiceConversation = mutation({
     title: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("voiceConversations", {
+    return await ctx.db.insert("hola_voiceConversations", {
       userId: args.userId,
       provider: args.provider,
       title: args.title,
@@ -217,7 +217,7 @@ export const createVoiceConversation = mutation({
 
 export const addTranscriptMessage = mutation({
   args: {
-    conversationId: v.id("voiceConversations"),
+    conversationId: v.id("hola_voiceConversations"),
     role: v.string(),
     content: v.string(),
   },
@@ -241,7 +241,7 @@ export const addTranscriptMessage = mutation({
 
 export const updateVoiceConversation = mutation({
   args: {
-    conversationId: v.id("voiceConversations"),
+    conversationId: v.id("hola_voiceConversations"),
     title: v.optional(v.string()),
     duration: v.optional(v.number()),
   },
@@ -255,7 +255,7 @@ export const updateVoiceConversation = mutation({
 });
 
 export const deleteVoiceConversation = mutation({
-  args: { conversationId: v.id("voiceConversations") },
+  args: { conversationId: v.id("hola_voiceConversations") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.conversationId);
   },
@@ -267,7 +267,7 @@ export const getVoiceStats = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const conversations = await ctx.db
-      .query("voiceConversations")
+      .query("hola_voiceConversations")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .collect();
 

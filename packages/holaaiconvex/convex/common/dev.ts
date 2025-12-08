@@ -1,4 +1,4 @@
-import { action } from "./_generated/server";
+import { action } from "../_generated/server";
 
 // ==================== DEVELOPER DIAGNOSTICS ====================
 

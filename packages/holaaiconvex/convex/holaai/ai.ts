@@ -1,7 +1,7 @@
-import { action, mutation, query, internalMutation } from "./_generated/server";
+import { action, mutation, query, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import { internal } from "../_generated/api";
+import { Id } from "../_generated/dataModel";
 
 // ==================== AI LESSONS ====================
 
@@ -13,7 +13,7 @@ export const listAiLessons = query({
   handler: async (ctx, args) => {
     if (args.favoritesOnly) {
       return await ctx.db
-        .query("aiLessons")
+        .query("hola_aiLessons")
         .withIndex("by_user_favorite", (q) =>
           q.eq("userId", args.userId).eq("isFavorite", true)
         )
@@ -22,7 +22,7 @@ export const listAiLessons = query({
     }
 
     return await ctx.db
-      .query("aiLessons")
+      .query("hola_aiLessons")
       .withIndex("by_user_created", (q) => q.eq("userId", args.userId))
       .order("desc")
       .collect();
@@ -30,7 +30,7 @@ export const listAiLessons = query({
 });
 
 export const getAiLesson = query({
-  args: { lessonId: v.id("aiLessons") },
+  args: { lessonId: v.id("hola_aiLessons") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.lessonId);
   },
@@ -82,8 +82,8 @@ export const saveAiLesson = internalMutation({
     }),
     estimatedMinutes: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<Id<"aiLessons">> => {
-    return await ctx.db.insert("aiLessons", {
+  handler: async (ctx, args): Promise<Id<"hola_aiLessons">> => {
+    return await ctx.db.insert("hola_aiLessons", {
       ...args,
       isFavorite: false,
       createdAt: Date.now(),
@@ -92,7 +92,7 @@ export const saveAiLesson = internalMutation({
 });
 
 export const toggleAiLessonFavorite = mutation({
-  args: { lessonId: v.id("aiLessons") },
+  args: { lessonId: v.id("hola_aiLessons") },
   handler: async (ctx, args) => {
     const lesson = await ctx.db.get(args.lessonId);
     if (!lesson) throw new Error("Lesson not found");
@@ -104,7 +104,7 @@ export const toggleAiLessonFavorite = mutation({
 });
 
 export const deleteAiLesson = mutation({
-  args: { lessonId: v.id("aiLessons") },
+  args: { lessonId: v.id("hola_aiLessons") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.lessonId);
   },
@@ -120,7 +120,7 @@ export const listBellaConversations = query({
   handler: async (ctx, args) => {
     if (args.favoritesOnly) {
       return await ctx.db
-        .query("bellaConversations")
+        .query("hola_bellaConversations")
         .withIndex("by_user_favorite", (q) =>
           q.eq("userId", args.userId).eq("isFavorite", true)
         )
@@ -129,7 +129,7 @@ export const listBellaConversations = query({
     }
 
     return await ctx.db
-      .query("bellaConversations")
+      .query("hola_bellaConversations")
       .withIndex("by_user_created", (q) => q.eq("userId", args.userId))
       .order("desc")
       .collect();
@@ -137,7 +137,7 @@ export const listBellaConversations = query({
 });
 
 export const getBellaConversation = query({
-  args: { conversationId: v.id("bellaConversations") },
+  args: { conversationId: v.id("hola_bellaConversations") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.conversationId);
   },
@@ -187,8 +187,8 @@ export const saveBellaConversation = internalMutation({
       )
     ),
   },
-  handler: async (ctx, args): Promise<Id<"bellaConversations">> => {
-    return await ctx.db.insert("bellaConversations", {
+  handler: async (ctx, args): Promise<Id<"hola_bellaConversations">> => {
+    return await ctx.db.insert("hola_bellaConversations", {
       ...args,
       isFavorite: false,
       createdAt: Date.now(),
@@ -197,7 +197,7 @@ export const saveBellaConversation = internalMutation({
 });
 
 export const toggleBellaFavorite = mutation({
-  args: { conversationId: v.id("bellaConversations") },
+  args: { conversationId: v.id("hola_bellaConversations") },
   handler: async (ctx, args) => {
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) throw new Error("Conversation not found");
@@ -209,7 +209,7 @@ export const toggleBellaFavorite = mutation({
 });
 
 export const deleteBellaConversation = mutation({
-  args: { conversationId: v.id("bellaConversations") },
+  args: { conversationId: v.id("hola_bellaConversations") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.conversationId);
   },
@@ -284,7 +284,7 @@ export const generateLesson = action({
     prompt: v.string(),
     level: v.string(), // "A1", "A2", "B1"
   },
-  handler: async (ctx, args): Promise<{ lessonId: Id<"aiLessons">; lesson: unknown }> => {
+  handler: async (ctx, args): Promise<{ lessonId: Id<"hola_aiLessons">; lesson: unknown }> => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not configured");
@@ -333,7 +333,7 @@ Generate the lesson in JSON format.`;
     const lessonContent = JSON.parse(content);
 
     // Save to database
-    const lessonId: Id<"aiLessons"> = await ctx.runMutation(internal.ai.saveAiLesson, {
+    const lessonId: Id<"hola_aiLessons"> = await ctx.runMutation(internal.holaai.ai.saveAiLesson, {
       userId: args.userId,
       title: lessonContent.title || "Untitled Lesson",
       level: args.level,
@@ -358,7 +358,7 @@ export const generateBellaConversation = action({
     situation: v.string(),
     level: v.string(), // "A1", "A2"
   },
-  handler: async (ctx, args): Promise<{ conversationId: Id<"bellaConversations">; conversation: unknown }> => {
+  handler: async (ctx, args): Promise<{ conversationId: Id<"hola_bellaConversations">; conversation: unknown }> => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not configured");
@@ -405,7 +405,7 @@ Generate a natural conversation scenario in JSON format.`;
     const conversationContent = JSON.parse(content);
 
     // Save to database
-    const conversationId: Id<"bellaConversations"> = await ctx.runMutation(internal.ai.saveBellaConversation, {
+    const conversationId: Id<"hola_bellaConversations"> = await ctx.runMutation(internal.holaai.ai.saveBellaConversation, {
       userId: args.userId,
       level: args.level,
       situation: args.situation,
@@ -426,7 +426,7 @@ export const textToSpeech = action({
     text: v.string(),
     language: v.optional(v.string()), // "es" for Spanish, "en" for English
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     // For now, we'll use a simpler approach
     // In production, you could use Google Cloud TTS or another service
     // The React Native app can use expo-speech for on-device TTS

@@ -94,7 +94,7 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
   const soundRef = useRef<Audio.Sound | null>(null);
   const { settings, isGeminiTTS } = useTTSSettings();
 
-  const generateTTS = useAction(api.tts.generateTTS);
+  const generateTTS = useAction(api.common.tts.generateTTS);
 
   // Cleanup sound on unmount
   useEffect(() => {

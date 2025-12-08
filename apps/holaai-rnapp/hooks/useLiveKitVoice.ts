@@ -10,7 +10,7 @@ export interface TranscriptMessage {
 }
 
 export interface UseLiveKitVoiceOptions {
-  userId: Id<'users'>;
+  userId: Id<"users">;
   userName: string;
 }
 
@@ -29,7 +29,7 @@ export interface UseLiveKitVoiceReturn {
 
   // Transcript
   transcript: TranscriptMessage[];
-  conversationId: Id<'voiceConversations'> | null;
+  conversationId: Id<"hola_voiceConversations"> | null;
 
   // Room info
   roomName: string | null;
@@ -69,17 +69,17 @@ export function useLiveKitVoice({
 
   // Transcript
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
-  const [conversationId, setConversationId] = useState<Id<'voiceConversations'> | null>(null);
+  const [conversationId, setConversationId] = useState<Id<"hola_voiceConversations"> | null>(null);
 
   // Track start time for duration calculation
   const startTimeRef = useRef<number | null>(null);
 
   // Convex actions
-  const generateToken = useAction(api.voice.generateLiveKitToken);
-  const dispatchAgent = useAction(api.voice.dispatchLiveKitAgent);
-  const createConversation = useMutation(api.voice.createVoiceConversation);
-  const addTranscriptMessage = useMutation(api.voice.addTranscriptMessage);
-  const updateConversation = useMutation(api.voice.updateVoiceConversation);
+  const generateToken = useAction(api.holaai.voice.generateLiveKitToken);
+  const dispatchAgent = useAction(api.holaai.voice.dispatchLiveKitAgent);
+  const createConversation = useMutation(api.holaai.voice.createVoiceConversation);
+  const addTranscriptMessage = useMutation(api.holaai.voice.addTranscriptMessage);
+  const updateConversation = useMutation(api.holaai.voice.updateVoiceConversation);
 
   const addMessage = useCallback(
     async (message: TranscriptMessage) => {
