@@ -3,12 +3,8 @@ import { useColor } from '@/hooks/useColor';
 import { DrawerContent } from '@/components/drawer/DrawerContent';
 import {
   Home,
-  MessageCircle,
   Settings,
-  Search,
   BookOpen,
-  MessageSquare,
-  Mic,
   GraduationCap,
   Sparkles,
   Video,
@@ -68,27 +64,6 @@ export default function DrawerLayout() {
         }}
       />
 
-      <Drawer.Screen
-        name='bella'
-        options={{
-          drawerLabel: 'Bella AI',
-          title: 'Bella Conversations',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={MessageSquare} color={color} size={size} />
-          ),
-        }}
-      />
-
-      <Drawer.Screen
-        name='voice'
-        options={{
-          drawerLabel: 'Voice Practice1',
-          title: 'Voice Practice',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={Mic} color={color} size={size} />
-          ),
-        }}
-      />
 
       <Drawer.Screen
         name='livekit-ai'
@@ -124,17 +99,6 @@ export default function DrawerLayout() {
       />
 
       <Drawer.Screen
-        name='chat'
-        options={{
-          drawerLabel: 'Chat',
-          title: 'Chat',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={MessageCircle} color={color} size={size} />
-          ),
-        }}
-      />
-
-      <Drawer.Screen
         name='settings'
         options={{
           drawerLabel: 'Settings',
@@ -145,16 +109,6 @@ export default function DrawerLayout() {
         }}
       />
 
-      <Drawer.Screen
-        name='search'
-        options={{
-          drawerLabel: 'Search',
-          title: 'Search',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={Search} color={color} size={size} />
-          ),
-        }}
-      />
     </Drawer>
   );
 }
