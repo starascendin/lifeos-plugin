@@ -8,6 +8,8 @@ import {
   GraduationCap,
   Sparkles,
   Video,
+  Map,
+  FileCheck,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
@@ -49,6 +51,17 @@ export default function DrawerLayout() {
           title: 'Home1',
           drawerIcon: ({ color, size }) => (
             <Icon name={Home} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='journey'
+        options={{
+          drawerLabel: 'A1 Journey',
+          title: 'A1 Learning Journey',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={Map} color={color} size={size} />
           ),
         }}
       />

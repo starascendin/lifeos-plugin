@@ -285,4 +285,202 @@ export const holaaiTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_created", ["userId", "createdAt"]),
+
+  // ==================== LEARNING JOURNEY (A1 Test Prep) ====================
+
+  // Learning modules: 7 structured modules for A1 curriculum
+  hola_learningModules: defineTable({
+    levelId: v.id("hola_contentLevels"),
+    moduleNumber: v.number(), // 1-7
+    title: v.string(), // e.g., "Foundations", "Present Tense & Description"
+    description: v.string(),
+    estimatedHours: v.optional(v.number()),
+    prerequisites: v.array(v.id("hola_learningModules")), // Module IDs that must be completed first
+    order: v.number(),
+  })
+    .index("by_level", ["levelId"])
+    .index("by_level_order", ["levelId", "order"]),
+
+  // Lessons within modules
+  hola_moduleLessons: defineTable({
+    moduleId: v.id("hola_learningModules"),
+    lessonNumber: v.string(), // e.g., "1.1", "1.2", "2.1"
+    title: v.string(),
+    description: v.string(),
+    objectives: v.array(v.string()), // Learning objectives
+    vocabularyIds: v.array(v.id("hola_vocabularyItems")),
+    grammarIds: v.array(v.id("hola_grammarRules")),
+    phraseIds: v.array(v.id("hola_phrases")),
+    exerciseIds: v.array(v.id("hola_exercises")),
+    isQuiz: v.boolean(), // True for module checkpoint quizzes
+    estimatedMinutes: v.optional(v.number()),
+    order: v.number(),
+  })
+    .index("by_module", ["moduleId"])
+    .index("by_module_order", ["moduleId", "order"]),
+
+  // User progress through modules
+  hola_userModuleProgress: defineTable({
+    userId: v.id("users"),
+    moduleId: v.id("hola_learningModules"),
+    lessonsCompleted: v.array(v.id("hola_moduleLessons")),
+    quizScore: v.optional(v.number()), // 0-100, null if quiz not taken
+    quizAttempts: v.number(), // Number of quiz attempts
+    isUnlocked: v.boolean(), // Whether user can access this module
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_module", ["userId", "moduleId"]),
+
+  // ==================== PRACTICE TESTS ====================
+
+  // Practice test definitions
+  hola_practiceTests: defineTable({
+    levelId: v.id("hola_contentLevels"),
+    testNumber: v.string(), // "1", "2", "mock"
+    title: v.string(), // e.g., "A1 Practice Test 1", "A1 Mock Exam"
+    description: v.string(),
+    duration: v.number(), // Duration in minutes
+    sections: v.array(
+      v.object({
+        type: v.string(), // "listening", "reading", "grammar", "writing", "speaking"
+        title: v.string(),
+        points: v.number(),
+        questionIds: v.array(v.string()), // IDs of questions (exercise IDs, passage IDs, etc.)
+      })
+    ),
+    passingScore: v.number(), // Minimum score to pass (e.g., 70)
+    order: v.number(),
+  })
+    .index("by_level", ["levelId"])
+    .index("by_level_order", ["levelId", "order"]),
+
+  // User test attempts
+  hola_testAttempts: defineTable({
+    userId: v.id("users"),
+    testId: v.id("hola_practiceTests"),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    timeSpent: v.optional(v.number()), // Actual time spent in seconds
+    sectionScores: v.array(
+      v.object({
+        section: v.string(),
+        score: v.number(),
+        maxScore: v.number(),
+        answers: v.optional(
+          v.array(
+            v.object({
+              questionId: v.string(),
+              answer: v.string(),
+              isCorrect: v.optional(v.boolean()),
+            })
+          )
+        ),
+      })
+    ),
+    totalScore: v.number(),
+    passed: v.boolean(),
+    feedback: v.optional(v.string()), // AI-generated feedback for writing
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_test", ["userId", "testId"])
+    .index("by_user_completed", ["userId", "completedAt"]),
+
+  // ==================== ENHANCED EXERCISE TYPES ====================
+
+  // Reading comprehension passages
+  hola_readingPassages: defineTable({
+    categoryId: v.optional(v.id("hola_contentCategories")),
+    levelId: v.id("hola_contentLevels"),
+    title: v.string(),
+    content: v.string(), // Spanish text passage
+    contentEnglish: v.optional(v.string()), // English translation (for reference)
+    difficulty: v.number(), // 1-5
+    wordCount: v.optional(v.number()),
+    questions: v.array(
+      v.object({
+        question: v.string(), // Question in Spanish or English
+        questionSpanish: v.optional(v.string()),
+        options: v.array(v.string()),
+        correctAnswer: v.string(),
+        explanation: v.optional(v.string()),
+        points: v.number(),
+      })
+    ),
+    order: v.number(),
+  })
+    .index("by_level", ["levelId"])
+    .index("by_category", ["categoryId"]),
+
+  // Listening comprehension dialogues
+  hola_listeningDialogues: defineTable({
+    categoryId: v.optional(v.id("hola_contentCategories")),
+    levelId: v.id("hola_contentLevels"),
+    title: v.string(),
+    audioUrl: v.optional(v.string()), // Pre-recorded audio URL
+    usesTTS: v.boolean(), // Whether to generate audio via TTS
+    transcript: v.array(
+      v.object({
+        speaker: v.string(), // "Speaker 1", "Speaker 2", or name
+        spanish: v.string(),
+        english: v.string(),
+      })
+    ),
+    context: v.optional(v.string()), // Scene description
+    questions: v.array(
+      v.object({
+        question: v.string(),
+        options: v.array(v.string()),
+        correctAnswer: v.string(),
+        explanation: v.optional(v.string()),
+        points: v.number(),
+      })
+    ),
+    difficulty: v.number(),
+    order: v.number(),
+  })
+    .index("by_level", ["levelId"])
+    .index("by_category", ["categoryId"]),
+
+  // Writing prompts
+  hola_writingPrompts: defineTable({
+    categoryId: v.optional(v.id("hola_contentCategories")),
+    levelId: v.id("hola_contentLevels"),
+    promptType: v.string(), // "form", "email", "paragraph"
+    title: v.string(),
+    instructions: v.string(), // What to write
+    instructionsSpanish: v.optional(v.string()),
+    requirements: v.array(v.string()), // e.g., "Include your name", "Mention 2 family members"
+    sampleAnswer: v.string(), // Example good response
+    rubric: v.array(
+      v.object({
+        criteria: v.string(), // e.g., "Grammar accuracy"
+        points: v.number(),
+        description: v.optional(v.string()),
+      })
+    ),
+    maxPoints: v.number(),
+    difficulty: v.number(),
+    order: v.number(),
+  })
+    .index("by_level", ["levelId"])
+    .index("by_category", ["categoryId"])
+    .index("by_type", ["promptType"]),
+
+  // ==================== CERTIFICATES ====================
+
+  // User certificates
+  hola_certificates: defineTable({
+    userId: v.id("users"),
+    levelId: v.id("hola_contentLevels"),
+    testId: v.id("hola_practiceTests"),
+    attemptId: v.id("hola_testAttempts"),
+    score: v.number(),
+    grade: v.string(), // "Advanced A1", "Standard A1", "Minimal A1"
+    earnedAt: v.number(),
+    certificateUrl: v.optional(v.string()), // URL to generated certificate image/PDF
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_level", ["userId", "levelId"]),
 };
