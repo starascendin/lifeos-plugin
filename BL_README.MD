@@ -1,9 +1,16 @@
 Decisions:
 - 1 mono repo for holaai + life os? or 1 for holaai and 1 for life os? 
-    - [DECISION - 1 mono repo]case for 1 main repo -- easy to manage. I guess i can have all the diff apps in the same repo, and they can have diff UIs.
+    - [DECISION - 1 mono repo] case for 1 main repo -- easy to manage. I guess i can have all the diff apps in the same repo, and they can have diff UIs.
         - they prob all share many similar components, like livekit, voice capability, etc. If i do this, just need to make sure each one are clearly defined and separated
         - hola ai -- convexbackend + rnapp + tanstack -- these are 1 thing
-        - lifeos -- has its own convexbackend + rnapp + tanstack -- these are 1 thing
+    - so in order to reduce complexity, i will have 1 main backend (convex) for all holaai + life os things, so i dont have to maintain so many things. In order to do this correctly, i need to encapsulate and organize my code correclty:
+        - convex backend:
+            - schema, functions should be app based -- for holaai, lifeos, etc.
+        - in webapp, rn app -- they should mirror the "apps" structure of convex, and have components or UI that reflects it.
+            - for sidebar, they should be organized by apps
+            - feature flagging:
+                - user should only see what "apps" they are supposed to see
+            - if we need to, we can separate out individual "web/rn" app for each "app" but use a common convex backend/ai things
 
 
 
