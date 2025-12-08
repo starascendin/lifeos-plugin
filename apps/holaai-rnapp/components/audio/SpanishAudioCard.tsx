@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { useColor } from '@/hooks/useColor';
 import { useSpanishTTS } from '@/hooks/useSpanishTTS';
-import { useTTSSettings } from '@/hooks/useTTSSettings';
+import { useTTSSettings } from '@/contexts/TTSSettingsContext';
 
 interface SpanishAudioCardProps {
   spanishText: string;

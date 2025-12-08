@@ -3,7 +3,7 @@ import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import { useAction } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
-import { useTTSSettings } from './useTTSSettings';
+import { useTTSSettings } from '@/contexts/TTSSettingsContext';
 
 export type TTSProviderUsed = 'ondevice' | 'gemini' | null;
 

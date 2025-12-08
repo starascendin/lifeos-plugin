@@ -13,7 +13,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { Code, Volume2, Smartphone, Cloud, Play, AlertCircle, CheckCircle } from 'lucide-react-native';
 import { useColor } from '@/hooks/useColor';
-import { useTTSSettings, TTSProvider } from '@/hooks/useTTSSettings';
+import { useTTSSettings, TTSProvider } from '@/contexts/TTSSettingsContext';
 import { useSpanishTTS } from '@/hooks/useSpanishTTS';
 import Slider from '@react-native-community/slider';
 
