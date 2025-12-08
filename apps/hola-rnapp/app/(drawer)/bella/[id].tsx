@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { ScrollView, TouchableOpacity } from 'react-native';
+import { useCallback, useState, useRef } from 'react';
+import { ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
@@ -8,8 +8,11 @@ import { View } from '@/components/ui/view';
 import { Text } from '@/components/ui/text';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useColor } from '@/hooks/useColor';
+import { useSpanishTTS } from '@/hooks/useSpanishTTS';
+import { GrammarAudioCard, PhraseAudioCard } from '@/components/audio';
 import {
   MessageSquare,
   Heart,
@@ -17,15 +20,21 @@ import {
   BookOpen,
   Key,
   RefreshCw,
+  Play,
+  Square,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
-import * as Speech from 'expo-speech';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 export default function BellaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('dialogue');
+
+  // Play All state
+  const [isPlayingAll, setIsPlayingAll] = useState(false);
+  const [currentDialogueIndex, setCurrentDialogueIndex] = useState<number | null>(null);
+  const playingRef = useRef(false);
 
   const conversation = useQuery(api.ai.getBellaConversation, {
     conversationId: id as Id<'bellaConversations'>,
@@ -38,9 +47,11 @@ export default function BellaDetailScreen() {
   const textMuted = useColor('textMuted');
   const card = useColor('card');
 
-  const speakSpanish = useCallback((text: string) => {
-    Speech.speak(text, { language: 'es-ES', rate: 0.8 });
-  }, []);
+  const { speak, stop, isPlaying } = useSpanishTTS();
+
+  const speakSpanish = useCallback(async (text: string) => {
+    await speak(text);
+  }, [speak]);
 
   const handleToggleFavorite = async () => {
     if (!conversation) return;
@@ -50,6 +61,37 @@ export default function BellaDetailScreen() {
       console.error('Error toggling favorite:', error);
     }
   };
+
+  // Play All Dialogue feature
+  const playAllDialogue = useCallback(async () => {
+    if (!conversation) return;
+
+    playingRef.current = true;
+    setIsPlayingAll(true);
+
+    for (let i = 0; i < conversation.dialogue.length; i++) {
+      if (!playingRef.current) break;
+
+      setCurrentDialogueIndex(i);
+      await speak(conversation.dialogue[i].spanish);
+
+      // Wait a bit between lines
+      if (playingRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+
+    setIsPlayingAll(false);
+    setCurrentDialogueIndex(null);
+    playingRef.current = false;
+  }, [conversation, speak]);
+
+  const stopPlayback = useCallback(async () => {
+    playingRef.current = false;
+    await stop();
+    setIsPlayingAll(false);
+    setCurrentDialogueIndex(null);
+  }, [stop]);
 
   if (conversation === undefined) {
     return (
@@ -130,6 +172,25 @@ export default function BellaDetailScreen() {
           </View>
         </View>
 
+        {/* Play All Button */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+          <Button
+            variant={isPlayingAll ? 'destructive' : 'outline'}
+            onPress={isPlayingAll ? stopPlayback : playAllDialogue}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Icon
+              name={isPlayingAll ? Square : Play}
+              size={16}
+              color={isPlayingAll ? '#fff' : levelColor}
+              fill={isPlayingAll ? '#fff' : levelColor}
+            />
+            <Text style={{ marginLeft: 8, color: isPlayingAll ? '#fff' : levelColor, fontWeight: '600' }}>
+              {isPlayingAll ? 'Stop Playback' : 'Play All Dialogue'}
+            </Text>
+          </Button>
+        </View>
+
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <View style={{ paddingHorizontal: 16 }}>
@@ -181,6 +242,8 @@ export default function BellaDetailScreen() {
             <TabsContent value='dialogue'>
               {conversation.dialogue.map((exchange, index) => {
                 const isFirst = exchange.speaker === 'A';
+                const isHighlighted = currentDialogueIndex === index;
+
                 return (
                   <View
                     key={index}
@@ -191,14 +254,16 @@ export default function BellaDetailScreen() {
                     }}
                   >
                     <View
-                      style={{
-                        maxWidth: '80%',
-                        backgroundColor: isFirst ? card : levelColor,
-                        padding: 12,
-                        borderRadius: 16,
-                        borderBottomLeftRadius: isFirst ? 4 : 16,
-                        borderBottomRightRadius: isFirst ? 16 : 4,
-                      }}
+                      style={[
+                        styles.dialogueBubble,
+                        {
+                          backgroundColor: isFirst ? card : levelColor,
+                          borderBottomLeftRadius: isFirst ? 4 : 16,
+                          borderBottomRightRadius: isFirst ? 16 : 4,
+                        },
+                        isHighlighted && styles.highlightedBubble,
+                        isHighlighted && { borderColor: isFirst ? levelColor : '#fff' },
+                      ]}
                     >
                       {exchange.speakerName && (
                         <Text
@@ -214,6 +279,7 @@ export default function BellaDetailScreen() {
                       <TouchableOpacity
                         onPress={() => speakSpanish(exchange.spanish)}
                         style={{ flexDirection: 'row', alignItems: 'flex-start' }}
+                        disabled={isPlayingAll}
                       >
                         <Text
                           style={{
@@ -224,12 +290,16 @@ export default function BellaDetailScreen() {
                         >
                           {exchange.spanish}
                         </Text>
-                        <Icon
-                          name={Volume2}
-                          size={16}
-                          color={isFirst ? levelColor : 'rgba(255,255,255,0.8)'}
-                          style={{ marginLeft: 8 }}
-                        />
+                        {isHighlighted && isPlaying ? (
+                          <Spinner size='sm' variant='circle' color={isFirst ? levelColor : '#fff'} style={{ marginLeft: 8 }} />
+                        ) : (
+                          <Icon
+                            name={Volume2}
+                            size={16}
+                            color={isFirst ? levelColor : 'rgba(255,255,255,0.8)'}
+                            style={{ marginLeft: 8 }}
+                          />
+                        )}
                       </TouchableOpacity>
                       <Text
                         variant='caption'
@@ -247,75 +317,31 @@ export default function BellaDetailScreen() {
               })}
             </TabsContent>
 
-            {/* Grammar Tab */}
+            {/* Grammar Tab - using GrammarAudioCard */}
             <TabsContent value='grammar'>
               {conversation.grammarHints.map((hint, index) => (
-                <Card key={index} style={{ marginBottom: 12 }}>
-                  <CardContent>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: levelColor, marginBottom: 8 }}>
-                      {hint.topic}
-                    </Text>
-                    <Text style={{ marginBottom: 12, lineHeight: 22 }}>
-                      {hint.explanation}
-                    </Text>
-                    {hint.examples.length > 0 && (
-                      <View style={{ backgroundColor: `${levelColor}10`, padding: 12, borderRadius: 8 }}>
-                        {hint.examples.map((ex, i) => (
-                          <TouchableOpacity
-                            key={i}
-                            onPress={() => speakSpanish(ex.spanish)}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              paddingVertical: 4,
-                            }}
-                          >
-                            <Icon name={Volume2} size={14} color={levelColor} style={{ marginRight: 8 }} />
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ color: levelColor }}>{ex.spanish}</Text>
-                              <Text variant='caption' style={{ color: textMuted }}>
-                                {ex.english}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </CardContent>
-                </Card>
+                <GrammarAudioCard
+                  key={index}
+                  topic={hint.topic}
+                  explanation={hint.explanation}
+                  examples={hint.examples}
+                  accentColor={levelColor}
+                  style={{ marginBottom: 12 }}
+                />
               ))}
             </TabsContent>
 
-            {/* Key Phrases Tab */}
+            {/* Key Phrases Tab - using PhraseAudioCard */}
             <TabsContent value='phrases'>
               {conversation.keyPhrases.map((phrase, index) => (
-                <Card key={index} style={{ marginBottom: 12 }}>
-                  <CardContent>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 16, color: levelColor, fontWeight: '500' }}>
-                          {phrase.spanish}
-                        </Text>
-                        <Text style={{ marginTop: 4 }}>{phrase.english}</Text>
-                        {phrase.usage && (
-                          <Text variant='caption' style={{ color: textMuted, marginTop: 4, fontStyle: 'italic' }}>
-                            {phrase.usage}
-                          </Text>
-                        )}
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => speakSpanish(phrase.spanish)}
-                        style={{
-                          padding: 8,
-                          backgroundColor: `${levelColor}20`,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Icon name={Volume2} size={18} color={levelColor} />
-                      </TouchableOpacity>
-                    </View>
-                  </CardContent>
-                </Card>
+                <PhraseAudioCard
+                  key={index}
+                  spanish={phrase.spanish}
+                  english={phrase.english}
+                  context={phrase.usage}
+                  accentColor={levelColor}
+                  style={{ marginBottom: 12 }}
+                />
               ))}
             </TabsContent>
 
@@ -406,3 +432,15 @@ export default function BellaDetailScreen() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  dialogueBubble: {
+    maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+  },
+  highlightedBubble: {
+    borderWidth: 2,
+    transform: [{ scale: 1.02 }],
+  },
+});

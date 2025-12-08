@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
@@ -10,12 +10,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useColor } from '@/hooks/useColor';
+import { useSpanishTTS } from '@/hooks/useSpanishTTS';
+import { SmallAudioButton } from '@/components/audio';
 import { BookOpen, Languages, MessageSquare, Volume2 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
-import * as Speech from 'expo-speech';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
-// Vocabulary Card Component
+// Vocabulary Card Component with flip interaction
 function VocabularyCard({
   item,
   levelColor,
@@ -31,15 +32,18 @@ function VocabularyCard({
   levelColor: string;
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const textMuted = useColor('textMuted');
-  const card = useColor('card');
+  const { speak } = useSpanishTTS();
 
-  const speakSpanish = useCallback((text: string) => {
-    Speech.speak(text, {
-      language: 'es-ES',
-      rate: 0.8,
-    });
-  }, []);
+  const handleSpeak = useCallback(async (text: string) => {
+    setIsPlaying(true);
+    try {
+      await speak(text);
+    } finally {
+      setIsPlaying(false);
+    }
+  }, [speak]);
 
   return (
     <TouchableOpacity
@@ -63,14 +67,21 @@ function VocabularyCard({
                   )}
                 </View>
                 <TouchableOpacity
-                  onPress={() => speakSpanish(item.spanish)}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    handleSpeak(item.spanish);
+                  }}
                   style={{
                     padding: 8,
                     backgroundColor: `${levelColor}20`,
                     borderRadius: 8,
                   }}
                 >
-                  <Icon name={Volume2} color={levelColor} size={20} />
+                  {isPlaying ? (
+                    <Spinner size='sm' variant='circle' color={levelColor} />
+                  ) : (
+                    <Icon name={Volume2} color={levelColor} size={20} />
+                  )}
                 </TouchableOpacity>
               </View>
               <Text variant='caption' style={{ color: textMuted, marginTop: 8 }}>
@@ -96,12 +107,7 @@ function VocabularyCard({
                     <Text style={{ flex: 1, color: levelColor, fontStyle: 'italic' }}>
                       "{item.exampleSentence}"
                     </Text>
-                    <TouchableOpacity
-                      onPress={() => speakSpanish(item.exampleSentence!)}
-                      style={{ padding: 4 }}
-                    >
-                      <Icon name={Volume2} color={levelColor} size={16} />
-                    </TouchableOpacity>
+                    <SmallAudioButton text={item.exampleSentence} color={levelColor} size={16} />
                   </View>
                   {item.exampleTranslation && (
                     <Text variant='caption' style={{ color: textMuted, marginTop: 4 }}>
@@ -138,10 +144,6 @@ function GrammarRuleCard({
 }) {
   const textMuted = useColor('textMuted');
 
-  const speakSpanish = useCallback((text: string) => {
-    Speech.speak(text, { language: 'es-ES', rate: 0.8 });
-  }, []);
-
   return (
     <Card style={{ marginBottom: 16 }}>
       <CardContent>
@@ -174,9 +176,8 @@ function GrammarRuleCard({
               Examples
             </Text>
             {rule.examples.map((ex, i) => (
-              <TouchableOpacity
+              <View
                 key={i}
-                onPress={() => speakSpanish(ex.spanish)}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -185,14 +186,14 @@ function GrammarRuleCard({
                   borderBottomColor: `${textMuted}20`,
                 }}
               >
-                <Icon name={Volume2} color={levelColor} size={14} style={{ marginRight: 8 }} />
-                <View style={{ flex: 1 }}>
+                <SmallAudioButton text={ex.spanish} color={levelColor} size={14} />
+                <View style={{ flex: 1, marginLeft: 8 }}>
                   <Text style={{ color: levelColor }}>{ex.spanish}</Text>
                   <Text variant='caption' style={{ color: textMuted }}>
                     {ex.english}
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             ))}
           </View>
         )}
@@ -229,16 +230,23 @@ function PhraseCard({
   };
   levelColor: string;
 }) {
+  const [isPlaying, setIsPlaying] = useState(false);
   const textMuted = useColor('textMuted');
+  const { speak } = useSpanishTTS();
 
-  const speakSpanish = useCallback((text: string) => {
-    Speech.speak(text, { language: 'es-ES', rate: 0.8 });
-  }, []);
+  const handleSpeak = useCallback(async () => {
+    setIsPlaying(true);
+    try {
+      await speak(phrase.spanish);
+    } finally {
+      setIsPlaying(false);
+    }
+  }, [speak, phrase.spanish]);
 
-  const formalityEmoji: Record<string, string> = {
-    formal: '👔',
-    informal: '😊',
-    neutral: '📝',
+  const formalityColors: Record<string, string> = {
+    formal: '#3b82f6',
+    informal: '#22c55e',
+    neutral: '#8b5cf6',
   };
 
   return (
@@ -256,23 +264,44 @@ function PhraseCard({
               </Text>
             )}
             {phrase.formalityLevel && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                <Text>{formalityEmoji[phrase.formalityLevel] || '📝'}</Text>
-                <Text variant='caption' style={{ color: textMuted, marginLeft: 4, textTransform: 'capitalize' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginTop: 8,
+                  backgroundColor: `${formalityColors[phrase.formalityLevel] || textMuted}15`,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 4,
+                  alignSelf: 'flex-start',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: formalityColors[phrase.formalityLevel] || textMuted,
+                    textTransform: 'capitalize',
+                  }}
+                >
                   {phrase.formalityLevel}
                 </Text>
               </View>
             )}
           </View>
           <TouchableOpacity
-            onPress={() => speakSpanish(phrase.spanish)}
+            onPress={handleSpeak}
             style={{
               padding: 8,
               backgroundColor: `${levelColor}20`,
               borderRadius: 8,
             }}
           >
-            <Icon name={Volume2} color={levelColor} size={20} />
+            {isPlaying ? (
+              <Spinner size='sm' variant='circle' color={levelColor} />
+            ) : (
+              <Icon name={Volume2} color={levelColor} size={20} />
+            )}
           </TouchableOpacity>
         </View>
       </CardContent>

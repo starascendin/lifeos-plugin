@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,16 +10,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useColor } from '@/hooks/useColor';
+import { VocabAudioCard, PhraseAudioCard, GrammarAudioCard } from '@/components/audio';
 import {
   Heart,
-  Volume2,
   Languages,
   BookOpen,
   MessageSquare,
   GraduationCap,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
-import * as Speech from 'expo-speech';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 export default function AILessonDetailScreen() {
@@ -38,10 +37,6 @@ export default function AILessonDetailScreen() {
   const foreground = useColor('foreground');
   const textMuted = useColor('textMuted');
   const card = useColor('card');
-
-  const speakSpanish = useCallback((text: string) => {
-    Speech.speak(text, { language: 'es-ES', rate: 0.8 });
-  }, []);
 
   const handleToggleFavorite = async () => {
     if (!lesson) return;
@@ -181,123 +176,45 @@ export default function AILessonDetailScreen() {
               paddingBottom: insets.bottom + 16,
             }}
           >
-            {/* Vocabulary Tab */}
+            {/* Vocabulary Tab - using VocabAudioCard */}
             <TabsContent value='vocabulary'>
               {lesson.content.vocabulary.map((item, index) => (
-                <Card key={index} style={{ marginBottom: 12 }}>
-                  <CardContent>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 18, color: levelColor, fontWeight: '500' }}>
-                          {item.spanish}
-                        </Text>
-                        <Text style={{ marginTop: 4 }}>{item.english}</Text>
-                        {item.exampleSentence && (
-                          <View
-                            style={{
-                              backgroundColor: `${levelColor}10`,
-                              padding: 12,
-                              borderRadius: 8,
-                              marginTop: 8,
-                            }}
-                          >
-                            <TouchableOpacity
-                              onPress={() => speakSpanish(item.exampleSentence!)}
-                              style={{ flexDirection: 'row', alignItems: 'center' }}
-                            >
-                              <Icon name={Volume2} size={14} color={levelColor} style={{ marginRight: 8 }} />
-                              <Text style={{ flex: 1, fontStyle: 'italic', color: levelColor }}>
-                                {item.exampleSentence}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => speakSpanish(item.spanish)}
-                        style={{
-                          padding: 8,
-                          backgroundColor: `${levelColor}20`,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Icon name={Volume2} size={18} color={levelColor} />
-                      </TouchableOpacity>
-                    </View>
-                  </CardContent>
-                </Card>
+                <VocabAudioCard
+                  key={index}
+                  spanish={item.spanish}
+                  english={item.english}
+                  exampleSentence={item.exampleSentence}
+                  accentColor={levelColor}
+                  style={{ marginBottom: 12 }}
+                />
               ))}
             </TabsContent>
 
-            {/* Grammar Tab */}
+            {/* Grammar Tab - using GrammarAudioCard */}
             <TabsContent value='grammar'>
               {lesson.content.grammarRules.map((rule, index) => (
-                <Card key={index} style={{ marginBottom: 16 }}>
-                  <CardContent>
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
-                      {rule.title}
-                    </Text>
-                    <Text style={{ marginBottom: 12, lineHeight: 22 }}>
-                      {rule.explanation}
-                    </Text>
-                    {rule.examples.length > 0 && (
-                      <View style={{ backgroundColor: `${levelColor}10`, padding: 12, borderRadius: 8 }}>
-                        {rule.examples.map((ex, i) => (
-                          <TouchableOpacity
-                            key={i}
-                            onPress={() => speakSpanish(ex.spanish)}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              paddingVertical: 4,
-                            }}
-                          >
-                            <Icon name={Volume2} size={14} color={levelColor} style={{ marginRight: 8 }} />
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ color: levelColor }}>{ex.spanish}</Text>
-                              <Text variant='caption' style={{ color: textMuted }}>
-                                {ex.english}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </CardContent>
-                </Card>
+                <GrammarAudioCard
+                  key={index}
+                  topic={rule.title}
+                  explanation={rule.explanation}
+                  examples={rule.examples}
+                  accentColor={levelColor}
+                  style={{ marginBottom: 16 }}
+                />
               ))}
             </TabsContent>
 
-            {/* Phrases Tab */}
+            {/* Phrases Tab - using PhraseAudioCard */}
             <TabsContent value='phrases'>
               {lesson.content.phrases.map((phrase, index) => (
-                <Card key={index} style={{ marginBottom: 12 }}>
-                  <CardContent>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 16, color: levelColor, fontWeight: '500' }}>
-                          {phrase.spanish}
-                        </Text>
-                        <Text style={{ marginTop: 4 }}>{phrase.english}</Text>
-                        {phrase.context && (
-                          <Text variant='caption' style={{ color: textMuted, marginTop: 4, fontStyle: 'italic' }}>
-                            {phrase.context}
-                          </Text>
-                        )}
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => speakSpanish(phrase.spanish)}
-                        style={{
-                          padding: 8,
-                          backgroundColor: `${levelColor}20`,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Icon name={Volume2} size={18} color={levelColor} />
-                      </TouchableOpacity>
-                    </View>
-                  </CardContent>
-                </Card>
+                <PhraseAudioCard
+                  key={index}
+                  spanish={phrase.spanish}
+                  english={phrase.english}
+                  context={phrase.context}
+                  accentColor={levelColor}
+                  style={{ marginBottom: 12 }}
+                />
               ))}
             </TabsContent>
 
