@@ -1,13 +1,24 @@
 {
-  "name": "holaaiconvex_prod",
+  "name": "@holaai/convex-prod",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "main": "index.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "convex dev",
+    "dev:once": "convex dev --once",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.20.0"
+  "exports": {
+    ".": "./index.ts",
+    "./_generated/api": "./convex/_generated/api.js",
+    "./_generated/dataModel": "./convex/_generated/dataModel.js",
+    "./schema": "./convex/schema.ts"
+  },
+  "dependencies": {
+    "convex": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "~5.9.2"
+  }
 }

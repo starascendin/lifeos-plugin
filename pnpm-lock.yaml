@@ -303,6 +303,19 @@ importers:
         specifier: ~5.9.2
         version: 5.9.3
 
+  packages/holaaiconvex_prod:
+    dependencies:
+      convex:
+        specifier: ^1.29.0
+        version: 1.30.0(@clerk/clerk-react@5.58.0(react-dom@19.2.1(react@19.2.1))(react@19.2.1))(react@19.2.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.1
+      typescript:
+        specifier: ~5.9.2
+        version: 5.9.3
+
   packages/livekit_agent_node:
     dependencies:
       '@livekit/agents':

@@ -16,3 +16,11 @@ Convex:
         - keen-nightingale-310 -- dev cloud (NOT USED)
         - production id -- agreeable-ibex-949 (MY PRODUCTION ENV)
     - holaaiconvex-staging and holaconvex-prod should have same parity based on the git workflow dev -> staging -> prod (main branch)
+
+
+Vecel:
+- 1 app "holaai-tanstack"
+    - environement:
+        - preview -- for dev branch
+        - staging -- for staging branch
+        - production -- for main branch
