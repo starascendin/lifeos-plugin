@@ -11,6 +11,7 @@ Decisions:
             - feature flagging:
                 - user should only see what "apps" they are supposed to see
             - if we need to, we can separate out individual "web/rn" app for each "app" but use a common convex backend/ai things
+        - [] I liked the way laravel organizes its code. Perhpas we can setup something similar for convex?
 
 
 
