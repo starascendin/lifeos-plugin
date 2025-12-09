@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { StyleSheet, TextInput, Keyboard } from 'react-native';
+import { useState, useMemo } from 'react';
+import { StyleSheet, Pressable } from 'react-native';
 import { View } from '@/components/ui/view';
 import { Text } from '@/components/ui/text';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useColor } from '@/hooks/useColor';
 import { SmallAudioButton } from '@/components/audio/SmallAudioButton';
 import { DrillFeedback } from './DrillFeedback';
-import { ArrowRight } from 'lucide-react-native';
+import { ArrowRight, Check } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
 interface TranslationDrillProps {
@@ -18,63 +18,61 @@ interface TranslationDrillProps {
     pronunciation?: string;
   };
   direction: 'en_to_es' | 'es_to_en';
+  distractors: { spanish: string; english: string }[];
   onAnswer: (correct: boolean) => void;
   onContinue: () => void;
 }
 
-// Normalize answer for comparison (handle accents, spacing, punctuation)
-function normalizeAnswer(answer: string): string {
-  return answer
-    .toLowerCase()
-    .trim()
-    // Normalize common accent variations
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics for comparison
-    .replace(/[¿¡.,!?]/g, '') // Remove punctuation
-    .replace(/\s+/g, ' '); // Normalize whitespace
-}
-
-// Check if answers match (with some flexibility)
-function checkAnswer(userAnswer: string, correctAnswer: string): boolean {
-  const normalizedUser = normalizeAnswer(userAnswer);
-  const normalizedCorrect = normalizeAnswer(correctAnswer);
-
-  // Exact match after normalization
-  if (normalizedUser === normalizedCorrect) return true;
-
-  // Allow for common variations
-  // Remove articles for comparison
-  const withoutArticles = (s: string) =>
-    s.replace(/^(el|la|los|las|un|una|unos|unas|the|a|an)\s+/gi, '');
-
-  if (withoutArticles(normalizedUser) === withoutArticles(normalizedCorrect)) return true;
-
-  return false;
+// Fisher-Yates shuffle
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 export function TranslationDrill({
   item,
   direction,
+  distractors,
   onAnswer,
   onContinue,
 }: TranslationDrillProps) {
-  const [userInput, setUserInput] = useState('');
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
 
   const primary = useColor('primary');
   const textMuted = useColor('textMuted');
   const card = useColor('card');
-  const background = useColor('background');
   const text = useColor('text');
+  const success = '#22c55e';
+  const error = '#ef4444';
 
   const isEnToEs = direction === 'en_to_es';
   const promptText = isEnToEs ? item.english : item.spanish;
   const correctAnswer = isEnToEs ? item.spanish : item.english;
 
+  // Generate shuffled options: correct answer + distractors
+  const options = useMemo(() => {
+    const distractorAnswers = distractors
+      .map((d) => (isEnToEs ? d.spanish : d.english))
+      .filter((answer) => answer !== correctAnswer)
+      .slice(0, 3);
+
+    // Ensure we have enough options (fill with variations if needed)
+    while (distractorAnswers.length < 3) {
+      distractorAnswers.push(`Option ${distractorAnswers.length + 2}`);
+    }
+
+    return shuffleArray([correctAnswer, ...distractorAnswers]);
+  }, [correctAnswer, distractors, isEnToEs]);
+
   const handleSubmit = () => {
-    Keyboard.dismiss();
-    const correct = checkAnswer(userInput, correctAnswer);
+    if (!selectedOption) return;
+    const correct = selectedOption === correctAnswer;
     setIsCorrect(correct);
     setShowFeedback(true);
     onAnswer(correct);
@@ -82,7 +80,7 @@ export function TranslationDrill({
 
   const handleContinue = () => {
     setShowFeedback(false);
-    setUserInput('');
+    setSelectedOption(null);
     onContinue();
   };
 
@@ -91,7 +89,7 @@ export function TranslationDrill({
       <DrillFeedback
         isCorrect={isCorrect}
         correctAnswer={correctAnswer}
-        userAnswer={userInput}
+        userAnswer={selectedOption || ''}
         pronunciation={isEnToEs ? item.pronunciation : undefined}
         onContinue={handleContinue}
       />
@@ -119,44 +117,65 @@ export function TranslationDrill({
         </CardContent>
       </Card>
 
-      {/* Input */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: card,
-              color: text,
-              borderColor: userInput ? primary : `${textMuted}30`,
-            },
-          ]}
-          value={userInput}
-          onChangeText={setUserInput}
-          placeholder={`Type in ${isEnToEs ? 'Spanish' : 'English'}...`}
-          placeholderTextColor={textMuted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
-          onSubmitEditing={userInput.trim() ? handleSubmit : undefined}
-        />
-        {isEnToEs && (
-          <View style={styles.previewButton}>
-            <SmallAudioButton
-              text={userInput || item.spanish}
-              color={textMuted}
-              size={20}
-            />
-          </View>
-        )}
+      {/* Multiple choice options */}
+      <View style={styles.optionsContainer}>
+        {options.map((option, index) => {
+          const isSelected = selectedOption === option;
+          const optionLetter = String.fromCharCode(65 + index); // A, B, C, D
+
+          return (
+            <Pressable
+              key={option}
+              style={[
+                styles.optionButton,
+                {
+                  backgroundColor: isSelected ? `${primary}15` : card,
+                  borderColor: isSelected ? primary : `${textMuted}30`,
+                },
+              ]}
+              onPress={() => setSelectedOption(option)}
+            >
+              <View
+                style={[
+                  styles.optionLetter,
+                  {
+                    backgroundColor: isSelected ? primary : `${textMuted}20`,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.optionLetterText,
+                    { color: isSelected ? '#fff' : textMuted },
+                  ]}
+                >
+                  {optionLetter}
+                </Text>
+              </View>
+              <Text
+                variant="body"
+                style={[styles.optionText, { color: text }]}
+                numberOfLines={2}
+              >
+                {option}
+              </Text>
+              {isSelected && (
+                <View style={[styles.checkIcon, { backgroundColor: primary }]}>
+                  <Icon name={Check} size={14} color="#fff" />
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Submit button */}
       <Button
         onPress={handleSubmit}
-        disabled={!userInput.trim()}
+        disabled={!selectedOption}
         style={[
           styles.submitButton,
-          { opacity: userInput.trim() ? 1 : 0.5 },
+          { opacity: selectedOption ? 1 : 0.5 },
         ]}
       >
         <Text style={styles.submitText}>Check Answer</Text>
@@ -190,22 +209,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginRight: 8,
   },
-  inputContainer: {
-    position: 'relative',
+  optionsContainer: {
     marginBottom: 24,
   },
-  input: {
-    fontSize: 18,
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
-    paddingRight: 50,
     borderRadius: 12,
     borderWidth: 2,
-    minHeight: 56,
+    marginBottom: 12,
   },
-  previewButton: {
-    position: 'absolute',
-    right: 12,
-    top: 16,
+  optionLetter: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  optionLetterText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  optionText: {
+    flex: 1,
+  },
+  checkIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   submitButton: {
     flexDirection: 'row',

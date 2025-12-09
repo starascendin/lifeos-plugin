@@ -186,6 +186,7 @@ export function DrillStage({
           <TranslationDrill
             item={item}
             direction="en_to_es"
+            distractors={getDistractors(item)}
             onAnswer={handleAnswer}
             onContinue={handleContinue}
           />
@@ -196,6 +197,7 @@ export function DrillStage({
           <TranslationDrill
             item={item}
             direction="es_to_en"
+            distractors={getDistractors(item)}
             onAnswer={handleAnswer}
             onContinue={handleContinue}
           />
@@ -246,6 +248,7 @@ export function DrillStage({
           <TranslationDrill
             item={item}
             direction="en_to_es"
+            distractors={getDistractors(item)}
             onAnswer={handleAnswer}
             onContinue={handleContinue}
           />
