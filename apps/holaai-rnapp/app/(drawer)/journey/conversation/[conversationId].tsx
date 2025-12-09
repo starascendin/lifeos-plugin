@@ -99,42 +99,50 @@ export default function ConversationScreen() {
   ];
 
   const renderDialogue = () => {
-    // Debug: log the dialogue data
-    console.log('Dialogue data:', JSON.stringify(conversation.dialogue, null, 2));
+    // Determine the first speaker to establish sides
+    const firstSpeaker = conversation.dialogue[0]?.speaker || conversation.dialogue[0]?.speakerName;
 
     return (
       <View style={{ padding: 16 }}>
         {conversation.dialogue.map((line, index) => {
-          const isLeft = line.speaker === 'A';
-          // Access text fields - try both direct and nested
+          // Determine side based on speaker - first speaker goes left, others go right
+          const currentSpeaker = line.speaker || line.speakerName;
+          const isLeft = currentSpeaker === firstSpeaker;
+
           const spanishText = (line as any).spanish || (line as any).text || (line as any).spanishText || '';
           const englishText = (line as any).english || (line as any).translation || (line as any).englishText || '';
 
           return (
             <View
               key={index}
-              style={[
-                styles.dialogueBubble,
-                isLeft ? styles.dialogueLeft : styles.dialogueRight,
-                { backgroundColor: isLeft ? card : `${primary}15` }
-              ]}
+              style={{
+                alignItems: isLeft ? 'flex-start' : 'flex-end',
+                marginBottom: 12,
+              }}
             >
-              {line.speakerName && (
-                <Text variant='caption' style={{ color: textMuted, marginBottom: 4 }}>
-                  {line.speakerName}
+              <View
+                style={{
+                  backgroundColor: isLeft ? card : `${primary}20`,
+                  padding: 12,
+                  borderRadius: 12,
+                  borderBottomLeftRadius: isLeft ? 4 : 12,
+                  borderBottomRightRadius: isLeft ? 12 : 4,
+                  maxWidth: '80%',
+                }}
+              >
+                {line.speakerName && (
+                  <Text variant='caption' style={{ color: isLeft ? textMuted : primary, marginBottom: 4, fontWeight: '600' }}>
+                    {line.speakerName}
+                  </Text>
+                )}
+                <Text variant='body' style={{ color: text, fontWeight: '500', marginBottom: 4 }}>
+                  {spanishText}
                 </Text>
-              )}
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <Text variant='body' style={{ color: '#1a1a1a', fontWeight: '600' }}>
-                    {spanishText || '[No Spanish text]'}
-                  </Text>
-                  <Text variant='caption' style={{ color: '#666666', marginTop: 4 }}>
-                    {englishText || '[No English text]'}
-                  </Text>
-                </View>
-                <View style={{ marginLeft: 8 }}>
-                  <SmallAudioButton text={spanishText} color={primary} size={18} />
+                <Text variant='caption' style={{ color: textMuted }}>
+                  {englishText}
+                </Text>
+                <View style={{ alignItems: 'flex-end', marginTop: 8 }}>
+                  <SmallAudioButton text={spanishText} color={isLeft ? primary : primary} size={20} />
                 </View>
               </View>
             </View>
@@ -357,20 +365,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
-  },
-  dialogueBubble: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    maxWidth: '85%',
-  },
-  dialogueLeft: {
-    alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
-  },
-  dialogueRight: {
-    alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
   },
   exampleRow: {
     marginBottom: 8,
