@@ -5,34 +5,101 @@ chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('app.html') });
 });
 
-// Set up alarm to check for due notes every minute
+// Ensure alarm exists - call this on every service worker wake
+async function ensureAlarmExists() {
+  const alarm = await chrome.alarms.get('checkNotes');
+  if (!alarm) {
+    console.log('Creating checkNotes alarm...');
+    chrome.alarms.create('checkNotes', { periodInMinutes: 1 });
+  } else {
+    console.log('Alarm already exists, next fire:', new Date(alarm.scheduledTime));
+  }
+}
+
+// Set up alarm on install
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create('checkNotes', { periodInMinutes: 1 });
   console.log('Substack Notes Scheduler installed');
+  ensureAlarmExists();
 });
 
-// Also create alarm on startup
+// Set up alarm on startup
 chrome.runtime.onStartup.addListener(() => {
-  chrome.alarms.create('checkNotes', { periodInMinutes: 1 });
+  console.log('Substack Notes Scheduler startup');
+  ensureAlarmExists();
 });
+
+// Ensure alarm exists when service worker wakes up
+ensureAlarmExists();
 
 // Handle alarm
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  console.log('Alarm fired:', alarm.name, 'at', new Date().toLocaleTimeString());
   if (alarm.name === 'checkNotes') {
     await checkAndPostDueNotes();
   }
 });
 
-// Check for notes that are due and post them
+// Grace period: only auto-post if due within this window (2 minutes)
+const GRACE_PERIOD_MS = 2 * 60 * 1000;
+
+// Check for notes that are due and post them (or move to backlog if too old)
 async function checkAndPostDueNotes() {
+  console.log('Checking for due notes...');
   const { notes = [] } = await chrome.storage.local.get('notes');
   const now = Date.now();
 
-  const dueNotes = notes.filter(n => n.status === 'pending' && n.scheduledFor <= now);
+  console.log(`Found ${notes.length} total notes`);
+
+  const pendingNotes = notes.filter(n => n.status === 'pending');
+  console.log(`Found ${pendingNotes.length} pending notes`);
+
+  for (const note of pendingNotes) {
+    const timeUntilDue = note.scheduledFor - now;
+    console.log(`Note "${note.text?.substring(0, 30)}..." scheduled for ${new Date(note.scheduledFor).toLocaleString()}, due in ${Math.round(timeUntilDue / 1000)}s`);
+  }
+
+  const dueNotes = pendingNotes.filter(n => n.scheduledFor <= now);
+  console.log(`Found ${dueNotes.length} notes that are due`);
+
+  let notesUpdated = false;
 
   for (const note of dueNotes) {
-    await postNote(note);
+    const overdueBy = now - note.scheduledFor;
+
+    if (overdueBy <= GRACE_PERIOD_MS) {
+      // Within grace period - post it
+      console.log('Posting note (within grace period):', note.text?.substring(0, 50));
+      await postNote(note);
+    } else {
+      // Too old - move to backlog
+      console.log(`Moving note to backlog (overdue by ${Math.round(overdueBy / 1000 / 60)} minutes):`, note.text?.substring(0, 50));
+      await markNoteAsBacklog(note.id);
+      notesUpdated = true;
+    }
   }
+
+  // If we moved any notes to backlog, notify the user
+  if (notesUpdated) {
+    const { notes: updatedNotes = [] } = await chrome.storage.local.get('notes');
+    const backlogCount = updatedNotes.filter(n => n.status === 'backlog').length;
+    if (backlogCount > 0) {
+      // Show badge on extension icon
+      chrome.action.setBadgeText({ text: backlogCount.toString() });
+      chrome.action.setBadgeBackgroundColor({ color: '#ff9800' });
+    }
+  }
+}
+
+// Mark note as backlog (missed/overdue)
+async function markNoteAsBacklog(noteId) {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const updated = notes.map(n => {
+    if (n.id === noteId) {
+      return { ...n, status: 'backlog', backlogAt: Date.now() };
+    }
+    return n;
+  });
+  await chrome.storage.local.set({ notes: updated });
 }
 
 // Post a single note to Substack

@@ -1,6 +1,14 @@
 // Substack Notes Scheduler - App Logic
 
 let currentImage = null;
+let currentWeekStart = getWeekStart(new Date());
+
+// Time slots configuration
+const TIME_SLOTS = [
+  { name: 'Morning', hour: 9 },
+  { name: 'Evening', hour: 16 },
+  { name: 'Night', hour: 21 }
+];
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,20 +16,37 @@ document.addEventListener('DOMContentLoaded', () => {
   initEditor();
   initImageUpload();
   initScheduler();
+  initCalendar();
   loadNotes();
+  loadBacklog();
   initExportImport();
+  checkForOverdueNotes();
 });
 
-// Display timezone
+// Display timezone and current time
 function initTimezone() {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   document.getElementById('timezone').textContent = tz;
+
+  // Update current time immediately and every second
+  updateCurrentTime();
+  setInterval(updateCurrentTime, 1000);
 
   // Set default schedule time to tomorrow 9 AM
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(9, 0, 0, 0);
   document.getElementById('scheduleDate').value = formatDateTimeLocal(tomorrow);
+}
+
+function updateCurrentTime() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  document.getElementById('currentTime').textContent = timeStr;
 }
 
 function formatDateTimeLocal(date) {
@@ -106,6 +131,82 @@ function initImageUpload() {
 function initScheduler() {
   document.getElementById('scheduleBtn').addEventListener('click', scheduleNote);
   document.getElementById('postNowBtn').addEventListener('click', postNow);
+  document.getElementById('nextSlotBtn').addEventListener('click', scheduleToNextSlot);
+}
+
+// Schedule to next available slot
+async function scheduleToNextSlot() {
+  const editor = document.getElementById('editor');
+  const content = editor.innerHTML.trim();
+  const text = editor.textContent.trim();
+
+  if (!text) {
+    showStatus('Please write something first', 'error');
+    return;
+  }
+
+  const nextSlot = await findNextAvailableSlot();
+  if (!nextSlot) {
+    showStatus('No available slots in the next 2 weeks', 'error');
+    return;
+  }
+
+  const note = {
+    id: Date.now().toString(),
+    content: content,
+    text: text,
+    image: currentImage,
+    scheduledFor: nextSlot.getTime(),
+    status: 'pending'
+  };
+
+  // Save to storage
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  notes.push(note);
+  notes.sort((a, b) => a.scheduledFor - b.scheduledFor);
+  await chrome.storage.local.set({ notes });
+
+  // Clear form
+  editor.innerHTML = '';
+  currentImage = null;
+  document.getElementById('imagePreviewContainer').style.display = 'none';
+  document.getElementById('imagePrompt').style.display = 'block';
+  document.getElementById('imageInput').value = '';
+
+  showStatus(`Scheduled for ${formatDateTime(nextSlot.getTime())}`, 'success');
+  loadNotes();
+  renderCalendar();
+}
+
+// Find next available slot
+async function findNextAvailableSlot() {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const pendingNotes = notes.filter(n => n.status === 'pending');
+  const scheduledTimes = new Set(pendingNotes.map(n => n.scheduledFor));
+
+  const now = new Date();
+
+  // Check slots for the next 14 days
+  for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
+    const day = new Date(now);
+    day.setDate(day.getDate() + dayOffset);
+    day.setMinutes(0, 0, 0);
+
+    for (const slot of TIME_SLOTS) {
+      const slotTime = new Date(day);
+      slotTime.setHours(slot.hour, 0, 0, 0);
+
+      // Skip if slot is in the past
+      if (slotTime <= now) continue;
+
+      // Check if slot is available
+      if (!scheduledTimes.has(slotTime.getTime())) {
+        return slotTime;
+      }
+    }
+  }
+
+  return null;
 }
 
 async function scheduleNote() {
@@ -228,11 +329,19 @@ async function loadNotes() {
         ${note.image ? '<div style="font-size:12px;color:#666;margin-top:4px;">📷 Has image</div>' : ''}
       </div>
       <div class="note-actions">
-        <button class="edit" onclick="editNote('${note.id}')">Edit</button>
-        <button class="delete" onclick="deleteNote('${note.id}')">Delete</button>
+        <button class="edit" data-action="edit" data-id="${note.id}">Edit</button>
+        <button class="delete" data-action="delete" data-id="${note.id}">Delete</button>
       </div>
     </li>
   `).join('');
+
+  // Add click handlers using event delegation
+  list.querySelectorAll('button[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => editNote(btn.dataset.id));
+  });
+  list.querySelectorAll('button[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', () => deleteNote(btn.dataset.id));
+  });
 }
 
 function formatDateTime(timestamp) {
@@ -340,6 +449,296 @@ function showStatus(message, type) {
   }, 3000);
 }
 
-// Make functions available globally for onclick handlers
-window.editNote = editNote;
-window.deleteNote = deleteNote;
+// ==================== BACKLOG ====================
+
+// Grace period matches background.js (2 minutes)
+const GRACE_PERIOD_MS = 2 * 60 * 1000;
+
+// Check for overdue notes and move them to backlog on app load
+async function checkForOverdueNotes() {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const now = Date.now();
+  let updated = false;
+
+  const updatedNotes = notes.map(note => {
+    if (note.status === 'pending' && note.scheduledFor <= now) {
+      const overdueBy = now - note.scheduledFor;
+      if (overdueBy > GRACE_PERIOD_MS) {
+        updated = true;
+        return { ...note, status: 'backlog', backlogAt: Date.now() };
+      }
+    }
+    return note;
+  });
+
+  if (updated) {
+    await chrome.storage.local.set({ notes: updatedNotes });
+    loadNotes();
+    loadBacklog();
+    renderCalendar();
+    // Clear badge since user is viewing the app
+    chrome.action.setBadgeText({ text: '' });
+  }
+}
+
+// Load and display backlog notes
+async function loadBacklog() {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const section = document.getElementById('backlogSection');
+  const list = document.getElementById('backlogList');
+  const count = document.getElementById('backlogCount');
+
+  const backlogNotes = notes.filter(n => n.status === 'backlog');
+  count.textContent = backlogNotes.length;
+
+  if (backlogNotes.length === 0) {
+    section.classList.add('empty');
+    list.innerHTML = '';
+    // Clear badge
+    chrome.action.setBadgeText({ text: '' });
+    return;
+  }
+
+  section.classList.remove('empty');
+
+  // Sort by original scheduled time (oldest first)
+  backlogNotes.sort((a, b) => a.scheduledFor - b.scheduledFor);
+
+  list.innerHTML = backlogNotes.map(note => `
+    <li class="backlog-item" data-id="${note.id}">
+      <div class="backlog-content">
+        <div class="backlog-time">Was scheduled for: ${formatDateTime(note.scheduledFor)}</div>
+        <div class="backlog-text">${escapeHtml(note.text)}</div>
+        ${note.image ? '<div style="font-size:12px;color:#666;margin-top:4px;">📷 Has image</div>' : ''}
+      </div>
+      <div class="backlog-actions">
+        <button class="post-now" data-action="backlog-post" data-id="${note.id}">Post Now</button>
+        <button class="reschedule" data-action="backlog-reschedule" data-id="${note.id}">Reschedule</button>
+        <button class="delete" data-action="backlog-delete" data-id="${note.id}">Delete</button>
+      </div>
+    </li>
+  `).join('');
+
+  // Add click handlers
+  list.querySelectorAll('button[data-action="backlog-post"]').forEach(btn => {
+    btn.addEventListener('click', () => postBacklogNote(btn.dataset.id));
+  });
+  list.querySelectorAll('button[data-action="backlog-reschedule"]').forEach(btn => {
+    btn.addEventListener('click', () => rescheduleBacklogNote(btn.dataset.id));
+  });
+  list.querySelectorAll('button[data-action="backlog-delete"]').forEach(btn => {
+    btn.addEventListener('click', () => deleteBacklogNote(btn.dataset.id));
+  });
+}
+
+// Post a backlog note immediately
+async function postBacklogNote(id) {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+
+  showStatus('Posting note...', 'success');
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'postNow',
+      note: {
+        content: note.content,
+        text: note.text,
+        image: note.image
+      }
+    });
+
+    if (response && response.success) {
+      // Mark as posted
+      const updated = notes.map(n => {
+        if (n.id === id) {
+          return { ...n, status: 'posted', postedAt: Date.now() };
+        }
+        return n;
+      });
+      await chrome.storage.local.set({ notes: updated });
+      showStatus('Posted successfully!', 'success');
+      loadBacklog();
+    } else {
+      showStatus('Failed to post: ' + (response?.error || 'Unknown error'), 'error');
+    }
+  } catch (error) {
+    showStatus('Failed to post: ' + error.message, 'error');
+  }
+}
+
+// Move backlog note back to editor for rescheduling
+async function rescheduleBacklogNote(id) {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+
+  // Load into editor
+  document.getElementById('editor').innerHTML = note.content;
+
+  if (note.image) {
+    currentImage = note.image;
+    document.getElementById('imagePreview').src = note.image;
+    document.getElementById('imagePreviewContainer').style.display = 'inline-block';
+    document.getElementById('imagePrompt').style.display = 'none';
+  }
+
+  // Set default schedule to next available slot
+  const nextSlot = await findNextAvailableSlot();
+  if (nextSlot) {
+    document.getElementById('scheduleDate').value = formatDateTimeLocal(nextSlot);
+  }
+
+  // Remove from backlog
+  const filtered = notes.filter(n => n.id !== id);
+  await chrome.storage.local.set({ notes: filtered });
+
+  showStatus('Note loaded - set a new time and schedule', 'success');
+  loadBacklog();
+  renderCalendar();
+
+  // Scroll to editor
+  document.getElementById('editor').focus();
+}
+
+// Delete a backlog note
+async function deleteBacklogNote(id) {
+  if (!confirm('Delete this missed note?')) return;
+
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const filtered = notes.filter(n => n.id !== id);
+  await chrome.storage.local.set({ notes: filtered });
+
+  showStatus('Note deleted', 'success');
+  loadBacklog();
+}
+
+// ==================== CALENDAR ====================
+
+// Get start of week (Sunday)
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Initialize calendar
+function initCalendar() {
+  document.getElementById('prevWeekBtn').addEventListener('click', () => {
+    currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    renderCalendar();
+  });
+
+  document.getElementById('nextWeekBtn').addEventListener('click', () => {
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    renderCalendar();
+  });
+
+  renderCalendar();
+}
+
+// Render the calendar grid
+async function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  const weekLabel = document.getElementById('weekLabel');
+
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const pendingNotes = notes.filter(n => n.status === 'pending');
+
+  // Create a map of scheduled times to notes
+  const notesByTime = {};
+  for (const note of pendingNotes) {
+    notesByTime[note.scheduledFor] = note;
+  }
+
+  // Calculate week end
+  const weekEnd = new Date(currentWeekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+
+  // Update week label
+  const formatOpts = { month: 'short', day: 'numeric' };
+  weekLabel.textContent = `${currentWeekStart.toLocaleDateString(undefined, formatOpts)} - ${weekEnd.toLocaleDateString(undefined, formatOpts)}, ${currentWeekStart.getFullYear()}`;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Build grid HTML
+  let html = '';
+
+  // Header row
+  html += '<div class="calendar-cell calendar-header-cell"></div>'; // Empty corner
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(currentWeekStart);
+    day.setDate(day.getDate() + i);
+    const isToday = day.getTime() === today.getTime();
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    html += `
+      <div class="calendar-cell calendar-header-cell">
+        <div class="calendar-day-header ${isToday ? 'today' : ''}">
+          <span class="day-name">${dayNames[i]}</span>
+          <span class="day-num">${day.getDate()}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Time slot rows
+  for (const slot of TIME_SLOTS) {
+    // Time label
+    const hour = slot.hour;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour;
+    html += `<div class="calendar-cell calendar-time-cell">${displayHour}:00 ${ampm}<br>${slot.name}</div>`;
+
+    // Day cells for this slot
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(currentWeekStart);
+      day.setDate(day.getDate() + i);
+      day.setHours(slot.hour, 0, 0, 0);
+
+      const slotTime = day.getTime();
+      const isPast = day < now;
+      const note = notesByTime[slotTime];
+
+      let cellClass = 'calendar-cell calendar-slot';
+      if (isPast) cellClass += ' past';
+      if (note) cellClass += ' has-note';
+
+      let cellContent = '';
+      if (note) {
+        cellContent = `<div class="slot-note" title="${escapeHtml(note.text)}">${escapeHtml(note.text.substring(0, 20))}${note.text.length > 20 ? '...' : ''}</div>`;
+      } else if (!isPast) {
+        cellContent = '<div class="slot-empty">+</div>';
+      }
+
+      html += `<div class="${cellClass}" data-time="${slotTime}">${cellContent}</div>`;
+    }
+  }
+
+  grid.innerHTML = html;
+
+  // Add click handlers for slots
+  grid.querySelectorAll('.calendar-slot:not(.past)').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const slotTime = parseInt(cell.dataset.time);
+      const note = notesByTime[slotTime];
+
+      if (note) {
+        // Edit existing note
+        editNote(note.id);
+      } else {
+        // Set schedule time to this slot
+        const slotDate = new Date(slotTime);
+        document.getElementById('scheduleDate').value = formatDateTimeLocal(slotDate);
+        showStatus(`Selected slot: ${formatDateTime(slotTime)}`, 'success');
+        // Scroll to editor
+        document.getElementById('editor').focus();
+      }
+    });
+  });
+}
+
