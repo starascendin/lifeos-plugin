@@ -82,8 +82,8 @@ export default function ConversationAIScreen() {
       setSelectedModuleIds([]);
       setShowGenerator(false);
 
-      // Navigate to the conversation
-      router.push(`/journey/conversation/${result.conversationId}`);
+      // Navigate to the conversation (within this stack)
+      router.push(`/conversation-ai/view/${result.conversationId}`);
     } catch (error) {
       console.error('Error generating conversation:', error);
       Alert.alert('Error', 'Failed to generate conversation. Please try again.');
@@ -93,7 +93,7 @@ export default function ConversationAIScreen() {
   };
 
   const navigateToConversation = (conversationId: Id<"hola_journeyConversations">) => {
-    router.push(`/journey/conversation/${conversationId}`);
+    router.push(`/conversation-ai/view/${conversationId}`);
   };
 
   const formatDate = (timestamp: number) => {

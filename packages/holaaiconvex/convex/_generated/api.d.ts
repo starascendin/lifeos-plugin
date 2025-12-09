@@ -18,6 +18,7 @@ import type * as holaai_ai from "../holaai/ai.js";
 import type * as holaai_content from "../holaai/content.js";
 import type * as holaai_exercises from "../holaai/exercises.js";
 import type * as holaai_journey from "../holaai/journey.js";
+import type * as holaai_learning from "../holaai/learning.js";
 import type * as holaai_progress from "../holaai/progress.js";
 import type * as holaai_seed from "../holaai/seed.js";
 import type * as holaai_voice from "../holaai/voice.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "holaai/content": typeof holaai_content;
   "holaai/exercises": typeof holaai_exercises;
   "holaai/journey": typeof holaai_journey;
+  "holaai/learning": typeof holaai_learning;
   "holaai/progress": typeof holaai_progress;
   "holaai/seed": typeof holaai_seed;
   "holaai/voice": typeof holaai_voice;

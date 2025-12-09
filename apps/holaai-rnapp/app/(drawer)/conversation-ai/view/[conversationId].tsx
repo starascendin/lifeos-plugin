@@ -23,7 +23,7 @@ import type { Id } from '@holaai/convex/_generated/dataModel';
 
 type TabType = 'dialogue' | 'grammar' | 'phrases';
 
-export default function ConversationScreen() {
+export default function ConversationViewScreen() {
   const router = useRouter();
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const insets = useSafeAreaInsets();
@@ -100,13 +100,11 @@ export default function ConversationScreen() {
   ];
 
   const renderDialogue = () => {
-    // Determine the first speaker to establish sides
     const firstSpeaker = conversation.dialogue[0]?.speaker || conversation.dialogue[0]?.speakerName;
 
     return (
       <View style={{ padding: 16 }}>
         {conversation.dialogue.map((line, index) => {
-          // Determine side based on speaker - first speaker goes left, others go right
           const currentSpeaker = line.speaker || line.speakerName;
           const isLeft = currentSpeaker === firstSpeaker;
 
@@ -143,7 +141,7 @@ export default function ConversationScreen() {
                   {englishText}
                 </Text>
                 <View style={{ alignItems: 'flex-end', marginTop: 8 }}>
-                  <SmallAudioButton text={spanishText} color={isLeft ? primary : primary} size={20} />
+                  <SmallAudioButton text={spanishText} color={primary} size={20} />
                 </View>
               </View>
             </View>

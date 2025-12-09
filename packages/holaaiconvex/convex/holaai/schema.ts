@@ -374,6 +374,37 @@ export const holaaiTables = {
     .index("by_user", ["userId"])
     .index("by_user_module", ["userId", "moduleId"]),
 
+  // Interactive lesson learning sessions
+  hola_lessonSessions: defineTable({
+    userId: v.id("users"),
+    lessonId: v.id("hola_moduleLessons"),
+    status: v.string(), // "in_progress" | "completed"
+    currentStageIndex: v.number(), // Which stage user is on
+    stages: v.array(
+      v.object({
+        id: v.string(),
+        type: v.string(), // "intro" | "teach_vocab" | "drill_vocab" | etc.
+        title: v.string(),
+        contentIds: v.array(v.string()),
+        isCompleted: v.boolean(),
+        drillTypes: v.optional(v.array(v.string())),
+      })
+    ),
+    itemMastery: v.any(), // Record<contentId, { correctCount, isMastered, attempts }>
+    startedAt: v.number(),
+    lastActivityAt: v.number(),
+    completedAt: v.optional(v.number()),
+    sessionStats: v.object({
+      totalDrills: v.number(),
+      correctDrills: v.number(),
+      hintsUsed: v.number(),
+      totalTimeSpent: v.number(), // seconds
+    }),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_lesson", ["userId", "lessonId"])
+    .index("by_user_status", ["userId", "status"]),
+
   // ==================== PRACTICE TESTS ====================
 
   // Practice test definitions

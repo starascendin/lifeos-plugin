@@ -19,6 +19,8 @@ import {
   Target,
   Sparkles,
   Plus,
+  Play,
+  BookMarked,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { SmallAudioButton } from '@/components/audio/SmallAudioButton';
@@ -484,15 +486,24 @@ export default function LessonScreen() {
           {renderContent()}
         </ScrollView>
 
-        {/* Complete Button */}
+        {/* Action Buttons */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <Button
-            onPress={handleCompleteLesson}
+            onPress={() => router.push(`/journey/learn/${lessonId}`)}
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Icon name={CheckCircle} color='#fff' size={20} />
+            <Icon name={Play} color='#fff' size={20} />
             <Text style={{ color: '#fff', marginLeft: 8, fontWeight: '600' }}>
-              Mark as Complete
+              Start Learning
+            </Text>
+          </Button>
+          <Button
+            onPress={handleCompleteLesson}
+            style={[styles.secondaryButton, { backgroundColor: card, marginTop: 10 }]}
+          >
+            <Icon name={BookMarked} color={textMuted} size={18} />
+            <Text style={{ color: textMuted, marginLeft: 8, fontWeight: '500' }}>
+              Skip to Complete
             </Text>
           </Button>
         </View>
@@ -594,5 +605,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
   },
 });
