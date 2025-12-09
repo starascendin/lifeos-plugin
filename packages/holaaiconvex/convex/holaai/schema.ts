@@ -266,6 +266,47 @@ export const holaaiTables = {
     .index("by_user_favorite", ["userId", "isFavorite"])
     .index("by_user_created", ["userId", "createdAt"]),
 
+  // Journey-specific AI conversations (contextualized to modules/lessons)
+  hola_journeyConversations: defineTable({
+    userId: v.id("users"),
+    moduleId: v.id("hola_learningModules"), // Which module context
+    lessonId: v.optional(v.id("hola_moduleLessons")), // Which lesson context (optional)
+    situation: v.string(), // User's scenario description
+    title: v.string(), // Generated title
+    dialogue: v.array(
+      v.object({
+        speaker: v.string(), // "A" or "B"
+        speakerName: v.optional(v.string()), // e.g., "Waiter", "Customer"
+        spanish: v.string(),
+        english: v.string(),
+      })
+    ),
+    grammarHints: v.array(
+      v.object({
+        topic: v.string(),
+        explanation: v.string(),
+        examples: v.array(
+          v.object({
+            spanish: v.string(),
+            english: v.string(),
+          })
+        ),
+      })
+    ),
+    keyPhrases: v.array(
+      v.object({
+        spanish: v.string(),
+        english: v.string(),
+        usage: v.optional(v.string()),
+      })
+    ),
+    isFavorite: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_module", ["userId", "moduleId"])
+    .index("by_user_created", ["userId", "createdAt"]),
+
   // ==================== VOICE CONVERSATIONS ====================
 
   // Voice conversation sessions

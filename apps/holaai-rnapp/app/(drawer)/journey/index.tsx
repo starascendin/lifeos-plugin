@@ -19,7 +19,9 @@ import {
   PlayCircle,
   Trophy,
   Target,
-  Database
+  Database,
+  Sparkles,
+  MessageSquare,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { useAuth } from '@clerk/clerk-expo';
@@ -55,6 +57,12 @@ export default function JourneyScreen() {
       : 'skip'
   );
 
+  // Get all user's AI conversations
+  const conversations = useQuery(
+    api.holaai.ai.listJourneyConversations,
+    currentUser ? { userId: currentUser._id } : 'skip'
+  );
+
   const initializeJourney = useMutation(api.holaai.journey.initializeJourney);
   const seedA1Journey = useMutation(api.holaai.seed.seedA1Journey);
   const [seeding, setSeeding] = useState(false);
@@ -79,6 +87,18 @@ export default function JourneyScreen() {
 
   const navigateToModule = (moduleId: Id<"hola_learningModules">) => {
     router.push(`/journey/module/${moduleId}`);
+  };
+
+  const navigateToConversation = (conversationId: Id<"hola_journeyConversations">) => {
+    router.push(`/journey/conversation/${conversationId}`);
+  };
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   if (levels === undefined || modules === undefined) {
@@ -176,8 +196,63 @@ export default function JourneyScreen() {
               </CardContent>
             </Card>
 
-            <Text variant='body' style={{ color: textMuted }}>
+            <Text variant='body' style={{ color: textMuted, marginBottom: 16 }}>
               Complete each module to unlock the next. Pass the quiz with 70% or higher to progress.
+            </Text>
+
+            {/* My AI Conversations Section */}
+            {conversations && conversations.length > 0 && (
+              <Card style={{ marginBottom: 16 }}>
+                <CardContent style={{ padding: 16 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <Icon name={Sparkles} color={primary} size={20} />
+                    <Text variant='title' style={{ marginLeft: 8, flex: 1 }}>
+                      My AI Conversations
+                    </Text>
+                    <Text variant='caption' style={{ color: textMuted }}>
+                      {conversations.length} saved
+                    </Text>
+                  </View>
+
+                  {/* Show latest 3 conversations */}
+                  {conversations.slice(0, 3).map((conv, index, arr) => (
+                    <TouchableOpacity
+                      key={conv._id}
+                      onPress={() => navigateToConversation(conv._id)}
+                      style={[
+                        styles.conversationItem,
+                        index === arr.length - 1 && { borderBottomWidth: 0 }
+                      ]}
+                    >
+                      <View style={[styles.conversationIcon, { backgroundColor: `${primary}15` }]}>
+                        <Icon name={MessageSquare} size={16} color={primary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text variant='body' style={{ fontWeight: '500' }} numberOfLines={1}>
+                          {conv.title}
+                        </Text>
+                        <Text variant='caption' style={{ color: textMuted }} numberOfLines={1}>
+                          {conv.situation}
+                        </Text>
+                      </View>
+                      <Text variant='caption' style={{ color: textMuted }}>
+                        {formatDate(conv.createdAt)}
+                      </Text>
+                      <Icon name={ChevronRight} size={16} color={textMuted} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  ))}
+
+                  {conversations.length > 3 && (
+                    <Text variant='caption' style={{ color: textMuted, textAlign: 'center', marginTop: 8 }}>
+                      +{conversations.length - 3} more conversations in module lessons
+                    </Text>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Text variant='subtitle' style={{ marginBottom: 8 }}>
+              Modules
             </Text>
           </View>
         }
@@ -371,5 +446,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  conversationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  conversationIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
 });

@@ -36,6 +36,21 @@ export default function JourneyLayout() {
           title: 'Lesson',
         }}
       />
+      <Stack.Screen
+        name="generate/[moduleId]"
+        options={{
+          headerShown: true,
+          title: 'Generate Conversation',
+          presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="conversation/[conversationId]"
+        options={{
+          headerShown: true,
+          title: 'Conversation',
+        }}
+      />
     </Stack>
   );
 }

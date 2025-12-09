@@ -17,7 +17,8 @@ import {
   Clock,
   FileQuestion,
   Play,
-  RotateCcw
+  RotateCcw,
+  Sparkles
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import type { Id } from '@holaai/convex/_generated/dataModel';
@@ -73,6 +74,10 @@ export default function ModuleDetailScreen() {
 
   const navigateToLesson = (lessonId: Id<"hola_moduleLessons">) => {
     router.push(`/journey/lesson/${lessonId}`);
+  };
+
+  const navigateToGenerate = () => {
+    router.push(`/journey/generate/${moduleId}`);
   };
 
   if (moduleData === undefined) {
@@ -175,6 +180,24 @@ export default function ModuleDetailScreen() {
                       </Text>
                     </TouchableOpacity>
                   )}
+
+                  {/* Generate Conversation Button */}
+                  <Button
+                    onPress={navigateToGenerate}
+                    variant='outline'
+                    style={{
+                      marginTop: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderColor: primary,
+                    }}
+                  >
+                    <Icon name={Sparkles} color={primary} size={18} />
+                    <Text style={{ color: primary, marginLeft: 8, fontWeight: '600' }}>
+                      Generate Practice Conversation
+                    </Text>
+                  </Button>
                 </CardContent>
               </Card>
 

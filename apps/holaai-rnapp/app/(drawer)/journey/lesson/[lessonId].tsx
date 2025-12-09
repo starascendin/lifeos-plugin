@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { ScrollView, TouchableOpacity, StyleSheet, Dimensions, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
@@ -16,13 +16,16 @@ import {
   FileText,
   Languages,
   MessageSquare,
-  Target
+  Target,
+  Sparkles,
+  Plus,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { SmallAudioButton } from '@/components/audio/SmallAudioButton';
+import { ConversationCard } from '@/components/journey/ConversationCard';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
-type TabType = 'objectives' | 'vocabulary' | 'grammar' | 'phrases' | 'exercises';
+type TabType = 'objectives' | 'vocabulary' | 'grammar' | 'phrases' | 'exercises' | 'ai_practice';
 
 export default function LessonScreen() {
   const router = useRouter();
@@ -37,7 +40,16 @@ export default function LessonScreen() {
     lessonId ? { lessonId: lessonId as Id<"hola_moduleLessons"> } : 'skip'
   );
 
+  // Get conversations for this module
+  const moduleId = lessonData?.module?._id;
+  const conversations = useQuery(
+    api.holaai.ai.listJourneyConversations,
+    currentUser && moduleId ? { userId: currentUser._id, moduleId } : 'skip'
+  );
+
   const completeLesson = useMutation(api.holaai.journey.completeLesson);
+  const toggleFavorite = useMutation(api.holaai.ai.toggleJourneyConversationFavorite);
+  const deleteConversation = useMutation(api.holaai.ai.deleteJourneyConversation);
 
   const primary = useColor('primary');
   const background = useColor('background');
@@ -53,6 +65,45 @@ export default function LessonScreen() {
       });
       router.back();
     }
+  };
+
+  const handleToggleFavorite = async (conversationId: Id<"hola_journeyConversations">) => {
+    try {
+      await toggleFavorite({ conversationId });
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const handleDeleteConversation = (conversationId: Id<"hola_journeyConversations">) => {
+    Alert.alert(
+      'Delete Conversation',
+      'Are you sure you want to delete this conversation?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteConversation({ conversationId });
+            } catch (error) {
+              console.error('Error deleting conversation:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const navigateToGenerate = () => {
+    if (moduleId) {
+      router.push(`/journey/generate/${moduleId}`);
+    }
+  };
+
+  const navigateToConversation = (conversationId: Id<"hola_journeyConversations">) => {
+    router.push(`/journey/conversation/${conversationId}`);
   };
 
   if (lessonData === undefined) {
@@ -73,13 +124,17 @@ export default function LessonScreen() {
     );
   }
 
-  const tabs: { key: TabType; label: string; icon: any; count: number }[] = [
-    { key: 'objectives', label: 'Goals', icon: Target, count: lessonData.objectives.length },
-    { key: 'vocabulary', label: 'Vocab', icon: Languages, count: lessonData.vocabulary.length },
-    { key: 'grammar', label: 'Grammar', icon: FileText, count: lessonData.grammar.length },
-    { key: 'phrases', label: 'Phrases', icon: MessageSquare, count: lessonData.phrases.length },
-    { key: 'exercises', label: 'Practice', icon: BookOpen, count: lessonData.exercises.length },
-  ].filter(tab => tab.count > 0 || tab.key === 'objectives');
+  const conversationCount = conversations?.length || 0;
+
+  const allTabs: { key: TabType; label: string; icon: any; count: number }[] = [
+    { key: 'objectives' as const, label: 'Goals', icon: Target, count: lessonData.objectives.length },
+    { key: 'vocabulary' as const, label: 'Vocab', icon: Languages, count: lessonData.vocabulary.length },
+    { key: 'grammar' as const, label: 'Grammar', icon: FileText, count: lessonData.grammar.length },
+    { key: 'phrases' as const, label: 'Phrases', icon: MessageSquare, count: lessonData.phrases.length },
+    { key: 'exercises' as const, label: 'Practice', icon: BookOpen, count: lessonData.exercises.length },
+    { key: 'ai_practice' as const, label: 'AI', icon: Sparkles, count: conversationCount },
+  ];
+  const tabs = allTabs.filter(tab => tab.count > 0 || tab.key === 'objectives' || tab.key === 'ai_practice');
 
   const renderObjectives = () => (
     <View style={{ padding: 16 }}>
@@ -300,6 +355,60 @@ export default function LessonScreen() {
     </View>
   );
 
+  const renderAiPractice = () => (
+    <View style={{ padding: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Text variant='title'>
+          AI Practice Conversations
+        </Text>
+        <Button
+          onPress={navigateToGenerate}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 }}
+        >
+          <Icon name={Plus} color='#fff' size={16} />
+          <Text style={{ color: '#fff', marginLeft: 6, fontWeight: '600', fontSize: 14 }}>New</Text>
+        </Button>
+      </View>
+
+      {conversations === undefined ? (
+        <View style={{ alignItems: 'center', padding: 32 }}>
+          <Spinner variant='circle' />
+        </View>
+      ) : conversations.length === 0 ? (
+        <Card>
+          <CardContent style={{ alignItems: 'center', padding: 32 }}>
+            <Icon name={Sparkles} color={textMuted} size={48} />
+            <Text variant='subtitle' style={{ marginTop: 16, textAlign: 'center' }}>
+              No conversations yet
+            </Text>
+            <Text variant='caption' style={{ color: textMuted, textAlign: 'center', marginTop: 8 }}>
+              Generate practice conversations based on this module's vocabulary and phrases!
+            </Text>
+            <Button
+              onPress={navigateToGenerate}
+              style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center' }}
+            >
+              <Icon name={Sparkles} color='#fff' size={18} />
+              <Text style={{ color: '#fff', marginLeft: 8, fontWeight: '600' }}>
+                Generate Conversation
+              </Text>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        conversations.map((conversation) => (
+          <ConversationCard
+            key={conversation._id}
+            conversation={conversation}
+            onPress={() => navigateToConversation(conversation._id)}
+            onToggleFavorite={() => handleToggleFavorite(conversation._id)}
+            onDelete={() => handleDeleteConversation(conversation._id)}
+          />
+        ))
+      )}
+    </View>
+  );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'objectives': return renderObjectives();
@@ -307,6 +416,7 @@ export default function LessonScreen() {
       case 'grammar': return renderGrammar();
       case 'phrases': return renderPhrases();
       case 'exercises': return renderExercises();
+      case 'ai_practice': return renderAiPractice();
       default: return null;
     }
   };
