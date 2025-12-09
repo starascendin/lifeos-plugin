@@ -10,6 +10,7 @@ import {
   Video,
   Map,
   FileCheck,
+  MessageSquare,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
@@ -62,6 +63,17 @@ export default function DrawerLayout() {
           title: 'A1 Learning Journey',
           drawerIcon: ({ color, size }) => (
             <Icon name={Map} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='conversation-ai'
+        options={{
+          drawerLabel: 'Conversation AI',
+          title: 'Conversation AI',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={MessageSquare} color={color} size={size} />
           ),
         }}
       />
