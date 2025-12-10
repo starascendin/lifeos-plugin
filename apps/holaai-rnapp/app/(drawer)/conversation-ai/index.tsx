@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet, FlatList } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useAction } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
 import { View } from '@/components/ui/view';
 import { Text } from '@/components/ui/text';
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
+import { useConversationGeneration } from '@/hooks/useConversationGeneration';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 export default function ConversationAIScreen() {
@@ -26,8 +27,10 @@ export default function ConversationAIScreen() {
   const insets = useSafeAreaInsets();
   const [situation, setSituation] = useState('');
   const [selectedModuleIds, setSelectedModuleIds] = useState<Id<"hola_learningModules">[]>([]);
-  const [generating, setGenerating] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
+
+  // Use centralized AI hook
+  const { generate, isGenerating } = useConversationGeneration();
 
   const currentUser = useQuery(api.common.users.currentUser);
 
@@ -46,8 +49,6 @@ export default function ConversationAIScreen() {
     currentUser ? { userId: currentUser._id } : 'skip'
   );
 
-  const generateConversation = useAction(api.holaai.ai.generateJourneyConversation);
-
   const primary = useColor('primary');
   const background = useColor('background');
   const textMuted = useColor('textMuted');
@@ -63,17 +64,15 @@ export default function ConversationAIScreen() {
   };
 
   const handleGenerate = async () => {
-    if (!situation.trim() || !currentUser || selectedModuleIds.length === 0) {
+    if (!situation.trim() || selectedModuleIds.length === 0) {
       Alert.alert('Missing Info', 'Please select at least one module and enter a scenario.');
       return;
     }
 
-    setGenerating(true);
     try {
       // Generate conversation using the first selected module
       // (API currently supports single module, we use first selected)
-      const result = await generateConversation({
-        userId: currentUser._id,
+      const result = await generate({
         moduleId: selectedModuleIds[0],
         situation: situation.trim(),
       });
@@ -88,8 +87,6 @@ export default function ConversationAIScreen() {
     } catch (error) {
       console.error('Error generating conversation:', error);
       Alert.alert('Error', 'Failed to generate conversation. Please try again.');
-    } finally {
-      setGenerating(false);
     }
   };
 
@@ -211,10 +208,10 @@ export default function ConversationAIScreen() {
         {/* Generate Button */}
         <Button
           onPress={handleGenerate}
-          disabled={!situation.trim() || selectedModuleIds.length === 0 || generating}
+          disabled={!situation.trim() || selectedModuleIds.length === 0 || isGenerating}
           style={{ marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
         >
-          {generating ? (
+          {isGenerating ? (
             <>
               <Spinner variant='circle' size='sm' />
               <Text style={{ color: '#fff', marginLeft: 8, fontWeight: '600' }}>

@@ -21,8 +21,13 @@ import {
   Sparkles,
   Waves,
   ChevronRight,
+  Trash2,
+  Activity,
+  Cloud,
+  Smartphone,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
+import { useAILog } from '@/contexts/AILogContext';
 
 // Environment variables
 const CONVEX_URL = process.env.EXPO_PUBLIC_CONVEX_URL || 'Not configured';
@@ -63,12 +68,35 @@ export default function DevPage() {
   const testGemini = useAction(api.common.dev.testGeminiConnection);
   const testLiveKit = useAction(api.common.dev.testLiveKitConnection);
 
+  // AI Usage Logs
+  const { logs, isLoading: logsLoading, clearLogs } = useAILog();
+
   const primary = useColor('primary');
   const background = useColor('background');
   const textMuted = useColor('textMuted');
   const card = useColor('card');
   const success = '#22c55e';
   const error = '#ef4444';
+
+  const formatLogTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  const handleClearLogs = () => {
+    Alert.alert(
+      'Clear AI Logs',
+      'Are you sure you want to clear all AI usage logs?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear', style: 'destructive', onPress: clearLogs },
+      ]
+    );
+  };
 
   const handleCopy = (value: string, label: string) => {
     Clipboard.setString(value);
@@ -356,6 +384,85 @@ export default function DevPage() {
               </View>
               <Icon name={ChevronRight} size={20} color={textMuted} />
             </TouchableOpacity>
+          </CardContent>
+        </Card>
+
+        {/* AI Usage Logs */}
+        <Card style={{ marginBottom: 16 }}>
+          <CardHeader>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name={Activity} size={20} color={primary} />
+                <Text variant='title' style={{ marginLeft: 8 }}>AI Usage Logs</Text>
+              </View>
+              {logs.length > 0 && (
+                <TouchableOpacity onPress={handleClearLogs} style={{ padding: 8 }}>
+                  <Icon name={Trash2} size={18} color={textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </CardHeader>
+          <CardContent>
+            {logsLoading ? (
+              <View style={{ alignItems: 'center', padding: 20 }}>
+                <Spinner variant='circle' size='sm' />
+              </View>
+            ) : logs.length === 0 ? (
+              <Text style={{ color: textMuted, textAlign: 'center', padding: 20 }}>
+                No AI usage logs yet. Logs will appear when you use TTS, generate conversations, or fetch suggestions.
+              </Text>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {logs.slice(0, 20).map((log) => (
+                  <View
+                    key={log.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 10,
+                      backgroundColor: log.success ? `${success}10` : `${error}10`,
+                      borderRadius: 8,
+                      borderLeftWidth: 3,
+                      borderLeftColor: log.success ? success : error,
+                    }}
+                  >
+                    <Icon
+                      name={log.provider === 'gemini' ? Cloud : Smartphone}
+                      size={16}
+                      color={log.provider === 'gemini' ? '#8b5cf6' : '#6b7280'}
+                    />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', textTransform: 'uppercase' }}>
+                          {log.type}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: textMuted }}>
+                          • {log.provider}
+                        </Text>
+                      </View>
+                      {log.inputPreview && (
+                        <Text style={{ fontSize: 11, color: textMuted, marginTop: 2 }} numberOfLines={1}>
+                          {log.inputPreview}
+                        </Text>
+                      )}
+                      {log.error && (
+                        <Text style={{ fontSize: 11, color: error, marginTop: 2 }} numberOfLines={1}>
+                          {log.error}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 10, color: textMuted }}>
+                      {formatLogTime(log.timestamp)}
+                    </Text>
+                  </View>
+                ))}
+                {logs.length > 20 && (
+                  <Text style={{ fontSize: 12, color: textMuted, textAlign: 'center', marginTop: 8 }}>
+                    Showing 20 of {logs.length} logs
+                  </Text>
+                )}
+              </View>
+            )}
           </CardContent>
         </Card>
 

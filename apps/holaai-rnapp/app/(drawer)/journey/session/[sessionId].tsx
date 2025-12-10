@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { TouchableOpacity, Alert, StyleSheet, FlatList } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useMutation, useAction } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
 import { View } from '@/components/ui/view';
 import { Text } from '@/components/ui/text';
@@ -23,22 +23,16 @@ import {
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
+import { useSuggestions } from '@/hooks/useSuggestions';
 import type { Id } from '@holaai/convex/_generated/dataModel';
-
-interface Suggestion {
-  title: string;
-  description: string;
-  scenario: string;
-}
 
 export default function SessionDetailScreen() {
   const router = useRouter();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const insets = useSafeAreaInsets();
 
-  // AI Suggestions state
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  // Use centralized AI hook
+  const { suggestions, isLoading: loadingSuggestions, fetchSuggestions } = useSuggestions();
 
   const currentUser = useQuery(api.common.users.currentUser);
   const session = useQuery(
@@ -48,31 +42,23 @@ export default function SessionDetailScreen() {
 
   const toggleFavorite = useMutation(api.holaai.ai.toggleSessionFavorite);
   const deleteSession = useMutation(api.holaai.ai.deleteSession);
-  const generateSuggestions = useAction(api.holaai.ai.generateSuggestions);
 
   // Fetch AI suggestions when session loads and has conversations
   useEffect(() => {
     if (currentUser && session && session.conversations.length > 0) {
-      fetchSuggestions();
-    }
-  }, [currentUser?._id, session?.moduleId, session?.conversations.length]);
-
-  const fetchSuggestions = async () => {
-    if (!currentUser || !session) return;
-
-    setLoadingSuggestions(true);
-    try {
-      const result = await generateSuggestions({
-        userId: currentUser._id,
+      fetchSuggestions({
         moduleId: session.moduleId as Id<"hola_learningModules">,
         context: "after_conversation",
       });
-      setSuggestions(result.suggestions);
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-    } finally {
-      setLoadingSuggestions(false);
     }
+  }, [currentUser?._id, session?.moduleId, session?.conversations.length]);
+
+  const handleRefreshSuggestions = () => {
+    if (!session) return;
+    fetchSuggestions({
+      moduleId: session.moduleId as Id<"hola_learningModules">,
+      context: "after_conversation",
+    });
   };
 
   const handleSuggestionTap = (scenario: string) => {
@@ -272,7 +258,7 @@ export default function SessionDetailScreen() {
                     </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={fetchSuggestions}
+                    onPress={handleRefreshSuggestions}
                     disabled={loadingSuggestions}
                     style={{ padding: 8 }}
                   >

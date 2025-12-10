@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useAction } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
 import { View } from '@/components/ui/view';
 import { Text } from '@/components/ui/text';
@@ -13,14 +13,9 @@ import { useColor } from '@/hooks/useColor';
 import { Sparkles, MessageSquare, Lightbulb, RefreshCw } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
-import { useAILog } from '@/contexts/AILogContext';
+import { useConversationGeneration } from '@/hooks/useConversationGeneration';
+import { useSuggestions } from '@/hooks/useSuggestions';
 import type { Id } from '@holaai/convex/_generated/dataModel';
-
-interface Suggestion {
-  title: string;
-  description: string;
-  scenario: string;
-}
 
 export default function GenerateConversationScreen() {
   const router = useRouter();
@@ -31,13 +26,12 @@ export default function GenerateConversationScreen() {
   }>();
   const insets = useSafeAreaInsets();
   const [situation, setSituation] = useState(scenario || '');
-  const [generating, setGenerating] = useState(false);
 
   const isAddingToSession = !!sessionId;
 
-  // AI Suggestions state
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  // Use centralized AI hooks
+  const { generate, isGenerating } = useConversationGeneration();
+  const { suggestions, isLoading: loadingSuggestions, fetchSuggestions } = useSuggestions();
 
   const currentUser = useQuery(api.common.users.currentUser);
   const moduleContext = useQuery(
@@ -45,32 +39,22 @@ export default function GenerateConversationScreen() {
     moduleId ? { moduleId: moduleId as Id<"hola_learningModules"> } : 'skip'
   );
 
-  const generateConversation = useAction(api.holaai.ai.generateJourneyConversation);
-  const generateSuggestions = useAction(api.holaai.ai.generateSuggestions);
-
   // Fetch AI suggestions on mount (only for new sessions, not when adding to existing)
   useEffect(() => {
     if (currentUser && moduleId && !isAddingToSession && !scenario) {
-      fetchSuggestions();
-    }
-  }, [currentUser?._id, moduleId]);
-
-  const fetchSuggestions = async () => {
-    if (!currentUser || !moduleId) return;
-
-    setLoadingSuggestions(true);
-    try {
-      const result = await generateSuggestions({
-        userId: currentUser._id,
+      fetchSuggestions({
         moduleId: moduleId as Id<"hola_learningModules">,
         context: "before_generation",
       });
-      setSuggestions(result.suggestions);
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-    } finally {
-      setLoadingSuggestions(false);
     }
+  }, [currentUser?._id, moduleId]);
+
+  const handleRefreshSuggestions = () => {
+    if (!moduleId) return;
+    fetchSuggestions({
+      moduleId: moduleId as Id<"hola_learningModules">,
+      context: "before_generation",
+    });
   };
 
   const primary = useColor('primary');
@@ -80,12 +64,10 @@ export default function GenerateConversationScreen() {
   const text = useColor('text');
 
   const handleGenerate = async () => {
-    if (!situation.trim() || !currentUser || !moduleId) return;
+    if (!situation.trim() || !moduleId) return;
 
-    setGenerating(true);
     try {
-      const result = await generateConversation({
-        userId: currentUser._id,
+      const result = await generate({
         moduleId: moduleId as Id<"hola_learningModules">,
         sessionId: sessionId ? (sessionId as Id<"hola_conversationSessions">) : undefined,
         situation: situation.trim(),
@@ -95,8 +77,6 @@ export default function GenerateConversationScreen() {
     } catch (error) {
       console.error('Error generating conversation:', error);
       Alert.alert('Error', 'Failed to generate conversation. Please try again.');
-    } finally {
-      setGenerating(false);
     }
   };
 
@@ -192,7 +172,7 @@ export default function GenerateConversationScreen() {
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={fetchSuggestions}
+                  onPress={handleRefreshSuggestions}
                   disabled={loadingSuggestions}
                   style={{ padding: 8 }}
                 >
@@ -293,10 +273,10 @@ export default function GenerateConversationScreen() {
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16, backgroundColor: background }]}>
           <Button
             onPress={handleGenerate}
-            disabled={!situation.trim() || generating}
+            disabled={!situation.trim() || isGenerating}
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
           >
-            {generating ? (
+            {isGenerating ? (
               <>
                 <Spinner variant='circle' size='sm' />
                 <Text style={{ color: '#fff', marginLeft: 8, fontWeight: '600' }}>
