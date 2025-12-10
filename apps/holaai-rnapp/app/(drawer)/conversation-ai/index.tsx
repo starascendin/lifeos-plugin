@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet, FlatList } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useAction } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
@@ -18,6 +18,7 @@ import {
   Plus,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 export default function ConversationAIScreen() {
@@ -257,15 +258,17 @@ export default function ConversationAIScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
-      <FlatList
-        data={conversations || []}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: insets.bottom + 16,
-        }}
-        ListHeaderComponent={
+    <>
+      <Stack.Screen options={{ headerRight: () => <TTSProviderToggle /> }} />
+      <View style={{ flex: 1, backgroundColor: background }}>
+        <FlatList
+          data={conversations || []}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={{
+            padding: 16,
+            paddingBottom: insets.bottom + 16,
+          }}
+          ListHeaderComponent={
           <View style={{ marginBottom: 16 }}>
             {/* New Conversation Button or Generator */}
             {showGenerator ? (
@@ -292,8 +295,8 @@ export default function ConversationAIScreen() {
               </View>
             )}
           </View>
-        }
-        ListEmptyComponent={
+          }
+          ListEmptyComponent={
           !showGenerator ? (
             <Card style={{ marginTop: 20 }}>
               <CardContent style={{ padding: 24, alignItems: 'center' }}>
@@ -313,11 +316,12 @@ export default function ConversationAIScreen() {
               </CardContent>
             </Card>
           ) : null
-        }
-        renderItem={renderConversationItem}
-        ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: card, marginVertical: 4 }} />}
-      />
-    </View>
+          }
+          renderItem={renderConversationItem}
+          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: card, marginVertical: 4 }} />}
+        />
+      </View>
+    </>
   );
 }
 

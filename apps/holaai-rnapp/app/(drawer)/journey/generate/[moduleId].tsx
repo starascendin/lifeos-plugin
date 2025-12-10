@@ -12,6 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useColor } from '@/hooks/useColor';
 import { Sparkles, MessageSquare, Lightbulb, RefreshCw } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 interface Suggestion {
@@ -137,7 +138,7 @@ export default function GenerateConversationScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: isAddingToSession ? 'Add Conversation' : 'Generate Conversation' }} />
+      <Stack.Screen options={{ title: isAddingToSession ? 'Add Conversation' : 'Generate Conversation', headerRight: () => <TTSProviderToggle /> }} />
       <View style={{ flex: 1, backgroundColor: background }}>
         <ScrollView
           style={{ flex: 1 }}

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { SmallAudioButton } from '@/components/audio/SmallAudioButton';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import { ConversationCard } from '@/components/journey/ConversationCard';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
@@ -425,7 +426,7 @@ export default function LessonScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: lessonData.lessonNumber }} />
+      <Stack.Screen options={{ title: lessonData.lessonNumber, headerRight: () => <TTSProviderToggle /> }} />
       <View style={{ flex: 1, backgroundColor: background }}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: card }]}>

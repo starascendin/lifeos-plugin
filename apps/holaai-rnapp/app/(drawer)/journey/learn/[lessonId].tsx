@@ -13,6 +13,7 @@ import { IntroStage } from '@/components/learning/stages/IntroStage';
 import { TeachingStage } from '@/components/learning/stages/TeachingStage';
 import { DrillStage } from '@/components/learning/stages/DrillStage';
 import { SummaryStage } from '@/components/learning/stages/SummaryStage';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 // Types for the learning flow
@@ -475,6 +476,7 @@ export default function LearnLessonScreen() {
         options={{
           title: lessonData.lessonNumber,
           headerBackTitle: 'Exit',
+          headerRight: () => <TTSProviderToggle />,
         }}
       />
       <View style={[styles.container, { backgroundColor: background }]}>

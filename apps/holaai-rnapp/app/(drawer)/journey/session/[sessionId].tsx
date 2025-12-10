@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 interface Suggestion {
@@ -180,7 +181,8 @@ export default function SessionDetailScreen() {
             </TouchableOpacity>
           ),
           headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <TTSProviderToggle />
               <TouchableOpacity onPress={handleToggleFavorite} style={{ padding: 8 }}>
                 <Icon
                   name={Heart}

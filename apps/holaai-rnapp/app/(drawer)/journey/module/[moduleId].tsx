@@ -21,6 +21,7 @@ import {
   Sparkles
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 export default function ModuleDetailScreen() {
@@ -108,7 +109,7 @@ export default function ModuleDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: `Module ${moduleData.moduleNumber}` }} />
+      <Stack.Screen options={{ title: `Module ${moduleData.moduleNumber}`, headerRight: () => <TTSProviderToggle /> }} />
       <View style={{ flex: 1, backgroundColor: background }}>
         <FlatList
           data={regularLessons}

@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useColor } from '@/hooks/useColor';
 import { MessageSquare, ChevronRight, Heart, Sparkles } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 export default function SessionsListScreen() {
@@ -52,7 +53,7 @@ export default function SessionsListScreen() {
   if (sessions === undefined) {
     return (
       <>
-        <Stack.Screen options={{ title: 'My Sessions' }} />
+        <Stack.Screen options={{ title: 'My Sessions', headerRight: () => <TTSProviderToggle /> }} />
         <View style={[styles.centered, { backgroundColor: background }]}>
           <Spinner variant='circle' />
         </View>
@@ -62,7 +63,7 @@ export default function SessionsListScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'My Sessions' }} />
+      <Stack.Screen options={{ title: 'My Sessions', headerRight: () => <TTSProviderToggle /> }} />
       <View style={{ flex: 1, backgroundColor: background }}>
         <FlatList
           data={sessions}
