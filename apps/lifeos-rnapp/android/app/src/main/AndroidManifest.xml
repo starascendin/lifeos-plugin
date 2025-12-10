@@ -30,8 +30,8 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="hola-rnapp"/>
-        <data android:scheme="exp+hola-rnapp"/>
+        <data android:scheme="lifeos"/>
+        <data android:scheme="exp+lifeos-rnapp"/>
       </intent-filter>
     </activity>
   </application>

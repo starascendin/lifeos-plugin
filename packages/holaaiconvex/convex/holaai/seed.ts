@@ -9,7 +9,7 @@ import {
   lessonContent,
   getCategoryContent,
   getLessonContent,
-} from "./seed-data";
+} from "./seedData";
 import type { Id } from "../_generated/dataModel";
 
 // Seed initial learning content for the app

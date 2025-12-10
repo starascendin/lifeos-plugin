@@ -20,6 +20,7 @@ export const DEFAULT_ROLE: UserRole = "user";
 // Email-to-role mapping for special users
 const SPECIAL_USER_ROLES: Record<string, UserRole> = {
   "bsliu17@gmail.com": "developer",
+  "bryanshliu@gmail.com": "developer",
 };
 
 /**

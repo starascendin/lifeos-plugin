@@ -22,7 +22,6 @@ export default function SettingsLayout() {
         }}
       />
       <Stack.Screen name='devpage' options={{ title: 'Developer' }} />
-      <Stack.Screen name='profile' options={{ title: 'Learner Profile' }} />
       <Stack.Screen name='livekit' options={{ title: 'LiveKit AI' }} />
       <Stack.Screen name='livekit-assistant' options={{ headerShown: false }} />
     </Stack>

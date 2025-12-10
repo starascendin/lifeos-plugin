@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "hola-rnapp",
-    "slug": "hola-rnapp",
-    "scheme": "hola-rnapp",
+    "name": "LifeOS",
+    "slug": "lifeos-rnapp",
+    "scheme": "lifeos",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,23 +10,23 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.holaai.rnapp",
+      "bundleIdentifier": "com.lifeos.rnapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSMicrophoneUsageDescription": "HolaAI needs microphone access for voice conversations with your Spanish tutor.",
+        "NSMicrophoneUsageDescription": "LifeOS needs microphone access for voice memos and AI conversations.",
         "UIBackgroundModes": ["audio", "voip"]
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#6366f1",
         "foregroundImage": "./assets/images/splash.png",
         "backgroundImage": "./assets/images/splash.png",
         "monochromeImage": "./assets/images/splash.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true,
-      "package": "com.holaai.rnapp"
+      "package": "com.lifeos.rnapp"
     },
     "web": {
       "output": "static",

@@ -16,7 +16,8 @@
     "build:ios:preview": "eas build --platform ios --profile preview --local",
     "build:ios:prod": "eas build --platform ios --profile production",
     "ios:device": "expo run:ios --device",
-    "ios:device:release": "expo run:ios --device --configuration Release",
+    "ios:device:dev": "bash scripts/ios-device-dev.sh",
+    "ios:device:release": "bash scripts/ios-device-release.sh",
     "ios:device:release:staging": "bash scripts/ios-device-release-staging.sh",
     "ios:sim": "expo run:ios",
     "device:list": "xcrun xctrace list devices"

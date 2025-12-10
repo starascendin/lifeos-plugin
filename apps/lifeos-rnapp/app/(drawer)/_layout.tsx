@@ -1,12 +1,7 @@
 import { Drawer } from 'expo-router/drawer';
 import { useColor } from '@/hooks/useColor';
 import { DrawerContent } from '@/components/drawer/DrawerContent';
-import {
-  Home,
-  Settings,
-  Map,
-  MessageSquare,
-} from 'lucide-react-native';
+import { Home, Settings } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
 export default function DrawerLayout() {
@@ -44,37 +39,12 @@ export default function DrawerLayout() {
         name='(home)'
         options={{
           drawerLabel: 'Home',
-          title: 'Home1',
+          title: 'Home',
           drawerIcon: ({ color, size }) => (
             <Icon name={Home} color={color} size={size} />
           ),
         }}
       />
-
-      <Drawer.Screen
-        name='journey'
-        options={{
-          drawerLabel: 'A1 Journey',
-          title: 'A1 Learning Journey',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={Map} color={color} size={size} />
-          ),
-        }}
-      />
-
-      <Drawer.Screen
-        name='conversation-ai'
-        options={{
-          drawerLabel: 'Conversation AI',
-          title: 'Conversation AI',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={MessageSquare} color={color} size={size} />
-          ),
-        }}
-      />
-
-
-
 
 
 

@@ -16,21 +16,15 @@ if [ ! -f ".env.staging" ]; then
     exit 1
 fi
 
-# Backup current .env and app.json
+# Backup current .env
 cp .env .env.backup
-cp app.json app.json.backup
 
 # Use staging env
 cp .env.staging .env
 
-# Change app name to HolaAIStaging for staging builds
-# Using node for reliable JSON manipulation
-node -e "
-const fs = require('fs');
-const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-app.expo.name = 'HolaAIStaging';
-fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
-"
+# Change app display name to HolaAIStaging in Info.plist
+# This is what actually controls the name shown on iPhone home screen
+plutil -replace CFBundleDisplayName -string "HolaAIStaging" ios/holarnapp/Info.plist
 
 echo "=== Building iOS Release with STAGING environment ==="
 echo "App Name: HolaAIStaging"
@@ -41,8 +35,8 @@ echo ""
 restore_files() {
     cp .env.backup .env
     rm .env.backup
-    cp app.json.backup app.json
-    rm app.json.backup
+    # Restore default app name
+    plutil -replace CFBundleDisplayName -string "HolaAI" ios/holarnapp/Info.plist
 }
 
 # Trap to ensure restoration on any exit
