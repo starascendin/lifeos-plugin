@@ -53,6 +53,9 @@ export async function getOrCreateUser(ctx: MutationCtx) {
     .unique();
 
   if (existingUser) {
+    // Get the expected role for this email (in case it was updated)
+    const expectedRole = getDefaultRole(identity.email!);
+
     // Update user data on each login
     await ctx.db.patch(existingUser._id, {
       name: identity.name ?? existingUser.name,
@@ -60,6 +63,8 @@ export async function getOrCreateUser(ctx: MutationCtx) {
       emailVerificationTime:
         (identity.emailVerificationTime as number | undefined) ??
         existingUser.emailVerificationTime,
+      // Sync role from SPECIAL_USER_ROLES if user is listed there
+      role: expectedRole === "developer" ? expectedRole : existingUser.role,
       updatedAt: Date.now(),
     });
     return existingUser._id;
