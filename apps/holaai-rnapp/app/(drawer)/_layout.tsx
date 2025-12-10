@@ -4,12 +4,7 @@ import { DrawerContent } from '@/components/drawer/DrawerContent';
 import {
   Home,
   Settings,
-  BookOpen,
-  GraduationCap,
-  Sparkles,
-  Video,
   Map,
-  FileCheck,
   MessageSquare,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
@@ -78,50 +73,10 @@ export default function DrawerLayout() {
         }}
       />
 
-      <Drawer.Screen
-        name='learn'
-        options={{
-          drawerLabel: 'Learn',
-          title: 'Learn Spanish1',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={BookOpen} color={color} size={size} />
-          ),
-        }}
-      />
 
 
-      <Drawer.Screen
-        name='livekit-ai'
-        options={{
-          drawerLabel: 'Livekit AI',
-          title: 'Livekit AI',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={Video} color={color} size={size} />
-          ),
-        }}
-      />
 
-      <Drawer.Screen
-        name='practice'
-        options={{
-          drawerLabel: 'Practice',
-          title: 'Practice & Quiz',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={GraduationCap} color={color} size={size} />
-          ),
-        }}
-      />
 
-      <Drawer.Screen
-        name='ai-lessons'
-        options={{
-          drawerLabel: 'AI Lessons',
-          title: 'AI Lessons',
-          drawerIcon: ({ color, size }) => (
-            <Icon name={Sparkles} color={color} size={size} />
-          ),
-        }}
-      />
 
       <Drawer.Screen
         name='settings'

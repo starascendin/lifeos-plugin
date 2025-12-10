@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScrollView, TouchableOpacity, Clipboard, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAction } from 'convex/react';
+import { useRouter } from 'expo-router';
 import { api } from '@holaai/convex/_generated/api';
 import { View } from '@/components/ui/view';
 import { Text } from '@/components/ui/text';
@@ -18,6 +19,8 @@ import {
   Key,
   Mic,
   Sparkles,
+  Waves,
+  ChevronRight,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
@@ -49,6 +52,7 @@ interface TestResult {
 
 export default function DevPage() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const [geminiStatus, setGeminiStatus] = useState<TestResult | null>(null);
   const [geminiTesting, setGeminiTesting] = useState(false);
@@ -319,6 +323,39 @@ export default function DevPage() {
                 </View>
               )}
             </View>
+          </CardContent>
+        </Card>
+
+        {/* LiveKit AI Assistant */}
+        <Card style={{ marginBottom: 16 }}>
+          <CardHeader>
+            <CardTitle>Voice AI Assistant</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TouchableOpacity
+              onPress={() => router.push('/settings/livekit')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: `${primary}15`,
+                padding: 16,
+                borderRadius: 12,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name={Waves} size={24} color={primary} />
+                <View style={{ marginLeft: 12 }}>
+                  <Text variant='subtitle' style={{ fontSize: 16 }}>
+                    LiveKit AI
+                  </Text>
+                  <Text style={{ fontSize: 13, color: textMuted, marginTop: 2 }}>
+                    Chat live with your voice AI agent
+                  </Text>
+                </View>
+              </View>
+              <Icon name={ChevronRight} size={20} color={textMuted} />
+            </TouchableOpacity>
           </CardContent>
         </Card>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FlatList, TouchableOpacity, RefreshControl, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
@@ -24,6 +24,7 @@ import {
   MessageSquare,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import { useAuth } from '@clerk/clerk-expo';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
@@ -149,18 +150,24 @@ export default function JourneyScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
-      <FlatList
-        data={modules}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: insets.bottom + 16,
+    <>
+      <Stack.Screen
+        options={{
+          headerRight: () => <TTSProviderToggle />,
         }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListHeaderComponent={
+      />
+      <View style={{ flex: 1, backgroundColor: background }}>
+        <FlatList
+          data={modules}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={{
+            padding: 16,
+            paddingBottom: insets.bottom + 16,
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListHeaderComponent={
           <View style={{ marginBottom: 20 }}>
             {/* Progress Overview */}
             <Card style={{ marginBottom: 16 }}>
@@ -274,8 +281,8 @@ export default function JourneyScreen() {
               Modules
             </Text>
           </View>
-        }
-        ListEmptyComponent={
+          }
+          ListEmptyComponent={
           <Card style={{ marginTop: 20 }}>
             <CardHeader>
               <CardTitle>No Modules Available</CardTitle>
@@ -311,8 +318,8 @@ export default function JourneyScreen() {
               </Button>
             </CardContent>
           </Card>
-        }
-        renderItem={({ item: module, index }) => {
+          }
+          renderItem={({ item: module, index }) => {
           const status = getModuleStatus(module);
           const StatusIcon = getModuleIcon(status);
           const moduleColor = getModuleColor(status, module.moduleNumber);
@@ -392,8 +399,8 @@ export default function JourneyScreen() {
               </Card>
             </TouchableOpacity>
           );
-        }}
-        ListFooterComponent={
+          }}
+          ListFooterComponent={
           modules.length > 0 ? (
             <View style={{ marginTop: 24, alignItems: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -415,9 +422,10 @@ export default function JourneyScreen() {
               </Button>
             </View>
           ) : null
-        }
-      />
-    </View>
+          }
+        />
+      </View>
+    </>
   );
 }
 

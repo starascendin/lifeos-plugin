@@ -1,5 +1,41 @@
 // Substack Notes Scheduler - Background Service Worker
 
+// ==================== LOGGING ====================
+
+// Log levels: info, success, warning, error
+async function addLog(level, message, noteId = null, details = null) {
+  const { logs = [] } = await chrome.storage.local.get('logs');
+
+  const logEntry = {
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+    level,
+    message,
+    noteId,
+    details
+  };
+
+  logs.unshift(logEntry); // Add to beginning (newest first)
+
+  // Keep only last 500 logs
+  if (logs.length > 500) {
+    logs.length = 500;
+  }
+
+  await chrome.storage.local.set({ logs });
+  console.log(`[${level.toUpperCase()}] ${message}`, details || '');
+}
+
+// Convenience functions
+const log = {
+  info: (msg, noteId, details) => addLog('info', msg, noteId, details),
+  success: (msg, noteId, details) => addLog('success', msg, noteId, details),
+  warning: (msg, noteId, details) => addLog('warning', msg, noteId, details),
+  error: (msg, noteId, details) => addLog('error', msg, noteId, details)
+};
+
+// ==================== CORE ====================
+
 // Open app.html when extension icon is clicked
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('app.html') });
@@ -244,40 +280,6 @@ async function markNoteAsFailed(noteId, error) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-// ==================== LOGGING ====================
-
-// Log levels: info, success, warning, error
-async function addLog(level, message, noteId = null, details = null) {
-  const { logs = [] } = await chrome.storage.local.get('logs');
-
-  const logEntry = {
-    id: Date.now().toString(),
-    timestamp: Date.now(),
-    level,
-    message,
-    noteId,
-    details
-  };
-
-  logs.unshift(logEntry); // Add to beginning (newest first)
-
-  // Keep only last 500 logs
-  if (logs.length > 500) {
-    logs.length = 500;
-  }
-
-  await chrome.storage.local.set({ logs });
-  console.log(`[${level.toUpperCase()}] ${message}`, details || '');
-}
-
-// Convenience functions
-const log = {
-  info: (msg, noteId, details) => addLog('info', msg, noteId, details),
-  success: (msg, noteId, details) => addLog('success', msg, noteId, details),
-  warning: (msg, noteId, details) => addLog('warning', msg, noteId, details),
-  error: (msg, noteId, details) => addLog('error', msg, noteId, details)
-};
 
 // Listen for messages from app.js and content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

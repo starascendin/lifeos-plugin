@@ -41,7 +41,7 @@ FAILED=0
 for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/packages/*; do
     [ -d "$dir" ] || continue
 
-    for encrypted_file in "$dir/.env.age" "$dir/.env.local.age"; do
+    for encrypted_file in "$dir/.env.age" "$dir/.env.local.age" "$dir/.env.staging.age"; do
         [ -f "$encrypted_file" ] || continue
 
         # Remove .age extension to get target path

@@ -12,7 +12,7 @@ import { Waves } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { useColor } from '@/hooks/useColor';
 
-export default function StartScreen() {
+export default function LiveKitStartScreen() {
   const router = useRouter();
   const { isConnectionActive, connect } = useConnection();
   const background = useColor('background');
@@ -22,7 +22,7 @@ export default function StartScreen() {
   // Navigate to Assistant screen when we have the connection details.
   useEffect(() => {
     if (isConnectionActive) {
-      router.push('/(drawer)/livekit-ai/assistant');
+      router.push('/(drawer)/settings/livekit-assistant');
     }
   }, [isConnectionActive, router]);
 

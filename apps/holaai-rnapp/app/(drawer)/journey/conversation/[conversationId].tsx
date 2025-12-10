@@ -19,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { SmallAudioButton } from '@/components/audio/SmallAudioButton';
+import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 type TabType = 'dialogue' | 'grammar' | 'phrases';
@@ -254,6 +255,7 @@ export default function ConversationScreen() {
           ),
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TTSProviderToggle />
               <TouchableOpacity onPress={handleToggleFavorite} style={{ padding: 8 }}>
                 <Icon
                   name={Heart}

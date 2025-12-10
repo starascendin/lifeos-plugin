@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
   loadNotes();
   loadBacklog();
   initExportImport();
+  initLogs();
+  initHistory();
   checkForOverdueNotes();
 });
 
@@ -860,5 +862,116 @@ async function clearLogs() {
   await chrome.storage.local.set({ logs: [] });
   loadLogs();
   showStatus('Logs cleared', 'success');
+}
+
+// ==================== NOTE HISTORY ====================
+
+let currentHistoryFilter = 'all';
+
+// Initialize history viewer
+function initHistory() {
+  const header = document.getElementById('historyHeader');
+  const section = document.getElementById('historySection');
+  const toggle = document.getElementById('historyToggle');
+
+  // Toggle collapse/expand
+  header.addEventListener('click', () => {
+    section.classList.toggle('collapsed');
+    const isCollapsed = section.classList.contains('collapsed');
+    toggle.textContent = isCollapsed ? '▶ Show' : '▼ Hide';
+    if (!isCollapsed) {
+      loadHistory();
+    }
+  });
+
+  // Filter buttons
+  document.getElementById('historyFilterAll').addEventListener('click', () => setHistoryFilter('all'));
+  document.getElementById('historyFilterPending').addEventListener('click', () => setHistoryFilter('pending'));
+  document.getElementById('historyFilterPosted').addEventListener('click', () => setHistoryFilter('posted'));
+  document.getElementById('historyFilterBacklog').addEventListener('click', () => setHistoryFilter('backlog'));
+
+  // Refresh
+  document.getElementById('historyRefresh').addEventListener('click', loadHistory);
+}
+
+// Set history filter
+function setHistoryFilter(filter) {
+  currentHistoryFilter = filter;
+
+  // Update button states
+  document.querySelectorAll('.history-filters button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  const filterBtnMap = {
+    'all': 'historyFilterAll',
+    'pending': 'historyFilterPending',
+    'posted': 'historyFilterPosted',
+    'backlog': 'historyFilterBacklog'
+  };
+
+  if (filterBtnMap[filter]) {
+    document.getElementById(filterBtnMap[filter]).classList.add('active');
+  }
+
+  loadHistory();
+}
+
+// Load and display note history
+async function loadHistory() {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const list = document.getElementById('historyList');
+  const count = document.getElementById('historyCount');
+
+  // Filter notes
+  let filteredNotes = notes;
+  if (currentHistoryFilter !== 'all') {
+    filteredNotes = notes.filter(note => note.status === currentHistoryFilter);
+  }
+
+  count.textContent = notes.length;
+
+  if (filteredNotes.length === 0) {
+    list.innerHTML = '<li class="history-empty">No notes found</li>';
+    return;
+  }
+
+  // Sort by most recent activity
+  filteredNotes.sort((a, b) => {
+    const aTime = a.postedAt || a.backlogAt || a.failedAt || a.scheduledFor;
+    const bTime = b.postedAt || b.backlogAt || b.failedAt || b.scheduledFor;
+    return bTime - aTime;
+  });
+
+  list.innerHTML = filteredNotes.map(note => {
+    const scheduledTime = formatDateTime(note.scheduledFor);
+    let statusTime = '';
+
+    if (note.status === 'posted' && note.postedAt) {
+      statusTime = `Posted: ${formatDateTime(note.postedAt)}`;
+    } else if (note.status === 'backlog' && note.backlogAt) {
+      statusTime = `Moved to backlog: ${formatDateTime(note.backlogAt)}`;
+    } else if (note.status === 'failed' && note.failedAt) {
+      statusTime = `Failed: ${formatDateTime(note.failedAt)}`;
+    } else if (note.status === 'pending') {
+      statusTime = `Scheduled: ${scheduledTime}`;
+    } else if (note.status === 'posting') {
+      statusTime = `Currently posting...`;
+    }
+
+    return `
+      <li class="history-item" data-id="${note.id}">
+        <div class="history-item-content">
+          <div class="history-item-meta">
+            <span class="status-badge ${note.status}">${note.status}</span>
+            <span>${statusTime}</span>
+            ${note.error ? `<span style="color:#c62828;">Error: ${escapeHtml(note.error)}</span>` : ''}
+          </div>
+          <div class="history-item-text">${escapeHtml(note.text)}</div>
+          ${note.image ? '<div style="font-size:12px;color:#666;margin-top:4px;">📷 Has image</div>' : ''}
+        </div>
+      </li>
+    `;
+  }).join('');
 }
 

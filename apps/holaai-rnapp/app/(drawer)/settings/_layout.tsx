@@ -12,11 +12,19 @@ export default function SettingsLayout() {
         headerShown: true,
         headerTintColor: text,
         headerStyle: { backgroundColor: background },
-        headerLeft: () => <DrawerToggleButton tintColor={text} />,
       }}
     >
-      <Stack.Screen name='index' options={{ title: 'Settings' }} />
+      <Stack.Screen
+        name='index'
+        options={{
+          title: 'Settings',
+          headerLeft: () => <DrawerToggleButton tintColor={text} />,
+        }}
+      />
       <Stack.Screen name='devpage' options={{ title: 'Developer' }} />
+      <Stack.Screen name='profile' options={{ title: 'Learner Profile' }} />
+      <Stack.Screen name='livekit' options={{ title: 'LiveKit AI' }} />
+      <Stack.Screen name='livekit-assistant' options={{ headerShown: false }} />
     </Stack>
   );
 }

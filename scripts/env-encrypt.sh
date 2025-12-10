@@ -49,7 +49,7 @@ FAILED=0
 for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/packages/*; do
     [ -d "$dir" ] || continue
 
-    for env_file in "$dir/.env" "$dir/.env.local"; do
+    for env_file in "$dir/.env" "$dir/.env.local" "$dir/.env.staging"; do
         [ -f "$env_file" ] || continue
 
         relative_path="${env_file#$REPO_ROOT/}"
