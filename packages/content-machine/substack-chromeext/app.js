@@ -461,11 +461,20 @@ async function checkForOverdueNotes() {
   let updated = false;
 
   const updatedNotes = notes.map(note => {
+    // Handle overdue pending notes
     if (note.status === 'pending' && note.scheduledFor <= now) {
       const overdueBy = now - note.scheduledFor;
       if (overdueBy > GRACE_PERIOD_MS) {
         updated = true;
         return { ...note, status: 'backlog', backlogAt: Date.now() };
+      }
+    }
+    // Handle stuck "posting" notes (more than 5 minutes)
+    if (note.status === 'posting') {
+      const stuckTime = now - (note.postingStartedAt || 0);
+      if (stuckTime > 5 * 60 * 1000) {
+        updated = true;
+        return { ...note, status: 'backlog', backlogAt: Date.now(), error: 'Posting was interrupted' };
       }
     }
     return note;

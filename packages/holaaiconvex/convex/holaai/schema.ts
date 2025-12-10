@@ -88,6 +88,22 @@ export const holaaiTables = {
     .index("by_category", ["categoryId"])
     .index("by_category_order", ["categoryId", "order"]),
 
+  // ==================== LEARNER PROFILE ====================
+
+  // Learner profile for personalized AI conversations
+  hola_learnerProfiles: defineTable({
+    userId: v.id("users"),
+    name: v.string(), // Learner's name
+    origin: v.string(), // Where they're from
+    profession: v.string(), // Occupation/profession
+    interests: v.array(v.string()), // Hobbies and interests
+    learningGoal: v.string(), // Why learning Spanish / in Argentina
+    additionalContext: v.optional(v.string()), // Any other relevant info
+    isComplete: v.boolean(), // Whether onboarding is complete
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   // ==================== USER PROGRESS ====================
 
   // Per-item progress tracking (spaced repetition)
@@ -266,11 +282,28 @@ export const holaaiTables = {
     .index("by_user_favorite", ["userId", "isFavorite"])
     .index("by_user_created", ["userId", "createdAt"]),
 
+  // Conversation sessions: groups of related AI conversations
+  hola_conversationSessions: defineTable({
+    userId: v.id("users"),
+    moduleId: v.id("hola_learningModules"),
+    lessonId: v.optional(v.id("hola_moduleLessons")),
+    scenarioDescription: v.string(), // The original scenario/situation
+    title: v.string(), // Generated or user-provided title
+    conversationCount: v.number(), // Number of conversations in session
+    isFavorite: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_module", ["userId", "moduleId"])
+    .index("by_user_created", ["userId", "createdAt"]),
+
   // Journey-specific AI conversations (contextualized to modules/lessons)
   hola_journeyConversations: defineTable({
     userId: v.id("users"),
     moduleId: v.id("hola_learningModules"), // Which module context
     lessonId: v.optional(v.id("hola_moduleLessons")), // Which lesson context (optional)
+    sessionId: v.optional(v.id("hola_conversationSessions")), // Parent session (optional for backwards compatibility)
     situation: v.string(), // User's scenario description
     title: v.string(), // Generated title
     dialogue: v.array(
@@ -305,7 +338,8 @@ export const holaaiTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_module", ["userId", "moduleId"])
-    .index("by_user_created", ["userId", "createdAt"]),
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_session", ["sessionId"]),
 
   // ==================== VOICE CONVERSATIONS ====================
 

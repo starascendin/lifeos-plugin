@@ -259,6 +259,7 @@ export const saveJourneyConversation = internalMutation({
     userId: v.id("users"),
     moduleId: v.id("hola_learningModules"),
     lessonId: v.optional(v.id("hola_moduleLessons")),
+    sessionId: v.optional(v.id("hola_conversationSessions")),
     situation: v.string(),
     title: v.string(),
     dialogue: v.array(
@@ -291,7 +292,15 @@ export const saveJourneyConversation = internalMutation({
   },
   handler: async (ctx, args): Promise<Id<"hola_journeyConversations">> => {
     return await ctx.db.insert("hola_journeyConversations", {
-      ...args,
+      userId: args.userId,
+      moduleId: args.moduleId,
+      lessonId: args.lessonId,
+      sessionId: args.sessionId,
+      situation: args.situation,
+      title: args.title,
+      dialogue: args.dialogue,
+      grammarHints: args.grammarHints,
+      keyPhrases: args.keyPhrases,
       isFavorite: false,
       createdAt: Date.now(),
     });
@@ -314,6 +323,138 @@ export const deleteJourneyConversation = mutation({
   args: { conversationId: v.id("hola_journeyConversations") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.conversationId);
+  },
+});
+
+// ==================== CONVERSATION SESSIONS ====================
+
+/**
+ * List all conversation sessions for a user
+ */
+export const listSessions = query({
+  args: {
+    userId: v.id("users"),
+    moduleId: v.optional(v.id("hola_learningModules")),
+  },
+  handler: async (ctx, args) => {
+    if (args.moduleId) {
+      return await ctx.db
+        .query("hola_conversationSessions")
+        .withIndex("by_user_module", (q) =>
+          q.eq("userId", args.userId).eq("moduleId", args.moduleId!)
+        )
+        .order("desc")
+        .collect();
+    }
+
+    return await ctx.db
+      .query("hola_conversationSessions")
+      .withIndex("by_user_created", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .collect();
+  },
+});
+
+/**
+ * Get a session with its conversations
+ */
+export const getSessionWithConversations = query({
+  args: { sessionId: v.id("hola_conversationSessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+
+    // Fetch module info
+    const module = await ctx.db.get(session.moduleId);
+
+    // Fetch all conversations in this session
+    const conversations = await ctx.db
+      .query("hola_journeyConversations")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .order("asc")
+      .collect();
+
+    return { ...session, module, conversations };
+  },
+});
+
+/**
+ * Create a new session (internal)
+ */
+export const createSession = internalMutation({
+  args: {
+    userId: v.id("users"),
+    moduleId: v.id("hola_learningModules"),
+    lessonId: v.optional(v.id("hola_moduleLessons")),
+    scenarioDescription: v.string(),
+    title: v.string(),
+  },
+  handler: async (ctx, args): Promise<Id<"hola_conversationSessions">> => {
+    const now = Date.now();
+    return await ctx.db.insert("hola_conversationSessions", {
+      userId: args.userId,
+      moduleId: args.moduleId,
+      lessonId: args.lessonId,
+      scenarioDescription: args.scenarioDescription,
+      title: args.title,
+      conversationCount: 0,
+      isFavorite: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/**
+ * Increment session conversation count (internal)
+ */
+export const incrementSessionConversationCount = internalMutation({
+  args: { sessionId: v.id("hola_conversationSessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Session not found");
+
+    await ctx.db.patch(args.sessionId, {
+      conversationCount: session.conversationCount + 1,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Toggle session favorite
+ */
+export const toggleSessionFavorite = mutation({
+  args: { sessionId: v.id("hola_conversationSessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Session not found");
+
+    await ctx.db.patch(args.sessionId, {
+      isFavorite: !session.isFavorite,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Delete a session and all its conversations
+ */
+export const deleteSession = mutation({
+  args: { sessionId: v.id("hola_conversationSessions") },
+  handler: async (ctx, args) => {
+    // Delete all conversations in the session
+    const conversations = await ctx.db
+      .query("hola_journeyConversations")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+
+    for (const conversation of conversations) {
+      await ctx.db.delete(conversation._id);
+    }
+
+    // Delete the session
+    await ctx.db.delete(args.sessionId);
   },
 });
 
@@ -531,6 +672,7 @@ The conversation should:
 3. Include natural dialogue between two speakers
 4. Highlight useful grammar structures relevant to the module
 5. Include key phrases to memorize
+6. When a learner profile is provided, naturally incorporate the learner's background (name, profession, interests, learning goals) into the conversation where relevant
 
 Respond in JSON format:
 {
@@ -550,15 +692,27 @@ Respond in JSON format:
   ]
 }`;
 
+// Internal query to get learner profile for AI context
+export const getLearnerProfileInternal = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("hola_learnerProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+  },
+});
+
 // Generate Journey Conversation using Gemini (contextualized to module)
 export const generateJourneyConversation = action({
   args: {
     userId: v.id("users"),
     moduleId: v.id("hola_learningModules"),
     lessonId: v.optional(v.id("hola_moduleLessons")),
+    sessionId: v.optional(v.id("hola_conversationSessions")),
     situation: v.string(),
   },
-  handler: async (ctx, args): Promise<{ conversationId: Id<"hola_journeyConversations">; conversation: unknown }> => {
+  handler: async (ctx, args): Promise<{ conversationId: Id<"hola_journeyConversations">; sessionId: Id<"hola_conversationSessions">; conversation: unknown }> => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not configured");
@@ -571,6 +725,24 @@ export const generateJourneyConversation = action({
 
     if (!module) {
       throw new Error("Module not found");
+    }
+
+    // Fetch learner profile for personalization
+    const learnerProfile = await ctx.runQuery(internal.holaai.ai.getLearnerProfileInternal, {
+      userId: args.userId,
+    });
+
+    // Build learner profile context if available
+    let profileContext = "";
+    if (learnerProfile && learnerProfile.isComplete) {
+      profileContext = `\nLearner Profile:
+- Name: ${learnerProfile.name}
+- From: ${learnerProfile.origin}
+- Profession: ${learnerProfile.profession}
+- Interests: ${learnerProfile.interests.join(", ")}
+- Learning Goal: ${learnerProfile.learningGoal}${learnerProfile.additionalContext ? `\n- Additional Context: ${learnerProfile.additionalContext}` : ""}
+
+Personalize the conversation naturally for this learner. For example, if they're a software engineer interested in cooking, you might have them discuss tech or food topics. Use their name where appropriate.\n`;
     }
 
     // Build context string from module vocabulary and phrases
@@ -591,7 +763,7 @@ export const generateJourneyConversation = action({
     }
 
     const fullPrompt = `${JOURNEY_CONVERSATION_PROMPT}
-
+${profileContext}
 Module Context:
 ${contextInfo}
 
@@ -626,20 +798,151 @@ Generate a natural A1-level conversation that uses vocabulary and concepts from 
     }
 
     const conversationContent = JSON.parse(content);
+    const conversationTitle = conversationContent.title || "Untitled Conversation";
 
-    // Save to database
+    // Handle session: use existing or create new
+    let sessionId = args.sessionId;
+    if (!sessionId) {
+      // Create a new session
+      sessionId = await ctx.runMutation(internal.holaai.ai.createSession, {
+        userId: args.userId,
+        moduleId: args.moduleId,
+        lessonId: args.lessonId,
+        scenarioDescription: args.situation,
+        title: conversationTitle,
+      });
+    }
+
+    // Save conversation to database with session link
     const conversationId: Id<"hola_journeyConversations"> = await ctx.runMutation(internal.holaai.ai.saveJourneyConversation, {
       userId: args.userId,
       moduleId: args.moduleId,
       lessonId: args.lessonId,
+      sessionId: sessionId,
       situation: args.situation,
-      title: conversationContent.title || "Untitled Conversation",
+      title: conversationTitle,
       dialogue: conversationContent.dialogue || [],
       grammarHints: conversationContent.grammarHints || [],
       keyPhrases: conversationContent.keyPhrases || [],
     });
 
-    return { conversationId, conversation: conversationContent };
+    // Increment session conversation count
+    await ctx.runMutation(internal.holaai.ai.incrementSessionConversationCount, {
+      sessionId: sessionId,
+    });
+
+    return { conversationId, sessionId, conversation: conversationContent };
+  },
+});
+
+// Prompt for generating scenario suggestions
+const SUGGESTIONS_PROMPT = `You are a Spanish language learning assistant. Generate personalized conversation scenario suggestions for a learner.
+
+Based on the learner's profile and the current learning module, suggest 3-5 realistic conversation scenarios they could practice.
+
+Each suggestion should:
+1. Be appropriate for A1 level (beginner) using simple vocabulary
+2. Relate to the learner's interests, profession, or learning goals when possible
+3. Be practical and useful for real-life situations
+4. Incorporate vocabulary and topics from the learning module
+
+Respond in JSON format:
+{
+  "suggestions": [
+    {
+      "title": "Short descriptive title (3-5 words)",
+      "description": "Brief description of what the scenario involves (1 sentence)",
+      "scenario": "Full situation description for AI conversation generation (2-3 sentences)"
+    }
+  ]
+}`;
+
+// Generate personalized scenario suggestions
+export const generateSuggestions = action({
+  args: {
+    userId: v.id("users"),
+    moduleId: v.id("hola_learningModules"),
+    context: v.union(v.literal("before_generation"), v.literal("after_conversation")),
+  },
+  handler: async (ctx, args): Promise<{ suggestions: Array<{ title: string; description: string; scenario: string }> }> => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY not configured");
+    }
+
+    // Fetch module context
+    const module = await ctx.runQuery(internal.holaai.ai.getModuleContextInternal, {
+      moduleId: args.moduleId,
+    });
+
+    if (!module) {
+      throw new Error("Module not found");
+    }
+
+    // Fetch learner profile
+    const learnerProfile = await ctx.runQuery(internal.holaai.ai.getLearnerProfileInternal, {
+      userId: args.userId,
+    });
+
+    // Build profile context
+    let profileContext = "";
+    if (learnerProfile && learnerProfile.isComplete) {
+      profileContext = `Learner Profile:
+- Name: ${learnerProfile.name}
+- From: ${learnerProfile.origin}
+- Profession: ${learnerProfile.profession}
+- Interests: ${learnerProfile.interests.join(", ")}
+- Learning Goal: ${learnerProfile.learningGoal}${learnerProfile.additionalContext ? `\n- Additional Context: ${learnerProfile.additionalContext}` : ""}
+
+Generate suggestions that are personally relevant to this learner's background and interests.\n\n`;
+    }
+
+    // Build module context
+    let moduleContext = `Learning Module: ${module.title}\nDescription: ${module.description}\n`;
+    if (module.sampleVocabulary && module.sampleVocabulary.length > 0) {
+      moduleContext += `\nKey vocabulary: ${module.sampleVocabulary.map((v: { spanish: string }) => v.spanish).join(", ")}\n`;
+    }
+
+    const contextNote = args.context === "before_generation"
+      ? "These are initial suggestions before the learner starts practicing."
+      : "These are follow-up suggestions after the learner has completed a conversation.";
+
+    const fullPrompt = `${SUGGESTIONS_PROMPT}
+
+${profileContext}${moduleContext}
+
+Context: ${contextNote}
+
+Generate suggestions that would be engaging and useful for this specific learner.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.9,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!content) {
+      throw new Error("No content generated");
+    }
+
+    const result = JSON.parse(content);
+    return { suggestions: result.suggestions || [] };
   },
 });
 

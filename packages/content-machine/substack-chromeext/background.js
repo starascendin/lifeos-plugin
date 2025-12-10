@@ -16,20 +16,47 @@ async function ensureAlarmExists() {
   }
 }
 
+// Clean up any notes stuck in "posting" status (browser crashed mid-post)
+async function cleanupStuckNotes() {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const now = Date.now();
+  let updated = false;
+
+  const cleanedNotes = notes.map(n => {
+    if (n.status === 'posting') {
+      // If stuck in posting for more than 5 minutes, move to backlog
+      const stuckTime = now - (n.postingStartedAt || 0);
+      if (stuckTime > 5 * 60 * 1000) {
+        console.log('Moving stuck note to backlog:', n.text?.substring(0, 30));
+        updated = true;
+        return { ...n, status: 'backlog', backlogAt: Date.now(), error: 'Posting was interrupted' };
+      }
+    }
+    return n;
+  });
+
+  if (updated) {
+    await chrome.storage.local.set({ notes: cleanedNotes });
+  }
+}
+
 // Set up alarm on install
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Substack Notes Scheduler installed');
   ensureAlarmExists();
+  cleanupStuckNotes();
 });
 
 // Set up alarm on startup
 chrome.runtime.onStartup.addListener(() => {
   console.log('Substack Notes Scheduler startup');
   ensureAlarmExists();
+  cleanupStuckNotes();
 });
 
-// Ensure alarm exists when service worker wakes up
+// Ensure alarm exists and cleanup when service worker wakes up
 ensureAlarmExists();
+cleanupStuckNotes();
 
 // Handle alarm
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -67,7 +94,11 @@ async function checkAndPostDueNotes() {
     const overdueBy = now - note.scheduledFor;
 
     if (overdueBy <= GRACE_PERIOD_MS) {
-      // Within grace period - post it
+      // Within grace period - mark as "posting" FIRST to prevent duplicate posts
+      console.log('Marking note as posting:', note.text?.substring(0, 50));
+      await markNoteAsPosting(note.id);
+
+      // Now post it
       console.log('Posting note (within grace period):', note.text?.substring(0, 50));
       await postNote(note);
     } else {
@@ -88,6 +119,18 @@ async function checkAndPostDueNotes() {
       chrome.action.setBadgeBackgroundColor({ color: '#ff9800' });
     }
   }
+}
+
+// Mark note as "posting" (in-progress) to prevent duplicate posts
+async function markNoteAsPosting(noteId) {
+  const { notes = [] } = await chrome.storage.local.get('notes');
+  const updated = notes.map(n => {
+    if (n.id === noteId) {
+      return { ...n, status: 'posting', postingStartedAt: Date.now() };
+    }
+    return n;
+  });
+  await chrome.storage.local.set({ notes: updated });
 }
 
 // Mark note as backlog (missed/overdue)
@@ -179,12 +222,12 @@ async function markNoteAsPosted(noteId) {
   await chrome.storage.local.set({ notes: updated });
 }
 
-// Mark note as failed
+// Mark note as failed - move to backlog so user can retry
 async function markNoteAsFailed(noteId, error) {
   const { notes = [] } = await chrome.storage.local.get('notes');
   const updated = notes.map(n => {
     if (n.id === noteId) {
-      return { ...n, status: 'failed', error: error, failedAt: Date.now() };
+      return { ...n, status: 'backlog', error: error, failedAt: Date.now(), backlogAt: Date.now() };
     }
     return n;
   });

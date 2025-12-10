@@ -57,9 +57,9 @@ export default function JourneyScreen() {
       : 'skip'
   );
 
-  // Get all user's AI conversations
-  const conversations = useQuery(
-    api.holaai.ai.listJourneyConversations,
+  // Get all user's AI conversation sessions
+  const sessions = useQuery(
+    api.holaai.ai.listSessions,
     currentUser ? { userId: currentUser._id } : 'skip'
   );
 
@@ -89,8 +89,8 @@ export default function JourneyScreen() {
     router.push(`/journey/module/${moduleId}`);
   };
 
-  const navigateToConversation = (conversationId: Id<"hola_journeyConversations">) => {
-    router.push(`/journey/conversation/${conversationId}`);
+  const navigateToSession = (sessionId: Id<"hola_conversationSessions">) => {
+    router.push(`/journey/session/${sessionId}`);
   };
 
   const formatDate = (timestamp: number) => {
@@ -200,25 +200,44 @@ export default function JourneyScreen() {
               Complete each module to unlock the next. Pass the quiz with 70% or higher to progress.
             </Text>
 
-            {/* My AI Conversations Section */}
-            {conversations && conversations.length > 0 && (
+            {/* My AI Sessions Button - Always visible */}
+            <TouchableOpacity
+              onPress={() => router.push('/journey/sessions')}
+              style={[styles.sessionsButton, { backgroundColor: `${primary}15` }]}
+            >
+              <View style={[styles.sessionsButtonIcon, { backgroundColor: primary }]}>
+                <Icon name={Sparkles} size={18} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant='body' style={{ fontWeight: '600', color: text }}>
+                  My AI Sessions
+                </Text>
+                <Text variant='caption' style={{ color: textMuted }}>
+                  {sessions?.length ?? 0} saved conversation{(sessions?.length ?? 0) !== 1 ? 's' : ''}
+                </Text>
+              </View>
+              <Icon name={ChevronRight} size={20} color={primary} />
+            </TouchableOpacity>
+
+            {/* My AI Conversation Sessions Preview */}
+            {sessions && sessions.length > 0 && (
               <Card style={{ marginBottom: 16 }}>
                 <CardContent style={{ padding: 16 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                     <Icon name={Sparkles} color={primary} size={20} />
                     <Text variant='title' style={{ marginLeft: 8, flex: 1 }}>
-                      My AI Conversations
+                      My AI Sessions
                     </Text>
                     <Text variant='caption' style={{ color: textMuted }}>
-                      {conversations.length} saved
+                      {sessions.length} saved
                     </Text>
                   </View>
 
-                  {/* Show latest 3 conversations */}
-                  {conversations.slice(0, 3).map((conv, index, arr) => (
+                  {/* Show latest 3 sessions */}
+                  {sessions.slice(0, 3).map((session, index, arr) => (
                     <TouchableOpacity
-                      key={conv._id}
-                      onPress={() => navigateToConversation(conv._id)}
+                      key={session._id}
+                      onPress={() => navigateToSession(session._id)}
                       style={[
                         styles.conversationItem,
                         index === arr.length - 1 && { borderBottomWidth: 0 }
@@ -229,24 +248,24 @@ export default function JourneyScreen() {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text variant='body' style={{ fontWeight: '500' }} numberOfLines={1}>
-                          {conv.title}
+                          {session.title}
                         </Text>
                         <Text variant='caption' style={{ color: textMuted }} numberOfLines={1}>
-                          {conv.situation}
+                          {session.scenarioDescription}
                         </Text>
                       </View>
-                      <Text variant='caption' style={{ color: textMuted }}>
-                        {formatDate(conv.createdAt)}
-                      </Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text variant='caption' style={{ color: textMuted }}>
+                          {formatDate(session.createdAt)}
+                        </Text>
+                        <Text variant='caption' style={{ color: primary, fontSize: 11 }}>
+                          {session.conversationCount} conversation{session.conversationCount !== 1 ? 's' : ''}
+                        </Text>
+                      </View>
                       <Icon name={ChevronRight} size={16} color={textMuted} style={{ marginLeft: 4 }} />
                     </TouchableOpacity>
                   ))}
 
-                  {conversations.length > 3 && (
-                    <Text variant='caption' style={{ color: textMuted, textAlign: 'center', marginTop: 8 }}>
-                      +{conversations.length - 3} more conversations in module lessons
-                    </Text>
-                  )}
                 </CardContent>
               </Card>
             )}
@@ -461,5 +480,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  sessionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  sessionsButtonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

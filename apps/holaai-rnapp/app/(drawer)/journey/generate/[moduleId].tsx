@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ScrollView, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,16 +10,32 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useColor } from '@/hooks/useColor';
-import { Sparkles, MessageSquare } from 'lucide-react-native';
+import { Sparkles, MessageSquare, Lightbulb, RefreshCw } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
+interface Suggestion {
+  title: string;
+  description: string;
+  scenario: string;
+}
+
 export default function GenerateConversationScreen() {
   const router = useRouter();
-  const { moduleId } = useLocalSearchParams<{ moduleId: string }>();
+  const { moduleId, sessionId, scenario } = useLocalSearchParams<{
+    moduleId: string;
+    sessionId?: string;
+    scenario?: string;
+  }>();
   const insets = useSafeAreaInsets();
-  const [situation, setSituation] = useState('');
+  const [situation, setSituation] = useState(scenario || '');
   const [generating, setGenerating] = useState(false);
+
+  const isAddingToSession = !!sessionId;
+
+  // AI Suggestions state
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const currentUser = useQuery(api.common.users.currentUser);
   const moduleContext = useQuery(
@@ -28,6 +44,32 @@ export default function GenerateConversationScreen() {
   );
 
   const generateConversation = useAction(api.holaai.ai.generateJourneyConversation);
+  const generateSuggestions = useAction(api.holaai.ai.generateSuggestions);
+
+  // Fetch AI suggestions on mount (only for new sessions, not when adding to existing)
+  useEffect(() => {
+    if (currentUser && moduleId && !isAddingToSession && !scenario) {
+      fetchSuggestions();
+    }
+  }, [currentUser?._id, moduleId]);
+
+  const fetchSuggestions = async () => {
+    if (!currentUser || !moduleId) return;
+
+    setLoadingSuggestions(true);
+    try {
+      const result = await generateSuggestions({
+        userId: currentUser._id,
+        moduleId: moduleId as Id<"hola_learningModules">,
+        context: "before_generation",
+      });
+      setSuggestions(result.suggestions);
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
 
   const primary = useColor('primary');
   const background = useColor('background');
@@ -43,9 +85,11 @@ export default function GenerateConversationScreen() {
       const result = await generateConversation({
         userId: currentUser._id,
         moduleId: moduleId as Id<"hola_learningModules">,
+        sessionId: sessionId ? (sessionId as Id<"hola_conversationSessions">) : undefined,
         situation: situation.trim(),
       });
-      router.replace(`/journey/conversation/${result.conversationId}`);
+      // Navigate to session detail page
+      router.replace(`/journey/session/${result.sessionId}`);
     } catch (error) {
       console.error('Error generating conversation:', error);
       Alert.alert('Error', 'Failed to generate conversation. Please try again.');
@@ -93,7 +137,7 @@ export default function GenerateConversationScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Generate Conversation' }} />
+      <Stack.Screen options={{ title: isAddingToSession ? 'Add Conversation' : 'Generate Conversation' }} />
       <View style={{ flex: 1, backgroundColor: background }}>
         <ScrollView
           style={{ flex: 1 }}
@@ -134,6 +178,65 @@ export default function GenerateConversationScreen() {
               )}
             </CardContent>
           </Card>
+
+          {/* AI Suggestions Section - Only show for new sessions */}
+          {!isAddingToSession && !scenario && (
+            <View style={{ marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name={Lightbulb} size={18} color={primary} />
+                  <Text variant='subtitle' style={{ marginLeft: 8 }}>
+                    Suggested for You
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={fetchSuggestions}
+                  disabled={loadingSuggestions}
+                  style={{ padding: 8 }}
+                >
+                  <Icon
+                    name={RefreshCw}
+                    size={16}
+                    color={loadingSuggestions ? textMuted : primary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {loadingSuggestions ? (
+                <View style={{ gap: 10 }}>
+                  {[1, 2, 3].map((i) => (
+                    <View
+                      key={i}
+                      style={[styles.suggestionCardSkeleton, { backgroundColor: card }]}
+                    >
+                      <View style={[styles.skeletonLine, { width: '60%', backgroundColor: textMuted }]} />
+                      <View style={[styles.skeletonLine, { width: '90%', backgroundColor: textMuted, marginTop: 6 }]} />
+                    </View>
+                  ))}
+                </View>
+              ) : suggestions.length > 0 ? (
+                <View style={{ gap: 10 }}>
+                  {suggestions.map((suggestion, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => setSituation(suggestion.scenario)}
+                      style={[
+                        styles.suggestionCard,
+                        { backgroundColor: card, borderColor: situation === suggestion.scenario ? primary : 'transparent' }
+                      ]}
+                    >
+                      <Text variant='body' style={{ fontWeight: '600', color: text, marginBottom: 4 }}>
+                        {suggestion.title}
+                      </Text>
+                      <Text variant='caption' style={{ color: textMuted }}>
+                        {suggestion.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          )}
 
           {/* Scenario Input */}
           <Text variant='subtitle' style={{ marginBottom: 12 }}>
@@ -202,7 +305,7 @@ export default function GenerateConversationScreen() {
               <>
                 <Icon name={Sparkles} color='#fff' size={18} />
                 <Text style={{ color: '#fff', marginLeft: 8, fontWeight: '600' }}>
-                  Generate Conversation
+                  {isAddingToSession ? 'Add to Session' : 'Generate Conversation'}
                 </Text>
               </>
             )}
@@ -248,6 +351,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
+  },
+  suggestionCard: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  suggestionCardSkeleton: {
+    padding: 14,
+    borderRadius: 12,
+    height: 70,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 4,
+    opacity: 0.3,
   },
   footer: {
     position: 'absolute',

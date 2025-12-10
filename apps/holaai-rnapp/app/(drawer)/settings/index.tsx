@@ -11,7 +11,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import { BookOpen, Code, Volume2, Smartphone, Cloud, Play, AlertCircle, CheckCircle } from 'lucide-react-native';
+import { BookOpen, Code, Volume2, Smartphone, Cloud, Play, AlertCircle, CheckCircle, UserCircle, ChevronRight } from 'lucide-react-native';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@holaai/convex/_generated/api';
 import { useColor } from '@/hooks/useColor';
 import { useJourneySettings } from '@/contexts/JourneySettingsContext';
 import { useTTSSettings, TTSProvider } from '@/contexts/TTSSettingsContext';
@@ -30,6 +32,13 @@ export default function SettingsScreen() {
   const { settings, isLoading: ttsLoading, setProvider, setSpeed, isGeminiTTS } = useTTSSettings();
   const { settings: journeySettings, setFreeMode, isLoading: journeyLoading } = useJourneySettings();
   const { speak, isPlaying, didFallback, providerUsed, clearFallback, error } = useSpanishTTS();
+
+  // Learner profile
+  const currentUser = useQuery(api.common.users.currentUser);
+  const learnerProfile = useQuery(
+    api.holaai.profile.getLearnerProfile,
+    currentUser?._id ? { userId: currentUser._id } : 'skip'
+  );
 
   const [testPlaying, setTestPlaying] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'fallback' | 'error' | null>(null);
@@ -119,6 +128,50 @@ export default function SettingsScreen() {
         <CardContent>
           <Text style={styles.sectionTitle}>Appearance</Text>
           <ModeToggle />
+        </CardContent>
+      </Card>
+
+      {/* Learner Profile */}
+      <Card>
+        <CardContent>
+          <View style={styles.sectionHeader}>
+            <Icon name={UserCircle} size={20} color={primary} />
+            <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>
+              Learner Profile
+            </Text>
+          </View>
+
+          {learnerProfile ? (
+            <View style={{ gap: 8 }}>
+              <View style={styles.profileRow}>
+                <Text style={{ color: textMuted, width: 80 }}>Name</Text>
+                <Text style={{ color: foreground, flex: 1 }}>{learnerProfile.name}</Text>
+              </View>
+              <View style={styles.profileRow}>
+                <Text style={{ color: textMuted, width: 80 }}>From</Text>
+                <Text style={{ color: foreground, flex: 1 }}>{learnerProfile.origin}</Text>
+              </View>
+              <View style={styles.profileRow}>
+                <Text style={{ color: textMuted, width: 80 }}>Profession</Text>
+                <Text style={{ color: foreground, flex: 1 }}>{learnerProfile.profession}</Text>
+              </View>
+              <View style={styles.profileRow}>
+                <Text style={{ color: textMuted, width: 80 }}>Interests</Text>
+                <Text style={{ color: foreground, flex: 1 }}>{learnerProfile.interests.join(', ')}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={{ color: textMuted }}>No profile set up yet</Text>
+          )}
+
+          <Button
+            variant='outline'
+            onPress={() => router.push('/settings/profile')}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}
+          >
+            <Text style={{ color: primary }}>{learnerProfile ? 'Edit Profile' : 'Set Up Profile'}</Text>
+            <Icon name={ChevronRight} size={18} color={primary} />
+          </Button>
         </CardContent>
       </Card>
 
@@ -335,6 +388,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   sectionTitle: {
     fontSize: 16,

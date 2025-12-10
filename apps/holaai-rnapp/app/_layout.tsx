@@ -163,6 +163,7 @@ function AuthGate({ colorScheme }: { colorScheme: 'light' | 'dark' }) {
               : 'light',
         }}
       />
+      <Stack.Screen name='onboarding' options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name='+not-found' />
     </Stack>
   );
