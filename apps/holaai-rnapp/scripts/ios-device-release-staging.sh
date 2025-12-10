@@ -16,8 +16,12 @@ if [ ! -f ".env.staging" ]; then
     exit 1
 fi
 
-# Backup current .env
+# Backup current .env and .env.local
 cp .env .env.backup
+if [ -f ".env.local" ]; then
+    cp .env.local .env.local.backup
+    rm .env.local
+fi
 
 # Use staging env
 cp .env.staging .env
@@ -35,6 +39,11 @@ echo ""
 restore_files() {
     cp .env.backup .env
     rm .env.backup
+    # Restore .env.local if it was backed up
+    if [ -f ".env.local.backup" ]; then
+        cp .env.local.backup .env.local
+        rm .env.local.backup
+    fi
     # Restore default app name
     plutil -replace CFBundleDisplayName -string "HolaAI" ios/holarnapp/Info.plist
 }
