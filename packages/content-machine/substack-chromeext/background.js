@@ -66,6 +66,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
+// Log on startup
+log.info('Extension service worker started');
+
 // Grace period: only auto-post if due within this window (2 minutes)
 const GRACE_PERIOD_MS = 2 * 60 * 1000;
 
@@ -95,15 +98,15 @@ async function checkAndPostDueNotes() {
 
     if (overdueBy <= GRACE_PERIOD_MS) {
       // Within grace period - mark as "posting" FIRST to prevent duplicate posts
-      console.log('Marking note as posting:', note.text?.substring(0, 50));
+      await log.info(`Starting to post scheduled note`, note.id, { text: note.text?.substring(0, 50) });
       await markNoteAsPosting(note.id);
 
       // Now post it
-      console.log('Posting note (within grace period):', note.text?.substring(0, 50));
       await postNote(note);
     } else {
       // Too old - move to backlog
-      console.log(`Moving note to backlog (overdue by ${Math.round(overdueBy / 1000 / 60)} minutes):`, note.text?.substring(0, 50));
+      const overdueMinutes = Math.round(overdueBy / 1000 / 60);
+      await log.warning(`Note moved to backlog (overdue by ${overdueMinutes} min)`, note.id, { text: note.text?.substring(0, 50) });
       await markNoteAsBacklog(note.id);
       notesUpdated = true;
     }
@@ -147,7 +150,7 @@ async function markNoteAsBacklog(noteId) {
 
 // Post a single note to Substack
 async function postNote(note) {
-  console.log('Posting note:', note.id);
+  await log.info('Opening Substack tab...', note.id);
 
   try {
     // Open Substack main page (where "What's on your mind?" appears)
@@ -158,11 +161,13 @@ async function postNote(note) {
 
     // Wait for page to load
     await waitForTabLoad(tab.id);
+    await log.info('Substack page loaded, waiting for initialization...', note.id);
 
     // Give the page a moment to fully initialize
     await sleep(2000);
 
     // Send message to content script to post the note
+    await log.info('Sending post request to content script...', note.id);
     const response = await chrome.tabs.sendMessage(tab.id, {
       action: 'postNote',
       note: {
@@ -175,10 +180,11 @@ async function postNote(note) {
     if (response && response.success) {
       // Mark note as posted
       await markNoteAsPosted(note.id);
-      console.log('Note posted successfully:', note.id);
+      await log.success('Note posted successfully!', note.id, { text: note.text?.substring(0, 50) });
     } else {
-      console.error('Failed to post note:', response?.error);
-      await markNoteAsFailed(note.id, response?.error || 'Unknown error');
+      const errorMsg = response?.error || 'Unknown error';
+      await log.error(`Failed to post note: ${errorMsg}`, note.id);
+      await markNoteAsFailed(note.id, errorMsg);
     }
 
     // Close the tab after a delay
@@ -186,7 +192,7 @@ async function postNote(note) {
     await chrome.tabs.remove(tab.id);
 
   } catch (error) {
-    console.error('Error posting note:', error);
+    await log.error(`Error posting note: ${error.message}`, note.id);
     await markNoteAsFailed(note.id, error.message);
   }
 }
@@ -239,6 +245,40 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ==================== LOGGING ====================
+
+// Log levels: info, success, warning, error
+async function addLog(level, message, noteId = null, details = null) {
+  const { logs = [] } = await chrome.storage.local.get('logs');
+
+  const logEntry = {
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+    level,
+    message,
+    noteId,
+    details
+  };
+
+  logs.unshift(logEntry); // Add to beginning (newest first)
+
+  // Keep only last 500 logs
+  if (logs.length > 500) {
+    logs.length = 500;
+  }
+
+  await chrome.storage.local.set({ logs });
+  console.log(`[${level.toUpperCase()}] ${message}`, details || '');
+}
+
+// Convenience functions
+const log = {
+  info: (msg, noteId, details) => addLog('info', msg, noteId, details),
+  success: (msg, noteId, details) => addLog('success', msg, noteId, details),
+  warning: (msg, noteId, details) => addLog('warning', msg, noteId, details),
+  error: (msg, noteId, details) => addLog('error', msg, noteId, details)
+};
+
 // Listen for messages from app.js and content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'notePosted') {
@@ -258,7 +298,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Post a note immediately (for "Post Now" button)
 async function postNoteImmediately(noteData) {
-  console.log('Posting note immediately...');
+  await log.info('Post Now requested', null, { text: noteData.text?.substring(0, 50) });
 
   try {
     // Open Substack main page
@@ -269,11 +309,13 @@ async function postNoteImmediately(noteData) {
 
     // Wait for page to load
     await waitForTabLoad(tab.id);
+    await log.info('Substack page loaded for immediate post');
 
     // Give the page a moment to fully initialize
     await sleep(2000);
 
     // Send message to content script to post the note
+    await log.info('Sending immediate post to content script...');
     const response = await chrome.tabs.sendMessage(tab.id, {
       action: 'postNote',
       note: noteData
@@ -283,10 +325,16 @@ async function postNoteImmediately(noteData) {
     await sleep(2000);
     await chrome.tabs.remove(tab.id);
 
+    if (response && response.success) {
+      await log.success('Immediate post successful!', null, { text: noteData.text?.substring(0, 50) });
+    } else {
+      await log.error(`Immediate post failed: ${response?.error || 'Unknown error'}`);
+    }
+
     return response;
 
   } catch (error) {
-    console.error('Error posting note immediately:', error);
+    await log.error(`Error posting immediately: ${error.message}`);
     return { success: false, error: error.message };
   }
 }

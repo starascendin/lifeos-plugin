@@ -310,6 +310,99 @@
     .backlog-actions button.delete { color: #d00; border-color: #fcc; }
     .backlog-actions button.delete:hover { background: #fee; }
 
+    /* Logs Section */
+    .logs-section {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 24px;
+    }
+    .logs-section.collapsed .logs-content { display: none; }
+    .logs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .logs-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logs-header h2::before {
+      content: "📋";
+    }
+    .logs-toggle {
+      font-size: 12px;
+      color: #666;
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #f5f5f5;
+    }
+    .logs-actions {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .logs-actions button {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .logs-actions button:hover { background: #f5f5f5; }
+    .logs-actions button.active { background: #e8e8e8; border-color: #999; }
+    .logs-list {
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      background: #1e1e1e;
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .log-entry {
+      padding: 4px 8px;
+      border-radius: 3px;
+      margin-bottom: 4px;
+      display: flex;
+      gap: 8px;
+    }
+    .log-entry:hover { background: rgba(255,255,255,0.05); }
+    .log-time {
+      color: #888;
+      white-space: nowrap;
+    }
+    .log-level {
+      font-weight: 600;
+      text-transform: uppercase;
+      width: 60px;
+      flex-shrink: 0;
+    }
+    .log-level.info { color: #64b5f6; }
+    .log-level.success { color: #81c784; }
+    .log-level.warning { color: #ffb74d; }
+    .log-level.error { color: #e57373; }
+    .log-message {
+      color: #e0e0e0;
+      word-break: break-word;
+    }
+    .log-details {
+      color: #888;
+      font-size: 11px;
+    }
+    .logs-empty {
+      color: #888;
+      text-align: center;
+      padding: 24px;
+    }
+
     /* Calendar Week View */
     .calendar-section {
       background: #fff;
@@ -502,6 +595,27 @@
       <ul class="notes-list" id="notesList">
         <li class="empty-state">No scheduled notes yet</li>
       </ul>
+    </div>
+
+    <!-- Logs Section -->
+    <div class="logs-section collapsed" id="logsSection">
+      <div class="logs-header" id="logsHeader">
+        <h2>Activity Logs</h2>
+        <span class="logs-toggle" id="logsToggle">▶ Show</span>
+      </div>
+      <div class="logs-content">
+        <div class="logs-actions">
+          <button type="button" id="filterAll" class="active">All</button>
+          <button type="button" id="filterSuccess">Success</button>
+          <button type="button" id="filterError">Errors</button>
+          <button type="button" id="filterWarning">Warnings</button>
+          <button type="button" id="refreshLogs">Refresh</button>
+          <button type="button" id="clearLogs">Clear Logs</button>
+        </div>
+        <div class="logs-list" id="logsList">
+          <div class="logs-empty">No logs yet</div>
+        </div>
+      </div>
     </div>
   </div>
 

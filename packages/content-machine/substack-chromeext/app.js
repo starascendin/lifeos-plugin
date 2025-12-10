@@ -751,3 +751,114 @@ async function renderCalendar() {
   });
 }
 
+// ==================== LOGS ====================
+
+let currentLogFilter = 'all';
+
+// Initialize log viewer
+function initLogs() {
+  const header = document.getElementById('logsHeader');
+  const section = document.getElementById('logsSection');
+  const toggle = document.getElementById('logsToggle');
+
+  // Toggle collapse/expand
+  header.addEventListener('click', () => {
+    section.classList.toggle('collapsed');
+    const isCollapsed = section.classList.contains('collapsed');
+    toggle.textContent = isCollapsed ? '▶ Show' : '▼ Hide';
+    if (!isCollapsed) {
+      loadLogs();
+    }
+  });
+
+  // Filter buttons
+  document.getElementById('filterAll').addEventListener('click', () => setLogFilter('all'));
+  document.getElementById('filterSuccess').addEventListener('click', () => setLogFilter('success'));
+  document.getElementById('filterError').addEventListener('click', () => setLogFilter('error'));
+  document.getElementById('filterWarning').addEventListener('click', () => setLogFilter('warning'));
+
+  // Refresh and clear
+  document.getElementById('refreshLogs').addEventListener('click', loadLogs);
+  document.getElementById('clearLogs').addEventListener('click', clearLogs);
+}
+
+// Set log filter
+function setLogFilter(filter) {
+  currentLogFilter = filter;
+
+  // Update button states
+  document.querySelectorAll('.logs-actions button').forEach(btn => {
+    btn.classList.remove('active');
+  });
+
+  const filterBtnMap = {
+    'all': 'filterAll',
+    'success': 'filterSuccess',
+    'error': 'filterError',
+    'warning': 'filterWarning'
+  };
+
+  if (filterBtnMap[filter]) {
+    document.getElementById(filterBtnMap[filter]).classList.add('active');
+  }
+
+  loadLogs();
+}
+
+// Load and display logs
+async function loadLogs() {
+  const { logs = [] } = await chrome.storage.local.get('logs');
+  const list = document.getElementById('logsList');
+
+  // Filter logs
+  let filteredLogs = logs;
+  if (currentLogFilter !== 'all') {
+    filteredLogs = logs.filter(log => log.level === currentLogFilter);
+  }
+
+  if (filteredLogs.length === 0) {
+    list.innerHTML = '<div class="logs-empty">No logs yet</div>';
+    return;
+  }
+
+  list.innerHTML = filteredLogs.map(log => {
+    const time = new Date(log.timestamp).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    let details = '';
+    if (log.details) {
+      if (typeof log.details === 'object') {
+        details = Object.entries(log.details)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', ');
+      } else {
+        details = log.details;
+      }
+    }
+
+    return `
+      <div class="log-entry">
+        <span class="log-time">${time}</span>
+        <span class="log-level ${log.level}">${log.level}</span>
+        <span class="log-message">
+          ${escapeHtml(log.message)}
+          ${details ? `<span class="log-details">(${escapeHtml(details)})</span>` : ''}
+        </span>
+      </div>
+    `;
+  }).join('');
+}
+
+// Clear all logs
+async function clearLogs() {
+  if (!confirm('Clear all logs?')) return;
+  await chrome.storage.local.set({ logs: [] });
+  loadLogs();
+  showStatus('Logs cleared', 'success');
+}
+
