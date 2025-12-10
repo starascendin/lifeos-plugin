@@ -1,0 +1,46 @@
+{
+  "categories": [
+    {
+      "levelName": "A1",
+      "name": "Greetings",
+      "description": "Basic greetings and introductions",
+      "icon": "hand-wave",
+      "order": 1
+    },
+    {
+      "levelName": "A1",
+      "name": "Numbers",
+      "description": "Numbers 1-100 and basic counting",
+      "icon": "hash",
+      "order": 2
+    },
+    {
+      "levelName": "A1",
+      "name": "Food & Drinks",
+      "description": "Basic food vocabulary and ordering",
+      "icon": "utensils",
+      "order": 3
+    },
+    {
+      "levelName": "A1",
+      "name": "Family",
+      "description": "Family members and relationships",
+      "icon": "users",
+      "order": 4
+    },
+    {
+      "levelName": "A2",
+      "name": "Travel",
+      "description": "Vocabulary for traveling and transportation",
+      "icon": "plane",
+      "order": 1
+    },
+    {
+      "levelName": "A2",
+      "name": "Shopping",
+      "description": "Shopping vocabulary and conversations",
+      "icon": "shopping-bag",
+      "order": 2
+    }
+  ]
+}

@@ -1,0 +1,589 @@
+{
+  "lessons": [
+    {
+      "moduleNumber": 1,
+      "lessonNumber": "1.1",
+      "title": "Spanish Alphabet & Pronunciation",
+      "description": "Learn the Spanish alphabet and key pronunciation rules that differ from English.",
+      "objectives": [
+        "Recognize all 27 letters of the Spanish alphabet",
+        "Pronounce vowels correctly (a, e, i, o, u)",
+        "Understand key consonant differences (j, ll, ñ, rr)",
+        "Practice basic Spanish sounds"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 1
+    },
+    {
+      "moduleNumber": 1,
+      "lessonNumber": "1.2",
+      "title": "Greetings & Introductions",
+      "description": "Learn to greet people and introduce yourself in Spanish.",
+      "objectives": [
+        "Greet people formally and informally",
+        "Introduce yourself with Me llamo...",
+        "Ask and respond to '¿Cómo estás?'",
+        "Use basic courtesy phrases"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 2,
+      "contentRefs": {
+        "vocabularyCategory": "Greetings",
+        "vocabularySlice": [0, 6],
+        "grammarCategory": "Greetings",
+        "grammarSlice": [0, 1],
+        "phraseCategory": "Greetings",
+        "phraseSlice": [0, 3],
+        "exerciseCategory": "Greetings",
+        "exerciseSlice": [0, 2]
+      }
+    },
+    {
+      "moduleNumber": 1,
+      "lessonNumber": "1.3",
+      "title": "Numbers 0-20",
+      "description": "Master counting from zero to twenty in Spanish.",
+      "objectives": [
+        "Count from 0-20 in Spanish",
+        "Recognize written numbers",
+        "Use numbers in basic sentences",
+        "Understand number pronunciation patterns"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 3,
+      "contentRefs": {
+        "vocabularyCategory": "Numbers",
+        "vocabularySlice": [0, 10],
+        "exerciseCategory": "Numbers"
+      }
+    },
+    {
+      "moduleNumber": 1,
+      "lessonNumber": "1.4",
+      "title": "Basic Sentence Structure",
+      "description": "Understand how Spanish sentences are formed.",
+      "objectives": [
+        "Understand Subject-Verb-Object order",
+        "Form simple declarative sentences",
+        "Ask yes/no questions with intonation",
+        "Use question marks and exclamation points correctly"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 4
+    },
+    {
+      "moduleNumber": 1,
+      "lessonNumber": "Quiz 1",
+      "title": "Foundation Check",
+      "description": "Test your knowledge of greetings, numbers, and basic Spanish.",
+      "objectives": [
+        "Demonstrate mastery of greetings vocabulary",
+        "Show understanding of numbers 0-20",
+        "Apply formal vs informal 'you'"
+      ],
+      "isQuiz": true,
+      "estimatedMinutes": 15,
+      "order": 5,
+      "contentRefs": {
+        "exerciseCategory": ["Greetings", "Numbers"]
+      }
+    },
+    {
+      "moduleNumber": 2,
+      "lessonNumber": "2.1",
+      "title": "Verb SER (To Be - Permanent)",
+      "description": "Master the verb SER for describing permanent characteristics, origin, and profession.",
+      "objectives": [
+        "Conjugate SER in all present tense forms",
+        "Use SER for nationality and origin",
+        "Describe professions with SER",
+        "Express identity and characteristics"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 30,
+      "order": 1
+    },
+    {
+      "moduleNumber": 2,
+      "lessonNumber": "2.2",
+      "title": "Verb ESTAR (To Be - Temporary/Location)",
+      "description": "Learn ESTAR for expressing location, emotions, and temporary states.",
+      "objectives": [
+        "Conjugate ESTAR in present tense",
+        "Use ESTAR for location",
+        "Express feelings and emotions",
+        "Distinguish when to use SER vs ESTAR"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 30,
+      "order": 2,
+      "contentRefs": {
+        "grammarCategory": "Greetings",
+        "grammarSlice": [1, 2]
+      }
+    },
+    {
+      "moduleNumber": 2,
+      "lessonNumber": "2.3",
+      "title": "Regular -AR Verbs",
+      "description": "Learn to conjugate regular -AR verbs like hablar, estudiar, trabajar.",
+      "objectives": [
+        "Identify -AR verb infinitives",
+        "Apply -AR conjugation pattern",
+        "Use common -AR verbs in sentences",
+        "Practice with hablar, estudiar, trabajar, caminar"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 3
+    },
+    {
+      "moduleNumber": 2,
+      "lessonNumber": "2.4",
+      "title": "Regular -ER/-IR Verbs",
+      "description": "Master the conjugation patterns for -ER and -IR verbs.",
+      "objectives": [
+        "Conjugate regular -ER verbs (comer, beber, leer)",
+        "Conjugate regular -IR verbs (vivir, escribir)",
+        "Recognize similarities between -ER and -IR patterns",
+        "Form complete sentences with mixed verb types"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 4
+    },
+    {
+      "moduleNumber": 2,
+      "lessonNumber": "2.5",
+      "title": "Articles & Noun-Adjective Agreement",
+      "description": "Learn definite/indefinite articles and adjective agreement rules.",
+      "objectives": [
+        "Use el, la, los, las correctly",
+        "Use un, una, unos, unas correctly",
+        "Match adjectives to noun gender",
+        "Match adjectives to noun number"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 5
+    },
+    {
+      "moduleNumber": 2,
+      "lessonNumber": "2.6",
+      "title": "Describing People & Things",
+      "description": "Put it all together to describe people, objects, and places.",
+      "objectives": [
+        "Describe physical appearance",
+        "Describe personality traits",
+        "Describe objects (color, size, shape)",
+        "Write a short self-description"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 30,
+      "order": 6
+    },
+    {
+      "moduleNumber": 2,
+      "lessonNumber": "Quiz 2",
+      "title": "Present Tense Mastery",
+      "description": "Test your verb conjugation and description skills.",
+      "objectives": [
+        "Demonstrate SER vs ESTAR mastery",
+        "Conjugate regular verbs correctly",
+        "Apply adjective agreement rules"
+      ],
+      "isQuiz": true,
+      "estimatedMinutes": 20,
+      "order": 7
+    },
+    {
+      "moduleNumber": 3,
+      "lessonNumber": "3.1",
+      "title": "Days, Months, Seasons",
+      "description": "Learn the days of the week, months, and seasons in Spanish.",
+      "objectives": [
+        "Name all days of the week",
+        "Name all months of the year",
+        "Name the four seasons",
+        "Use dates in conversation"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 1
+    },
+    {
+      "moduleNumber": 3,
+      "lessonNumber": "3.2",
+      "title": "Telling Time",
+      "description": "Master telling time in Spanish including hours and minutes.",
+      "objectives": [
+        "Ask '¿Qué hora es?'",
+        "Tell time on the hour",
+        "Tell time with minutes (y, menos)",
+        "Use 'cuarto' and 'media' correctly"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 2
+    },
+    {
+      "moduleNumber": 3,
+      "lessonNumber": "3.3",
+      "title": "Daily Routines",
+      "description": "Describe your daily activities and schedule.",
+      "objectives": [
+        "Describe morning routine",
+        "Describe afternoon activities",
+        "Use reflexive verbs for daily actions",
+        "Sequence events with time expressions"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 3
+    },
+    {
+      "moduleNumber": 3,
+      "lessonNumber": "3.4",
+      "title": "Irregular Verb: TENER",
+      "description": "Learn the essential irregular verb TENER (to have).",
+      "objectives": [
+        "Conjugate TENER in present tense",
+        "Use TENER for possession",
+        "Use TENER expressions (hambre, sed, años)",
+        "Express age with TENER"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 4
+    },
+    {
+      "moduleNumber": 3,
+      "lessonNumber": "3.5",
+      "title": "Expressing Age & Possession",
+      "description": "Use TENER to express age and ownership.",
+      "objectives": [
+        "Ask and tell age",
+        "Describe what you have/own",
+        "Use possessive expressions",
+        "Combine with adjectives (tengo dos hermanos pequeños)"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 5
+    },
+    {
+      "moduleNumber": 3,
+      "lessonNumber": "Quiz 3",
+      "title": "Time & Routines",
+      "description": "Test your time-telling and daily routine vocabulary.",
+      "objectives": [
+        "Tell time accurately",
+        "Conjugate TENER correctly",
+        "Describe a daily schedule"
+      ],
+      "isQuiz": true,
+      "estimatedMinutes": 15,
+      "order": 6
+    },
+    {
+      "moduleNumber": 4,
+      "lessonNumber": "4.1",
+      "title": "Family Vocabulary",
+      "description": "Learn words for family members and relationships.",
+      "objectives": [
+        "Name immediate family members",
+        "Name extended family members",
+        "Describe family relationships",
+        "Use gender-specific family terms"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 1
+    },
+    {
+      "moduleNumber": 4,
+      "lessonNumber": "4.2",
+      "title": "Possessive Adjectives",
+      "description": "Master mi, tu, su, nuestro, vuestro, su.",
+      "objectives": [
+        "Use mi/mis, tu/tus correctly",
+        "Use su/sus for third person",
+        "Use nuestro/a/os/as",
+        "Combine possessives with family terms"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 2
+    },
+    {
+      "moduleNumber": 4,
+      "lessonNumber": "4.3",
+      "title": "Describing Family Members",
+      "description": "Practice describing your family using SER, TENER, and adjectives.",
+      "objectives": [
+        "Describe family members' appearance",
+        "Describe family members' personalities",
+        "State ages of family members",
+        "Write a family description paragraph"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 3
+    },
+    {
+      "moduleNumber": 4,
+      "lessonNumber": "4.4",
+      "title": "Irregular Verb: IR (to go)",
+      "description": "Learn the irregular verb IR and common expressions.",
+      "objectives": [
+        "Conjugate IR in present tense",
+        "Use IR + a + infinitive for future",
+        "Express where you're going",
+        "Use IR with places and activities"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 4
+    },
+    {
+      "moduleNumber": 4,
+      "lessonNumber": "Quiz 4",
+      "title": "Family & Possessives",
+      "description": "Test your family vocabulary and possessive adjective skills.",
+      "objectives": [
+        "Identify family members correctly",
+        "Use possessive adjectives accurately",
+        "Conjugate IR correctly"
+      ],
+      "isQuiz": true,
+      "estimatedMinutes": 15,
+      "order": 5
+    },
+    {
+      "moduleNumber": 5,
+      "lessonNumber": "5.1",
+      "title": "Food & Drink Vocabulary",
+      "description": "Learn essential food and beverage vocabulary.",
+      "objectives": [
+        "Name common foods",
+        "Name beverages",
+        "Categorize by food groups",
+        "Use articles with food nouns"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 1,
+      "contentRefs": {
+        "vocabularyCategory": "Food & Drinks"
+      }
+    },
+    {
+      "moduleNumber": 5,
+      "lessonNumber": "5.2",
+      "title": "Expressing Likes/Dislikes (GUSTAR)",
+      "description": "Master the special verb GUSTAR for expressing preferences.",
+      "objectives": [
+        "Understand GUSTAR structure (reverse of English)",
+        "Use me gusta / me gustan correctly",
+        "Express what you don't like with no me gusta",
+        "Use other similar verbs (encantar, interesar)"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 30,
+      "order": 2
+    },
+    {
+      "moduleNumber": 5,
+      "lessonNumber": "5.3",
+      "title": "Restaurant Conversations",
+      "description": "Learn to navigate dining out in Spanish.",
+      "objectives": [
+        "Ask for a table",
+        "Read a menu",
+        "Ask about ingredients",
+        "Handle common restaurant situations"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 3,
+      "contentRefs": {
+        "phraseCategory": "Food & Drinks",
+        "phraseSlice": [0, 2]
+      }
+    },
+    {
+      "moduleNumber": 5,
+      "lessonNumber": "5.4",
+      "title": "Ordering Food",
+      "description": "Practice ordering food and drinks like a native.",
+      "objectives": [
+        "Order food politely (Quisiera, Me gustaría)",
+        "Ask for the check",
+        "Handle dietary restrictions",
+        "Tip and pay appropriately"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 4,
+      "contentRefs": {
+        "phraseCategory": "Food & Drinks",
+        "phraseSlice": [2, 5],
+        "exerciseCategory": "Food & Drinks"
+      }
+    },
+    {
+      "moduleNumber": 5,
+      "lessonNumber": "Quiz 5",
+      "title": "Food & Preferences",
+      "description": "Test your food vocabulary and GUSTAR usage.",
+      "objectives": [
+        "Name foods accurately",
+        "Use GUSTAR correctly",
+        "Order food in a restaurant scenario"
+      ],
+      "isQuiz": true,
+      "estimatedMinutes": 15,
+      "order": 5,
+      "contentRefs": {
+        "exerciseCategory": "Food & Drinks"
+      }
+    },
+    {
+      "moduleNumber": 6,
+      "lessonNumber": "6.1",
+      "title": "City Locations",
+      "description": "Learn vocabulary for places in a city.",
+      "objectives": [
+        "Name common city locations",
+        "Describe where places are",
+        "Ask about locations",
+        "Use HAY for expressing existence"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 1
+    },
+    {
+      "moduleNumber": 6,
+      "lessonNumber": "6.2",
+      "title": "Prepositions of Place",
+      "description": "Master spatial prepositions: en, sobre, debajo, cerca, lejos.",
+      "objectives": [
+        "Use basic prepositions correctly",
+        "Describe object locations",
+        "Give simple directions",
+        "Combine with ESTAR for locations"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 2
+    },
+    {
+      "moduleNumber": 6,
+      "lessonNumber": "6.3",
+      "title": "Where are you from?",
+      "description": "Discuss nationality and origin.",
+      "objectives": [
+        "Ask '¿De dónde eres?'",
+        "State your nationality",
+        "Name countries and nationalities",
+        "Use SER for origin"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 20,
+      "order": 3
+    },
+    {
+      "moduleNumber": 6,
+      "lessonNumber": "6.4",
+      "title": "Asking for Directions",
+      "description": "Learn to ask for and understand directions.",
+      "objectives": [
+        "Ask where something is",
+        "Understand basic directions",
+        "Use direction vocabulary (izquierda, derecha, recto)",
+        "Navigate a simple map conversation"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 4
+    },
+    {
+      "moduleNumber": 6,
+      "lessonNumber": "Quiz 6",
+      "title": "Locations & Movement",
+      "description": "Test your knowledge of places and directions.",
+      "objectives": [
+        "Name city locations",
+        "Use prepositions correctly",
+        "Give and understand directions"
+      ],
+      "isQuiz": true,
+      "estimatedMinutes": 15,
+      "order": 5
+    },
+    {
+      "moduleNumber": 7,
+      "lessonNumber": "7.1",
+      "title": "Comprehensive Grammar Review",
+      "description": "Review all grammar concepts covered in A1.",
+      "objectives": [
+        "Review SER vs ESTAR usage",
+        "Review verb conjugations",
+        "Review adjective agreement",
+        "Practice integrated grammar exercises"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 30,
+      "order": 1
+    },
+    {
+      "moduleNumber": 7,
+      "lessonNumber": "7.2",
+      "title": "Real-world Conversations",
+      "description": "Practice complete conversations for common scenarios.",
+      "objectives": [
+        "Handle introductions scenario",
+        "Order at a restaurant",
+        "Ask for directions",
+        "Describe yourself and family"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 30,
+      "order": 2
+    },
+    {
+      "moduleNumber": 7,
+      "lessonNumber": "7.3",
+      "title": "Common Mistakes & Corrections",
+      "description": "Learn to avoid the most common errors Spanish learners make.",
+      "objectives": [
+        "Avoid SER/ESTAR confusion",
+        "Avoid article errors",
+        "Avoid false cognates",
+        "Self-correct common errors"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 25,
+      "order": 3
+    },
+    {
+      "moduleNumber": 7,
+      "lessonNumber": "Practice",
+      "title": "Mixed Scenarios Practice",
+      "description": "Practice with mixed exercises from all modules.",
+      "objectives": [
+        "Complete mixed-topic exercises",
+        "Demonstrate integrated skills",
+        "Prepare for final assessment"
+      ],
+      "isQuiz": false,
+      "estimatedMinutes": 30,
+      "order": 4
+    }
+  ]
+}

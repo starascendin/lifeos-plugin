@@ -1,0 +1,22 @@
+{
+  "levels": [
+    {
+      "name": "A1",
+      "displayName": "Beginner",
+      "description": "Basic phrases, greetings, and simple present tense",
+      "order": 1
+    },
+    {
+      "name": "A2",
+      "displayName": "Elementary",
+      "description": "Common vocabulary, past tense, and everyday situations",
+      "order": 2
+    },
+    {
+      "name": "B1",
+      "displayName": "Intermediate",
+      "description": "Complex grammar, varied vocabulary, and nuanced expression",
+      "order": 3
+    }
+  ]
+}

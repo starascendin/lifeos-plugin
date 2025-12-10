@@ -1,0 +1,27 @@
+{
+  "categoryName": "Numbers",
+  "levelName": "A1",
+  "vocabulary": [
+    { "spanish": "uno", "english": "one", "pronunciation": "OO-noh" },
+    { "spanish": "dos", "english": "two", "pronunciation": "dohs" },
+    { "spanish": "tres", "english": "three", "pronunciation": "trehs" },
+    { "spanish": "cuatro", "english": "four", "pronunciation": "KWAH-troh" },
+    { "spanish": "cinco", "english": "five", "pronunciation": "SEEN-koh" },
+    { "spanish": "seis", "english": "six", "pronunciation": "says" },
+    { "spanish": "siete", "english": "seven", "pronunciation": "SYEH-teh" },
+    { "spanish": "ocho", "english": "eight", "pronunciation": "OH-choh" },
+    { "spanish": "nueve", "english": "nine", "pronunciation": "NWEH-beh" },
+    { "spanish": "diez", "english": "ten", "pronunciation": "dyehs" },
+    { "spanish": "veinte", "english": "twenty", "pronunciation": "BAYN-teh" },
+    { "spanish": "cien", "english": "one hundred", "pronunciation": "syehn" }
+  ],
+  "exercises": [
+    {
+      "type": "multiple_choice",
+      "question": "What is 'siete' in English?",
+      "options": ["six", "seven", "eight", "nine"],
+      "correctAnswer": "seven",
+      "difficulty": 1
+    }
+  ]
+}

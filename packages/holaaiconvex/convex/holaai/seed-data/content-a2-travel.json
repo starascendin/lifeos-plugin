@@ -1,0 +1,42 @@
+{
+  "categoryName": "Travel",
+  "levelName": "A2",
+  "vocabulary": [
+    {
+      "spanish": "el aeropuerto",
+      "english": "airport",
+      "exampleSentence": "El aeropuerto está lejos.",
+      "exampleTranslation": "The airport is far."
+    },
+    {
+      "spanish": "el avión",
+      "english": "airplane",
+      "exampleSentence": "El avión sale a las tres.",
+      "exampleTranslation": "The plane leaves at three."
+    },
+    {
+      "spanish": "el hotel",
+      "english": "hotel",
+      "exampleSentence": "Reservé un hotel céntrico.",
+      "exampleTranslation": "I booked a central hotel."
+    },
+    {
+      "spanish": "el pasaporte",
+      "english": "passport",
+      "exampleSentence": "¿Dónde está mi pasaporte?",
+      "exampleTranslation": "Where is my passport?"
+    },
+    {
+      "spanish": "la maleta",
+      "english": "suitcase",
+      "exampleSentence": "Mi maleta es negra.",
+      "exampleTranslation": "My suitcase is black."
+    },
+    {
+      "spanish": "el billete",
+      "english": "ticket",
+      "exampleSentence": "Compré el billete online.",
+      "exampleTranslation": "I bought the ticket online."
+    }
+  ]
+}

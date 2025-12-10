@@ -4,6 +4,7 @@ import { Audio } from 'expo-av';
 import { useAction } from 'convex/react';
 import { api } from '@holaai/convex/_generated/api';
 import { useTTSSettings } from '@/contexts/TTSSettingsContext';
+import { useAILog } from '@/contexts/AILogContext';
 
 export type TTSProviderUsed = 'ondevice' | 'gemini' | null;
 
@@ -103,6 +104,7 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
   const [didFallback, setDidFallback] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const { settings, isGeminiTTS } = useTTSSettings();
+  const { addLog } = useAILog();
 
   const clearFallback = useCallback(() => {
     setDidFallback(false);
@@ -211,20 +213,44 @@ export function useSpanishTTS(): UseSpanishTTSReturn {
     setDidFallback(false);
     setProviderUsed(null);
 
+    const inputPreview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
+
     try {
       if (isGeminiTTS) {
-        await speakWithGemini(text);
+        const usedGemini = await speakWithGemini(text);
+        // Log TTS usage - provider depends on whether fallback occurred
+        addLog({
+          type: 'tts',
+          provider: usedGemini ? 'gemini' : 'ondevice',
+          success: true,
+          inputPreview,
+        });
       } else {
         setProviderUsed('ondevice');
         await speakOnDevice(text);
+        // Log on-device TTS
+        addLog({
+          type: 'tts',
+          provider: 'ondevice',
+          success: true,
+          inputPreview,
+        });
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown TTS error';
       setError(errorMessage);
       setIsPlaying(false);
       console.error('TTS error:', err);
+      // Log TTS error
+      addLog({
+        type: 'tts',
+        provider: isGeminiTTS ? 'gemini' : 'ondevice',
+        success: false,
+        error: errorMessage,
+        inputPreview,
+      });
     }
-  }, [isGeminiTTS, speakOnDevice, speakWithGemini]);
+  }, [isGeminiTTS, speakOnDevice, speakWithGemini, addLog]);
 
   /**
    * Stop current playback

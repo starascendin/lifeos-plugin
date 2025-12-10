@@ -13,6 +13,7 @@ import { useColor } from '@/hooks/useColor';
 import { Sparkles, MessageSquare, Lightbulb, RefreshCw } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
+import { useAILog } from '@/contexts/AILogContext';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 interface Suggestion {

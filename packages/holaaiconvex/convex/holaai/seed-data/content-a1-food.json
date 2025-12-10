@@ -1,0 +1,96 @@
+{
+  "categoryName": "Food & Drinks",
+  "levelName": "A1",
+  "vocabulary": [
+    {
+      "spanish": "el agua",
+      "english": "water",
+      "exampleSentence": "Un vaso de agua, por favor.",
+      "exampleTranslation": "A glass of water, please."
+    },
+    {
+      "spanish": "el café",
+      "english": "coffee",
+      "exampleSentence": "Me gusta el café con leche.",
+      "exampleTranslation": "I like coffee with milk."
+    },
+    {
+      "spanish": "el pan",
+      "english": "bread",
+      "exampleSentence": "El pan está fresco.",
+      "exampleTranslation": "The bread is fresh."
+    },
+    {
+      "spanish": "la fruta",
+      "english": "fruit",
+      "exampleSentence": "Como fruta todos los días.",
+      "exampleTranslation": "I eat fruit every day."
+    },
+    {
+      "spanish": "la carne",
+      "english": "meat",
+      "exampleSentence": "No como carne.",
+      "exampleTranslation": "I don't eat meat."
+    },
+    {
+      "spanish": "el pescado",
+      "english": "fish",
+      "exampleSentence": "El pescado está delicioso.",
+      "exampleTranslation": "The fish is delicious."
+    },
+    {
+      "spanish": "la ensalada",
+      "english": "salad",
+      "exampleSentence": "Quiero una ensalada.",
+      "exampleTranslation": "I want a salad."
+    },
+    {
+      "spanish": "el arroz",
+      "english": "rice",
+      "exampleSentence": "Arroz con pollo es mi favorito.",
+      "exampleTranslation": "Rice with chicken is my favorite."
+    }
+  ],
+  "phrases": [
+    {
+      "spanish": "La cuenta, por favor",
+      "english": "The check, please",
+      "context": "Asking for the bill at a restaurant",
+      "formalityLevel": "neutral"
+    },
+    {
+      "spanish": "¿Qué recomienda?",
+      "english": "What do you recommend?",
+      "context": "Asking waiter for recommendations",
+      "formalityLevel": "neutral"
+    },
+    {
+      "spanish": "Tengo hambre",
+      "english": "I'm hungry",
+      "context": "Expressing hunger",
+      "formalityLevel": "neutral"
+    },
+    {
+      "spanish": "Tengo sed",
+      "english": "I'm thirsty",
+      "context": "Expressing thirst",
+      "formalityLevel": "neutral"
+    },
+    {
+      "spanish": "¡Está delicioso!",
+      "english": "It's delicious!",
+      "context": "Complimenting the food",
+      "formalityLevel": "neutral"
+    }
+  ],
+  "exercises": [
+    {
+      "type": "translate",
+      "question": "Translate to Spanish: 'I want water, please'",
+      "questionSpanish": "Quiero agua, por favor",
+      "correctAnswer": "Quiero agua, por favor",
+      "explanation": "'Quiero' means 'I want'. 'Agua' is water. 'Por favor' means 'please'.",
+      "difficulty": 2
+    }
+  ]
+}
