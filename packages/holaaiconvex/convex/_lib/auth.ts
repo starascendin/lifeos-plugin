@@ -1,5 +1,6 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
+import { getDefaultRole } from "./roles";
 
 /**
  * Get the current user's identity from Clerk JWT
@@ -64,13 +65,17 @@ export async function getOrCreateUser(ctx: MutationCtx) {
     return existingUser._id;
   }
 
-  // Create new user
+  // Create new user with appropriate role based on email
+  const email = identity.email!;
+  const role = getDefaultRole(email);
+
   const userId = await ctx.db.insert("users", {
     tokenIdentifier: identity.tokenIdentifier,
-    email: identity.email!,
+    email: email,
     name: identity.name,
     pictureUrl: identity.pictureUrl,
     emailVerificationTime: identity.emailVerificationTime as number | undefined,
+    role: role,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });

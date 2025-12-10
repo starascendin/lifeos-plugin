@@ -10,8 +10,10 @@
 
 import type * as _lib_algorithms_sm2 from "../_lib/algorithms/sm2.js";
 import type * as _lib_auth from "../_lib/auth.js";
+import type * as _lib_roles from "../_lib/roles.js";
 import type * as common_dev from "../common/dev.js";
 import type * as common_messages from "../common/messages.js";
+import type * as common_migrations from "../common/migrations.js";
 import type * as common_tts from "../common/tts.js";
 import type * as common_users from "../common/users.js";
 import type * as holaai_ai from "../holaai/ai.js";
@@ -33,8 +35,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   "_lib/algorithms/sm2": typeof _lib_algorithms_sm2;
   "_lib/auth": typeof _lib_auth;
+  "_lib/roles": typeof _lib_roles;
   "common/dev": typeof common_dev;
   "common/messages": typeof common_messages;
+  "common/migrations": typeof common_migrations;
   "common/tts": typeof common_tts;
   "common/users": typeof common_users;
   "holaai/ai": typeof holaai_ai;

@@ -17,7 +17,7 @@
     "build:ios:prod": "eas build --platform ios --profile production",
     "ios:device": "expo run:ios --device",
     "ios:device:release": "expo run:ios --device --configuration Release",
-    "ios:device:release:staging": "cp .env .env.backup && cp .env.staging .env && expo run:ios --device --configuration Release; cp .env.backup .env && rm .env.backup",
+    "ios:device:release:staging": "bash scripts/ios-device-release-staging.sh",
     "ios:sim": "expo run:ios",
     "device:list": "xcrun xctrace list devices"
   },

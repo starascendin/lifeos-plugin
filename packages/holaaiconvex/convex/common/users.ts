@@ -15,6 +15,7 @@ export const ensureUser = mutation({
 
 /**
  * Get the current authenticated user
+ * Returns user with role defaulting to "user" if not set
  */
 export const currentUser = query({
   args: {},
@@ -25,7 +26,15 @@ export const currentUser = query({
     }
 
     const user = await ctx.db.get(userId);
-    return user;
+    if (!user) {
+      return null;
+    }
+
+    // Ensure role is always defined (default to "user" for backward compatibility)
+    return {
+      ...user,
+      role: user.role ?? "user",
+    };
   },
 });
 

@@ -18,6 +18,7 @@ import { useColor } from '@/hooks/useColor';
 import { useJourneySettings } from '@/contexts/JourneySettingsContext';
 import { useTTSSettings, TTSProvider } from '@/contexts/TTSSettingsContext';
 import { useSpanishTTS } from '@/hooks/useSpanishTTS';
+import { useUserRole } from '@/hooks/useUserRole';
 import Slider from '@react-native-community/slider';
 
 export default function SettingsScreen() {
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
   const { settings, isLoading: ttsLoading, setProvider, setSpeed, isGeminiTTS } = useTTSSettings();
   const { settings: journeySettings, setFreeMode, isLoading: journeyLoading } = useJourneySettings();
   const { speak, isPlaying, didFallback, providerUsed, clearFallback, error } = useSpanishTTS();
+  const { isDeveloper } = useUserRole();
 
   // Learner profile
   const currentUser = useQuery(api.common.users.currentUser);
@@ -360,20 +362,22 @@ export default function SettingsScreen() {
         </CardContent>
       </Card>
 
-      {/* Developer */}
-      <Card>
-        <CardContent>
-          <Text style={styles.sectionTitle}>Developer</Text>
-          <Button
-            variant='outline'
-            onPress={() => router.push('/settings/devpage')}
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Icon name={Code} size={18} color={textMuted} />
-            <Text style={{ marginLeft: 8, color: textMuted }}>Dev Page</Text>
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Developer - Only visible to users with developer role */}
+      {isDeveloper && (
+        <Card>
+          <CardContent>
+            <Text style={styles.sectionTitle}>Developer</Text>
+            <Button
+              variant='outline'
+              onPress={() => router.push('/settings/devpage')}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name={Code} size={18} color={textMuted} />
+              <Text style={{ marginLeft: 8, color: textMuted }}>Dev Page</Text>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </ScrollView>
   );
 }
