@@ -20,9 +20,9 @@ import {
 import { Icon } from '@/components/ui/icon';
 import { SmallAudioButton } from '@/components/audio/SmallAudioButton';
 import { TTSProviderToggle } from '@/components/audio/TTSProviderToggle';
-import { HighlightableText } from '@/components/ui/highlightable-text';
+import { SelectableText } from '@/components/ui/selectable-text';
 import { TranslationModal } from '@/components/translate/TranslationModal';
-import { useTextSelection } from '@/hooks/useTextSelection';
+import { TextSelectionPopup } from '@/components/translate/TextSelectionPopup';
 import type { Id } from '@holaai/convex/_generated/dataModel';
 
 type TabType = 'dialogue' | 'grammar' | 'phrases';
@@ -33,13 +33,26 @@ export default function ConversationScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('dialogue');
 
-  // Text selection via context/hook
-  const {
-    selectedText,
-    sourceLanguage,
-    showTranslationModal,
-    handleCloseTranslationModal,
-  } = useTextSelection({ sourceLanguage: 'es' });
+  // Text selection state
+  const [selectedText, setSelectedText] = useState('');
+  const [showSelectionPopup, setShowSelectionPopup] = useState(false);
+  const [showTranslationModal, setShowTranslationModal] = useState(false);
+
+  const handleTextSelection = (text: string) => {
+    setSelectedText(text);
+    setShowSelectionPopup(true);
+  };
+
+  const handleTranslate = () => {
+    setShowSelectionPopup(false);
+    setShowTranslationModal(true);
+  };
+
+  const handleAddToVocab = () => {
+    // Open translation modal which has the add to vocab functionality
+    setShowSelectionPopup(false);
+    setShowTranslationModal(true);
+  };
 
   const conversation = useQuery(
     api.holaai.ai.getJourneyConversation,
@@ -148,12 +161,12 @@ export default function ConversationScreen() {
                     {line.speakerName}
                   </Text>
                 )}
-                <HighlightableText
+                <SelectableText
                   style={{ color: text, fontWeight: '500', marginBottom: 4, fontSize: 16 }}
-                  sourceLanguage="es"
+                  onLongPressText={handleTextSelection}
                 >
                   {spanishText}
-                </HighlightableText>
+                </SelectableText>
                 <Text variant='caption' style={{ color: textMuted }}>
                   {englishText}
                 </Text>
@@ -192,12 +205,12 @@ export default function ConversationScreen() {
                   {hint.examples.map((ex, i) => (
                     <View key={i} style={styles.exampleRow}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <HighlightableText
+                        <SelectableText
                           style={{ color: primary, flex: 1, fontSize: 16 }}
-                          sourceLanguage="es"
+                          onLongPressText={handleTextSelection}
                         >
                           {ex.spanish}
-                        </HighlightableText>
+                        </SelectableText>
                         <SmallAudioButton text={ex.spanish} color={primary} size={16} />
                       </View>
                       <Text variant='caption' style={{ color: textMuted }}>
@@ -227,12 +240,12 @@ export default function ConversationScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <HighlightableText
+                    <SelectableText
                       style={{ color: primary, fontWeight: '600', fontSize: 16, flex: 1 }}
-                      sourceLanguage="es"
+                      onLongPressText={handleTextSelection}
                     >
                       {phrase.spanish}
-                    </HighlightableText>
+                    </SelectableText>
                     <View style={{ marginLeft: 8 }}>
                       <SmallAudioButton text={phrase.spanish} color={primary} size={18} />
                     </View>
@@ -355,12 +368,21 @@ export default function ConversationScreen() {
         </ScrollView>
       </View>
 
-      {/* Translation Modal - triggered by HighlightableText context menu */}
+      {/* Text Selection Popup */}
+      <TextSelectionPopup
+        visible={showSelectionPopup}
+        selectedText={selectedText}
+        onTranslate={handleTranslate}
+        onAddToVocab={handleAddToVocab}
+        onClose={() => setShowSelectionPopup(false)}
+      />
+
+      {/* Translation Modal */}
       <TranslationModal
         visible={showTranslationModal}
         text={selectedText}
-        sourceLanguage={sourceLanguage}
-        onClose={handleCloseTranslationModal}
+        sourceLanguage="es"
+        onClose={() => setShowTranslationModal(false)}
       />
     </>
   );

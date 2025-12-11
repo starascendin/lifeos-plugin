@@ -4,7 +4,6 @@ registerGlobals();
 import { Auth } from '@/components/auth/auth';
 import { AILogProvider } from '@/contexts/AILogContext';
 import { JourneySettingsProvider } from '@/contexts/JourneySettingsContext';
-import { TextSelectionProvider } from '@/contexts/TextSelectionContext';
 import { TTSSettingsProvider } from '@/contexts/TTSSettingsContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ConnectionProvider } from '@/hooks/useLiveKitSandbox';
@@ -72,9 +71,7 @@ export default function RootLayout() {
               <JourneySettingsProvider>
                 <TTSSettingsProvider>
                   <AILogProvider>
-                    <TextSelectionProvider>
                       <AuthGate colorScheme={colorScheme} />
-                    </TextSelectionProvider>
                   </AILogProvider>
                 </TTSSettingsProvider>
               </JourneySettingsProvider>
