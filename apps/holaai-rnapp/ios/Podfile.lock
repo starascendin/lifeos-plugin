@@ -2359,6 +2359,28 @@ PODS:
   - SDWebImageWebPCoder (0.14.6):
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
+  - SelectableText (2.1.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - WebRTC-SDK (137.7151.04)
   - Yoga (0.0.0)
 
@@ -2472,6 +2494,7 @@ DEPENDENCIES:
   - "RNScreens (from `../../../node_modules/.pnpm/react-native-screens@4.16.0_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-screens`)"
   - "RNSVG (from `../../../node_modules/.pnpm/react-native-svg@15.15.1_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-svg`)"
   - "RNWorklets (from `../../../node_modules/.pnpm/react-native-worklets@0.5.1_@babel+core@7.28.5_react-native@0.81.5_@babel+core@7.28.5_@_475598bffd18458016f257ef2eebee20/node_modules/react-native-worklets`)"
+  - "SelectableText (from `../../../node_modules/.pnpm/@rob117+react-native-selectable-text@2.1.0_react-native@0.81.5_@babel+core@7.28.5_@type_b66835b770f7d9ddd69110ac2dac896f/node_modules/@rob117/react-native-selectable-text`)"
   - "Yoga (from `../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/yoga`)"
 
 SPEC REPOS:
@@ -2703,6 +2726,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/.pnpm/react-native-svg@15.15.1_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/react-native-svg"
   RNWorklets:
     :path: "../../../node_modules/.pnpm/react-native-worklets@0.5.1_@babel+core@7.28.5_react-native@0.81.5_@babel+core@7.28.5_@_475598bffd18458016f257ef2eebee20/node_modules/react-native-worklets"
+  SelectableText:
+    :path: "../../../node_modules/.pnpm/@rob117+react-native-selectable-text@2.1.0_react-native@0.81.5_@babel+core@7.28.5_@type_b66835b770f7d9ddd69110ac2dac896f/node_modules/@rob117/react-native-selectable-text"
   Yoga:
     :path: "../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/ReactCommon/yoga"
 
@@ -2822,6 +2847,7 @@ SPEC CHECKSUMS:
   SDWebImageAVIFCoder: 00310d246aab3232ce77f1d8f0076f8c4b021d90
   SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
+  SelectableText: d78bb18cae7508bd797c4ea3294dc0e3df935172
   WebRTC-SDK: 40d4f5ba05cadff14e4db5614aec402a633f007e
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
 
