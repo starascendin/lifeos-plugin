@@ -37,6 +37,7 @@
     "@react-navigation/drawer": "^7.7.8",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
+    "@rob117/react-native-selectable-text": "^2.1.0",
     "convex": "^1.29.0",
     "expo": "~54.0.23",
     "expo-asset": "~12.0.9",

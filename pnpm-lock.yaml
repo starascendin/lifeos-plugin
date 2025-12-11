@@ -59,6 +59,9 @@ importers:
       '@react-navigation/native':
         specifier: ^7.1.8
         version: 7.1.24(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      '@rob117/react-native-selectable-text':
+        specifier: ^2.1.0
+        version: 2.1.0(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       convex:
         specifier: ^1.29.0
         version: 1.30.0(@clerk/clerk-react@5.58.0(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
@@ -3028,6 +3031,12 @@ packages:
 
   '@react-navigation/routers@7.5.2':
     resolution: {integrity: sha512-kymreY5aeTz843E+iPAukrsOtc7nabAH6novtAPREmmGu77dQpfxPB2ZWpKb5nRErIRowp1kYRoN2Ckl+S6JYw==}
+
+  '@rob117/react-native-selectable-text@2.1.0':
+    resolution: {integrity: sha512-54gb7slKGCoEnv36T02xzJ/taPv4xq1DyQQjHWwnYluteK7M/CvQcmBOtCsQkhfgm28XQyYbm4d0Cw8+qcl4Rw==}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
 
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
@@ -10861,6 +10870,11 @@ snapshots:
   '@react-navigation/routers@7.5.2':
     dependencies:
       nanoid: 3.3.11
+
+  '@rob117/react-native-selectable-text@2.1.0(react-native@0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)':
+    dependencies:
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0)
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
