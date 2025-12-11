@@ -26,6 +26,8 @@ import type * as holaai_progress from "../holaai/progress.js";
 import type * as holaai_seed from "../holaai/seed.js";
 import type * as holaai_seedData_index from "../holaai/seedData/index.js";
 import type * as holaai_seedData_types from "../holaai/seedData/types.js";
+import type * as holaai_translate from "../holaai/translate.js";
+import type * as holaai_vocab from "../holaai/vocab.js";
 import type * as holaai_voice from "../holaai/voice.js";
 
 import type {
@@ -53,6 +55,8 @@ declare const fullApi: ApiFromModules<{
   "holaai/seed": typeof holaai_seed;
   "holaai/seedData/index": typeof holaai_seedData_index;
   "holaai/seedData/types": typeof holaai_seedData_types;
+  "holaai/translate": typeof holaai_translate;
+  "holaai/vocab": typeof holaai_vocab;
   "holaai/voice": typeof holaai_voice;
 }>;
 

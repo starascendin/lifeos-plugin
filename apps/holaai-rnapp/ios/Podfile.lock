@@ -268,6 +268,8 @@ PODS:
     - ExpoModulesCore
   - ExpoSystemUI (6.0.8):
     - ExpoModulesCore
+  - ExpoTranslateText (0.1.0):
+    - ExpoModulesCore
   - ExpoWebBrowser (15.0.9):
     - ExpoModulesCore
   - EXUpdatesInterface (2.0.0):
@@ -2389,6 +2391,7 @@ DEPENDENCIES:
   - "ExpoSplashScreen (from `../../../node_modules/.pnpm/expo-splash-screen@31.0.11_expo@54.0.26/node_modules/expo-splash-screen/ios`)"
   - "ExpoSymbols (from `../../../node_modules/.pnpm/expo-symbols@1.0.7_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/expo-symbols/ios`)"
   - "ExpoSystemUI (from `../../../node_modules/.pnpm/expo-system-ui@6.0.8_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0_18b72849a487ebd6ebc628cce56d0f01/node_modules/expo-system-ui/ios`)"
+  - "ExpoTranslateText (from `../../../node_modules/.pnpm/expo-translate-text@0.1.0_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+re_55729039e5cd247fc8322dcc350b91d3/node_modules/expo-translate-text/ios`)"
   - "ExpoWebBrowser (from `../../../node_modules/.pnpm/expo-web-browser@15.0.9_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/expo-web-browser/ios`)"
   - "EXUpdatesInterface (from `../../../node_modules/.pnpm/expo-updates-interface@2.0.0_expo@54.0.26/node_modules/expo-updates-interface/ios`)"
   - "FBLazyVector (from `../../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0/node_modules/react-native/Libraries/FBLazyVector`)"
@@ -2539,6 +2542,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/.pnpm/expo-symbols@1.0.7_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/expo-symbols/ios"
   ExpoSystemUI:
     :path: "../../../node_modules/.pnpm/expo-system-ui@6.0.8_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0_18b72849a487ebd6ebc628cce56d0f01/node_modules/expo-system-ui/ios"
+  ExpoTranslateText:
+    :path: "../../../node_modules/.pnpm/expo-translate-text@0.1.0_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+re_55729039e5cd247fc8322dcc350b91d3/node_modules/expo-translate-text/ios"
   ExpoWebBrowser:
     :path: "../../../node_modules/.pnpm/expo-web-browser@15.0.9_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/expo-web-browser/ios"
   EXUpdatesInterface:
@@ -2730,6 +2735,7 @@ SPEC CHECKSUMS:
   ExpoSplashScreen: 268b2f128dc04284c21010540a6c4dd9f95003e3
   ExpoSymbols: 1ae04ce686de719b9720453b988d8bc5bf776c68
   ExpoSystemUI: 2761aa6875849af83286364811d46e8ed8ea64c7
+  ExpoTranslateText: a55a89837be7e41dac954f5569631ca6c4881301
   ExpoWebBrowser: b973e1351fdcf5fec0c400997b1851f5a8219ec3
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: e95a291ad2dadb88e42b06e0c5fb8262de53ec12

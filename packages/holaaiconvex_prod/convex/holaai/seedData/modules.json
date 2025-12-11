@@ -1,0 +1,60 @@
+{
+  "modules": [
+    {
+      "moduleNumber": 1,
+      "title": "Foundations",
+      "description": "Spanish alphabet, pronunciation, greetings, and basic numbers. Build the foundation for your Spanish journey.",
+      "estimatedHours": 3,
+      "prerequisiteModuleNumbers": [],
+      "order": 1
+    },
+    {
+      "moduleNumber": 2,
+      "title": "Present Tense & Description",
+      "description": "Learn the essential verbs SER and ESTAR, regular verb conjugation, and how to describe people and things.",
+      "estimatedHours": 4,
+      "prerequisiteModuleNumbers": [1],
+      "order": 2
+    },
+    {
+      "moduleNumber": 3,
+      "title": "Daily Life & Time",
+      "description": "Learn to tell time, describe daily routines, and use the irregular verb TENER.",
+      "estimatedHours": 3,
+      "prerequisiteModuleNumbers": [2],
+      "order": 3
+    },
+    {
+      "moduleNumber": 4,
+      "title": "Family & Relationships",
+      "description": "Learn family vocabulary, possessive adjectives, and the verb IR.",
+      "estimatedHours": 3,
+      "prerequisiteModuleNumbers": [3],
+      "order": 4
+    },
+    {
+      "moduleNumber": 5,
+      "title": "Food & Preferences",
+      "description": "Learn food vocabulary, how to order at restaurants, and express likes/dislikes with GUSTAR.",
+      "estimatedHours": 3,
+      "prerequisiteModuleNumbers": [4],
+      "order": 5
+    },
+    {
+      "moduleNumber": 6,
+      "title": "Places & Directions",
+      "description": "Learn city vocabulary, prepositions of place, and how to ask for directions.",
+      "estimatedHours": 2,
+      "prerequisiteModuleNumbers": [5],
+      "order": 6
+    },
+    {
+      "moduleNumber": 7,
+      "title": "Review & Integration",
+      "description": "Comprehensive review of all A1 content, real-world practice, and exam preparation.",
+      "estimatedHours": 2,
+      "prerequisiteModuleNumbers": [6],
+      "order": 7
+    }
+  ]
+}

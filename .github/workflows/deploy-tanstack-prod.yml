@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "apps/holaai-tanstack-web/**"
+      # - "apps/holaai-tanstack-web/**"
       - "packages/holaaiconvex_prod/**"
       - ".github/workflows/deploy-tanstack-prod.yml"
 
@@ -33,6 +33,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+
+      - name: Sync Convex to Production
+        run: pnpm convex:sync-to-prod
 
       - name: Deploy Convex to Production
         working-directory: packages/holaaiconvex_prod

@@ -6,6 +6,8 @@ import {
   Settings,
   Map,
   MessageSquare,
+  Languages,
+  BookMarked,
 } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
@@ -73,8 +75,27 @@ export default function DrawerLayout() {
         }}
       />
 
+      <Drawer.Screen
+        name='translate'
+        options={{
+          drawerLabel: 'Translate',
+          title: 'Translate',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={Languages} color={color} size={size} />
+          ),
+        }}
+      />
 
-
+      <Drawer.Screen
+        name='vocab-bank'
+        options={{
+          drawerLabel: 'Vocab Bank',
+          title: 'Vocab Bank',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={BookMarked} color={color} size={size} />
+          ),
+        }}
+      />
 
 
 

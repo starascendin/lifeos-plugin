@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
-export type AILogType = 'tts' | 'conversation' | 'suggestion' | 'lesson';
+export type AILogType = 'tts' | 'conversation' | 'suggestion' | 'lesson' | 'translation';
 export type AILogProvider = 'ondevice' | 'gemini';
 
 export interface AILogEntry {
