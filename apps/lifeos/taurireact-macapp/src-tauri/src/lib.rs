@@ -19,6 +19,12 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_oauth::init())
+        .plugin(
+            tauri_plugin_clerk::ClerkPluginBuilder::new()
+                .publishable_key(option_env!("VITE_CLERK_PUBLISHABLE_KEY").unwrap_or("pk_test_Y2xpbWJpbmctYmFybmFjbGUtODUuY2xlcmsuYWNjb3VudHMuZGV2JA"))
+                .with_tauri_store()
+                .build()
+        )
         .invoke_handler(tauri::generate_handler![
             check_screentime_permission,
             read_screentime_sessions,

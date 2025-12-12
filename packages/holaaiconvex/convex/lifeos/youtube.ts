@@ -39,6 +39,7 @@ export const upsertPlaylist = mutation({
         videoCount: args.videoCount,
         thumbnailUrl: args.thumbnailUrl,
         lastSyncedAt: now,
+        updatedAt: now,
       });
       return existing._id;
     }
@@ -54,6 +55,7 @@ export const upsertPlaylist = mutation({
       thumbnailUrl: args.thumbnailUrl,
       lastSyncedAt: now,
       createdAt: now,
+      updatedAt: now,
     });
   },
 });

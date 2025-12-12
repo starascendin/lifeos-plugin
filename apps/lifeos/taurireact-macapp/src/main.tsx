@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { initClerk } from "tauri-plugin-clerk";
 import App from "./App";
 import "./App.css";
 
@@ -17,12 +18,20 @@ if (!import.meta.env.VITE_CONVEX_URL) {
   throw new Error("Missing VITE_CONVEX_URL environment variable");
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <ClerkProvider publishableKey={clerkPublishableKey}>
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <App />
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
-  </React.StrictMode>
-);
+// Initialize Clerk for Tauri (patches fetch to route through Rust)
+initClerk(clerkPublishableKey).then(() => {
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>
+      <ClerkProvider
+        publishableKey={clerkPublishableKey}
+        allowedRedirectProtocols={["tauri:"]}
+      >
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          <App />
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
+    </React.StrictMode>
+  );
+}).catch((err) => {
+  console.error("Failed to initialize Clerk:", err);
+});

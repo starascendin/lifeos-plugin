@@ -28,6 +28,8 @@ export const lifeosTables = {
     lastSyncedAt: v.number(),
     // Timestamps
     createdAt: v.number(),
+    // When playlist metadata was last updated (title, videoCount, etc.)
+    updatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_youtube_id", ["youtubePlaylistId"])

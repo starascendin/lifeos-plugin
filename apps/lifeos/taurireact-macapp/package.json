@@ -25,7 +25,8 @@
     "@tauri-apps/plugin-store": "^2",
     "convex": "^1.17.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "tauri-plugin-clerk": "^0.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

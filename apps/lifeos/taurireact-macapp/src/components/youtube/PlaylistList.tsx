@@ -2,7 +2,12 @@ import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api, type Doc } from "@holaai/convex";
 
-type SortOption = "title-asc" | "title-desc" | "videos-desc" | "videos-asc" | "synced-desc" | "synced-asc";
+type SortOption =
+  | "title-asc" | "title-desc"
+  | "videos-desc" | "videos-asc"
+  | "synced-desc" | "synced-asc"
+  | "updated-desc" | "updated-asc"
+  | "created-desc" | "created-asc";
 
 interface PlaylistListProps {
   onSelectPlaylist: (playlist: Doc<"life_youtubePlaylists">) => void;
@@ -13,7 +18,7 @@ export function PlaylistList({
   onSelectPlaylist,
   selectedPlaylistId,
 }: PlaylistListProps) {
-  const [sortBy, setSortBy] = useState<SortOption>("synced-desc");
+  const [sortBy, setSortBy] = useState<SortOption>("updated-desc");
   const playlists = useQuery(api.lifeos.youtube.getPlaylists);
 
   const sortedPlaylists = useMemo(() => {
@@ -33,6 +38,14 @@ export function PlaylistList({
           return (b.lastSyncedAt ?? 0) - (a.lastSyncedAt ?? 0);
         case "synced-asc":
           return (a.lastSyncedAt ?? 0) - (b.lastSyncedAt ?? 0);
+        case "updated-desc":
+          return (b.updatedAt ?? b.lastSyncedAt ?? 0) - (a.updatedAt ?? a.lastSyncedAt ?? 0);
+        case "updated-asc":
+          return (a.updatedAt ?? a.lastSyncedAt ?? 0) - (b.updatedAt ?? b.lastSyncedAt ?? 0);
+        case "created-desc":
+          return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+        case "created-asc":
+          return (a.createdAt ?? 0) - (b.createdAt ?? 0);
         default:
           return 0;
       }
@@ -70,6 +83,10 @@ export function PlaylistList({
           onChange={(e) => setSortBy(e.target.value as SortOption)}
           className="text-xs bg-[var(--bg-secondary)] border border-[var(--border)] rounded px-2 py-1 text-[var(--text-primary)]"
         >
+          <option value="updated-desc">Recently Updated</option>
+          <option value="updated-asc">Oldest Updated</option>
+          <option value="created-desc">Recently Added</option>
+          <option value="created-asc">Oldest Added</option>
           <option value="synced-desc">Recently Synced</option>
           <option value="synced-asc">Oldest Synced</option>
           <option value="title-asc">Title A-Z</option>

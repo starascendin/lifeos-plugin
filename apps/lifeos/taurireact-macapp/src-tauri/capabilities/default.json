@@ -15,12 +15,16 @@
       "identifier": "http:default",
       "allow": [
         { "url": "https://www.googleapis.com/**" },
-        { "url": "https://youtube.googleapis.com/**" }
+        { "url": "https://youtube.googleapis.com/**" },
+        { "url": "https://*.clerk.accounts.dev/**" },
+        { "url": "https://clerk.rjlabs.dev/**" },
+        { "url": "https://*.convex.cloud/**" }
       ]
     },
     "deep-link:default",
     "store:default",
     "oauth:allow-start",
-    "oauth:allow-cancel"
+    "oauth:allow-cancel",
+    "clerk:default"
   ]
 }
