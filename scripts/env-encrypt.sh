@@ -45,11 +45,14 @@ ENCRYPTED=0
 SKIPPED=0
 FAILED=0
 
-# Find all .env and .env.local files in apps/* and packages/*
-for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/packages/*; do
+# Find all .env files in apps/*, apps/*/* (nested), and packages/*
+for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/apps/*/* "$REPO_ROOT"/packages/*; do
     [ -d "$dir" ] || continue
 
-    for env_file in "$dir/.env" "$dir/.env.local" "$dir/.env.staging"; do
+    # Skip if this is the apps/lifeos directory itself (we want its children)
+    [[ "$dir" == "$REPO_ROOT/apps/lifeos" ]] && continue
+
+    for env_file in "$dir/.env" "$dir/.env.local" "$dir/.env.staging" "$dir/.env.production"; do
         [ -f "$env_file" ] || continue
 
         relative_path="${env_file#$REPO_ROOT/}"

@@ -37,11 +37,14 @@ DECRYPTED=0
 SKIPPED=0
 FAILED=0
 
-# Find all .env.age and .env.local.age files in apps/* and packages/*
-for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/packages/*; do
+# Find all .env.age files in apps/*, apps/*/* (nested), and packages/*
+for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/apps/*/* "$REPO_ROOT"/packages/*; do
     [ -d "$dir" ] || continue
 
-    for encrypted_file in "$dir/.env.age" "$dir/.env.local.age" "$dir/.env.staging.age"; do
+    # Skip if this is the apps/lifeos directory itself (we want its children)
+    [[ "$dir" == "$REPO_ROOT/apps/lifeos" ]] && continue
+
+    for encrypted_file in "$dir/.env.age" "$dir/.env.local.age" "$dir/.env.staging.age" "$dir/.env.production.age"; do
         [ -f "$encrypted_file" ] || continue
 
         # Remove .age extension to get target path
