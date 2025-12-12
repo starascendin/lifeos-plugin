@@ -81,7 +81,7 @@ export function SignIn() {
         });
 
         // Open the OAuth URL in external browser
-        await open(externalUrl);
+        await open(externalUrl.toString());
 
       } else {
         // For web: Use standard redirect flow

@@ -27,7 +27,7 @@ export function ScreenTimeDashboard() {
 
   return (
     <div className="space-y-4 overflow-y-auto h-full">
-      <ScreenTimeSyncButton autoSync autoSyncIntervalMinutes={30} />
+      <ScreenTimeSyncButton />
 
       {/* Today's summary */}
       {todaySummary && (

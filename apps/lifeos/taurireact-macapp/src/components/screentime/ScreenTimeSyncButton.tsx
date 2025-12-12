@@ -1,22 +1,11 @@
-import { useScreenTimeSync } from "../../lib/hooks/useScreenTimeSync";
+import { useScreenTimeSync } from "../../lib/contexts/SyncContext";
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
-interface ScreenTimeSyncButtonProps {
-  autoSync?: boolean;
-  autoSyncIntervalMinutes?: number;
-}
-
-export function ScreenTimeSyncButton({
-  autoSync = false,
-  autoSyncIntervalMinutes = 30,
-}: ScreenTimeSyncButtonProps) {
+export function ScreenTimeSyncButton() {
   const { progress, hasPermission, startSync, isSyncing, refreshPermission } =
-    useScreenTimeSync({
-      autoSync,
-      autoSyncIntervalMinutes,
-    });
+    useScreenTimeSync();
 
   const openSystemPreferences = async () => {
     if (!isTauri) return;
@@ -138,11 +127,6 @@ export function ScreenTimeSyncButton({
           >
             Sync Screen Time Data
           </button>
-          {autoSync && (
-            <p className="text-xs text-[var(--text-secondary)] mt-2 text-center">
-              Auto-sync every {autoSyncIntervalMinutes} minutes
-            </p>
-          )}
         </div>
       )}
     </div>

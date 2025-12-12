@@ -1,14 +1,11 @@
 import { useSession } from "@clerk/clerk-react";
-import { useAction } from "convex/react";
-import { api } from "@holaai/convex";
-import { useSyncProgress } from "../../lib/hooks/useSyncProgress";
+import { useYouTubeSync } from "../../lib/contexts/SyncContext";
 import { useState, useEffect } from "react";
 
 export function SyncButton() {
   const { session } = useSession();
-  const { progress, startSync } = useSyncProgress();
+  const { progress, startSync } = useYouTubeSync();
   const [hasYouTubeAccess, setHasYouTubeAccess] = useState<boolean | null>(null);
-  const getGoogleToken = useAction(api.lifeos.youtube.getGoogleOAuthToken);
 
   // Check if user has Google connected with YouTube scope
   useEffect(() => {
@@ -22,22 +19,7 @@ export function SyncButton() {
 
   const handleSync = async () => {
     console.log("[SyncButton] handleSync called");
-    try {
-      // Get the Google OAuth access token via Convex action
-      console.log("[SyncButton] Getting Google OAuth token from Convex...");
-      const { token } = await getGoogleToken();
-
-      console.log("[SyncButton] Token received:", token ? `${token.substring(0, 20)}...` : "null");
-      if (token) {
-        console.log("[SyncButton] Starting sync...");
-        await startSync(token);
-        console.log("[SyncButton] Sync completed");
-      } else {
-        console.error("[SyncButton] Could not get Google OAuth token");
-      }
-    } catch (err) {
-      console.error("[SyncButton] Failed to get token:", err);
-    }
+    await startSync();
   };
 
   if (hasYouTubeAccess === null) {

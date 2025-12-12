@@ -3,6 +3,7 @@ import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { AuthGate } from "./components/auth/AuthGate";
 import { SignIn } from "./components/auth/SignIn";
 import { MainContent } from "./components/MainContent";
+import { SyncProvider } from "./lib/contexts/SyncContext";
 import "./App.css";
 
 // Check if running in Tauri
@@ -39,7 +40,9 @@ function App() {
       </SignedOut>
       <SignedIn>
         <AuthGate>
-          <MainContent />
+          <SyncProvider>
+            <MainContent />
+          </SyncProvider>
         </AuthGate>
       </SignedIn>
     </>
