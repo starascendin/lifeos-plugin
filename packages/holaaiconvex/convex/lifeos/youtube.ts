@@ -369,38 +369,24 @@ export const getGoogleOAuthToken = action({
     }
 
     // Extract Clerk user ID from the subject claim
-    // Convex stores it as the full subject, but we need just the user ID part
     const clerkUserId = identity.subject;
-    console.log("[getGoogleOAuthToken] identity.subject:", clerkUserId);
-    console.log("[getGoogleOAuthToken] identity.tokenIdentifier:", identity.tokenIdentifier);
 
-    const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+    const secretKey = process.env.CLERK_SECRET_KEY;
     if (!secretKey) {
       throw new Error("CLERK_SECRET_KEY not configured");
     }
 
-    console.log("[getGoogleOAuthToken] secretKey length:", secretKey.length);
-    console.log("[getGoogleOAuthToken] secretKey starts with:", secretKey.substring(0, 10));
-
     const clerk = createClerkClient({ secretKey });
 
-    try {
-      const tokens = await clerk.users.getUserOauthAccessToken(
-        clerkUserId,
-        "oauth_google"
-      );
+    const tokens = await clerk.users.getUserOauthAccessToken(
+      clerkUserId,
+      "oauth_google"
+    );
 
-      console.log("[getGoogleOAuthToken] tokens response:", JSON.stringify(tokens));
-
-      if (!tokens.data || tokens.data.length === 0) {
-        throw new Error("No Google OAuth token found. Please sign out and sign in again with Google.");
-      }
-
-      return { token: tokens.data[0].token };
-    } catch (error: any) {
-      console.error("[getGoogleOAuthToken] Clerk API error:", error.message);
-      console.error("[getGoogleOAuthToken] Error details:", JSON.stringify(error.errors || error));
-      throw new Error(`Failed to get Google OAuth token: ${error.message}`);
+    if (!tokens.data || tokens.data.length === 0) {
+      throw new Error("No Google OAuth token found. Please sign out and sign in again with Google.");
     }
+
+    return { token: tokens.data[0].token };
   },
 });
