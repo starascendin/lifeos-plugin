@@ -1,7 +1,7 @@
 import { Drawer } from 'expo-router/drawer';
 import { useColor } from '@/hooks/useColor';
 import { DrawerContent } from '@/components/drawer/DrawerContent';
-import { Home, Settings } from 'lucide-react-native';
+import { Home, Settings, Mic } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
 export default function DrawerLayout() {
@@ -46,7 +46,16 @@ export default function DrawerLayout() {
         }}
       />
 
-
+      <Drawer.Screen
+        name='voicememo'
+        options={{
+          drawerLabel: 'Voice Memo',
+          title: 'Voice Memo',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={Mic} color={color} size={size} />
+          ),
+        }}
+      />
 
       <Drawer.Screen
         name='settings'

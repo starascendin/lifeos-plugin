@@ -95,4 +95,91 @@ export const lifeosTables = {
     .index("by_video", ["videoId"])
     .index("by_youtube_id", ["youtubeVideoId"])
     .index("by_user_youtube_id", ["userId", "youtubeVideoId"]),
+
+  // ==================== SCREEN TIME SESSIONS ====================
+  life_screentimeSessions: defineTable({
+    // User who owns this session
+    userId: v.id("users"),
+    // Unique identifier for this session (bundleId_startTime for deduplication)
+    sessionKey: v.string(),
+    // App bundle identifier (e.g., "com.apple.Safari")
+    bundleId: v.string(),
+    // Human-readable app name
+    appName: v.optional(v.string()),
+    // App category (productivity, social, entertainment, etc.)
+    category: v.optional(v.string()),
+    // Session timestamps (Unix epoch milliseconds)
+    startTime: v.number(),
+    endTime: v.number(),
+    // Duration in seconds
+    durationSeconds: v.number(),
+    // Timezone offset in seconds from UTC
+    timezoneOffset: v.optional(v.number()),
+    // Device identifier
+    deviceId: v.optional(v.string()),
+    // Whether this is web usage (Safari/Chrome)
+    isWebUsage: v.boolean(),
+    // Domain for web usage sessions
+    domain: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "startTime"])
+    .index("by_session_key", ["userId", "sessionKey"])
+    .index("by_user_bundle", ["userId", "bundleId"]),
+
+  // ==================== SCREEN TIME DAILY SUMMARIES ====================
+  life_screentimeDailySummaries: defineTable({
+    // User who owns this summary
+    userId: v.id("users"),
+    // Date string in YYYY-MM-DD format (in user's local timezone)
+    date: v.string(),
+    // Total screen time for the day in seconds
+    totalSeconds: v.number(),
+    // Per-app breakdown
+    appUsage: v.array(
+      v.object({
+        bundleId: v.string(),
+        appName: v.optional(v.string()),
+        category: v.optional(v.string()),
+        seconds: v.number(),
+        sessionCount: v.number(),
+      })
+    ),
+    // Per-category breakdown
+    categoryUsage: v.array(
+      v.object({
+        category: v.string(),
+        seconds: v.number(),
+      })
+    ),
+    // Device identifier
+    deviceId: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"]),
+
+  // ==================== SCREEN TIME SYNC STATUS ====================
+  life_screentimeSyncStatus: defineTable({
+    // User who owns this sync status
+    userId: v.id("users"),
+    // Last successful sync timestamp (Unix epoch ms)
+    lastSyncAt: v.optional(v.number()),
+    // Last session timestamp synced (to enable incremental sync)
+    lastSessionTime: v.optional(v.number()),
+    // Device identifier
+    deviceId: v.optional(v.string()),
+    // Whether auto-sync is enabled
+    autoSyncEnabled: v.boolean(),
+    // Auto-sync interval in minutes
+    autoSyncIntervalMinutes: v.optional(v.number()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
 };
