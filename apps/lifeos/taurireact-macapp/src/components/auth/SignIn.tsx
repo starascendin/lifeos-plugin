@@ -1,11 +1,13 @@
-import { useSignIn } from "@clerk/clerk-react";
+import { useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 import { useState, useRef } from "react";
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
 export function SignIn() {
-  const { signIn, setActive, isLoaded } = useSignIn();
+  const { signIn, isLoaded } = useSignIn();
+  const { signUp } = useSignUp();
+  const clerk = useClerk();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const portRef = useRef<number | null>(null);
@@ -59,13 +61,53 @@ export function SignIn() {
         await onUrl(async (url) => {
           console.log("[SignIn] Localhost callback received:", url);
           try {
-            // Reload the sign-in to get updated status
-            const updatedSignIn = await signIn.reload();
-            console.log("[SignIn] Updated signIn status:", updatedSignIn.status);
+            // Parse the callback URL to get the rotating token nonce
+            const callbackUrl = new URL(url);
+            const rotatingTokenNonce = callbackUrl.searchParams.get("rotating_token_nonce");
 
-            if (updatedSignIn.status === "complete" && updatedSignIn.createdSessionId) {
-              console.log("[SignIn] Setting active session:", updatedSignIn.createdSessionId);
-              await setActive({ session: updatedSignIn.createdSessionId });
+            if (!rotatingTokenNonce) {
+              throw new Error("Missing rotating_token_nonce in callback URL");
+            }
+
+            console.log("[SignIn] Got rotatingTokenNonce, reloading signIn...");
+
+            // Reload sign-in with nonce to complete OAuth handshake
+            const reloadedSignIn = await signIn.reload({ rotatingTokenNonce });
+            console.log("[SignIn] Reloaded signIn status:", reloadedSignIn.status);
+            console.log("[SignIn] firstFactorVerification.status:", reloadedSignIn.firstFactorVerification?.status);
+
+            // Check if this is a "transfer" scenario (new user needs to sign up)
+            if (reloadedSignIn.firstFactorVerification?.status === "transferable") {
+              console.log("[SignIn] Transfer scenario - user needs to sign up");
+
+              if (!signUp) {
+                throw new Error("signUp not available for transfer");
+              }
+
+              // Create sign-up via transfer from sign-in attempt
+              const newSignUp = await signUp.create({ transfer: true });
+              console.log("[SignIn] SignUp created with transfer, status:", newSignUp.status);
+
+              // Reload sign-up with nonce to complete OAuth flow
+              const reloadedSignUp = await newSignUp.reload({ rotatingTokenNonce });
+              console.log("[SignIn] SignUp reloaded, createdSessionId:", reloadedSignUp.createdSessionId);
+
+              if (reloadedSignUp.createdSessionId) {
+                await clerk.setActive({ session: reloadedSignUp.createdSessionId });
+                console.log("[SignIn] Session activated from signUp");
+              } else {
+                throw new Error("No session ID after signUp reload");
+              }
+            } else {
+              // Normal sign-in flow - existing user
+              console.log("[SignIn] Normal sign-in flow, createdSessionId:", reloadedSignIn.createdSessionId);
+
+              if (reloadedSignIn.createdSessionId) {
+                await clerk.setActive({ session: reloadedSignIn.createdSessionId });
+                console.log("[SignIn] Session activated from signIn");
+              } else {
+                throw new Error("No session ID after signIn reload");
+              }
             }
           } catch (err) {
             console.error("[SignIn] Error processing callback:", err);

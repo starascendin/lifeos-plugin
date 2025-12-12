@@ -30,6 +30,7 @@ import type * as holaai_translate from "../holaai/translate.js";
 import type * as holaai_vocab from "../holaai/vocab.js";
 import type * as holaai_voice from "../holaai/voice.js";
 import type * as lifeos_screentime from "../lifeos/screentime.js";
+import type * as lifeos_voicememo from "../lifeos/voicememo.js";
 import type * as lifeos_youtube from "../lifeos/youtube.js";
 
 import type {
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "holaai/vocab": typeof holaai_vocab;
   "holaai/voice": typeof holaai_voice;
   "lifeos/screentime": typeof lifeos_screentime;
+  "lifeos/voicememo": typeof lifeos_voicememo;
   "lifeos/youtube": typeof lifeos_youtube;
 }>;
 

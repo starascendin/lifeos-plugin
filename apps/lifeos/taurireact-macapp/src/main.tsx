@@ -19,10 +19,13 @@ if (!import.meta.env.VITE_CONVEX_URL) {
 }
 
 // Initialize Clerk for Tauri (patches fetch to route through Rust)
-initClerk(clerkPublishableKey).then(() => {
+// IMPORTANT: Pass the Clerk instance from initClerk to ClerkProvider
+// Otherwise ClerkProvider creates its own instance without the Tauri fetch patching
+initClerk(clerkPublishableKey).then((clerk) => {
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <ClerkProvider
+        Clerk={clerk as any}
         publishableKey={clerkPublishableKey}
         allowedRedirectProtocols={["tauri:"]}
       >
