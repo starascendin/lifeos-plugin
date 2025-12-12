@@ -6,32 +6,37 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:staging": "tsc && vite build --mode staging",
+    "build:production": "tsc && vite build --mode production",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:staging": "TAURI_BUILD_MODE=staging tauri build -c src-tauri/tauri.staging.conf.json",
+    "tauri:production": "TAURI_BUILD_MODE=production tauri build -c src-tauri/tauri.production.conf.json"
   },
   "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "@clerk/clerk-react": "^5.0.0",
+    "@fabianlars/tauri-plugin-oauth": "^2",
+    "@holaai/convex": "workspace:*",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-deep-link": "^2",
+    "@tauri-apps/plugin-http": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-shell": "^2",
-    "@tauri-apps/plugin-http": "^2",
-    "@tauri-apps/plugin-deep-link": "^2",
     "@tauri-apps/plugin-store": "^2",
-    "@fabianlars/tauri-plugin-oauth": "^2",
-    "@clerk/clerk-react": "^5.0.0",
     "convex": "^1.17.0",
-    "@holaai/convex": "workspace:*"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^25.0.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4",
-    "@tauri-apps/cli": "^2",
-    "tailwindcss": "^3.4.0",
     "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0"
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
   }
 }

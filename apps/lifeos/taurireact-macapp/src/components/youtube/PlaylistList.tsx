@@ -1,5 +1,8 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api, type Doc } from "@holaai/convex";
+
+type SortOption = "title-asc" | "title-desc" | "videos-desc" | "videos-asc" | "synced-desc" | "synced-asc";
 
 interface PlaylistListProps {
   onSelectPlaylist: (playlist: Doc<"life_youtubePlaylists">) => void;
@@ -10,7 +13,31 @@ export function PlaylistList({
   onSelectPlaylist,
   selectedPlaylistId,
 }: PlaylistListProps) {
+  const [sortBy, setSortBy] = useState<SortOption>("synced-desc");
   const playlists = useQuery(api.lifeos.youtube.getPlaylists);
+
+  const sortedPlaylists = useMemo(() => {
+    if (!playlists) return [];
+
+    return [...playlists].sort((a, b) => {
+      switch (sortBy) {
+        case "title-asc":
+          return a.title.localeCompare(b.title);
+        case "title-desc":
+          return b.title.localeCompare(a.title);
+        case "videos-desc":
+          return (b.videoCount ?? 0) - (a.videoCount ?? 0);
+        case "videos-asc":
+          return (a.videoCount ?? 0) - (b.videoCount ?? 0);
+        case "synced-desc":
+          return (b.lastSyncedAt ?? 0) - (a.lastSyncedAt ?? 0);
+        case "synced-asc":
+          return (a.lastSyncedAt ?? 0) - (b.lastSyncedAt ?? 0);
+        default:
+          return 0;
+      }
+    });
+  }, [playlists, sortBy]);
 
   if (playlists === undefined) {
     return (
@@ -32,8 +59,29 @@ export function PlaylistList({
   }
 
   return (
-    <div className="space-y-2">
-      {playlists.map((playlist) => (
+    <div className="flex flex-col h-full">
+      {/* Sort controls */}
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        <span className="text-xs text-[var(--text-secondary)]">
+          {playlists.length} playlists
+        </span>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className="text-xs bg-[var(--bg-secondary)] border border-[var(--border)] rounded px-2 py-1 text-[var(--text-primary)]"
+        >
+          <option value="synced-desc">Recently Synced</option>
+          <option value="synced-asc">Oldest Synced</option>
+          <option value="title-asc">Title A-Z</option>
+          <option value="title-desc">Title Z-A</option>
+          <option value="videos-desc">Most Videos</option>
+          <option value="videos-asc">Fewest Videos</option>
+        </select>
+      </div>
+
+      {/* Scrollable playlist list */}
+      <div className="flex-1 overflow-y-auto space-y-2">
+        {sortedPlaylists.map((playlist) => (
         <button
           key={playlist._id}
           onClick={() => onSelectPlaylist(playlist)}
@@ -96,7 +144,8 @@ export function PlaylistList({
             />
           </svg>
         </button>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

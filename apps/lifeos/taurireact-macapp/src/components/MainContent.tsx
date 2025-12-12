@@ -141,13 +141,15 @@ export function MainContent() {
             selectedVideoId={selectedVideo?._id}
           />
         ) : (
-          <>
+          <div className="flex flex-col h-full">
             <SyncButton />
-            <PlaylistList
-              onSelectPlaylist={handleSelectPlaylist}
-              selectedPlaylistId={undefined}
-            />
-          </>
+            <div className="flex-1 min-h-0">
+              <PlaylistList
+                onSelectPlaylist={handleSelectPlaylist}
+                selectedPlaylistId={undefined}
+              />
+            </div>
+          </div>
         )}
       </main>
     </div>
