@@ -4444,6 +4444,8 @@ version = "0.1.0"
 dependencies = [
  "dirs 5.0.1",
  "gethostname",
+ "rand 0.8.5",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

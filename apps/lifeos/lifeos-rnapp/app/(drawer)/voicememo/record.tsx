@@ -2,11 +2,11 @@ import { View, ViewStyle, SafeAreaView, Pressable, Platform } from 'react-native
 import { useRouter } from 'expo-router';
 import { useColor } from '@/hooks/useColor';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useVoiceMemoStorage } from '@/hooks/useVoiceMemoStorage';
+import { useVoiceMemoSync } from '@/hooks/useVoiceMemoSync';
 import { RecordButton, WaveformVisualizer } from '@/components/voicememo';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
-import { X, Check, Pause, Play } from 'lucide-react-native';
+import { X, Check, Pause, Play, Cloud } from 'lucide-react-native';
 import { formatDuration } from '@/utils/voicememo/format';
 import { useState, useCallback } from 'react';
 import * as Haptics from 'expo-haptics';
@@ -38,7 +38,7 @@ export default function RecordScreen() {
     cancelRecording,
   } = useAudioRecorder();
 
-  const { addMemo } = useVoiceMemoStorage();
+  const { addMemo, isSyncing } = useVoiceMemoSync();
 
   const handleRecordToggle = useCallback(async () => {
     if (!isRecording) {
@@ -67,7 +67,8 @@ export default function RecordScreen() {
     try {
       const uri = await stopRecording();
       if (uri) {
-        await addMemo(uri, duration);
+        // addMemo will automatically sync to cloud in the background
+        await addMemo(uri, duration, true);
       }
       router.back();
     } catch (error) {

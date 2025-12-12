@@ -182,4 +182,50 @@ export const lifeosTables = {
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"]),
+
+  // ==================== VOICE MEMOS ====================
+  life_voiceMemos: defineTable({
+    // User who owns this memo
+    userId: v.id("users"),
+    // Client-generated UUID (for linking local to cloud)
+    localId: v.string(),
+    // User-editable name
+    name: v.string(),
+    // Convex file storage ID for the audio file
+    storageId: v.id("_storage"),
+    // Duration in milliseconds
+    duration: v.number(),
+    // Transcription status
+    transcriptionStatus: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    // Error message if transcription failed
+    transcriptionError: v.optional(v.string()),
+    // Full transcription text
+    transcript: v.optional(v.string()),
+    // Timed segments (matching YouTube transcript pattern)
+    segments: v.optional(
+      v.array(
+        v.object({
+          start: v.number(), // Start time in seconds
+          duration: v.number(), // Duration in seconds
+          text: v.string(), // Segment text
+        })
+      )
+    ),
+    // Language detected/specified
+    language: v.optional(v.string()),
+    // Original client timestamps
+    clientCreatedAt: v.number(),
+    clientUpdatedAt: v.number(),
+    // Server timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_localId", ["userId", "localId"])
+    .index("by_user_created", ["userId", "clientCreatedAt"]),
 };

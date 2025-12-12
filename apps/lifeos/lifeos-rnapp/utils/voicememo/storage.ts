@@ -16,6 +16,14 @@ export interface VoiceMemo {
   duration: number; // in milliseconds
   createdAt: number; // Unix timestamp
   updatedAt: number; // Unix timestamp
+  // Sync fields
+  convexId?: string; // Cloud ID if synced
+  syncStatus: 'local' | 'syncing' | 'synced' | 'error';
+  syncError?: string;
+  // Transcription fields
+  transcriptionStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  transcript?: string;
+  language?: string;
 }
 
 const VOICE_MEMO_DIRECTORY = `${documentDirectory}voicememos/`;

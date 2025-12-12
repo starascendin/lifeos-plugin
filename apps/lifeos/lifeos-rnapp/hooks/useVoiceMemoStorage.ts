@@ -27,9 +27,14 @@ export function useVoiceMemoStorage(): UseVoiceMemoStorageReturn {
   const refreshMemos = useCallback(async () => {
     try {
       const loadedMemos = await loadMemoMetadata();
+      // Migrate old memos that don't have syncStatus
+      const migratedMemos = loadedMemos.map((memo) => ({
+        ...memo,
+        syncStatus: memo.syncStatus ?? 'local',
+      })) as VoiceMemo[];
       // Sort by createdAt descending (newest first)
-      loadedMemos.sort((a, b) => b.createdAt - a.createdAt);
-      setMemos(loadedMemos);
+      migratedMemos.sort((a, b) => b.createdAt - a.createdAt);
+      setMemos(migratedMemos);
     } catch (error) {
       console.error('Failed to load memos:', error);
     }
@@ -63,6 +68,7 @@ export function useVoiceMemoStorage(): UseVoiceMemoStorageReturn {
         duration,
         createdAt: now,
         updatedAt: now,
+        syncStatus: 'local',
       };
 
       const updatedMemos = [newMemo, ...memos];

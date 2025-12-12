@@ -2,7 +2,7 @@ import { useColor } from '@/hooks/useColor';
 import { View, ViewStyle, Pressable, Platform, TextInput } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
-import { Play, Pause, Trash2, Pencil, Check, X } from 'lucide-react-native';
+import { Play, Pause, Trash2, Pencil, Check, X, Cloud, CloudOff } from 'lucide-react-native';
 import { VoiceMemo } from '@/utils/voicememo/storage';
 import {
   formatDurationShort,
@@ -23,22 +23,35 @@ import {
 import { useState, useCallback } from 'react';
 import { StaticWaveform } from './WaveformVisualizer';
 import { PlaybackControls } from './PlaybackControls';
+import { SyncStatusBadge } from './SyncStatusBadge';
+import { TranscriptView } from './TranscriptView';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 
 interface MemoItemProps {
   memo: VoiceMemo;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  onSync?: (id: string) => void;
+  onTranscribe?: (id: string) => void;
+  onRetryTranscription?: (id: string) => void;
 }
 
 const SWIPE_THRESHOLD = 80;
 
-export function MemoItem({ memo, onDelete, onRename }: MemoItemProps) {
+export function MemoItem({
+  memo,
+  onDelete,
+  onRename,
+  onSync,
+  onTranscribe,
+  onRetryTranscription,
+}: MemoItemProps) {
   const cardColor = useColor('card');
   const textColor = useColor('text');
   const textMuted = useColor('textMuted');
   const redColor = useColor('red');
   const blueColor = useColor('blue');
+  const greenColor = useColor('green');
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -98,6 +111,27 @@ export function MemoItem({ memo, onDelete, onRename }: MemoItemProps) {
     setEditedName(memo.name);
     setIsEditing(false);
   }, [memo.name]);
+
+  const handleSync = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onSync?.(memo.id);
+  }, [onSync, memo.id]);
+
+  const handleTranscribe = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onTranscribe?.(memo.id);
+  }, [onTranscribe, memo.id]);
+
+  const handleRetryTranscription = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onRetryTranscription?.(memo.id);
+  }, [onRetryTranscription, memo.id]);
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
@@ -260,6 +294,7 @@ export function MemoItem({ memo, onDelete, onRename }: MemoItemProps) {
                       <Text variant="caption" style={{ color: textMuted }}>
                         {formatDurationShort(memo.duration)}
                       </Text>
+                      <SyncStatusBadge status={memo.syncStatus} size={14} />
                     </View>
                   </>
                 )}
@@ -285,6 +320,43 @@ export function MemoItem({ memo, onDelete, onRename }: MemoItemProps) {
                 onPause={pause}
                 onSeek={seek}
               />
+
+              {/* Transcription view */}
+              <TranscriptView
+                status={memo.transcriptionStatus}
+                transcript={memo.transcript}
+                language={memo.language}
+                onTranscribe={
+                  memo.syncStatus === 'synced' ? handleTranscribe : undefined
+                }
+                onRetry={handleRetryTranscription}
+              />
+
+              {/* Sync button for local memos */}
+              {memo.syncStatus === 'local' && onSync && (
+                <Pressable
+                  onPress={handleSync}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    backgroundColor: blueColor + '20',
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    borderRadius: 8,
+                    marginTop: 12,
+                  }}
+                >
+                  <Icon name={Cloud} size={16} color={blueColor} />
+                  <Text
+                    variant="body"
+                    style={{ color: blueColor, fontWeight: '500' }}
+                  >
+                    Sync to Cloud
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
         </Animated.View>

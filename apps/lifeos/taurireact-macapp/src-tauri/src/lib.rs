@@ -1,7 +1,9 @@
 // TubeVault - YouTube playlist sync to Convex
 
+mod notes;
 mod screentime;
 
+use notes::{count_apple_notes, export_apple_notes, get_exported_folders, get_exported_notes};
 use screentime::{check_screentime_permission, get_device_id, read_screentime_sessions};
 use tauri::{
     tray::TrayIconEvent,
@@ -21,6 +23,10 @@ pub fn run() {
             check_screentime_permission,
             read_screentime_sessions,
             get_device_id,
+            count_apple_notes,
+            export_apple_notes,
+            get_exported_notes,
+            get_exported_folders,
         ])
         .on_tray_icon_event(|tray, event| {
             match event {

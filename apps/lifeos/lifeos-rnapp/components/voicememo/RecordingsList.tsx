@@ -13,6 +13,9 @@ interface RecordingsListProps {
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onRefresh?: () => Promise<void>;
+  onSync?: (id: string) => void;
+  onTranscribe?: (id: string) => void;
+  onRetryTranscription?: (id: string) => void;
 }
 
 export function RecordingsList({
@@ -21,6 +24,9 @@ export function RecordingsList({
   onDelete,
   onRename,
   onRefresh,
+  onSync,
+  onTranscribe,
+  onRetryTranscription,
 }: RecordingsListProps) {
   const textMuted = useColor('textMuted');
   const blue = useColor('blue');
@@ -36,9 +42,16 @@ export function RecordingsList({
 
   const renderItem = useCallback(
     ({ item }: { item: VoiceMemo }) => (
-      <MemoItem memo={item} onDelete={onDelete} onRename={onRename} />
+      <MemoItem
+        memo={item}
+        onDelete={onDelete}
+        onRename={onRename}
+        onSync={onSync}
+        onTranscribe={onTranscribe}
+        onRetryTranscription={onRetryTranscription}
+      />
     ),
-    [onDelete, onRename]
+    [onDelete, onRename, onSync, onTranscribe, onRetryTranscription]
   );
 
   const keyExtractor = useCallback((item: VoiceMemo) => item.id, []);
