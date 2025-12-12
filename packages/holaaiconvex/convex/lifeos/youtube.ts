@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { action, mutation, query } from "../_generated/server";
 import { requireUser } from "../_lib/auth";
+import { createClerkClient } from "@clerk/backend";
 
 // ==================== MUTATIONS ====================
 
@@ -348,5 +349,42 @@ export const searchTranscripts = query({
     );
 
     return matches.slice(0, limit);
+  },
+});
+
+// ==================== ACTIONS ====================
+
+/**
+ * Get Google OAuth access token for YouTube API
+ * Uses Clerk backend SDK to retrieve the token
+ */
+export const getGoogleOAuthToken = action({
+  args: {},
+  handler: async (ctx): Promise<{ token: string }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Extract Clerk user ID from the subject claim
+    const clerkUserId = identity.subject;
+
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) {
+      throw new Error("CLERK_SECRET_KEY not configured");
+    }
+
+    const clerk = createClerkClient({ secretKey });
+
+    const tokens = await clerk.users.getUserOauthAccessToken(
+      clerkUserId,
+      "oauth_google"
+    );
+
+    if (!tokens.data || tokens.data.length === 0) {
+      throw new Error("No Google OAuth token found. Please sign out and sign in again with Google.");
+    }
+
+    return { token: tokens.data[0].token };
   },
 });

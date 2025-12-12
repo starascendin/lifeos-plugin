@@ -11,7 +11,13 @@
     "core:window:allow-close",
     "opener:default",
     "shell:allow-open",
-    "http:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://www.googleapis.com/**" },
+        { "url": "https://youtube.googleapis.com/**" }
+      ]
+    },
     "deep-link:default",
     "store:default",
     "oauth:allow-start",

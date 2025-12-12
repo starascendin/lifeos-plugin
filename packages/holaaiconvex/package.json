@@ -17,6 +17,7 @@
     "./schema": "./convex/schema.ts"
   },
   "dependencies": {
+    "@clerk/backend": "^1.21.0",
     "convex": "^1.29.0"
   },
   "devDependencies": {

@@ -1,4 +1,6 @@
 import { useSession } from "@clerk/clerk-react";
+import { useAction } from "convex/react";
+import { api } from "@holaai/convex";
 import { useSyncProgress } from "../../lib/hooks/useSyncProgress";
 import { useState, useEffect } from "react";
 
@@ -6,6 +8,7 @@ export function SyncButton() {
   const { session } = useSession();
   const { progress, startSync } = useSyncProgress();
   const [hasYouTubeAccess, setHasYouTubeAccess] = useState<boolean | null>(null);
+  const getGoogleToken = useAction(api.lifeos.youtube.getGoogleOAuthToken);
 
   // Check if user has Google connected with YouTube scope
   useEffect(() => {
@@ -20,21 +23,9 @@ export function SyncButton() {
   const handleSync = async () => {
     console.log("[SyncButton] handleSync called");
     try {
-      // Get the Google OAuth access token from the user's external account
-      console.log("[SyncButton] Getting Google OAuth token from external account...");
-
-      const googleAccount = session?.user?.externalAccounts?.find(
-        (account) => account.provider === "google"
-      );
-
-      if (!googleAccount) {
-        console.error("[SyncButton] No Google account connected");
-        return;
-      }
-
-      // Get a fresh token from the external account
-      const tokenResponse = await googleAccount.getToken();
-      const token = tokenResponse?.token;
+      // Get the Google OAuth access token via Convex action
+      console.log("[SyncButton] Getting Google OAuth token from Convex...");
+      const { token } = await getGoogleToken();
 
       console.log("[SyncButton] Token received:", token ? `${token.substring(0, 20)}...` : "null");
       if (token) {
@@ -42,7 +33,7 @@ export function SyncButton() {
         await startSync(token);
         console.log("[SyncButton] Sync completed");
       } else {
-        console.error("[SyncButton] Could not get Google OAuth token from external account");
+        console.error("[SyncButton] Could not get Google OAuth token");
       }
     } catch (err) {
       console.error("[SyncButton] Failed to get token:", err);

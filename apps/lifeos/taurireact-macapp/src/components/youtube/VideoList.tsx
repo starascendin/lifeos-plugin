@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery, useConvex } from "convex/react";
-import { useAuth } from "@clerk/clerk-react";
+import { useQuery, useConvex, useAction } from "convex/react";
 import { api, type Doc, type Id } from "@holaai/convex";
 import { formatDuration } from "../../lib/services/youtube-api";
 import {
@@ -25,7 +24,7 @@ export function VideoList({
 }: VideoListProps) {
   const videos = useQuery(api.lifeos.youtube.getVideos, { playlistId });
   const convex = useConvex();
-  const { getToken } = useAuth();
+  const getGoogleToken = useAction(api.lifeos.youtube.getGoogleOAuthToken);
 
   const [selectedVideos, setSelectedVideos] = useState<Set<Id<"life_youtubeVideos">>>(new Set());
   const [syncProgress, setSyncProgress] = useState<SyncProgress>(initialProgress);
@@ -47,12 +46,16 @@ export function VideoList({
   });
 
   const handleSyncVideos = async () => {
-    const token = await getToken({ template: "oauth_google" });
-    if (!token) {
-      console.error("Could not get Google OAuth token");
-      return;
+    try {
+      const { token } = await getGoogleToken();
+      if (!token) {
+        console.error("Could not get Google OAuth token");
+        return;
+      }
+      await syncPlaylistVideos(convex, token, playlistId, youtubePlaylistId, setSyncProgress);
+    } catch (err) {
+      console.error("Failed to get Google token:", err);
     }
-    await syncPlaylistVideos(convex, token, playlistId, youtubePlaylistId, setSyncProgress);
   };
 
   const toggleVideoSelection = (videoId: Id<"life_youtubeVideos">) => {
