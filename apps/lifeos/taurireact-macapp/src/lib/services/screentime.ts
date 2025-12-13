@@ -22,6 +22,13 @@ export interface ScreenTimeResult {
   error: string | null;
 }
 
+export interface DeviceInfo {
+  device_id: string;
+  device_type: string; // "mac", "iphone", "ipad", "ios", "unknown"
+  display_name: string;
+  session_count: number;
+}
+
 export interface ScreenTimeSyncProgress {
   status: "idle" | "checking" | "syncing" | "error" | "complete";
   currentStep: string;
@@ -49,7 +56,8 @@ export async function checkScreenTimePermission(): Promise<boolean> {
 }
 
 export async function readScreenTimeSessions(
-  sinceTimestamp?: number
+  sinceTimestamp?: number,
+  deviceId?: string
 ): Promise<ScreenTimeResult> {
   if (!isTauri) {
     return {
@@ -60,7 +68,18 @@ export async function readScreenTimeSessions(
   }
   return await invoke<ScreenTimeResult>("read_screentime_sessions", {
     sinceTimestamp,
+    deviceId,
   });
+}
+
+export async function listScreenTimeDevices(): Promise<DeviceInfo[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<DeviceInfo[]>("list_screentime_devices");
+  } catch (error) {
+    console.error("Failed to list devices:", error);
+    return [];
+  }
 }
 
 export async function getDeviceId(): Promise<string | null> {

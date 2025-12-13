@@ -1,10 +1,42 @@
 import { useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { ScreenTimeSyncButton } from "./ScreenTimeSyncButton";
+import { useState, useEffect } from "react";
+import { listScreenTimeDevices, type DeviceInfo } from "../../lib/services/screentime";
+
+// Device type to emoji mapping
+const deviceEmoji: Record<string, string> = {
+  mac: "💻",
+  iphone: "📱",
+  ipad: "📱",
+  ios: "📲",
+  unknown: "❓",
+};
 
 export function ScreenTimeDashboard() {
   // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split("T")[0];
+
+  // Device state
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  // Fetch devices on mount
+  useEffect(() => {
+    async function fetchDevices() {
+      setIsLoadingDevices(true);
+      try {
+        const deviceList = await listScreenTimeDevices();
+        setDevices(deviceList);
+      } catch (error) {
+        console.error("Failed to fetch devices:", error);
+      } finally {
+        setIsLoadingDevices(false);
+      }
+    }
+    fetchDevices();
+  }, []);
 
   // Get today's summary
   const todaySummary = useQuery(api.lifeos.screentime.getDailySummary, {
@@ -28,6 +60,28 @@ export function ScreenTimeDashboard() {
   return (
     <div className="space-y-4 overflow-y-auto h-full">
       <ScreenTimeSyncButton />
+
+      {/* Device selector */}
+      {devices.length > 0 && (
+        <div className="p-3 bg-[var(--bg-secondary)] rounded-lg">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Device:</label>
+            <select
+              value={selectedDeviceId ?? "all"}
+              onChange={(e) => setSelectedDeviceId(e.target.value === "all" ? null : e.target.value)}
+              className="flex-1 px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              disabled={isLoadingDevices}
+            >
+              <option value="all">All Devices</option>
+              {devices.map((device) => (
+                <option key={device.device_id} value={device.device_id}>
+                  {deviceEmoji[device.device_type] || deviceEmoji.unknown} {device.display_name} ({device.session_count.toLocaleString()})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Today's summary */}
       {todaySummary && (

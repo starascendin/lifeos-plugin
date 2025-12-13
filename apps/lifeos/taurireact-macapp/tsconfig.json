@@ -21,7 +21,13 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Node types for workspace dependencies */
-    "types": ["node"]
+    "types": ["node"],
+
+    /* Path aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

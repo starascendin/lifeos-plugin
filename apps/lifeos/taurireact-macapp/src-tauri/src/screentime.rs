@@ -1,9 +1,11 @@
 // Screen Time data reader for macOS
 // Reads from ~/Library/Application Support/Knowledge/knowledgeC.db
+// Also reads device data from ~/Library/Biome/streams/restricted/App.InFocus
 
 use rusqlite::{Connection, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::fs;
 use tauri::command;
 
 // Mac epoch offset: seconds from Jan 1, 1970 (Unix epoch) to Jan 1, 2001 (Mac epoch)
@@ -28,6 +30,14 @@ pub struct ScreenTimeResult {
     pub sessions: Vec<ScreenTimeSession>,
     pub has_permission: bool,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeviceInfo {
+    pub device_id: String,
+    pub device_type: String,  // "mac", "iphone", "ipad", "ios", "unknown"
+    pub display_name: String,
+    pub session_count: i32,
 }
 
 /// Get the path to knowledgeC.db
@@ -60,6 +70,51 @@ fn check_full_disk_access() -> bool {
 /// Convert Mac epoch timestamp to Unix epoch milliseconds
 fn mac_to_unix_ms(mac_timestamp: f64) -> i64 {
     ((mac_timestamp + MAC_EPOCH_OFFSET as f64) * 1000.0) as i64
+}
+
+/// Get the path to Biome App.InFocus directory
+fn get_biome_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| {
+        home.join("Library/Biome/streams/restricted/App.InFocus")
+    })
+}
+
+/// Infer device type from device ID pattern
+/// Based on Apple UDID patterns:
+/// - 00008020* = iPhone
+/// - 00008030* = iPad
+/// - 32+ hex chars = iOS/tvOS device
+/// - Otherwise = Mac
+fn infer_device_type(device_id: &str) -> &'static str {
+    if device_id.is_empty() || device_id == "local" {
+        return "mac";
+    }
+    if device_id.starts_with("00008020") {
+        return "iphone";
+    }
+    if device_id.starts_with("00008030") {
+        return "ipad";
+    }
+    // Hex UUIDs (with or without hyphens) are typically iOS/tvOS devices
+    let clean_id: String = device_id.chars().filter(|c| *c != '-').collect();
+    if clean_id.len() >= 32 && clean_id.chars().all(|c| c.is_ascii_hexdigit()) {
+        return "ios";
+    }
+    "mac"
+}
+
+/// Generate display name for device based on type and ID
+fn get_device_display_name(device_id: &str, device_type: &str) -> String {
+    if device_id.is_empty() || device_id == "local" {
+        return "This Mac".to_string();
+    }
+    match device_type {
+        "iphone" => format!("iPhone ({}...)", &device_id[..8.min(device_id.len())]),
+        "ipad" => format!("iPad ({}...)", &device_id[..8.min(device_id.len())]),
+        "ios" => format!("iOS Device ({}...)", &device_id[..8.min(device_id.len())]),
+        "mac" => format!("Mac ({}...)", &device_id[..8.min(device_id.len())]),
+        _ => format!("Unknown ({}...)", &device_id[..8.min(device_id.len())]),
+    }
 }
 
 /// Map bundle ID to human-readable app name
@@ -229,32 +284,49 @@ fn get_category(bundle_id: &str) -> Option<String> {
 fn read_sessions_from_db(
     db_path: &PathBuf,
     since_mac_timestamp: Option<f64>,
+    filter_device_id: Option<&str>,
 ) -> SqliteResult<Vec<ScreenTimeSession>> {
     let conn = Connection::open(db_path)?;
 
     // Build the WHERE clause for incremental sync
     let since_clause = since_mac_timestamp
-        .map(|ts| format!("AND ZSTARTDATE > {}", ts))
+        .map(|ts| format!("AND ZOBJECT.ZSTARTDATE > {}", ts))
+        .unwrap_or_default();
+
+    // Build the device filter clause
+    let device_clause = filter_device_id
+        .map(|id| {
+            if id.is_empty() || id == "local" {
+                // Filter for local/null device
+                "AND (ZSOURCE.ZDEVICEID IS NULL OR ZSOURCE.ZDEVICEID = '')".to_string()
+            } else {
+                format!("AND ZSOURCE.ZDEVICEID = '{}'", id.replace('\'', "''"))
+            }
+        })
         .unwrap_or_default();
 
     let query = format!(
         r#"
         SELECT
-            ZVALUESTRING as bundle_id,
-            ZSTARTDATE as start_date,
-            ZENDDATE as end_date,
-            ZSECONDSFROMGMT as tz_offset,
-            ZSTREAMNAME as stream_name
+            ZOBJECT.ZVALUESTRING as bundle_id,
+            ZOBJECT.ZSTARTDATE as start_date,
+            ZOBJECT.ZENDDATE as end_date,
+            ZOBJECT.ZSECONDSFROMGMT as tz_offset,
+            ZOBJECT.ZSTREAMNAME as stream_name,
+            ZSOURCE.ZDEVICEID as device_id
         FROM ZOBJECT
-        WHERE ZSTREAMNAME IN ('/app/usage', '/app/webUsage')
-        AND ZVALUESTRING IS NOT NULL
-        AND ZSTARTDATE IS NOT NULL
-        AND ZENDDATE IS NOT NULL
+        LEFT JOIN ZSOURCE ON ZOBJECT.ZSOURCE = ZSOURCE.Z_PK
+        WHERE ZOBJECT.ZSTREAMNAME IN ('/app/usage', '/app/webUsage')
+        AND ZOBJECT.ZVALUESTRING IS NOT NULL
+        AND ZOBJECT.ZSTARTDATE IS NOT NULL
+        AND ZOBJECT.ZENDDATE IS NOT NULL
         {}
-        ORDER BY ZSTARTDATE DESC
+        {}
+        ORDER BY ZOBJECT.ZSTARTDATE DESC
         LIMIT 10000
         "#,
-        since_clause
+        since_clause,
+        device_clause
     );
 
     let mut stmt = conn.prepare(&query)?;
@@ -264,6 +336,7 @@ fn read_sessions_from_db(
         let end_date: Option<f64> = row.get(2).ok();
         let tz_offset: Option<i32> = row.get(3).ok();
         let stream_name: String = row.get(4)?;
+        let device_id: Option<String> = row.get(5).ok();
 
         let start_time_ms = mac_to_unix_ms(start_date);
         let end_time_ms = end_date.map(mac_to_unix_ms).unwrap_or(start_time_ms);
@@ -278,6 +351,12 @@ fn read_sessions_from_db(
             None
         };
 
+        // Normalize empty device_id to "local"
+        let normalized_device_id = match &device_id {
+            Some(id) if !id.is_empty() => Some(id.clone()),
+            _ => Some("local".to_string()),
+        };
+
         Ok(ScreenTimeSession {
             bundle_id: bundle_id.clone(),
             app_name: get_app_name(&bundle_id),
@@ -286,7 +365,7 @@ fn read_sessions_from_db(
             end_time: end_time_ms,
             duration_seconds,
             timezone_offset: tz_offset,
-            device_id: None, // Could extract from ZSOURCE.ZDEVICEID if needed
+            device_id: normalized_device_id,
             is_web_usage,
             domain,
         })
@@ -315,6 +394,7 @@ pub fn check_screentime_permission() -> bool {
 #[command]
 pub async fn read_screentime_sessions(
     since_timestamp: Option<i64>, // Unix epoch ms, for incremental sync
+    device_id: Option<String>,    // Optional device filter
 ) -> Result<ScreenTimeResult, String> {
     // Check permission first
     if !check_full_disk_access() {
@@ -331,7 +411,7 @@ pub async fn read_screentime_sessions(
     // Convert since_timestamp back to Mac epoch for SQL query
     let since_mac = since_timestamp.map(|ts| (ts as f64 / 1000.0) - MAC_EPOCH_OFFSET as f64);
 
-    match read_sessions_from_db(&db_path, since_mac) {
+    match read_sessions_from_db(&db_path, since_mac, device_id.as_deref()) {
         Ok(sessions) => Ok(ScreenTimeResult {
             sessions,
             has_permission: true,
@@ -351,4 +431,128 @@ pub fn get_device_id() -> Option<String> {
     gethostname::gethostname()
         .to_str()
         .map(|s| s.to_string())
+}
+
+/// Enumerate devices from Biome directory structure
+fn enumerate_biome_devices() -> Vec<DeviceInfo> {
+    let mut devices = Vec::new();
+
+    let biome_path = match get_biome_path() {
+        Some(path) => path,
+        None => return devices,
+    };
+
+    // Check local device
+    let local_path = biome_path.join("local");
+    if local_path.exists() && local_path.is_dir() {
+        // Count files as proxy for session activity
+        let file_count = fs::read_dir(&local_path)
+            .map(|entries| entries.filter_map(|e| e.ok()).count())
+            .unwrap_or(0);
+
+        if file_count > 0 {
+            devices.push(DeviceInfo {
+                device_id: "local".to_string(),
+                device_type: "mac".to_string(),
+                display_name: "This Mac (Biome)".to_string(),
+                session_count: file_count as i32,
+            });
+        }
+    }
+
+    // Check remote devices
+    let remote_path = biome_path.join("remote");
+    if remote_path.exists() && remote_path.is_dir() {
+        if let Ok(entries) = fs::read_dir(&remote_path) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                if entry.path().is_dir() {
+                    let device_id = entry.file_name().to_string_lossy().to_string();
+                    let device_type = infer_device_type(&device_id);
+                    let display_name = get_device_display_name(&device_id, device_type);
+
+                    // Count files in device directory
+                    let file_count = fs::read_dir(entry.path())
+                        .map(|entries| entries.filter_map(|e| e.ok()).count())
+                        .unwrap_or(0);
+
+                    if file_count > 0 {
+                        devices.push(DeviceInfo {
+                            device_id,
+                            device_type: device_type.to_string(),
+                            display_name,
+                            session_count: file_count as i32,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    devices
+}
+
+/// List all devices with screen time data
+#[command]
+pub async fn list_screentime_devices() -> Result<Vec<DeviceInfo>, String> {
+    // Check permission first
+    if !check_full_disk_access() {
+        return Err("Full Disk Access permission required".to_string());
+    }
+
+    let db_path = get_knowledge_db_path()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Query unique devices from knowledgeC.db
+    let query = r#"
+        SELECT
+            ZSOURCE.ZDEVICEID as device_id,
+            COUNT(*) as session_count
+        FROM ZOBJECT
+        LEFT JOIN ZSOURCE ON ZOBJECT.ZSOURCE = ZSOURCE.Z_PK
+        WHERE ZOBJECT.ZSTREAMNAME = '/app/usage'
+        AND ZOBJECT.ZVALUESTRING IS NOT NULL
+        GROUP BY ZSOURCE.ZDEVICEID
+        ORDER BY session_count DESC
+    "#;
+
+    let mut stmt = conn.prepare(query)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let mut devices: Vec<DeviceInfo> = stmt.query_map([], |row| {
+        let device_id: Option<String> = row.get(0).ok();
+        let session_count: i32 = row.get(1)?;
+
+        // Normalize device ID
+        let normalized_id = device_id.unwrap_or_default();
+        let id_for_type = if normalized_id.is_empty() { "local" } else { &normalized_id };
+        let device_type = infer_device_type(id_for_type);
+        let display_name = get_device_display_name(id_for_type, device_type);
+
+        Ok(DeviceInfo {
+            device_id: if normalized_id.is_empty() { "local".to_string() } else { normalized_id },
+            device_type: device_type.to_string(),
+            display_name,
+            session_count,
+        })
+    })
+    .map_err(|e| format!("Query error: {}", e))?
+    .filter_map(|r| r.ok())
+    .collect();
+
+    // Add Biome devices (may have additional remote devices)
+    let biome_devices = enumerate_biome_devices();
+    for biome_device in biome_devices {
+        // Only add if not already in list
+        if !devices.iter().any(|d| d.device_id == biome_device.device_id) {
+            devices.push(biome_device);
+        }
+    }
+
+    // Sort by session count descending
+    devices.sort_by(|a, b| b.session_count.cmp(&a.session_count));
+
+    Ok(devices)
 }

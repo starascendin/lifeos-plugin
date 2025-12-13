@@ -4,7 +4,9 @@ import { ClerkProvider, useAuth } from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { initClerk } from "tauri-plugin-clerk";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
+import LifeOSApp from "./LifeOSApp";
 import "./App.css";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -30,7 +32,12 @@ initClerk(clerkPublishableKey).then((clerk) => {
         allowedRedirectProtocols={["tauri:"]}
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <App />
+          <HashRouter>
+            <Routes>
+              <Route path="/" element={<App />} />
+              <Route path="/lifeos/*" element={<LifeOSApp />} />
+            </Routes>
+          </HashRouter>
         </ConvexProviderWithClerk>
       </ClerkProvider>
     </React.StrictMode>

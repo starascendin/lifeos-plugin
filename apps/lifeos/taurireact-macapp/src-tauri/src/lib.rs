@@ -4,9 +4,10 @@ mod notes;
 mod screentime;
 
 use notes::{count_apple_notes, export_apple_notes, get_exported_folders, get_exported_notes};
-use screentime::{check_screentime_permission, get_device_id, read_screentime_sessions};
+use screentime::{check_screentime_permission, get_device_id, list_screentime_devices, read_screentime_sessions};
 use tauri::{
-    tray::TrayIconEvent,
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
     Manager,
 };
 
@@ -25,36 +26,57 @@ pub fn run() {
                 .with_tauri_store()
                 .build()
         )
+        .setup(|app| {
+            // Create menu items for tray context menu
+            let sync_jobs = MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs", true, None::<&str>)?;
+            let lifeos_app = MenuItem::with_id(app, "lifeos_app", "LifeOS App", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+
+            // Build context menu
+            let menu = Menu::with_items(app, &[&sync_jobs, &lifeos_app, &quit])?;
+
+            // Build tray icon with menu
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .icon_as_template(true) // macOS menu bar style
+                .menu(&menu)
+                .show_menu_on_left_click(true) // Left-click shows menu
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "sync_jobs" => {
+                            // Show/focus the main TubeVault window
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "lifeos_app" => {
+                            // Show/focus the LifeOS window
+                            if let Some(window) = app.get_webview_window("lifeos") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             check_screentime_permission,
             read_screentime_sessions,
             get_device_id,
+            list_screentime_devices,
             count_apple_notes,
             export_apple_notes,
             get_exported_notes,
             get_exported_folders,
         ])
-        .on_tray_icon_event(|tray, event| {
-            match event {
-                TrayIconEvent::Click {
-                    button: tauri::tray::MouseButton::Left,
-                    button_state: tauri::tray::MouseButtonState::Up,
-                    ..
-                } => {
-                    let app = tray.app_handle();
-                    if let Some(window) = app.get_webview_window("main") {
-                        // Toggle window visibility
-                        if window.is_visible().unwrap_or(false) {
-                            let _ = window.hide();
-                        } else {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                }
-                _ => {}
-            }
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

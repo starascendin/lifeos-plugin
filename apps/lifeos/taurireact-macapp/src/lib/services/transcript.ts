@@ -81,9 +81,11 @@ export async function fetchTranscript(
     }
 
     const transcriptXml = await transcriptResponse.text();
+    console.log("[transcript] XML preview:", transcriptXml.substring(0, 500));
 
     // Parse the XML transcript
     const segments = parseTranscriptXml(transcriptXml);
+    console.log("[transcript] Parsed segments count:", segments.length);
     const fullText = segments.map((s) => s.text).join(" ");
 
     return {
@@ -100,15 +102,39 @@ export async function fetchTranscript(
 
 function parseTranscriptXml(xml: string): TranscriptSegment[] {
   const segments: TranscriptSegment[] = [];
-  const regex = /<text start="([\d.]+)" dur="([\d.]+)"[^>]*>(.*?)<\/text>/g;
 
+  // Try the new YouTube format first: <p t="..." d="...">content</p>
+  // where t and d are in milliseconds (attributes can be in any order)
+  const pTagRegex = /<p\s+([^>]*)>(.*?)<\/p>/gs;
   let match;
-  while ((match = regex.exec(xml)) !== null) {
-    segments.push({
-      start: parseFloat(match[1]),
-      duration: parseFloat(match[2]),
-      text: decodeHtmlEntities(match[3]),
-    });
+
+  while ((match = pTagRegex.exec(xml)) !== null) {
+    const attrs = match[1];
+    const content = match[2];
+
+    const tMatch = attrs.match(/\bt="(\d+)"/);
+    const dMatch = attrs.match(/\bd="(\d+)"/);
+
+    if (tMatch && dMatch) {
+      segments.push({
+        start: parseInt(tMatch[1]) / 1000, // Convert ms to seconds
+        duration: parseInt(dMatch[1]) / 1000,
+        text: decodeHtmlEntities(content),
+      });
+    }
+  }
+
+  // If no matches, try the old format: <text start="..." dur="...">content</text>
+  // where start and dur are in seconds
+  if (segments.length === 0) {
+    const oldFormatRegex = /<text start="([\d.]+)" dur="([\d.]+)"[^>]*>(.*?)<\/text>/g;
+    while ((match = oldFormatRegex.exec(xml)) !== null) {
+      segments.push({
+        start: parseFloat(match[1]),
+        duration: parseFloat(match[2]),
+        text: decodeHtmlEntities(match[3]),
+      });
+    }
   }
 
   return segments;

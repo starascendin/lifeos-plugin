@@ -1,0 +1,54 @@
+import { useEffect } from "react";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { SignIn } from "./components/auth/SignIn";
+import { AuthGate } from "./components/auth/AuthGate";
+import { ThemeProvider } from "./lib/contexts/ThemeContext";
+import { TooltipProvider } from "./components/ui/tooltip";
+import { LifeOSDashboard } from "./components/lifeos/Dashboard";
+import { LifeOSSettings } from "./components/lifeos/Settings";
+
+const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+
+export default function LifeOSApp() {
+  useEffect(() => {
+    if (!isTauri) return;
+
+    const setupTauri = async () => {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      const appWindow = getCurrentWindow();
+
+      // Hide window on close (menu bar app behavior)
+      const unlisten = await appWindow.onCloseRequested(async (event) => {
+        event.preventDefault();
+        await appWindow.hide();
+      });
+
+      return unlisten;
+    };
+
+    const cleanup = setupTauri();
+    return () => {
+      cleanup.then((unlisten) => unlisten?.());
+    };
+  }, []);
+
+  return (
+    <ThemeProvider defaultTheme="dark">
+      <TooltipProvider delayDuration={300}>
+        <SignedOut>
+          <SignIn />
+        </SignedOut>
+        <SignedIn>
+          <AuthGate>
+            <Routes>
+              <Route path="/" element={<LifeOSDashboard />} />
+              <Route path="/settings" element={<LifeOSSettings />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AuthGate>
+        </SignedIn>
+      </TooltipProvider>
+    </ThemeProvider>
+  );
+}
