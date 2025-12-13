@@ -7,8 +7,9 @@ import { VideoList } from "./youtube/VideoList";
 import { TranscriptView } from "./youtube/TranscriptView";
 import { ScreenTimeDashboard } from "./screentime/ScreenTimeDashboard";
 import { NotesTab } from "./notes/NotesTab";
+import { SettingsTab } from "./settings/SettingsTab";
 
-type Tab = "youtube" | "screentime" | "notes";
+type Tab = "youtube" | "screentime" | "notes" | "settings";
 
 export function MainContent() {
   const [activeTab, setActiveTab] = useState<Tab>("youtube");
@@ -44,6 +45,9 @@ export function MainContent() {
   }
 
   const getTitle = () => {
+    if (activeTab === "settings") {
+      return "Settings";
+    }
     if (activeTab === "screentime") {
       return "Screen Time";
     }
@@ -120,11 +124,23 @@ export function MainContent() {
         >
           Notes
         </button>
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
+            activeTab === "settings"
+              ? "text-[var(--accent)] border-b-2 border-[var(--accent)]"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          Settings
+        </button>
       </div>
 
       {/* Main content */}
       <main className="flex-1 overflow-hidden p-3">
-        {activeTab === "notes" ? (
+        {activeTab === "settings" ? (
+          <SettingsTab />
+        ) : activeTab === "notes" ? (
           <NotesTab />
         ) : activeTab === "screentime" ? (
           <ScreenTimeDashboard />

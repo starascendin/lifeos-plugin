@@ -18,7 +18,7 @@ export function PlaylistList({
   onSelectPlaylist,
   selectedPlaylistId,
 }: PlaylistListProps) {
-  const [sortBy, setSortBy] = useState<SortOption>("updated-desc");
+  const [sortBy, setSortBy] = useState<SortOption>("updated-asc");
   const playlists = useQuery(api.lifeos.youtube.getPlaylists);
 
   const sortedPlaylists = useMemo(() => {
