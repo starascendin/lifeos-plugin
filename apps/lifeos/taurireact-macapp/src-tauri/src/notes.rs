@@ -134,16 +134,14 @@ pub struct NotesExportProgress {
 
 /// Get the app data directory for notes storage
 fn get_notes_data_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| {
-        home.join("Library/Application Support/com.bryanliu.tubevault-react/notes")
-    })
+    dirs::home_dir()
+        .map(|home| home.join("Library/Application Support/com.bryanliu.tubevault-react/notes"))
 }
 
 /// Get the SQLite database path
 fn get_notes_db_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| {
-        home.join("Library/Application Support/com.bryanliu.tubevault-react/notes.db")
-    })
+    dirs::home_dir()
+        .map(|home| home.join("Library/Application Support/com.bryanliu.tubevault-react/notes.db"))
 }
 
 /// Initialize the SQLite database schema
@@ -223,7 +221,10 @@ fn extract_folders() -> Result<Vec<RawFolder>, String> {
                 folders.push(RawFolder {
                     long_id: current_folder.get("long_id").cloned().unwrap_or_default(),
                     name: current_folder.get("name").cloned().unwrap_or_default(),
-                    parent: current_folder.get("parent").cloned().filter(|s| !s.is_empty()),
+                    parent: current_folder
+                        .get("parent")
+                        .cloned()
+                        .filter(|s| !s.is_empty()),
                 });
                 current_folder.clear();
             }
@@ -254,11 +255,18 @@ fn topological_sort(nodes: Vec<RawFolder>) -> Vec<RawFolder> {
 
     for node in &nodes {
         if let Some(parent_id) = &node.parent {
-            children.entry(parent_id.clone()).or_default().push(node.clone());
+            children
+                .entry(parent_id.clone())
+                .or_default()
+                .push(node.clone());
         }
     }
 
-    fn traverse(node: RawFolder, children: &HashMap<String, Vec<RawFolder>>, result: &mut Vec<RawFolder>) {
+    fn traverse(
+        node: RawFolder,
+        children: &HashMap<String, Vec<RawFolder>>,
+        result: &mut Vec<RawFolder>,
+    ) {
         let long_id = node.long_id.clone();
         result.push(node);
         if let Some(node_children) = children.get(&long_id) {
@@ -284,14 +292,16 @@ fn convert_html_to_markdown(html: &str) -> String {
 
     // Handle multiple consecutive h1 tags by combining them
     let h1_pattern = regex::Regex::new(r"(?i)(<h1[^>]*>([^<]+)</h1>\s*)+").unwrap();
-    result = h1_pattern.replace_all(&result, |caps: &regex::Captures| {
-        let h1_inner = regex::Regex::new(r"(?i)<h1[^>]*>([^<]+)</h1>").unwrap();
-        let headers: Vec<String> = h1_inner
-            .captures_iter(&caps[0])
-            .filter_map(|c| c.get(1).map(|m| m.as_str().trim().to_string()))
-            .collect();
-        format!("<h1>{}</h1>", headers.join(" "))
-    }).to_string();
+    result = h1_pattern
+        .replace_all(&result, |caps: &regex::Captures| {
+            let h1_inner = regex::Regex::new(r"(?i)<h1[^>]*>([^<]+)</h1>").unwrap();
+            let headers: Vec<String> = h1_inner
+                .captures_iter(&caps[0])
+                .filter_map(|c| c.get(1).map(|m| m.as_str().trim().to_string()))
+                .collect();
+            format!("<h1>{}</h1>", headers.join(" "))
+        })
+        .to_string();
 
     // Basic HTML to Markdown conversions
     // Headers
@@ -445,16 +455,18 @@ pub fn count_apple_notes() -> Result<i32, String> {
 
 /// Export Apple Notes to local storage
 #[command]
-pub async fn export_apple_notes(app: AppHandle, days: Option<i32>) -> Result<NotesExportResult, String> {
+pub async fn export_apple_notes(
+    app: AppHandle,
+    days: Option<i32>,
+) -> Result<NotesExportResult, String> {
     // Ensure data directory exists
-    let data_dir = get_notes_data_dir()
-        .ok_or_else(|| "Could not determine app data directory".to_string())?;
-    fs::create_dir_all(&data_dir)
-        .map_err(|e| format!("Failed to create data directory: {}", e))?;
+    let data_dir =
+        get_notes_data_dir().ok_or_else(|| "Could not determine app data directory".to_string())?;
+    fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data directory: {}", e))?;
 
     // Initialize database
-    let db_path = get_notes_db_path()
-        .ok_or_else(|| "Could not determine database path".to_string())?;
+    let db_path =
+        get_notes_db_path().ok_or_else(|| "Could not determine database path".to_string())?;
 
     // Ensure parent directory exists
     if let Some(parent) = db_path.parent() {
@@ -462,8 +474,7 @@ pub async fn export_apple_notes(app: AppHandle, days: Option<i32>) -> Result<Not
             .map_err(|e| format!("Failed to create database directory: {}", e))?;
     }
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
     init_database(&conn)?;
 
     // Process folders first
@@ -474,7 +485,10 @@ pub async fn export_apple_notes(app: AppHandle, days: Option<i32>) -> Result<Not
     let mut folder_ids_to_names: HashMap<i64, String> = HashMap::new();
 
     for folder in sorted_folders {
-        let parent_id = folder.parent.as_ref().and_then(|p| folder_long_ids_to_id.get(p).copied());
+        let parent_id = folder
+            .parent
+            .as_ref()
+            .and_then(|p| folder_long_ids_to_id.get(p).copied());
 
         conn.execute(
             "INSERT OR REPLACE INTO folders (long_id, name, parent_id) VALUES (?1, ?2, ?3)",
@@ -524,14 +538,17 @@ pub async fn export_apple_notes(app: AppHandle, days: Option<i32>) -> Result<Not
     let mut processed_count = 0;
 
     // Emit initial progress
-    let _ = app.emit("notes-export-progress", NotesExportProgress {
-        current: 0,
-        total: total_count,
-        exported: 0,
-        skipped: 0,
-        current_title: "Starting export...".to_string(),
-        status: "extracting".to_string(),
-    });
+    let _ = app.emit(
+        "notes-export-progress",
+        NotesExportProgress {
+            current: 0,
+            total: total_count,
+            exported: 0,
+            skipped: 0,
+            current_title: "Starting export...".to_string(),
+            status: "extracting".to_string(),
+        },
+    );
 
     let lines = execute_applescript_streaming(&script)?;
     let mut current_note: HashMap<String, String> = HashMap::new();
@@ -598,15 +615,21 @@ pub async fn export_apple_notes(app: AppHandle, days: Option<i32>) -> Result<Not
                 processed_count += 1;
 
                 // Emit progress update
-                let title = current_note.get("title").cloned().unwrap_or_else(|| "Untitled".to_string());
-                let _ = app.emit("notes-export-progress", NotesExportProgress {
-                    current: processed_count,
-                    total: total_count,
-                    exported: exported_count,
-                    skipped: skipped_count,
-                    current_title: title,
-                    status: "exporting".to_string(),
-                });
+                let title = current_note
+                    .get("title")
+                    .cloned()
+                    .unwrap_or_else(|| "Untitled".to_string());
+                let _ = app.emit(
+                    "notes-export-progress",
+                    NotesExportProgress {
+                        current: processed_count,
+                        total: total_count,
+                        exported: exported_count,
+                        skipped: skipped_count,
+                        current_title: title,
+                        status: "exporting".to_string(),
+                    },
+                );
             }
 
             current_note.clear();
@@ -632,14 +655,17 @@ pub async fn export_apple_notes(app: AppHandle, days: Option<i32>) -> Result<Not
     }
 
     // Emit completion
-    let _ = app.emit("notes-export-progress", NotesExportProgress {
-        current: processed_count,
-        total: total_count,
-        exported: exported_count,
-        skipped: skipped_count,
-        current_title: "".to_string(),
-        status: "complete".to_string(),
-    });
+    let _ = app.emit(
+        "notes-export-progress",
+        NotesExportProgress {
+            current: processed_count,
+            total: total_count,
+            exported: exported_count,
+            skipped: skipped_count,
+            current_title: "".to_string(),
+            status: "complete".to_string(),
+        },
+    );
 
     Ok(NotesExportResult {
         total_count,
@@ -652,15 +678,14 @@ pub async fn export_apple_notes(app: AppHandle, days: Option<i32>) -> Result<Not
 /// Get all exported notes from local database
 #[command]
 pub async fn get_exported_notes() -> Result<Vec<AppleNote>, String> {
-    let db_path = get_notes_db_path()
-        .ok_or_else(|| "Could not determine database path".to_string())?;
+    let db_path =
+        get_notes_db_path().ok_or_else(|| "Could not determine database path".to_string())?;
 
     if !db_path.exists() {
         return Ok(Vec::new());
     }
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     let mut stmt = conn
         .prepare(
@@ -700,15 +725,14 @@ pub async fn get_exported_notes() -> Result<Vec<AppleNote>, String> {
 /// Get all exported folders from local database
 #[command]
 pub async fn get_exported_folders() -> Result<Vec<AppleFolder>, String> {
-    let db_path = get_notes_db_path()
-        .ok_or_else(|| "Could not determine database path".to_string())?;
+    let db_path =
+        get_notes_db_path().ok_or_else(|| "Could not determine database path".to_string())?;
 
     if !db_path.exists() {
         return Ok(Vec::new());
     }
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     let mut stmt = conn
         .prepare("SELECT id, long_id, name, parent_id FROM folders ORDER BY name")

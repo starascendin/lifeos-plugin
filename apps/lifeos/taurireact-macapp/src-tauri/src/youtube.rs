@@ -46,7 +46,11 @@ pub async fn fetch_youtube_transcript(video_id: String) -> Result<TranscriptResu
         })
         .collect();
 
-    let full_text = segments.iter().map(|s| s.text.as_str()).collect::<Vec<_>>().join(" ");
+    let full_text = segments
+        .iter()
+        .map(|s| s.text.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
 
     // Determine language from the transcript
     let language = transcript.language().to_string();

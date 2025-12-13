@@ -4,8 +4,8 @@
 
 use rusqlite::{Connection, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 use tauri::command;
 
 // Mac epoch offset: seconds from Jan 1, 1970 (Unix epoch) to Jan 1, 2001 (Mac epoch)
@@ -16,8 +16,8 @@ pub struct ScreenTimeSession {
     pub bundle_id: String,
     pub app_name: Option<String>,
     pub category: Option<String>,
-    pub start_time: i64,      // Unix epoch milliseconds
-    pub end_time: i64,        // Unix epoch milliseconds
+    pub start_time: i64, // Unix epoch milliseconds
+    pub end_time: i64,   // Unix epoch milliseconds
     pub duration_seconds: i64,
     pub timezone_offset: Option<i32>,
     pub device_id: Option<String>,
@@ -35,16 +35,14 @@ pub struct ScreenTimeResult {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceInfo {
     pub device_id: String,
-    pub device_type: String,  // "mac", "iphone", "ipad", "ios", "unknown"
+    pub device_type: String, // "mac", "iphone", "ipad", "ios", "unknown"
     pub display_name: String,
     pub session_count: i32,
 }
 
 /// Get the path to knowledgeC.db
 fn get_knowledge_db_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| {
-        home.join("Library/Application Support/Knowledge/knowledgeC.db")
-    })
+    dirs::home_dir().map(|home| home.join("Library/Application Support/Knowledge/knowledgeC.db"))
 }
 
 /// Check if Full Disk Access permission is granted by attempting to read the DB
@@ -74,9 +72,7 @@ fn mac_to_unix_ms(mac_timestamp: f64) -> i64 {
 
 /// Get the path to Biome App.InFocus directory
 fn get_biome_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| {
-        home.join("Library/Biome/streams/restricted/App.InFocus")
-    })
+    dirs::home_dir().map(|home| home.join("Library/Biome/streams/restricted/App.InFocus"))
 }
 
 /// Infer device type from device ID pattern
@@ -170,17 +166,14 @@ fn get_app_name(bundle_id: &str) -> Option<String> {
     }
 
     // Extract app name from bundle ID as fallback (last component)
-    bundle_id
-        .split('.')
-        .last()
-        .map(|s| {
-            // Capitalize first letter
-            let mut chars = s.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
+    bundle_id.split('.').last().map(|s| {
+        // Capitalize first letter
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    })
 }
 
 /// Get category for app bundle ID
@@ -250,10 +243,7 @@ fn get_category(bundle_id: &str) -> Option<String> {
             ],
             "Productivity",
         ),
-        (
-            &["com.figma.Desktop", "com.adobe", "com.sketch"],
-            "Design",
-        ),
+        (&["com.figma.Desktop", "com.adobe", "com.sketch"], "Design"),
         (
             &[
                 "com.apple.finder",
@@ -262,13 +252,7 @@ fn get_category(bundle_id: &str) -> Option<String> {
             ],
             "System",
         ),
-        (
-            &[
-                "com.anthropic.claudefordesktop",
-                "com.openai.chat",
-            ],
-            "AI",
-        ),
+        (&["com.anthropic.claudefordesktop", "com.openai.chat"], "AI"),
     ];
 
     for (ids, category) in categories {
@@ -325,8 +309,7 @@ fn read_sessions_from_db(
         ORDER BY ZOBJECT.ZSTARTDATE DESC
         LIMIT 10000
         "#,
-        since_clause,
-        device_clause
+        since_clause, device_clause
     );
 
     let mut stmt = conn.prepare(&query)?;
@@ -405,8 +388,8 @@ pub async fn read_screentime_sessions(
         });
     }
 
-    let db_path = get_knowledge_db_path()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    let db_path =
+        get_knowledge_db_path().ok_or_else(|| "Could not determine home directory".to_string())?;
 
     // Convert since_timestamp back to Mac epoch for SQL query
     let since_mac = since_timestamp.map(|ts| (ts as f64 / 1000.0) - MAC_EPOCH_OFFSET as f64);
@@ -428,9 +411,7 @@ pub async fn read_screentime_sessions(
 /// Get device identifier
 #[command]
 pub fn get_device_id() -> Option<String> {
-    gethostname::gethostname()
-        .to_str()
-        .map(|s| s.to_string())
+    gethostname::gethostname().to_str().map(|s| s.to_string())
 }
 
 /// Enumerate devices from Biome directory structure
@@ -499,11 +480,10 @@ pub async fn list_screentime_devices() -> Result<Vec<DeviceInfo>, String> {
         return Err("Full Disk Access permission required".to_string());
     }
 
-    let db_path = get_knowledge_db_path()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    let db_path =
+        get_knowledge_db_path().ok_or_else(|| "Could not determine home directory".to_string())?;
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     // Query unique devices from knowledgeC.db
     let query = r#"
@@ -518,35 +498,48 @@ pub async fn list_screentime_devices() -> Result<Vec<DeviceInfo>, String> {
         ORDER BY session_count DESC
     "#;
 
-    let mut stmt = conn.prepare(query)
+    let mut stmt = conn
+        .prepare(query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
-    let mut devices: Vec<DeviceInfo> = stmt.query_map([], |row| {
-        let device_id: Option<String> = row.get(0).ok();
-        let session_count: i32 = row.get(1)?;
+    let mut devices: Vec<DeviceInfo> = stmt
+        .query_map([], |row| {
+            let device_id: Option<String> = row.get(0).ok();
+            let session_count: i32 = row.get(1)?;
 
-        // Normalize device ID
-        let normalized_id = device_id.unwrap_or_default();
-        let id_for_type = if normalized_id.is_empty() { "local" } else { &normalized_id };
-        let device_type = infer_device_type(id_for_type);
-        let display_name = get_device_display_name(id_for_type, device_type);
+            // Normalize device ID
+            let normalized_id = device_id.unwrap_or_default();
+            let id_for_type = if normalized_id.is_empty() {
+                "local"
+            } else {
+                &normalized_id
+            };
+            let device_type = infer_device_type(id_for_type);
+            let display_name = get_device_display_name(id_for_type, device_type);
 
-        Ok(DeviceInfo {
-            device_id: if normalized_id.is_empty() { "local".to_string() } else { normalized_id },
-            device_type: device_type.to_string(),
-            display_name,
-            session_count,
+            Ok(DeviceInfo {
+                device_id: if normalized_id.is_empty() {
+                    "local".to_string()
+                } else {
+                    normalized_id
+                },
+                device_type: device_type.to_string(),
+                display_name,
+                session_count,
+            })
         })
-    })
-    .map_err(|e| format!("Query error: {}", e))?
-    .filter_map(|r| r.ok())
-    .collect();
+        .map_err(|e| format!("Query error: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
 
     // Add Biome devices (may have additional remote devices)
     let biome_devices = enumerate_biome_devices();
     for biome_device in biome_devices {
         // Only add if not already in list
-        if !devices.iter().any(|d| d.device_id == biome_device.device_id) {
+        if !devices
+            .iter()
+            .any(|d| d.device_id == biome_device.device_id)
+        {
             devices.push(biome_device);
         }
     }
@@ -601,11 +594,10 @@ pub async fn get_screentime_daily_stats(
         return Err("Full Disk Access permission required".to_string());
     }
 
-    let db_path = get_knowledge_db_path()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    let db_path =
+        get_knowledge_db_path().ok_or_else(|| "Could not determine home directory".to_string())?;
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     // Parse date to get Mac epoch range
     let date_start = format!("{} 00:00:00", date);
@@ -625,7 +617,8 @@ pub async fn get_screentime_daily_stats(
     let end_mac = end_unix - MAC_EPOCH_OFFSET as f64;
 
     // Build device filter clause
-    let device_clause = device_id.as_ref()
+    let device_clause = device_id
+        .as_ref()
         .map(|id| {
             if id.is_empty() || id == "local" {
                 "AND (ZSOURCE.ZDEVICEID IS NULL OR ZSOURCE.ZDEVICEID = '')".to_string()
@@ -657,19 +650,22 @@ pub async fn get_screentime_daily_stats(
         start_mac, end_mac, device_clause
     );
 
-    let mut stmt = conn.prepare(&query)
+    let mut stmt = conn
+        .prepare(&query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
     let mut app_usage: Vec<AppUsageStat> = Vec::new();
     let mut category_map: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     let mut total_seconds: i64 = 0;
 
-    let rows = stmt.query_map([], |row| {
-        let bundle_id: String = row.get(0)?;
-        let seconds: f64 = row.get(1)?;
-        let session_count: i32 = row.get(2)?;
-        Ok((bundle_id, seconds as i64, session_count))
-    }).map_err(|e| format!("Query error: {}", e))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let bundle_id: String = row.get(0)?;
+            let seconds: f64 = row.get(1)?;
+            let session_count: i32 = row.get(2)?;
+            Ok((bundle_id, seconds as i64, session_count))
+        })
+        .map_err(|e| format!("Query error: {}", e))?;
 
     for row in rows.filter_map(|r| r.ok()) {
         let (bundle_id, seconds, session_count) = row;
@@ -718,18 +714,18 @@ pub async fn get_screentime_recent_summaries(
         return Err("Full Disk Access permission required".to_string());
     }
 
-    let db_path = get_knowledge_db_path()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    let db_path =
+        get_knowledge_db_path().ok_or_else(|| "Could not determine home directory".to_string())?;
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     // Calculate cutoff date
     let cutoff = chrono::Utc::now() - chrono::Duration::days(days as i64);
     let cutoff_mac = cutoff.timestamp() as f64 - MAC_EPOCH_OFFSET as f64;
 
     // Build device filter clause
-    let device_clause = device_id.as_ref()
+    let device_clause = device_id
+        .as_ref()
         .map(|id| {
             if id.is_empty() || id == "local" {
                 "AND (ZSOURCE.ZDEVICEID IS NULL OR ZSOURCE.ZDEVICEID = '')".to_string()
@@ -759,20 +755,22 @@ pub async fn get_screentime_recent_summaries(
         MAC_EPOCH_OFFSET, cutoff_mac, device_clause, MAC_EPOCH_OFFSET
     );
 
-    let mut stmt = conn.prepare(&query)
+    let mut stmt = conn
+        .prepare(&query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
-    let summaries: Vec<DailySummaryEntry> = stmt.query_map([], |row| {
-        let date: String = row.get(0)?;
-        let total_seconds: f64 = row.get(1)?;
-        Ok(DailySummaryEntry {
-            date,
-            total_seconds: total_seconds as i64,
+    let summaries: Vec<DailySummaryEntry> = stmt
+        .query_map([], |row| {
+            let date: String = row.get(0)?;
+            let total_seconds: f64 = row.get(1)?;
+            Ok(DailySummaryEntry {
+                date,
+                total_seconds: total_seconds as i64,
+            })
         })
-    })
-    .map_err(|e| format!("Query error: {}", e))?
-    .filter_map(|r| r.ok())
-    .collect();
+        .map_err(|e| format!("Query error: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
 
     Ok(summaries)
 }

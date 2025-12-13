@@ -9,12 +9,12 @@ use screentime::{
     check_screentime_permission, get_device_id, get_screentime_daily_stats,
     get_screentime_recent_summaries, list_screentime_devices, read_screentime_sessions,
 };
-use youtube::fetch_youtube_transcript;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Manager,
 };
+use youtube::fetch_youtube_transcript;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,14 +27,20 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         .plugin(
             tauri_plugin_clerk::ClerkPluginBuilder::new()
-                .publishable_key(option_env!("VITE_CLERK_PUBLISHABLE_KEY").unwrap_or("pk_test_Y2xpbWJpbmctYmFybmFjbGUtODUuY2xlcmsuYWNjb3VudHMuZGV2JA"))
+                .publishable_key(
+                    option_env!("VITE_CLERK_PUBLISHABLE_KEY").unwrap_or(
+                        "pk_test_Y2xpbWJpbmctYmFybmFjbGUtODUuY2xlcmsuYWNjb3VudHMuZGV2JA",
+                    ),
+                )
                 .with_tauri_store()
-                .build()
+                .build(),
         )
         .setup(|app| {
             // Create menu items for tray context menu
-            let sync_jobs = MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs", true, None::<&str>)?;
-            let lifeos_app = MenuItem::with_id(app, "lifeos_app", "LifeOS App", true, None::<&str>)?;
+            let sync_jobs =
+                MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs", true, None::<&str>)?;
+            let lifeos_app =
+                MenuItem::with_id(app, "lifeos_app", "LifeOS App", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
             // Build context menu
