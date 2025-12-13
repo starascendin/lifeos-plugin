@@ -2,9 +2,14 @@
 
 mod notes;
 mod screentime;
+mod youtube;
 
 use notes::{count_apple_notes, export_apple_notes, get_exported_folders, get_exported_notes};
-use screentime::{check_screentime_permission, get_device_id, list_screentime_devices, read_screentime_sessions};
+use screentime::{
+    check_screentime_permission, get_device_id, get_screentime_daily_stats,
+    get_screentime_recent_summaries, list_screentime_devices, read_screentime_sessions,
+};
+use youtube::fetch_youtube_transcript;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -72,10 +77,13 @@ pub fn run() {
             read_screentime_sessions,
             get_device_id,
             list_screentime_devices,
+            get_screentime_daily_stats,
+            get_screentime_recent_summaries,
             count_apple_notes,
             export_apple_notes,
             get_exported_notes,
             get_exported_folders,
+            fetch_youtube_transcript,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

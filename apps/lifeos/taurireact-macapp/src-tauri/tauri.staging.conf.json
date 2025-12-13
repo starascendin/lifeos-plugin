@@ -11,10 +11,6 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
-    },
     "windows": [
       {
         "label": "main",
@@ -26,6 +22,18 @@
         "decorations": true,
         "resizable": true,
         "center": true
+      },
+      {
+        "label": "lifeos",
+        "title": "LifeOS (Staging)",
+        "width": 1200,
+        "height": 800,
+        "visible": false,
+        "skipTaskbar": false,
+        "decorations": true,
+        "resizable": true,
+        "center": true,
+        "url": "index.html#/lifeos"
       }
     ],
     "security": {

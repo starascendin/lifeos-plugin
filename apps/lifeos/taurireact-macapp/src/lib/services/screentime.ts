@@ -82,6 +82,67 @@ export async function listScreenTimeDevices(): Promise<DeviceInfo[]> {
   }
 }
 
+// Types for aggregated stats (matching Rust structs)
+export interface AppUsageStat {
+  bundle_id: string;
+  app_name: string;
+  category: string;
+  seconds: number;
+  session_count: number;
+}
+
+export interface CategoryUsageStat {
+  category: string;
+  seconds: number;
+}
+
+export interface DailyStats {
+  date: string;
+  total_seconds: number;
+  app_usage: AppUsageStat[];
+  category_usage: CategoryUsageStat[];
+  device_id: string | null;
+}
+
+export interface DailySummaryEntry {
+  date: string;
+  total_seconds: number;
+}
+
+// Get daily stats for a specific date with optional device filter
+export async function getScreenTimeDailyStats(
+  date: string,
+  deviceId?: string | null
+): Promise<DailyStats | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<DailyStats | null>("get_screentime_daily_stats", {
+      date,
+      deviceId: deviceId ?? undefined,
+    });
+  } catch (error) {
+    console.error("Failed to get daily stats:", error);
+    return null;
+  }
+}
+
+// Get recent daily summaries with optional device filter
+export async function getScreenTimeRecentSummaries(
+  days: number,
+  deviceId?: string | null
+): Promise<DailySummaryEntry[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<DailySummaryEntry[]>("get_screentime_recent_summaries", {
+      days,
+      deviceId: deviceId ?? undefined,
+    });
+  } catch (error) {
+    console.error("Failed to get recent summaries:", error);
+    return [];
+  }
+}
+
 export async function getDeviceId(): Promise<string | null> {
   if (!isTauri) return null;
   return await invoke<string | null>("get_device_id");

@@ -1,134 +1,171 @@
 import { useScreenTimeSync } from "../../lib/contexts/SyncContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+  RefreshCw,
+  Loader2,
+  Monitor,
+  Settings,
+} from "lucide-react";
+import { useEffect, useRef } from "react";
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
-export function ScreenTimeSyncButton() {
+interface ScreenTimeSyncButtonProps {
+  onSyncComplete?: () => void;
+}
+
+export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonProps) {
   const { progress, hasPermission, startSync, isSyncing, refreshPermission } =
     useScreenTimeSync();
 
+  // Track previous status to detect when sync completes
+  const prevStatusRef = useRef(progress.status);
+
+  // Call onSyncComplete when sync finishes
+  useEffect(() => {
+    if (prevStatusRef.current !== "complete" && progress.status === "complete") {
+      onSyncComplete?.();
+    }
+    prevStatusRef.current = progress.status;
+  }, [progress.status, onSyncComplete]);
+
   const openSystemPreferences = async () => {
     if (!isTauri) return;
-    // Open System Settings to Full Disk Access
     const { open } = await import("@tauri-apps/plugin-shell");
     await open(
       "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
     );
   };
 
+  // Calculate progress percentage
+  const getProgressPercentage = () => {
+    if (progress.totalSessions === 0) return 0;
+    return Math.round(
+      (progress.syncedSessions / progress.totalSessions) * 100
+    );
+  };
+
   if (hasPermission === null) {
     return (
-      <div className="mb-4 p-4 bg-[var(--bg-secondary)] rounded-lg">
-        <div className="flex items-center gap-2">
-          <div className="spinner" />
-          <span className="text-sm">Checking permissions...</span>
-        </div>
-      </div>
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              Checking permissions...
+            </span>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!hasPermission || !progress.hasPermission) {
     return (
-      <div className="mb-4 p-4 bg-[var(--bg-secondary)] rounded-lg">
-        <div className="flex items-center gap-2 mb-3">
-          <svg
-            className="w-5 h-5 text-yellow-500"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fillRule="evenodd"
-              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span className="text-sm font-medium">Full Disk Access Required</span>
-        </div>
-        <p className="text-xs text-[var(--text-secondary)] mb-3">
-          Screen Time data requires Full Disk Access permission to read.
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={openSystemPreferences}
-            className="flex-1 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            Open System Settings
-          </button>
-          <button
-            onClick={refreshPermission}
-            className="px-4 py-2 border border-[var(--border)] hover:bg-[var(--bg-secondary)] rounded-lg text-sm font-medium transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
+      <Alert variant="destructive" className="mb-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription className="ml-2">
+          <div className="space-y-3">
+            <p className="font-medium">Full Disk Access Required</p>
+            <p className="text-xs opacity-80">
+              Screen Time data requires Full Disk Access permission to read.
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={openSystemPreferences}>
+                <Settings className="h-4 w-4 mr-2" />
+                Open System Settings
+              </Button>
+              <Button size="sm" variant="outline" onClick={refreshPermission}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </div>
+        </AlertDescription>
+      </Alert>
     );
   }
 
   return (
-    <div className="mb-4 p-4 bg-[var(--bg-secondary)] rounded-lg">
-      {isSyncing ? (
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="spinner" />
-            <span className="text-sm font-medium">
-              {progress.status === "checking" ? "Checking..." : "Syncing..."}
-            </span>
-          </div>
-          <p className="text-xs text-[var(--text-secondary)] mb-2">
-            {progress.currentStep}
-          </p>
-          {progress.totalSessions > 0 && (
-            <div className="text-xs text-[var(--text-secondary)]">
-              Sessions: {progress.syncedSessions}/{progress.totalSessions}
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        {isSyncing ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-sm font-medium">
+                {progress.status === "checking" ? "Checking..." : "Syncing..."}
+              </span>
             </div>
-          )}
-        </div>
-      ) : progress.status === "complete" ? (
-        <div>
-          <p className="text-sm text-green-600 mb-2">Sync complete!</p>
-          <p className="text-xs text-[var(--text-secondary)] mb-3">
-            {progress.currentStep}
-          </p>
-          <button
-            onClick={startSync}
-            className="w-full px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            Sync Again
-          </button>
-        </div>
-      ) : progress.status === "error" ? (
-        <div>
-          <p className="text-sm text-red-500 mb-2">Error: {progress.error}</p>
-          <button
-            onClick={startSync}
-            className="w-full px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            Retry Sync
-          </button>
-        </div>
-      ) : (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-green-600 flex items-center gap-1">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Screen Time Access Granted
-            </span>
+            <p className="text-xs text-muted-foreground">
+              {progress.currentStep}
+            </p>
+            {progress.totalSessions > 0 && (
+              <>
+                <Progress value={getProgressPercentage()} className="h-2" />
+                <Badge variant="secondary" className="text-xs">
+                  Sessions: {progress.syncedSessions}/{progress.totalSessions}
+                </Badge>
+              </>
+            )}
           </div>
-          <button
-            onClick={startSync}
-            className="w-full px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            Sync Screen Time Data
-          </button>
-        </div>
-      )}
-    </div>
+        ) : progress.status === "complete" ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">Sync complete!</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {progress.currentStep}
+            </p>
+            <Button onClick={startSync} className="w-full" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Sync Again
+            </Button>
+          </div>
+        ) : progress.status === "error" ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">Sync failed</span>
+            </div>
+            <p className="text-xs text-muted-foreground">{progress.error}</p>
+            <Button
+              onClick={startSync}
+              variant="destructive"
+              className="w-full"
+              size="sm"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry Sync
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Badge
+                variant="outline"
+                className="text-green-600 border-green-600"
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Screen Time Access Granted
+              </Badge>
+            </div>
+            <Button onClick={startSync} className="w-full" size="sm">
+              <Monitor className="h-4 w-4 mr-2" />
+              Sync Screen Time Data
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

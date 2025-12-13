@@ -1,16 +1,21 @@
-import { useQuery } from "convex/react";
-import { api } from "@holaai/convex";
 import { ScreenTimeSyncButton } from "./ScreenTimeSyncButton";
-import { useState, useEffect } from "react";
-import { listScreenTimeDevices, type DeviceInfo } from "../../lib/services/screentime";
+import { useState, useEffect, useCallback } from "react";
+import {
+  listScreenTimeDevices,
+  getScreenTimeDailyStats,
+  getScreenTimeRecentSummaries,
+  type DeviceInfo,
+  type DailyStats,
+  type DailySummaryEntry,
+} from "../../lib/services/screentime";
 
 // Device type to emoji mapping
 const deviceEmoji: Record<string, string> = {
-  mac: "💻",
-  iphone: "📱",
-  ipad: "📱",
-  ios: "📲",
-  unknown: "❓",
+  mac: "\u{1F4BB}",
+  iphone: "\u{1F4F1}",
+  ipad: "\u{1F4F1}",
+  ios: "\u{1F4F2}",
+  unknown: "\u{2753}",
 };
 
 export function ScreenTimeDashboard() {
@@ -21,6 +26,11 @@ export function ScreenTimeDashboard() {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+
+  // Data state (from Tauri, not Convex)
+  const [todaySummary, setTodaySummary] = useState<DailyStats | null | undefined>(undefined);
+  const [recentSummaries, setRecentSummaries] = useState<DailySummaryEntry[] | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
   // Fetch devices on mount
   useEffect(() => {
@@ -38,15 +48,30 @@ export function ScreenTimeDashboard() {
     fetchDevices();
   }, []);
 
-  // Get today's summary
-  const todaySummary = useQuery(api.lifeos.screentime.getDailySummary, {
-    date: today,
-  });
+  // Fetch data from Tauri when device changes
+  const fetchData = useCallback(async () => {
+    setIsLoadingData(true);
+    try {
+      // Fetch today's stats
+      const dailyStats = await getScreenTimeDailyStats(today, selectedDeviceId);
+      setTodaySummary(dailyStats);
 
-  // Get recent summaries
-  const recentSummaries = useQuery(api.lifeos.screentime.getRecentSummaries, {
-    days: 7,
-  });
+      // Fetch recent summaries
+      const summaries = await getScreenTimeRecentSummaries(7, selectedDeviceId);
+      setRecentSummaries(summaries);
+    } catch (error) {
+      console.error("Failed to fetch screen time data:", error);
+      setTodaySummary(null);
+      setRecentSummaries([]);
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [today, selectedDeviceId]);
+
+  // Fetch data on mount and when device changes
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -59,7 +84,7 @@ export function ScreenTimeDashboard() {
 
   return (
     <div className="space-y-4 overflow-y-auto h-full">
-      <ScreenTimeSyncButton />
+      <ScreenTimeSyncButton onSyncComplete={fetchData} />
 
       {/* Device selector */}
       {devices.length > 0 && (
@@ -70,7 +95,7 @@ export function ScreenTimeDashboard() {
               value={selectedDeviceId ?? "all"}
               onChange={(e) => setSelectedDeviceId(e.target.value === "all" ? null : e.target.value)}
               className="flex-1 px-2 py-1 text-sm bg-[var(--bg-primary)] border border-[var(--border)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              disabled={isLoadingDevices}
+              disabled={isLoadingDevices || isLoadingData}
             >
               <option value="all">All Devices</option>
               {devices.map((device) => (
@@ -88,24 +113,23 @@ export function ScreenTimeDashboard() {
         <div className="p-4 bg-[var(--bg-secondary)] rounded-lg">
           <h3 className="font-semibold mb-2">Today's Screen Time</h3>
           <p className="text-2xl font-bold text-[var(--accent)]">
-            {formatDuration(todaySummary.totalSeconds)}
+            {formatDuration(todaySummary.total_seconds)}
           </p>
 
-          {todaySummary.appUsage.length > 0 && (
+          {todaySummary.app_usage.length > 0 && (
             <div className="mt-4">
               <h4 className="text-sm font-medium mb-2">Top Apps</h4>
               <div className="space-y-2">
-                {todaySummary.appUsage
-                  .sort((a, b) => b.seconds - a.seconds)
+                {todaySummary.app_usage
                   .slice(0, 5)
                   .map((app) => (
                     <div
-                      key={app.bundleId}
+                      key={app.bundle_id}
                       className="flex justify-between items-center text-sm"
                     >
                       <div className="flex flex-col min-w-0">
                         <span className="truncate">
-                          {app.appName || app.bundleId.split(".").pop()}
+                          {app.app_name || app.bundle_id.split(".").pop()}
                         </span>
                         {app.category && (
                           <span className="text-xs text-[var(--text-secondary)]">
@@ -122,12 +146,11 @@ export function ScreenTimeDashboard() {
             </div>
           )}
 
-          {todaySummary.categoryUsage.length > 0 && (
+          {todaySummary.category_usage.length > 0 && (
             <div className="mt-4">
               <h4 className="text-sm font-medium mb-2">By Category</h4>
               <div className="space-y-2">
-                {todaySummary.categoryUsage
-                  .sort((a, b) => b.seconds - a.seconds)
+                {todaySummary.category_usage
                   .map((cat) => (
                     <div
                       key={cat.category}
@@ -146,7 +169,7 @@ export function ScreenTimeDashboard() {
       )}
 
       {/* No data state */}
-      {todaySummary === null && (
+      {todaySummary === null && !isLoadingData && (
         <div className="p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
           <p className="text-sm text-[var(--text-secondary)]">
             No screen time data for today yet.
@@ -190,7 +213,7 @@ export function ScreenTimeDashboard() {
                         : "text-[var(--text-secondary)]"
                     }
                   >
-                    {formatDuration(summary.totalSeconds)}
+                    {formatDuration(summary.total_seconds)}
                   </span>
                 </div>
               );
@@ -200,7 +223,7 @@ export function ScreenTimeDashboard() {
       )}
 
       {/* Loading state */}
-      {todaySummary === undefined && (
+      {(todaySummary === undefined || isLoadingData) && (
         <div className="p-4 bg-[var(--bg-secondary)] rounded-lg">
           <div className="flex items-center gap-2">
             <div className="spinner" />

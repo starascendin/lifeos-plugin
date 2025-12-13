@@ -556,3 +556,223 @@ pub async fn list_screentime_devices() -> Result<Vec<DeviceInfo>, String> {
 
     Ok(devices)
 }
+
+// ============================================
+// Aggregated Stats Commands (for dashboard)
+// ============================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppUsageStat {
+    pub bundle_id: String,
+    pub app_name: String,
+    pub category: String,
+    pub seconds: i64,
+    pub session_count: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CategoryUsageStat {
+    pub category: String,
+    pub seconds: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DailyStats {
+    pub date: String,
+    pub total_seconds: i64,
+    pub app_usage: Vec<AppUsageStat>,
+    pub category_usage: Vec<CategoryUsageStat>,
+    pub device_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DailySummaryEntry {
+    pub date: String,
+    pub total_seconds: i64,
+}
+
+/// Get daily stats for a specific date with optional device filter
+#[command]
+pub async fn get_screentime_daily_stats(
+    date: String, // YYYY-MM-DD format
+    device_id: Option<String>,
+) -> Result<Option<DailyStats>, String> {
+    if !check_full_disk_access() {
+        return Err("Full Disk Access permission required".to_string());
+    }
+
+    let db_path = get_knowledge_db_path()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Parse date to get Mac epoch range
+    let date_start = format!("{} 00:00:00", date);
+    let date_end = format!("{} 23:59:59", date);
+
+    // Convert to Mac epoch
+    let start_unix = chrono::NaiveDateTime::parse_from_str(&date_start, "%Y-%m-%d %H:%M:%S")
+        .map_err(|e| format!("Invalid date format: {}", e))?
+        .and_utc()
+        .timestamp() as f64;
+    let end_unix = chrono::NaiveDateTime::parse_from_str(&date_end, "%Y-%m-%d %H:%M:%S")
+        .map_err(|e| format!("Invalid date format: {}", e))?
+        .and_utc()
+        .timestamp() as f64;
+
+    let start_mac = start_unix - MAC_EPOCH_OFFSET as f64;
+    let end_mac = end_unix - MAC_EPOCH_OFFSET as f64;
+
+    // Build device filter clause
+    let device_clause = device_id.as_ref()
+        .map(|id| {
+            if id.is_empty() || id == "local" {
+                "AND (ZSOURCE.ZDEVICEID IS NULL OR ZSOURCE.ZDEVICEID = '')".to_string()
+            } else {
+                format!("AND ZSOURCE.ZDEVICEID = '{}'", id.replace('\'', "''"))
+            }
+        })
+        .unwrap_or_default();
+
+    // Query aggregated app usage
+    let query = format!(
+        r#"
+        SELECT
+            ZOBJECT.ZVALUESTRING as bundle_id,
+            SUM(ZOBJECT.ZENDDATE - ZOBJECT.ZSTARTDATE) as total_seconds,
+            COUNT(*) as session_count
+        FROM ZOBJECT
+        LEFT JOIN ZSOURCE ON ZOBJECT.ZSOURCE = ZSOURCE.Z_PK
+        WHERE ZOBJECT.ZSTREAMNAME = '/app/usage'
+        AND ZOBJECT.ZVALUESTRING IS NOT NULL
+        AND ZOBJECT.ZSTARTDATE >= {}
+        AND ZOBJECT.ZSTARTDATE <= {}
+        AND (ZOBJECT.ZENDDATE - ZOBJECT.ZSTARTDATE) >= 5
+        AND (ZOBJECT.ZENDDATE - ZOBJECT.ZSTARTDATE) < 86400
+        {}
+        GROUP BY ZOBJECT.ZVALUESTRING
+        ORDER BY total_seconds DESC
+        "#,
+        start_mac, end_mac, device_clause
+    );
+
+    let mut stmt = conn.prepare(&query)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let mut app_usage: Vec<AppUsageStat> = Vec::new();
+    let mut category_map: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    let mut total_seconds: i64 = 0;
+
+    let rows = stmt.query_map([], |row| {
+        let bundle_id: String = row.get(0)?;
+        let seconds: f64 = row.get(1)?;
+        let session_count: i32 = row.get(2)?;
+        Ok((bundle_id, seconds as i64, session_count))
+    }).map_err(|e| format!("Query error: {}", e))?;
+
+    for row in rows.filter_map(|r| r.ok()) {
+        let (bundle_id, seconds, session_count) = row;
+        let app_name = get_app_name(&bundle_id).unwrap_or_else(|| bundle_id.clone());
+        let category = get_category(&bundle_id).unwrap_or_else(|| "Other".to_string());
+
+        total_seconds += seconds;
+        *category_map.entry(category.clone()).or_insert(0) += seconds;
+
+        app_usage.push(AppUsageStat {
+            bundle_id,
+            app_name,
+            category,
+            seconds,
+            session_count,
+        });
+    }
+
+    if app_usage.is_empty() {
+        return Ok(None);
+    }
+
+    // Convert category map to sorted vec
+    let mut category_usage: Vec<CategoryUsageStat> = category_map
+        .into_iter()
+        .map(|(category, seconds)| CategoryUsageStat { category, seconds })
+        .collect();
+    category_usage.sort_by(|a, b| b.seconds.cmp(&a.seconds));
+
+    Ok(Some(DailyStats {
+        date,
+        total_seconds,
+        app_usage,
+        category_usage,
+        device_id,
+    }))
+}
+
+/// Get recent daily summaries with optional device filter
+#[command]
+pub async fn get_screentime_recent_summaries(
+    days: i32,
+    device_id: Option<String>,
+) -> Result<Vec<DailySummaryEntry>, String> {
+    if !check_full_disk_access() {
+        return Err("Full Disk Access permission required".to_string());
+    }
+
+    let db_path = get_knowledge_db_path()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Calculate cutoff date
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(days as i64);
+    let cutoff_mac = cutoff.timestamp() as f64 - MAC_EPOCH_OFFSET as f64;
+
+    // Build device filter clause
+    let device_clause = device_id.as_ref()
+        .map(|id| {
+            if id.is_empty() || id == "local" {
+                "AND (ZSOURCE.ZDEVICEID IS NULL OR ZSOURCE.ZDEVICEID = '')".to_string()
+            } else {
+                format!("AND ZSOURCE.ZDEVICEID = '{}'", id.replace('\'', "''"))
+            }
+        })
+        .unwrap_or_default();
+
+    // Query daily totals
+    let query = format!(
+        r#"
+        SELECT
+            DATE(DATETIME(ZOBJECT.ZSTARTDATE + {}, 'unixepoch')) as date,
+            SUM(ZOBJECT.ZENDDATE - ZOBJECT.ZSTARTDATE) as total_seconds
+        FROM ZOBJECT
+        LEFT JOIN ZSOURCE ON ZOBJECT.ZSOURCE = ZSOURCE.Z_PK
+        WHERE ZOBJECT.ZSTREAMNAME = '/app/usage'
+        AND ZOBJECT.ZVALUESTRING IS NOT NULL
+        AND ZOBJECT.ZSTARTDATE >= {}
+        AND (ZOBJECT.ZENDDATE - ZOBJECT.ZSTARTDATE) >= 5
+        AND (ZOBJECT.ZENDDATE - ZOBJECT.ZSTARTDATE) < 86400
+        {}
+        GROUP BY DATE(DATETIME(ZOBJECT.ZSTARTDATE + {}, 'unixepoch'))
+        ORDER BY date DESC
+        "#,
+        MAC_EPOCH_OFFSET, cutoff_mac, device_clause, MAC_EPOCH_OFFSET
+    );
+
+    let mut stmt = conn.prepare(&query)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let summaries: Vec<DailySummaryEntry> = stmt.query_map([], |row| {
+        let date: String = row.get(0)?;
+        let total_seconds: f64 = row.get(1)?;
+        Ok(DailySummaryEntry {
+            date,
+            total_seconds: total_seconds as i64,
+        })
+    })
+    .map_err(|e| format!("Query error: {}", e))?
+    .filter_map(|r| r.ok())
+    .collect();
+
+    Ok(summaries)
+}

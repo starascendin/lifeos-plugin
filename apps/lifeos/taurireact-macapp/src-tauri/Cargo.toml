@@ -33,4 +33,7 @@ dirs = "5.0"
 gethostname = "0.5"
 regex = "1"
 rand = "0.8"
+chrono = "0.4"
+yt-transcript-rs = "0.1"
+tokio = { version = "1", features = ["full"] }
 
