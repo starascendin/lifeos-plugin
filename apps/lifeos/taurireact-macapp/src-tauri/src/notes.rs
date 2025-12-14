@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tauri::{command, AppHandle, Emitter};
 
@@ -205,7 +205,7 @@ fn execute_applescript_streaming(script: &str) -> Result<impl Iterator<Item = St
     let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
     let reader = BufReader::new(stderr);
 
-    Ok(reader.lines().filter_map(|line| line.ok()))
+    Ok(reader.lines().map_while(Result::ok))
 }
 
 /// Extract folders from AppleScript output
@@ -415,7 +415,7 @@ fn create_safe_filename(title: &str) -> String {
 /// Create a markdown file for a note
 fn create_markdown_file(
     note: &AppleNote,
-    output_dir: &PathBuf,
+    output_dir: &Path,
     folder_name: &str,
 ) -> Result<PathBuf, String> {
     let folder_path = output_dir.join(folder_name);
@@ -513,10 +513,8 @@ pub async fn export_apple_notes(
             })
             .map_err(|e| format!("Failed to query existing notes: {}", e))?;
 
-        for row in rows {
-            if let Ok((id, updated)) = row {
-                existing_notes.insert(id, updated);
-            }
+        for (id, updated) in rows.flatten() {
+            existing_notes.insert(id, updated);
         }
     }
 
@@ -713,10 +711,8 @@ pub async fn get_exported_notes() -> Result<Vec<AppleNote>, String> {
         .map_err(|e| format!("Failed to query notes: {}", e))?;
 
     let mut result = Vec::new();
-    for note in notes {
-        if let Ok(n) = note {
-            result.push(n);
-        }
+    for n in notes.flatten() {
+        result.push(n);
     }
 
     Ok(result)
@@ -750,10 +746,8 @@ pub async fn get_exported_folders() -> Result<Vec<AppleFolder>, String> {
         .map_err(|e| format!("Failed to query folders: {}", e))?;
 
     let mut result = Vec::new();
-    for folder in folders {
-        if let Ok(f) = folder {
-            result.push(f);
-        }
+    for f in folders.flatten() {
+        result.push(f);
     }
 
     Ok(result)

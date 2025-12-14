@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:staging": "TAURI_BUILD_MODE=staging tauri build -c src-tauri/tauri.staging.conf.json",
-    "tauri:production": "TAURI_BUILD_MODE=production tauri build -c src-tauri/tauri.production.conf.json"
+    "tauri:production": "TAURI_BUILD_MODE=production tauri build -c src-tauri/tauri.production.conf.json",
+    "lint:rust": "cd src-tauri && cargo clippy --all -- -D warnings",
+    "fmt:rust": "cd src-tauri && cargo fmt --all"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.0.0",

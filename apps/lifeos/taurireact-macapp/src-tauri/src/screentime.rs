@@ -195,10 +195,8 @@ fn check_full_disk_access() -> bool {
     match Connection::open(&db_path) {
         Ok(conn) => {
             // Try a simple query to verify we can actually read
-            match conn.query_row("SELECT COUNT(*) FROM ZOBJECT LIMIT 1", [], |_| Ok(())) {
-                Ok(_) => true,
-                Err(_) => false,
-            }
+            conn.query_row("SELECT COUNT(*) FROM ZOBJECT LIMIT 1", [], |_| Ok(()))
+                .is_ok()
         }
         Err(_) => false,
     }
@@ -429,7 +427,7 @@ fn get_app_name(bundle_id: &str) -> Option<String> {
     }
 
     // Extract app name from bundle ID as fallback (last component)
-    bundle_id.split('.').last().map(|s| {
+    bundle_id.split('.').next_back().map(|s| {
         // Capitalize first letter
         let mut chars = s.chars();
         match chars.next() {
@@ -672,7 +670,7 @@ fn parse_all_biome_data(cutoff_timestamp: f64) -> Vec<SegbRecord> {
 }
 
 /// Calculate duration for SEGB records by looking at time until next record per device
-fn calculate_segb_durations(records: &mut Vec<SegbRecord>) -> Vec<(SegbRecord, f64)> {
+fn calculate_segb_durations(records: &mut [SegbRecord]) -> Vec<(SegbRecord, f64)> {
     const CAP_SECONDS: f64 = 30.0 * 60.0; // Cap at 30 minutes
 
     // Sort by device_id then timestamp
@@ -687,7 +685,7 @@ fn calculate_segb_durations(records: &mut Vec<SegbRecord>) -> Vec<(SegbRecord, f
         let rec = &records[i];
         let duration = if i + 1 < records.len() && records[i + 1].device_id == rec.device_id {
             let delta = records[i + 1].timestamp - rec.timestamp;
-            delta.max(0.0).min(CAP_SECONDS)
+            delta.clamp(0.0, CAP_SECONDS)
         } else {
             0.0
         };
@@ -1072,16 +1070,14 @@ fn read_sessions_from_db(
     })?;
 
     let mut result = Vec::new();
-    for session in session_iter {
-        if let Ok(s) = session {
-            // Filter out very short sessions (< 5 seconds) and invalid durations
-            if s.duration_seconds >= 5 && s.duration_seconds < 86400 {
-                // Skip system events (SleepLockScreen, Home-screen-open-folder, etc.)
-                if is_system_event(&s.bundle_id, s.app_name.as_deref()) {
-                    continue;
-                }
-                result.push(s);
+    for s in session_iter.flatten() {
+        // Filter out very short sessions (< 5 seconds) and invalid durations
+        if s.duration_seconds >= 5 && s.duration_seconds < 86400 {
+            // Skip system events (SleepLockScreen, Home-screen-open-folder, etc.)
+            if is_system_event(&s.bundle_id, s.app_name.as_deref()) {
+                continue;
             }
+            result.push(s);
         }
     }
 
@@ -1434,7 +1430,7 @@ pub async fn get_screentime_daily_stats(
                     })
                     .map(|iter| iter.filter_map(|r| r.ok()).collect())
                 } else {
-                    let device_filter = device_id.as_ref().map(|id| id.as_str()).unwrap_or("local");
+                    let device_filter = device_id.as_deref().unwrap_or("local");
                     stmt.query_map([&date, device_filter], |row| {
                         let bundle_id: String = row.get(0)?;
                         let app_name: String = row.get(1)?;
@@ -1635,7 +1631,7 @@ pub async fn get_screentime_recent_summaries(
                     .map(|iter| iter.filter_map(|r| r.ok()).collect())
                     .unwrap_or_default()
                 } else {
-                    let device_filter = device_id.as_ref().map(|id| id.as_str()).unwrap_or("local");
+                    let device_filter = device_id.as_deref().unwrap_or("local");
                     stmt.query_map([device_filter, &cutoff_date], |row| {
                         let date: String = row.get(0)?;
                         let total_seconds: f64 = row.get(1)?;
