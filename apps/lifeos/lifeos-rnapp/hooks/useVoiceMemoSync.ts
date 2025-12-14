@@ -163,7 +163,7 @@ export function useVoiceMemoSync(): UseVoiceMemoSyncReturn {
    * Add a new memo with optional auto-sync
    */
   const addMemo = useCallback(
-    async (uri: string, duration: number, autoSync = true): Promise<VoiceMemo> => {
+    async (uri: string, duration: number, autoSync = false): Promise<VoiceMemo> => {
       const newMemo = await addLocalMemo(uri, duration);
 
       if (autoSync) {

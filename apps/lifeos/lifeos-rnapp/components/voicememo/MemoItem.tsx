@@ -318,7 +318,6 @@ export function MemoItem({
                 duration={duration || memo.duration}
                 onPlay={play}
                 onPause={pause}
-                onSeek={seek}
               />
 
               {/* Transcription view */}

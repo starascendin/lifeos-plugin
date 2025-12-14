@@ -67,8 +67,7 @@ export default function RecordScreen() {
     try {
       const uri = await stopRecording();
       if (uri) {
-        // addMemo will automatically sync to cloud in the background
-        await addMemo(uri, duration, true);
+        await addMemo(uri, duration);
       }
       router.back();
     } catch (error) {
