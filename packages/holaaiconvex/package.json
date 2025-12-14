@@ -8,7 +8,13 @@
     "dev:once": "convex dev --once",
     "typecheck": "tsc --noEmit",
     "seed:prod": "./scripts/seed-prod.sh",
-    "seed:dev": "./scripts/seed-prod.sh --dev"
+    "seed:dev": "./scripts/seed-prod.sh --dev",
+    "env:sync": "./scripts/sync-env.sh",
+    "env:sync:prod": "./scripts/sync-env.sh --prod",
+    "env:sync:all": "./scripts/sync-env.sh --all",
+    "env:sync:all:prod": "./scripts/sync-env.sh --all --prod",
+    "env:list": "./scripts/sync-env.sh --list",
+    "env:list:prod": "./scripts/sync-env.sh --list --prod"
   },
   "exports": {
     ".": "./index.ts",

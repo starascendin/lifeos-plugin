@@ -7,6 +7,7 @@ import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
+import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -43,6 +44,7 @@ export default function LifeOSApp() {
           <AuthGate>
             <Routes>
               <Route path="/" element={<LifeOSDashboard />} />
+              <Route path="/chatnexus" element={<LifeOSChatNexus />} />
               <Route path="/settings" element={<LifeOSSettings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

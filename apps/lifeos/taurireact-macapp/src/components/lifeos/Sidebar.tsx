@@ -21,6 +21,7 @@ import {
   ChevronRight,
   LayoutDashboard,
   LogOut,
+  MessageSquare,
   Moon,
   Settings,
   Sun,
@@ -43,6 +44,7 @@ export function Sidebar() {
 
   const navigation = [
     { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
+    { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
     { name: "Settings", href: "/lifeos/settings", icon: Settings },
   ];
 

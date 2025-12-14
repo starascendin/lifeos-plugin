@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/env-decrypt.sh
-# Decrypts all .env.age and .env.local.age files in apps/* and packages/*
+# Decrypts all .env*.age files in apps/* and packages/*
 
 set -e
 
@@ -37,15 +37,16 @@ DECRYPTED=0
 SKIPPED=0
 FAILED=0
 
-# Find all .env.age files in apps/*, apps/*/* (nested), and packages/*
-for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/apps/*/* "$REPO_ROOT"/packages/*; do
-    [ -d "$dir" ] || continue
+# Function to decrypt env.age files in a directory
+decrypt_env_files() {
+    local dir="$1"
 
-    # Skip if this is the apps/lifeos directory itself (we want its children)
-    [[ "$dir" == "$REPO_ROOT/apps/lifeos" ]] && continue
-
-    for encrypted_file in "$dir/.env.age" "$dir/.env.local.age" "$dir/.env.staging.age" "$dir/.env.production.age"; do
+    # Find all .env*.age files (but not .tmpdecrypted files)
+    for encrypted_file in "$dir"/.env*.age; do
         [ -f "$encrypted_file" ] || continue
+
+        # Skip .tmpdecrypted files
+        [[ "$encrypted_file" == *.tmpdecrypted ]] && continue
 
         # Remove .age extension to get target path
         decrypted_file="${encrypted_file%.age}"
@@ -66,6 +67,34 @@ for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/apps/*/* "$REPO_ROOT"/packages/*; do
             echo "  [FAIL] $relative_decrypted (decryption failed)"
             ((FAILED++))
         fi
+    done
+}
+
+# Process apps/ directory (including nested like apps/lifeos/*)
+for dir in "$REPO_ROOT"/apps/*; do
+    [ -d "$dir" ] || continue
+
+    # Check if this directory has .env.age files directly
+    decrypt_env_files "$dir"
+
+    # Check nested directories (e.g., apps/lifeos/taurireact-macapp)
+    for nested_dir in "$dir"/*; do
+        [ -d "$nested_dir" ] || continue
+        decrypt_env_files "$nested_dir"
+    done
+done
+
+# Process packages/ directory (including nested)
+for dir in "$REPO_ROOT"/packages/*; do
+    [ -d "$dir" ] || continue
+
+    # Check if this directory has .env.age files directly
+    decrypt_env_files "$dir"
+
+    # Check nested directories
+    for nested_dir in "$dir"/*; do
+        [ -d "$nested_dir" ] || continue
+        decrypt_env_files "$nested_dir"
     done
 done
 

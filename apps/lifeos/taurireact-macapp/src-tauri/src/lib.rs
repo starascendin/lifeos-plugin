@@ -8,6 +8,7 @@ use notes::{count_apple_notes, export_apple_notes, get_exported_folders, get_exp
 use screentime::{
     check_screentime_permission, get_device_id, get_screentime_daily_stats,
     get_screentime_recent_summaries, list_screentime_devices, read_screentime_sessions,
+    sync_screentime_to_local_db,
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -85,6 +86,7 @@ pub fn run() {
             list_screentime_devices,
             get_screentime_daily_stats,
             get_screentime_recent_summaries,
+            sync_screentime_to_local_db,
             count_apple_notes,
             export_apple_notes,
             get_exported_notes,

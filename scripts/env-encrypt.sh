@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/env-encrypt.sh
-# Encrypts all .env and .env.local files in apps/* and packages/*
+# Encrypts all .env* files (excluding .age files) in apps/* and packages/*
 
 set -e
 
@@ -45,15 +45,19 @@ ENCRYPTED=0
 SKIPPED=0
 FAILED=0
 
-# Find all .env files in apps/*, apps/*/* (nested), and packages/*
-for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/apps/*/* "$REPO_ROOT"/packages/*; do
-    [ -d "$dir" ] || continue
+# Function to encrypt env files in a directory
+encrypt_env_files() {
+    local dir="$1"
 
-    # Skip if this is the apps/lifeos directory itself (we want its children)
-    [[ "$dir" == "$REPO_ROOT/apps/lifeos" ]] && continue
-
-    for env_file in "$dir/.env" "$dir/.env.local" "$dir/.env.staging" "$dir/.env.production"; do
+    # Find all .env* files that are NOT .age files and NOT .tmpdecrypted files
+    for env_file in "$dir"/.env*; do
         [ -f "$env_file" ] || continue
+
+        # Skip .age files
+        [[ "$env_file" == *.age ]] && continue
+
+        # Skip .tmpdecrypted files
+        [[ "$env_file" == *.tmpdecrypted ]] && continue
 
         relative_path="${env_file#$REPO_ROOT/}"
         encrypted_path="${env_file}.age"
@@ -65,6 +69,34 @@ for dir in "$REPO_ROOT"/apps/* "$REPO_ROOT"/apps/*/* "$REPO_ROOT"/packages/*; do
             echo "  [FAIL] ${relative_path}.age (encryption failed)"
             ((FAILED++))
         fi
+    done
+}
+
+# Process apps/ directory (including nested like apps/lifeos/*)
+for dir in "$REPO_ROOT"/apps/*; do
+    [ -d "$dir" ] || continue
+
+    # Check if this directory has .env files directly
+    encrypt_env_files "$dir"
+
+    # Check nested directories (e.g., apps/lifeos/taurireact-macapp)
+    for nested_dir in "$dir"/*; do
+        [ -d "$nested_dir" ] || continue
+        encrypt_env_files "$nested_dir"
+    done
+done
+
+# Process packages/ directory (including nested)
+for dir in "$REPO_ROOT"/packages/*; do
+    [ -d "$dir" ] || continue
+
+    # Check if this directory has .env files directly
+    encrypt_env_files "$dir"
+
+    # Check nested directories
+    for nested_dir in "$dir"/*; do
+        [ -d "$nested_dir" ] || continue
+        encrypt_env_files "$nested_dir"
     done
 done
 

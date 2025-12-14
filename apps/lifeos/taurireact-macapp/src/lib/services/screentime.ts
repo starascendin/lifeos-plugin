@@ -148,6 +148,21 @@ export async function getDeviceId(): Promise<string | null> {
   return await invoke<string | null>("get_device_id");
 }
 
+// Sync result from Rust
+export interface LocalSyncResult {
+  knowledge_sessions: number;
+  biome_sessions: number;
+  daily_summaries: number;
+}
+
+// Sync screen time data to our local database (parses SEGB files and knowledgeC.db)
+export async function syncScreenTimeToLocalDb(): Promise<LocalSyncResult> {
+  if (!isTauri) {
+    return { knowledge_sessions: 0, biome_sessions: 0, daily_summaries: 0 };
+  }
+  return await invoke<LocalSyncResult>("sync_screentime_to_local_db");
+}
+
 // Generate session key for deduplication
 function generateSessionKey(session: ScreenTimeSession): string {
   return `${session.bundle_id}_${session.start_time}`;
@@ -178,9 +193,10 @@ function aggregateDailySummaries(
   const summaries = new Map<string, DailySummary>();
 
   for (const session of sessions) {
-    // Convert to local date string (YYYY-MM-DD)
+    // Convert to local date string (YYYY-MM-DD) using device timezone
     const date = new Date(session.start_time);
-    const dateStr = date.toISOString().split("T")[0];
+    // Use local timezone for date bucketing (not UTC)
+    const dateStr = date.toLocaleDateString('en-CA'); // 'en-CA' returns YYYY-MM-DD format
 
     if (!summaries.has(dateStr)) {
       summaries.set(dateStr, {

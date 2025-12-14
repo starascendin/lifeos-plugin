@@ -1,4 +1,5 @@
-import { mutation, query } from "../_generated/server";
+import { mutation, query, internalQuery } from "../_generated/server";
+import { v } from "convex/values";
 import { getOrCreateUser, getAuthUserId } from "../_lib/auth";
 
 /**
@@ -57,5 +58,25 @@ export const getUser = query({
       .unique();
 
     return user;
+  },
+});
+
+// ==================== INTERNAL QUERIES ====================
+
+/**
+ * Internal: Get user by token identifier
+ * Used by HTTP actions to look up user from auth identity
+ */
+export const getUserByTokenIdentifier = internalQuery({
+  args: {
+    tokenIdentifier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", args.tokenIdentifier)
+      )
+      .unique();
   },
 });

@@ -15,12 +15,13 @@ const deviceEmoji: Record<string, string> = {
   iphone: "\u{1F4F1}",
   ipad: "\u{1F4F1}",
   ios: "\u{1F4F2}",
+  misc: "\u{1F4E6}",
   unknown: "\u{2753}",
 };
 
 export function ScreenTimeDashboard() {
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split("T")[0];
+  // Get today's date in YYYY-MM-DD format (local timezone, not UTC)
+  const today = new Date().toLocaleDateString('en-CA'); // 'en-CA' returns YYYY-MM-DD format
 
   // Device state
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
@@ -172,9 +173,7 @@ export function ScreenTimeDashboard() {
       {todaySummary === null && !isLoadingData && (
         <div className="p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
           <p className="text-sm text-[var(--text-secondary)]">
-            No screen time data for today yet.
-            <br />
-            Click "Sync Screen Time Data" to get started.
+            No data
           </p>
         </div>
       )}

@@ -8,6 +8,7 @@ import {
   ScreenTimeSyncProgress,
   initialSyncProgress,
   checkScreenTimePermission,
+  syncScreenTimeToLocalDb,
 } from "../services/screentime";
 
 // YouTube Sync State
@@ -86,10 +87,28 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     if (isSyncingRef.current) return;
 
     isSyncingRef.current = true;
-    setStProgress({ ...initialSyncProgress, status: "syncing" });
+    setStProgress({ ...initialSyncProgress, status: "syncing", currentStep: "Syncing local database..." });
 
     try {
+      // First, sync to our local database (parse SEGB files + knowledgeC.db)
+      const localResult = await syncScreenTimeToLocalDb();
+      console.log("[SyncContext] Local sync result:", localResult);
+
+      setStProgress({
+        ...initialSyncProgress,
+        status: "syncing",
+        currentStep: `Synced ${localResult.knowledge_sessions + localResult.biome_sessions} sessions locally. Uploading to Convex...`,
+      });
+
+      // Then sync to Convex
       await syncScreenTimeData(convex, setStProgress);
+    } catch (error) {
+      console.error("[SyncContext] Screen time sync error:", error);
+      setStProgress({
+        ...initialSyncProgress,
+        status: "error",
+        error: error instanceof Error ? error.message : "Sync failed",
+      });
     } finally {
       isSyncingRef.current = false;
     }
