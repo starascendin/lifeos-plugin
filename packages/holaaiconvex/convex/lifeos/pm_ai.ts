@@ -4,7 +4,7 @@
  * Using @convex-dev/agent for built-in thread persistence and tool execution
  */
 import { Agent, createTool } from "@convex-dev/agent";
-import { openai } from "@ai-sdk/openai";
+import { gateway } from "@ai-sdk/gateway";
 import { z } from "zod";
 import { v } from "convex/values";
 import { action, query } from "../_generated/server";
@@ -400,7 +400,7 @@ const getPMContextTool = createTool({
 
 export const pmAgent = new Agent(components.agent, {
   name: "PM Assistant",
-  languageModel: openai.chat("gpt-4o-mini"),
+  languageModel: gateway("google/gemini-2.5-flash-lite"),
   instructions: `You are a helpful project management assistant for LifeOS.
 You can help users manage their projects, issues, cycles, and labels.
 

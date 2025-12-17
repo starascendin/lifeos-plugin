@@ -23,6 +23,7 @@
     "./schema": "./convex/schema.ts"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^2.0.22",
     "@ai-sdk/openai": "^2.0.88",
     "@clerk/backend": "^1.21.0",
     "@convex-dev/agent": "^0.3.2",
