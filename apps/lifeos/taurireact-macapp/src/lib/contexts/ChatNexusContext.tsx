@@ -13,9 +13,13 @@ import type { Doc, Id } from "@holaai/convex";
 import {
   LayoutType,
   ModelOption,
-  DEFAULT_PANEL_MODELS,
+  ModelTier,
+  TierConfiguration,
+  Provider,
   LAYOUT_CONFIGS,
   WHITELISTED_MODELS,
+  DEFAULT_TIER_CONFIG,
+  DEFAULT_PANEL_PROVIDERS,
 } from "../constants/models";
 import { useChatNexusSettings } from "../hooks/useChatNexusSettings";
 
@@ -53,6 +57,9 @@ interface ChatNexusContextValue {
   layoutType: LayoutType;
   panelConfigs: PanelConfig[];
 
+  // Tier state
+  currentTier: ModelTier;
+
   // Streaming state
   streamState: StreamState;
   isAnyPanelStreaming: boolean;
@@ -62,6 +69,7 @@ interface ChatNexusContextValue {
   loadConversation: (id: Id<"lifeos_chatnexusConversations">) => void;
   setLayoutType: (type: LayoutType) => void;
   updatePanelModel: (panelId: string, model: ModelOption) => void;
+  applyTierToAllPanels: (tier: ModelTier) => void;
   sendMessage: (content: string) => Promise<void>;
   archiveConversation: (id: Id<"lifeos_chatnexusConversations">) => Promise<void>;
   deleteConversation: (id: Id<"lifeos_chatnexusConversations">) => Promise<void>;
@@ -83,55 +91,67 @@ function generatePanelId(): string {
   return crypto.randomUUID();
 }
 
-function getEnabledDefaultModels(enabledModelIds: string[]): ModelOption[] {
-  // Filter DEFAULT_PANEL_MODELS to only include enabled models
-  const enabledDefaults = DEFAULT_PANEL_MODELS.filter((m) =>
-    enabledModelIds.includes(m.id)
-  );
+// Get model for a provider at a specific tier
+function getModelForProviderTier(
+  provider: string,
+  tier: ModelTier,
+  tierConfig: TierConfiguration,
+  enabledModelIds: string[]
+): ModelOption | null {
+  const providerConfig = tierConfig[provider];
+  let modelId = providerConfig?.[tier] ?? null;
 
-  // If no default models are enabled, use the first enabled model from whitelist
-  if (enabledDefaults.length === 0) {
-    const firstEnabled = WHITELISTED_MODELS.find((m) =>
-      enabledModelIds.includes(m.id)
-    );
-    return firstEnabled ? [firstEnabled] : [WHITELISTED_MODELS[0]];
+  // If model is not set or disabled, fall back to first enabled model for provider
+  if (!modelId || !enabledModelIds.includes(modelId)) {
+    const providerModels = WHITELISTED_MODELS.filter((m) => m.provider === provider);
+    const firstEnabled = providerModels.find((m) => enabledModelIds.includes(m.id));
+    modelId = firstEnabled?.id ?? null;
   }
 
-  return enabledDefaults;
+  if (!modelId) return null;
+  return WHITELISTED_MODELS.find((m) => m.id === modelId) ?? null;
 }
 
-function createDefaultPanelConfigs(
+// Create panel configs with each panel having a different provider
+function createPanelConfigsForTier(
   layoutType: LayoutType,
-  existingConfigs?: PanelConfig[],
-  enabledModelIds?: string[]
+  tier: ModelTier,
+  tierConfig: TierConfiguration,
+  enabledModelIds: string[],
+  panelProviders: Provider[],
+  existingConfigs?: PanelConfig[]
 ): PanelConfig[] {
   const panelCount = LAYOUT_CONFIGS[layoutType].panels;
   const configs: PanelConfig[] = [];
 
-  // Get enabled default models (or all defaults if no filter provided)
-  const defaultModels = enabledModelIds
-    ? getEnabledDefaultModels(enabledModelIds)
-    : DEFAULT_PANEL_MODELS;
-
   for (let i = 0; i < panelCount; i++) {
-    // Reuse existing config if available and model is still enabled
-    const existing = existingConfigs?.find((c) => c.position === i);
-    if (existing) {
-      // Check if model is still enabled
-      const isEnabled = !enabledModelIds || enabledModelIds.includes(existing.modelId);
-      if (isEnabled) {
-        configs.push({ ...existing, isActive: true });
-        continue;
+    // Each panel gets a provider from the configured order (cycling through)
+    const provider = panelProviders[i % panelProviders.length] || DEFAULT_PANEL_PROVIDERS[i % DEFAULT_PANEL_PROVIDERS.length];
+
+    // Get the model for this provider at the current tier
+    const model = getModelForProviderTier(provider, tier, tierConfig, enabledModelIds);
+
+    if (!model) {
+      // Fallback: use first enabled model from any provider
+      const fallback = WHITELISTED_MODELS.find((m) => enabledModelIds.includes(m.id));
+      if (fallback) {
+        configs.push({
+          panelId: existingConfigs?.[i]?.panelId || generatePanelId(),
+          modelId: fallback.id,
+          modelProvider: fallback.provider,
+          modelDisplayName: fallback.name,
+          position: i,
+          isActive: true,
+        });
       }
+      continue;
     }
 
-    // Use default model (cycle through enabled defaults)
-    const defaultModel = defaultModels[i % defaultModels.length] || defaultModels[0];
     configs.push({
-      panelId: existing?.panelId || generatePanelId(),
-      modelId: defaultModel.id,
-      modelProvider: defaultModel.provider,
-      modelDisplayName: defaultModel.name,
+      panelId: existingConfigs?.[i]?.panelId || generatePanelId(),
+      modelId: model.id,
+      modelProvider: model.provider,
+      modelDisplayName: model.name,
       position: i,
       isActive: true,
     });
@@ -146,17 +166,25 @@ const ChatNexusContext = createContext<ChatNexusContextValue | null>(null);
 
 export function ChatNexusProvider({ children }: { children: ReactNode }) {
   const { getToken } = useAuth();
-  const { enabledModelIds } = useChatNexusSettings();
+  const { enabledModelIds, currentTier, setCurrentTier, tierConfiguration, panelProviders } =
+    useChatNexusSettings();
 
   // Local state
   const [currentConversationId, setCurrentConversationId] =
     useState<Id<"lifeos_chatnexusConversations"> | null>(null);
   const [layoutType, setLayoutTypeState] = useState<LayoutType>("two-column");
+  // Initialize with default tier config - will be updated in useEffect
   const [panelConfigs, setPanelConfigs] = useState<PanelConfig[]>(() =>
-    createDefaultPanelConfigs("two-column")
+    createPanelConfigsForTier(
+      "two-column",
+      "mini", // Default tier
+      DEFAULT_TIER_CONFIG,
+      WHITELISTED_MODELS.map((m) => m.id), // All models enabled initially
+      DEFAULT_PANEL_PROVIDERS
+    )
   );
   const [streamState, setStreamState] = useState<StreamState>({});
-  const [initializedWithEnabledModels, setInitializedWithEnabledModels] = useState(false);
+  const [initializedWithSettings, setInitializedWithSettings] = useState(false);
 
   // Convex queries
   const conversations = useQuery(api.lifeos.chatnexus.getConversations, {
@@ -211,25 +239,48 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
       );
       if (conversation) {
         setLayoutTypeState(conversation.layoutType);
-        // Filter panel configs to only use enabled models
-        const filteredConfigs = createDefaultPanelConfigs(
-          conversation.layoutType,
-          conversation.panelConfigs,
-          enabledModelIds
-        );
-        setPanelConfigs(filteredConfigs);
+        // Use conversation's saved panel configs, but update disabled models
+        const updatedConfigs = conversation.panelConfigs.map((config, i) => {
+          if (enabledModelIds.includes(config.modelId)) {
+            return { ...config, isActive: true };
+          }
+          // Model is disabled, get replacement based on provider and tier
+          const model = getModelForProviderTier(
+            config.modelProvider,
+            currentTier,
+            tierConfiguration,
+            enabledModelIds
+          );
+          if (model) {
+            return {
+              ...config,
+              modelId: model.id,
+              modelProvider: model.provider,
+              modelDisplayName: model.name,
+              isActive: true,
+            };
+          }
+          return { ...config, isActive: true };
+        });
+        setPanelConfigs(updatedConfigs);
       }
     }
-  }, [currentConversationId, conversations, enabledModelIds]);
+  }, [currentConversationId, conversations, enabledModelIds, currentTier, tierConfiguration]);
 
-  // Update panel configs when enabled models change
+  // Initialize panels with current tier and settings
   useEffect(() => {
-    if (!initializedWithEnabledModels) {
-      // Initialize with enabled models on first render
-      setPanelConfigs((prev) =>
-        createDefaultPanelConfigs(layoutType, prev, enabledModelIds)
+    if (!initializedWithSettings) {
+      // Initialize with user's settings (tier, enabled models, panel providers)
+      const newConfigs = createPanelConfigsForTier(
+        layoutType,
+        currentTier,
+        tierConfiguration,
+        enabledModelIds,
+        panelProviders,
+        panelConfigs
       );
-      setInitializedWithEnabledModels(true);
+      setPanelConfigs(newConfigs);
+      setInitializedWithSettings(true);
       return;
     }
 
@@ -239,22 +290,44 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
     );
 
     if (hasDisabledModel) {
-      // Update panels to use only enabled models
-      const updatedConfigs = createDefaultPanelConfigs(
-        layoutType,
-        panelConfigs,
-        enabledModelIds
-      );
+      // Update panels to use only enabled models while keeping providers
+      const updatedConfigs = panelConfigs.map((config) => {
+        if (enabledModelIds.includes(config.modelId)) {
+          return config;
+        }
+        const model = getModelForProviderTier(
+          config.modelProvider,
+          currentTier,
+          tierConfiguration,
+          enabledModelIds
+        );
+        if (model) {
+          return {
+            ...config,
+            modelId: model.id,
+            modelProvider: model.provider,
+            modelDisplayName: model.name,
+          };
+        }
+        return config;
+      });
       setPanelConfigs(updatedConfigs);
     }
-  }, [enabledModelIds, initializedWithEnabledModels, layoutType, panelConfigs]);
+  }, [enabledModelIds, initializedWithSettings, layoutType, panelConfigs, currentTier, tierConfiguration, panelProviders]);
 
   // ==================== ACTIONS ====================
 
   const setLayoutType = useCallback(
     (type: LayoutType) => {
       setLayoutTypeState(type);
-      const newConfigs = createDefaultPanelConfigs(type, panelConfigs, enabledModelIds);
+      const newConfigs = createPanelConfigsForTier(
+        type,
+        currentTier,
+        tierConfiguration,
+        enabledModelIds,
+        panelProviders,
+        panelConfigs
+      );
       setPanelConfigs(newConfigs);
 
       // Update conversation if one is selected
@@ -266,7 +339,7 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [currentConversationId, panelConfigs, enabledModelIds, updateConversationMutation]
+    [currentConversationId, panelConfigs, enabledModelIds, currentTier, tierConfiguration, panelProviders, updateConversationMutation]
   );
 
   const updatePanelModel = useCallback(
@@ -303,6 +376,63 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
       }
     },
     [currentConversationId, panelConfigs, updateConversationMutation]
+  );
+
+  const applyTierToAllPanels = useCallback(
+    (tier: ModelTier) => {
+      // Update tier setting
+      setCurrentTier(tier);
+
+      // Update all panels to use the tier's model for their provider
+      const newConfigs = panelConfigs.map((config) => {
+        // Look up the model for this provider and tier
+        const providerConfig = tierConfiguration[config.modelProvider];
+        if (!providerConfig) return config;
+
+        let modelId = providerConfig[tier];
+
+        // If model is not set or disabled, fall back to first enabled model for provider
+        if (!modelId || !enabledModelIds.includes(modelId)) {
+          const providerModels = WHITELISTED_MODELS.filter(
+            (m) => m.provider === config.modelProvider
+          );
+          const firstEnabled = providerModels.find((m) =>
+            enabledModelIds.includes(m.id)
+          );
+          modelId = firstEnabled?.id ?? null;
+        }
+
+        if (!modelId) return config;
+
+        const model = WHITELISTED_MODELS.find((m) => m.id === modelId);
+        if (!model) return config;
+
+        return {
+          ...config,
+          modelId: model.id,
+          modelProvider: model.provider,
+          modelDisplayName: model.name,
+        };
+      });
+
+      setPanelConfigs(newConfigs);
+
+      // Update conversation if one is selected
+      if (currentConversationId) {
+        updateConversationMutation({
+          conversationId: currentConversationId,
+          panelConfigs: newConfigs,
+        });
+      }
+    },
+    [
+      setCurrentTier,
+      tierConfiguration,
+      enabledModelIds,
+      panelConfigs,
+      currentConversationId,
+      updateConversationMutation,
+    ]
   );
 
   const createConversation = useCallback(async () => {
@@ -556,6 +686,9 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
     layoutType,
     panelConfigs,
 
+    // Tier state
+    currentTier,
+
     // Streaming state
     streamState,
     isAnyPanelStreaming,
@@ -565,6 +698,7 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
     loadConversation,
     setLayoutType,
     updatePanelModel,
+    applyTierToAllPanels,
     sendMessage,
     archiveConversation,
     deleteConversation,

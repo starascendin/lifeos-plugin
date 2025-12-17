@@ -15,6 +15,19 @@ export interface ModelOption {
   contextWindow?: number; // Context window size
 }
 
+// Model tier levels for quick switching
+export type ModelTier = "mini" | "normal" | "pro";
+
+// Per-provider tier configuration (which model to use for each tier)
+export interface ProviderTierConfig {
+  mini: string | null; // modelId for mini tier
+  normal: string | null; // modelId for normal tier
+  pro: string | null; // modelId for pro tier
+}
+
+// Complete tier configuration across all providers
+export type TierConfiguration = Record<string, ProviderTierConfig>;
+
 /**
  * ===========================================
  * WHITELISTED MODELS - Edit this list to update available models
@@ -262,3 +275,44 @@ export const LAYOUT_CONFIGS: Record<LayoutType, { panels: number; gridCols: stri
   "three-column": { panels: 3, gridCols: "grid-cols-3" },
   "grid-2x2": { panels: 4, gridCols: "grid-cols-2" },
 };
+
+// Default tier configuration for each provider
+export const DEFAULT_TIER_CONFIG: TierConfiguration = {
+  anthropic: {
+    mini: "anthropic/claude-haiku-4.5",
+    normal: "anthropic/claude-sonnet-4.5",
+    pro: "anthropic/claude-opus-4.5",
+  },
+  openai: {
+    mini: "openai/gpt-5-mini",
+    normal: "openai/gpt-5",
+    pro: "openai/gpt-5.2-pro",
+  },
+  google: {
+    mini: "google/gemini-2.5-flash-lite",
+    normal: "google/gemini-2.5-pro",
+    pro: "google/gemini-3-pro-preview",
+  },
+  xai: {
+    mini: "xai/grok-code-fast-1",
+    normal: "xai/grok-4",
+    pro: "xai/grok-4", // xAI lacks a clear "pro" tier, reuse grok-4
+  },
+};
+
+// Display names and descriptions for tiers
+export const TIER_INFO: Record<ModelTier, { name: string; description: string }> = {
+  mini: { name: "Mini", description: "Fast & affordable" },
+  normal: { name: "Normal", description: "Balanced" },
+  pro: { name: "Pro", description: "Best quality" },
+};
+
+// All available tiers for iteration
+export const MODEL_TIERS: ModelTier[] = ["mini", "normal", "pro"];
+
+// All available providers for panel assignment
+export const ALL_PROVIDERS = ["anthropic", "openai", "google", "xai"] as const;
+export type Provider = (typeof ALL_PROVIDERS)[number];
+
+// Default provider order for panels (can be customized by user)
+export const DEFAULT_PANEL_PROVIDERS: Provider[] = ["anthropic", "openai", "google", "xai"];

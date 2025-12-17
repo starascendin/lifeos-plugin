@@ -5,6 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   CheckCircle,
   AlertCircle,
   AlertTriangle,
@@ -12,6 +18,7 @@ import {
   Loader2,
   Monitor,
   Settings,
+  Clock,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
@@ -23,8 +30,20 @@ interface ScreenTimeSyncButtonProps {
 }
 
 export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonProps) {
-  const { progress, hasPermission, startSync, isSyncing, refreshPermission } =
+  const { progress, hasPermission, startSync, isSyncing, refreshPermission, syncHistory } =
     useScreenTimeSync();
+
+  // Format sync history timestamp (SQLite datetime string)
+  const formatSyncTime = (timestamp: string) => {
+    const date = new Date(timestamp + "Z"); // Append Z to treat as UTC
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
 
   // Track previous status to detect when sync completes
   const prevStatusRef = useRef(progress.status);
@@ -94,6 +113,37 @@ export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonPro
     );
   }
 
+  // Sync history tooltip component
+  const SyncHistoryTooltip = () => {
+    if (syncHistory.length === 0) return null;
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Clock className="h-3 w-3" />
+              <span>Last synced {formatSyncTime(syncHistory[0].synced_at)}</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="p-2">
+            <div className="text-xs space-y-1">
+              <p className="font-medium mb-1">Recent syncs:</p>
+              {syncHistory.map((entry, i) => (
+                <p key={i} className="text-muted-foreground">
+                  {formatSyncTime(entry.synced_at)}{" "}
+                  <span className="opacity-60">
+                    ({entry.source === "background" ? "auto" : "manual"})
+                  </span>
+                </p>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   return (
     <Card className="mb-4">
       <CardContent className="p-4">
@@ -119,9 +169,12 @@ export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonPro
           </div>
         ) : progress.status === "complete" ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="h-4 w-4" />
-              <span className="text-sm font-medium">Sync complete!</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">Sync complete!</span>
+              </div>
+              <SyncHistoryTooltip />
             </div>
             <p className="text-xs text-muted-foreground">
               {progress.currentStep}
@@ -158,6 +211,7 @@ export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonPro
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Screen Time Access Granted
               </Badge>
+              <SyncHistoryTooltip />
             </div>
             <Button onClick={startSync} className="w-full" size="sm">
               <Monitor className="h-4 w-4 mr-2" />

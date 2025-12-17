@@ -163,6 +163,26 @@ export async function syncScreenTimeToLocalDb(): Promise<LocalSyncResult> {
   return await invoke<LocalSyncResult>("sync_screentime_to_local_db");
 }
 
+// Sync history entry type
+export interface SyncHistoryEntry {
+  synced_at: string;
+  knowledge_sessions: number;
+  biome_sessions: number;
+  daily_summaries: number;
+  source: string; // "manual" or "background"
+}
+
+// Get sync history from local database
+export async function getScreenTimeSyncHistory(): Promise<SyncHistoryEntry[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<SyncHistoryEntry[]>("get_screentime_sync_history");
+  } catch (error) {
+    console.error("Failed to get sync history:", error);
+    return [];
+  }
+}
+
 // Generate session key for deduplication
 function generateSessionKey(session: ScreenTimeSession): string {
   return `${session.bundle_id}_${session.start_time}`;

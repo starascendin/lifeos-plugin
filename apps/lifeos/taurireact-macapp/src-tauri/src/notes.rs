@@ -132,16 +132,26 @@ pub struct NotesExportProgress {
     pub status: String,
 }
 
+/// Get the bundle identifier based on build mode
+/// Uses TAURI_BUILD_MODE env var to determine environment-specific paths
+fn get_bundle_id() -> &'static str {
+    match option_env!("TAURI_BUILD_MODE") {
+        Some("production") => "com.bryanliu.lifeos-nexus",
+        Some("staging") => "com.bryanliu.lifeos-nexus-staging",
+        _ => "com.bryanliu.lifeos-nexus-dev", // dev (default)
+    }
+}
+
 /// Get the app data directory for notes storage
 fn get_notes_data_dir() -> Option<PathBuf> {
     dirs::home_dir()
-        .map(|home| home.join("Library/Application Support/com.bryanliu.tubevault-react/notes"))
+        .map(|home| home.join(format!("Library/Application Support/{}/notes", get_bundle_id())))
 }
 
 /// Get the SQLite database path
 fn get_notes_db_path() -> Option<PathBuf> {
     dirs::home_dir()
-        .map(|home| home.join("Library/Application Support/com.bryanliu.tubevault-react/notes.db"))
+        .map(|home| home.join(format!("Library/Application Support/{}/notes.db", get_bundle_id())))
 }
 
 /// Initialize the SQLite database schema
@@ -490,13 +500,23 @@ pub async fn export_apple_notes(
             .as_ref()
             .and_then(|p| folder_long_ids_to_id.get(p).copied());
 
+        // Use INSERT ... ON CONFLICT to preserve existing row IDs (prevents FOREIGN KEY errors)
         conn.execute(
-            "INSERT OR REPLACE INTO folders (long_id, name, parent_id) VALUES (?1, ?2, ?3)",
+            "INSERT INTO folders (long_id, name, parent_id) VALUES (?1, ?2, ?3)
+             ON CONFLICT(long_id) DO UPDATE SET name = excluded.name, parent_id = excluded.parent_id",
             params![folder.long_id, folder.name, parent_id],
         )
         .map_err(|e| format!("Failed to insert folder: {}", e))?;
 
-        let id = conn.last_insert_rowid();
+        // Get the actual ID (either newly inserted or existing)
+        let id: i64 = conn
+            .query_row(
+                "SELECT id FROM folders WHERE long_id = ?1",
+                params![folder.long_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Failed to get folder id: {}", e))?;
+
         folder_long_ids_to_id.insert(folder.long_id.clone(), id);
         folder_ids_to_names.insert(id, folder.name.clone());
     }

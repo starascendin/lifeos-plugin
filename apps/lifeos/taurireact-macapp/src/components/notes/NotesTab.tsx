@@ -10,6 +10,25 @@ import {
   getNotePlainTextPreview,
   formatNoteDate,
 } from "../../lib/services/notes";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertCircle,
+  CheckCircle,
+  Download,
+  Loader2,
+  FolderOpen,
+} from "lucide-react";
 
 type ExportScope = "7" | "30" | "full";
 
@@ -77,109 +96,117 @@ export function NotesTab() {
 
   const isExporting = progress.status === "counting" || progress.status === "exporting";
 
+  // Calculate progress percentage
+  const getProgressPercentage = () => {
+    if (progress.totalCount === 0) return 0;
+    return Math.round((progress.currentNote / progress.totalCount) * 100);
+  };
+
   return (
     <div className="space-y-4 overflow-y-auto h-full">
       {/* Export Controls */}
-      <div className="p-4 bg-[var(--bg-secondary)] rounded-lg">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-[var(--text-secondary)]">Export:</label>
-            <select
-              value={exportScope}
-              onChange={(e) => setExportScope(e.target.value as ExportScope)}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Export:</span>
+              <Select
+                value={exportScope}
+                onValueChange={(value) => setExportScope(value as ExportScope)}
+                disabled={isExporting}
+              >
+                <SelectTrigger className="w-[140px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="full">All notes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              onClick={handleExport}
               disabled={isExporting}
-              className="px-2 py-1 text-sm rounded bg-[var(--bg-primary)] border border-[var(--border)] disabled:opacity-50"
+              size="sm"
             >
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="full">All notes</option>
-            </select>
+              {isExporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Notes
+                </>
+              )}
+            </Button>
           </div>
 
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
-          >
-            {isExporting ? (
-              <span className="flex items-center gap-2">
-                <div className="spinner-sm" />
-                Exporting...
-              </span>
-            ) : (
-              "Export Notes"
-            )}
-          </button>
-        </div>
-
-        {/* Progress indicator */}
-        {progress.status !== "idle" && (
-          <div className="mt-3 pt-3 border-t border-[var(--border)]">
-            {/* Progress bar */}
-            {progress.status === "exporting" && progress.totalCount > 0 && (
-              <div className="mb-2">
-                <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-1">
-                  <span>{progress.currentNote} / {progress.totalCount}</span>
-                  <span>{Math.round((progress.currentNote / progress.totalCount) * 100)}%</span>
+          {/* Progress indicator */}
+          {progress.status !== "idle" && (
+            <div className="mt-3 pt-3 border-t">
+              {/* Progress bar */}
+              {progress.status === "exporting" && progress.totalCount > 0 && (
+                <div className="mb-2 space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{progress.currentNote} / {progress.totalCount}</span>
+                    <span>{getProgressPercentage()}%</span>
+                  </div>
+                  <Progress value={getProgressPercentage()} className="h-2" />
                 </div>
-                <div className="w-full bg-[var(--border)] rounded-full h-2">
-                  <div
-                    className="bg-[var(--accent)] h-2 rounded-full transition-all duration-200"
-                    style={{ width: `${(progress.currentNote / progress.totalCount) * 100}%` }}
-                  />
+              )}
+              <p className="text-sm truncate">
+                {progress.currentStep}
+              </p>
+              {progress.status === "exporting" && progress.currentTitle && (
+                <p className="text-xs text-muted-foreground mt-1 truncate">
+                  Current: {progress.currentTitle}
+                </p>
+              )}
+              {progress.status === "complete" && (
+                <div className="flex items-center gap-2 text-green-600 mt-1">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-xs">
+                    {progress.exportedCount} exported, {progress.skippedCount} unchanged
+                  </span>
                 </div>
-              </div>
-            )}
-            <p className="text-sm truncate">
-              {progress.currentStep}
-            </p>
-            {progress.status === "exporting" && progress.currentTitle && (
-              <p className="text-xs text-[var(--text-secondary)] mt-1 truncate">
-                Current: {progress.currentTitle}
-              </p>
-            )}
-            {progress.status === "complete" && (
-              <p className="text-xs text-[var(--text-secondary)] mt-1">
-                {progress.exportedCount} exported, {progress.skippedCount} unchanged
-              </p>
-            )}
-            {progress.status === "error" && (
-              <p className="text-xs text-red-500 mt-1">
-                Error: {progress.error}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+              {progress.status === "error" && (
+                <div className="flex items-center gap-2 text-destructive mt-1">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-xs">Error: {progress.error}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Folder filter */}
       {folders.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-2">
-          <button
+          <Badge
+            variant={selectedFolderId === null ? "default" : "outline"}
+            className="cursor-pointer flex-shrink-0"
             onClick={() => setSelectedFolderId(null)}
-            className={`px-3 py-1 text-xs rounded-full flex-shrink-0 transition-colors ${
-              selectedFolderId === null
-                ? "bg-[var(--accent)] text-white"
-                : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]"
-            }`}
           >
             All ({notes.length})
-          </button>
+          </Badge>
           {folders.map((folder) => {
             const count = notes.filter((n) => n.folder_id === folder.id).length;
             if (count === 0) return null;
             return (
-              <button
+              <Badge
                 key={folder.id}
+                variant={selectedFolderId === folder.id ? "default" : "outline"}
+                className="cursor-pointer flex-shrink-0"
                 onClick={() => setSelectedFolderId(folder.id)}
-                className={`px-3 py-1 text-xs rounded-full flex-shrink-0 transition-colors ${
-                  selectedFolderId === folder.id
-                    ? "bg-[var(--accent)] text-white"
-                    : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--border)]"
-                }`}
               >
                 {folder.name} ({count})
-              </button>
+              </Badge>
             );
           })}
         </div>
@@ -187,23 +214,24 @@ export function NotesTab() {
 
       {/* Loading state */}
       {isLoading && (
-        <div className="p-4 bg-[var(--bg-secondary)] rounded-lg">
-          <div className="flex items-center gap-2">
-            <div className="spinner" />
-            <span className="text-sm">Loading notes...</span>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading notes...</span>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* No notes state */}
       {!isLoading && notes.length === 0 && (
-        <div className="p-4 bg-[var(--bg-secondary)] rounded-lg text-center">
-          <p className="text-sm text-[var(--text-secondary)]">
-            No notes exported yet.
-            <br />
-            Click "Export Notes" to get started.
-          </p>
-        </div>
+        <Alert>
+          <FolderOpen className="h-4 w-4" />
+          <AlertDescription>
+            No notes exported yet. Click "Export Notes" to get started.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Notes list grouped by folder */}
@@ -212,7 +240,7 @@ export function NotesTab() {
           {Object.entries(notesByFolder).map(([folderName, folderNotes]) => (
             <div key={folderName} className="space-y-2">
               {!selectedFolderId && (
-                <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide px-1">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
                   {folderName} ({folderNotes.length})
                 </h3>
               )}
@@ -233,20 +261,22 @@ function NoteCard({ note }: { note: AppleNote }) {
   const preview = getNotePlainTextPreview(note.body, 120);
 
   return (
-    <div className="p-3 bg-[var(--bg-secondary)] rounded-lg hover:bg-[var(--border)] transition-colors cursor-pointer">
-      <div className="flex justify-between items-start gap-2">
-        <h4 className="font-medium text-sm truncate flex-1">
-          {note.title || "Untitled"}
-        </h4>
-        <span className="text-xs text-[var(--text-secondary)] flex-shrink-0">
-          {formatNoteDate(note.updated)}
-        </span>
-      </div>
-      {preview && (
-        <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
-          {preview}
-        </p>
-      )}
-    </div>
+    <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+      <CardContent className="p-3">
+        <div className="flex justify-between items-start gap-2">
+          <h4 className="font-medium text-sm truncate flex-1">
+            {note.title || "Untitled"}
+          </h4>
+          <span className="text-xs text-muted-foreground flex-shrink-0">
+            {formatNoteDate(note.updated)}
+          </span>
+        </div>
+        {preview && (
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+            {preview}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

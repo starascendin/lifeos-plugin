@@ -87,10 +87,20 @@ fn get_knowledge_db_path() -> Option<PathBuf> {
     dirs::home_dir().map(|home| home.join("Library/Application Support/Knowledge/knowledgeC.db"))
 }
 
+/// Get the bundle identifier based on build mode
+/// Uses TAURI_BUILD_MODE env var to determine environment-specific paths
+fn get_bundle_id() -> &'static str {
+    match option_env!("TAURI_BUILD_MODE") {
+        Some("production") => "com.bryanliu.lifeos-nexus",
+        Some("staging") => "com.bryanliu.lifeos-nexus-staging",
+        _ => "com.bryanliu.lifeos-nexus-dev", // dev (default)
+    }
+}
+
 /// Get the path to our own screentime database in the app data directory
 fn get_app_screentime_db_path() -> Option<PathBuf> {
     dirs::data_local_dir().map(|data_dir| {
-        let app_dir = data_dir.join("com.bryanliu.tubevault").join("screentime");
+        let app_dir = data_dir.join(get_bundle_id()).join("screentime");
         // Create directory if it doesn't exist
         let _ = fs::create_dir_all(&app_dir);
         app_dir.join("screentime.db")
@@ -178,6 +188,19 @@ fn init_screentime_database(db_path: &PathBuf) -> SqliteResult<()> {
     // Initialize sync_metadata if empty
     conn.execute(
         "INSERT OR IGNORE INTO sync_metadata (id, last_sync_timestamp) VALUES (1, 0)",
+        [],
+    )?;
+
+    // Create sync_history table to track recent syncs
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS sync_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            knowledge_sessions INTEGER DEFAULT 0,
+            biome_sessions INTEGER DEFAULT 0,
+            daily_summaries INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'manual'
+        )",
         [],
     )?;
 
@@ -910,9 +933,8 @@ fn generate_daily_summary(conn: &Connection) -> Result<i32, String> {
     Ok(count)
 }
 
-/// Main sync command - exports data from system DBs to our DB
-#[command]
-pub async fn sync_screentime_to_local_db() -> Result<SyncResult, String> {
+/// Internal sync function - can be called from background scheduler
+pub fn sync_screentime_internal_with_source(source: &str) -> Result<SyncResult, String> {
     if !check_full_disk_access() {
         return Err("Full Disk Access permission required".to_string());
     }
@@ -965,6 +987,18 @@ pub async fn sync_screentime_to_local_db() -> Result<SyncResult, String> {
         ).ok();
     }
 
+    // Record sync in history (keep only last 10)
+    conn.execute(
+        "INSERT INTO sync_history (knowledge_sessions, biome_sessions, daily_summaries, source) VALUES (?, ?, ?, ?)",
+        rusqlite::params![knowledge_count, biome_count, summary_count, source],
+    ).ok();
+
+    // Clean up old history entries (keep only last 10)
+    conn.execute(
+        "DELETE FROM sync_history WHERE id NOT IN (SELECT id FROM sync_history ORDER BY synced_at DESC LIMIT 10)",
+        [],
+    ).ok();
+
     Ok(SyncResult {
         knowledge_sessions: knowledge_count,
         biome_sessions: biome_count,
@@ -972,11 +1006,79 @@ pub async fn sync_screentime_to_local_db() -> Result<SyncResult, String> {
     })
 }
 
+/// Internal sync function - convenience wrapper with default source
+pub fn sync_screentime_internal() -> Result<SyncResult, String> {
+    sync_screentime_internal_with_source("background")
+}
+
+/// Main sync command - exports data from system DBs to our DB
+#[command]
+pub async fn sync_screentime_to_local_db() -> Result<SyncResult, String> {
+    sync_screentime_internal_with_source("manual")
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SyncResult {
     pub knowledge_sessions: i32,
     pub biome_sessions: i32,
     pub daily_summaries: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SyncHistoryEntry {
+    pub synced_at: String,
+    pub knowledge_sessions: i32,
+    pub biome_sessions: i32,
+    pub daily_summaries: i32,
+    pub source: String,
+}
+
+/// Get recent sync history
+#[command]
+pub async fn get_screentime_sync_history() -> Result<Vec<SyncHistoryEntry>, String> {
+    let db_path = get_app_screentime_db_path()
+        .ok_or_else(|| "Could not determine app data directory".to_string())?;
+
+    let conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Check if table exists
+    let table_exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='sync_history'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if !table_exists {
+        return Ok(vec![]);
+    }
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT synced_at, knowledge_sessions, biome_sessions, daily_summaries, source
+             FROM sync_history
+             ORDER BY synced_at DESC
+             LIMIT 5",
+        )
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let history = stmt
+        .query_map([], |row| {
+            Ok(SyncHistoryEntry {
+                synced_at: row.get(0)?,
+                knowledge_sessions: row.get(1)?,
+                biome_sessions: row.get(2)?,
+                daily_summaries: row.get(3)?,
+                source: row.get(4)?,
+            })
+        })
+        .map_err(|e| format!("Failed to query sync history: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(history)
 }
 
 /// Read Screen Time sessions from knowledgeC.db

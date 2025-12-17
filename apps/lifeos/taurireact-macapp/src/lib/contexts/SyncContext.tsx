@@ -9,6 +9,8 @@ import {
   initialSyncProgress,
   checkScreenTimePermission,
   syncScreenTimeToLocalDb,
+  getScreenTimeSyncHistory,
+  type SyncHistoryEntry,
 } from "../services/screentime";
 
 // YouTube Sync State
@@ -25,7 +27,9 @@ interface ScreenTimeSyncState {
   startSync: () => Promise<void>;
   reset: () => void;
   refreshPermission: () => Promise<boolean>;
+  refreshSyncHistory: () => Promise<void>;
   isSyncing: boolean;
+  syncHistory: SyncHistoryEntry[];
 }
 
 interface SyncContextValue {
@@ -45,12 +49,26 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // Screen time sync state
   const [stProgress, setStProgress] = useState<ScreenTimeSyncProgress>(initialSyncProgress);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
   const isSyncingRef = useRef(false);
 
-  // Check screen time permission on mount
+  // Refresh sync history from Tauri
+  const refreshSyncHistory = useCallback(async () => {
+    const history = await getScreenTimeSyncHistory();
+    setSyncHistory(history);
+  }, []);
+
+  // Check screen time permission and fetch sync history on mount
   useEffect(() => {
     checkScreenTimePermission().then(setHasPermission);
-  }, []);
+    refreshSyncHistory();
+  }, [refreshSyncHistory]);
+
+  // Periodically refresh sync history to catch background syncs
+  useEffect(() => {
+    const interval = setInterval(refreshSyncHistory, 60000); // Every minute
+    return () => clearInterval(interval);
+  }, [refreshSyncHistory]);
 
   // YouTube sync functions
   const startYouTubeSync = useCallback(async () => {
@@ -102,6 +120,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
       // Then sync to Convex
       await syncScreenTimeData(convex, setStProgress);
+
+      // Refresh sync history from database
+      await refreshSyncHistory();
     } catch (error) {
       console.error("[SyncContext] Screen time sync error:", error);
       setStProgress({
@@ -112,11 +133,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     } finally {
       isSyncingRef.current = false;
     }
-  }, [convex]);
+  }, [convex, refreshSyncHistory]);
 
   const resetScreenTimeSync = useCallback(() => {
     setStProgress(initialSyncProgress);
   }, []);
+
+  // Note: Background sync is handled by Tauri/Rust side (runs every 30 minutes regardless of UI focus)
 
   const refreshPermission = useCallback(async () => {
     const permission = await checkScreenTimePermission();
@@ -136,7 +159,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       startSync: startScreenTimeSync,
       reset: resetScreenTimeSync,
       refreshPermission,
+      refreshSyncHistory,
       isSyncing: stProgress.status === "syncing" || stProgress.status === "checking",
+      syncHistory,
     },
   };
 

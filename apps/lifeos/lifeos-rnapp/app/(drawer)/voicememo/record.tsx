@@ -6,9 +6,9 @@ import { useVoiceMemoSync } from '@/hooks/useVoiceMemoSync';
 import { RecordButton, WaveformVisualizer } from '@/components/voicememo';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
-import { X, Check, Pause, Play, Cloud } from 'lucide-react-native';
+import { X, Pause, Play } from 'lucide-react-native';
 import { formatDuration } from '@/utils/voicememo/format';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useAnimatedStyle,
@@ -22,7 +22,6 @@ export default function RecordScreen() {
   const textColor = useColor('text');
   const textMuted = useColor('textMuted');
   const redColor = useColor('red');
-  const greenColor = useColor('green');
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -40,15 +39,45 @@ export default function RecordScreen() {
 
   const { addMemo, isSyncing } = useVoiceMemoSync();
 
+  // Auto-start recording when screen opens
+  const hasStarted = useRef(false);
+  useEffect(() => {
+    if (!hasStarted.current) {
+      hasStarted.current = true;
+      startRecording();
+    }
+  }, [startRecording]);
+
   const handleRecordToggle = useCallback(async () => {
     if (!isRecording) {
+      // Start recording immediately
       await startRecording();
-    } else if (isPaused) {
+    } else {
+      // Stop, save, and close immediately
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setIsSaving(true);
+      try {
+        const uri = await stopRecording();
+        if (uri) {
+          await addMemo(uri, duration);
+        }
+        router.back();
+      } catch (error) {
+        console.error('Failed to save recording:', error);
+        setIsSaving(false);
+      }
+    }
+  }, [isRecording, startRecording, stopRecording, addMemo, duration, router]);
+
+  const handlePauseResume = useCallback(async () => {
+    if (isPaused) {
       await resumeRecording();
     } else {
       await pauseRecording();
     }
-  }, [isRecording, isPaused, startRecording, pauseRecording, resumeRecording]);
+  }, [isPaused, pauseRecording, resumeRecording]);
 
   const handleCancel = useCallback(async () => {
     if (Platform.OS === 'ios') {
@@ -58,23 +87,6 @@ export default function RecordScreen() {
     router.back();
   }, [cancelRecording, router]);
 
-  const handleSave = useCallback(async () => {
-    if (Platform.OS === 'ios') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    setIsSaving(true);
-
-    try {
-      const uri = await stopRecording();
-      if (uri) {
-        await addMemo(uri, duration);
-      }
-      router.back();
-    } catch (error) {
-      console.error('Failed to save recording:', error);
-      setIsSaving(false);
-    }
-  }, [stopRecording, addMemo, duration, router]);
 
   const containerStyle: ViewStyle = {
     flex: 1,
@@ -123,15 +135,6 @@ export default function RecordScreen() {
           disabled={isSaving}
         />
 
-        {isRecording && duration > 0 && (
-          <HeaderButton
-            icon={Check}
-            label="Done"
-            color={greenColor}
-            onPress={handleSave}
-            disabled={isSaving}
-          />
-        )}
       </View>
 
       {/* Content */}
@@ -165,7 +168,7 @@ export default function RecordScreen() {
           )}
           {!isRecording && (
             <Text variant="body" style={{ color: textMuted }}>
-              Tap to start recording
+              Starting...
             </Text>
           )}
         </View>
@@ -188,7 +191,7 @@ export default function RecordScreen() {
             <View style={pauseResumeStyle}>
               <PauseResumeButton
                 isPaused={isPaused}
-                onPress={handleRecordToggle}
+                onPress={handlePauseResume}
               />
             </View>
           )}

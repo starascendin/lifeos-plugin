@@ -1,5 +1,6 @@
 import { useChatNexus } from "../../lib/contexts/ChatNexusContext";
 import { LayoutSelector } from "./LayoutSelector";
+import { TierSelector } from "./TierSelector";
 
 export function ChatNexusHeader() {
   const { currentConversationId, conversations } = useChatNexus();
@@ -17,6 +18,7 @@ export function ChatNexusHeader() {
       </div>
 
       <div className="flex items-center gap-2">
+        <TierSelector />
         <LayoutSelector />
       </div>
     </div>
