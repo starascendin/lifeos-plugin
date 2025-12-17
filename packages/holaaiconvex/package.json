@@ -23,8 +23,12 @@
     "./schema": "./convex/schema.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.88",
     "@clerk/backend": "^1.21.0",
-    "convex": "^1.29.0"
+    "@convex-dev/agent": "^0.3.2",
+    "ai": "^5.0.115",
+    "convex": "^1.29.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

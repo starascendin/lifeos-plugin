@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  Bot,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -75,6 +76,7 @@ export function Sidebar() {
         { name: "Cycles", href: "/lifeos/pm/cycles", icon: RefreshCw },
       ],
     },
+    { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
     { name: "Settings", href: "/lifeos/settings", icon: Settings },
   ];
 

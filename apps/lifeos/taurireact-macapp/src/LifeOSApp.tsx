@@ -9,6 +9,7 @@ import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
 import { LifeOSPM } from "./components/lifeos/PM";
+import { LifeOSPMAI } from "./components/lifeos/PMAI";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -44,13 +45,14 @@ export default function LifeOSApp() {
         <SignedIn>
           <AuthGate>
             <Routes>
-              <Route path="/" element={<LifeOSDashboard />} />
-              <Route path="/chatnexus" element={<LifeOSChatNexus />} />
-              <Route path="/pm" element={<LifeOSPM />} />
-              <Route path="/pm/:view" element={<LifeOSPM />} />
-              <Route path="/pm/:view/:id" element={<LifeOSPM />} />
-              <Route path="/settings" element={<LifeOSSettings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route index element={<LifeOSDashboard />} />
+              <Route path="chatnexus" element={<LifeOSChatNexus />} />
+              <Route path="pm" element={<LifeOSPM />} />
+              <Route path="pm/:view" element={<LifeOSPM />} />
+              <Route path="pm/:view/:id" element={<LifeOSPM />} />
+              <Route path="pm-ai" element={<LifeOSPMAI />} />
+              <Route path="settings" element={<LifeOSSettings />} />
+              <Route path="*" element={<Navigate to="/lifeos" replace />} />
             </Routes>
           </AuthGate>
         </SignedIn>
