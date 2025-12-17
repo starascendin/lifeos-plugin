@@ -3,11 +3,13 @@ import ReactDOM from "react-dom/client";
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { initClerk } from "tauri-plugin-clerk";
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
 import LifeOSApp from "./LifeOSApp";
 import "./App.css";
+
+// Check if running in Tauri
+const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -20,21 +22,31 @@ if (!import.meta.env.VITE_CONVEX_URL) {
   throw new Error("Missing VITE_CONVEX_URL environment variable");
 }
 
-// Initialize Clerk for Tauri (patches fetch to route through Rust)
-// IMPORTANT: Pass the Clerk instance from initClerk to ClerkProvider
-// Otherwise ClerkProvider creates its own instance without the Tauri fetch patching
-initClerk(clerkPublishableKey).then((clerk) => {
+async function initializeApp() {
+  let clerkInstance = undefined;
+
+  // Only use tauri-plugin-clerk when running in Tauri
+  // It patches fetch to route through Rust for proper cookie handling
+  if (isTauri) {
+    const { initClerk } = await import("tauri-plugin-clerk");
+    clerkInstance = await initClerk(clerkPublishableKey);
+  }
+
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <ClerkProvider
-        Clerk={clerk as any}
+        {...(clerkInstance ? { Clerk: clerkInstance as any } : {})}
         publishableKey={clerkPublishableKey}
-        allowedRedirectProtocols={["tauri:"]}
+        allowedRedirectProtocols={isTauri ? ["tauri:"] : undefined}
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
           <HashRouter>
             <Routes>
-              <Route path="/" element={<App />} />
+              {/* On web, redirect / to /lifeos. On Tauri, show menu bar app */}
+              <Route
+                path="/"
+                element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
+              />
               <Route path="/lifeos/*" element={<LifeOSApp />} />
             </Routes>
           </HashRouter>
@@ -42,6 +54,8 @@ initClerk(clerkPublishableKey).then((clerk) => {
       </ClerkProvider>
     </React.StrictMode>
   );
-}).catch((err) => {
-  console.error("Failed to initialize Clerk:", err);
+}
+
+initializeApp().catch((err) => {
+  console.error("Failed to initialize app:", err);
 });
