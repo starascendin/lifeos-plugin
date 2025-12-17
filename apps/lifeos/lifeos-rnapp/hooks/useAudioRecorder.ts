@@ -60,6 +60,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
       });
 
       const { recording } = await Audio.Recording.createAsync(
@@ -121,6 +122,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
+        staysActiveInBackground: true,
       });
 
       recordingRef.current = null;
@@ -152,6 +154,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
+        staysActiveInBackground: true,
       });
 
       recordingRef.current = null;

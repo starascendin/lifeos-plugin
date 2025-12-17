@@ -57,6 +57,7 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
           playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
         });
 
         const { sound } = await Audio.Sound.createAsync(
