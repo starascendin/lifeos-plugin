@@ -17,17 +17,30 @@ import { cn } from "@/lib/utils";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Circle,
+  Kanban,
   LayoutDashboard,
+  ListTodo,
   LogOut,
   MessageSquare,
   Moon,
+  FolderKanban,
+  RefreshCw,
   Settings,
   Sun,
   User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children?: { name: string; href: string; icon?: React.ComponentType<{ className?: string }> }[];
+}
 
 export function Sidebar() {
   const location = useLocation();
@@ -37,14 +50,31 @@ export function Sidebar() {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<string[]>(["Projects"]);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const navigation = [
+  const toggleSection = (name: string) => {
+    setExpandedSections((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
+
+  const navigation: NavItem[] = [
     { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
     { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
+    {
+      name: "Projects",
+      href: "/lifeos/pm",
+      icon: Kanban,
+      children: [
+        { name: "All Issues", href: "/lifeos/pm", icon: ListTodo },
+        { name: "Projects", href: "/lifeos/pm/projects", icon: FolderKanban },
+        { name: "Cycles", href: "/lifeos/pm/cycles", icon: RefreshCw },
+      ],
+    },
     { name: "Settings", href: "/lifeos/settings", icon: Settings },
   ];
 
@@ -96,6 +126,62 @@ export function Sidebar() {
             const isActive =
               pathname === item.href ||
               (item.href !== "/lifeos" && pathname?.startsWith(`${item.href}/`));
+            const hasChildren = item.children && item.children.length > 0;
+            const isExpanded = expandedSections.includes(item.name);
+
+            // For items with children, render expandable section
+            if (hasChildren && !isCollapsed) {
+              return (
+                <div key={item.name} className="space-y-1">
+                  <button
+                    onClick={() => toggleSection(item.name)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-md font-medium text-sm transition-colors",
+                      "gap-3 px-3 py-2",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="h-5 w-5 flex-shrink-0" />
+                      <span>{item.name}</span>
+                    </div>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 transition-transform",
+                        isExpanded && "rotate-180"
+                      )}
+                    />
+                  </button>
+                  {isExpanded && (
+                    <div className="ml-4 space-y-1 border-l border-sidebar-border pl-2">
+                      {item.children!.map((child) => {
+                        const isChildActive = pathname === child.href;
+                        const ChildIcon = child.icon || Circle;
+                        return (
+                          <Link
+                            key={child.name}
+                            to={child.href}
+                            className={cn(
+                              "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
+                              isChildActive
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            )}
+                          >
+                            <ChildIcon className="h-4 w-4 flex-shrink-0" />
+                            <span>{child.name}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Regular nav item or collapsed mode
             const linkContent = (
               <Link
                 key={item.name}

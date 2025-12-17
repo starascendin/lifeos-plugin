@@ -1,16 +1,19 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { chatnexusTables } from "./chatnexus_schema";
+import { pmTables } from "./pm_schema";
 
 /**
  * LifeOS Tables
  *
  * Tables for the LifeOS personal productivity app.
- * All table names are prefixed with `life_` or `lifeos_chatnexus` to avoid conflicts.
+ * All table names are prefixed with `life_` or `lifeos_chatnexus` or `lifeos_pm` to avoid conflicts.
  */
 export const lifeosTables = {
   // Chat Nexus tables
   ...chatnexusTables,
+  // Project Management tables
+  ...pmTables,
   // ==================== YOUTUBE PLAYLISTS ====================
   life_youtubePlaylists: defineTable({
     // User who owns this playlist sync

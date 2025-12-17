@@ -1,0 +1,165 @@
+import { defineTable } from "convex/server";
+import { v } from "convex/values";
+
+/**
+ * Project Management Tables
+ *
+ * Linear-like project management for LifeOS.
+ * All table names are prefixed with `lifeos_pm` to avoid conflicts.
+ */
+
+// ==================== SHARED VALIDATORS ====================
+
+export const priorityValidator = v.union(
+  v.literal("urgent"),
+  v.literal("high"),
+  v.literal("medium"),
+  v.literal("low"),
+  v.literal("none")
+);
+
+export const issueStatusValidator = v.union(
+  v.literal("backlog"),
+  v.literal("todo"),
+  v.literal("in_progress"),
+  v.literal("in_review"),
+  v.literal("done"),
+  v.literal("cancelled")
+);
+
+export const projectStatusValidator = v.union(
+  v.literal("planned"),
+  v.literal("in_progress"),
+  v.literal("paused"),
+  v.literal("completed"),
+  v.literal("cancelled")
+);
+
+export const projectHealthValidator = v.union(
+  v.literal("on_track"),
+  v.literal("at_risk"),
+  v.literal("off_track")
+);
+
+export const cycleStatusValidator = v.union(
+  v.literal("upcoming"),
+  v.literal("active"),
+  v.literal("completed")
+);
+
+// ==================== TABLE DEFINITIONS ====================
+
+export const pmTables = {
+  // ==================== PROJECTS ====================
+  lifeos_pmProjects: defineTable({
+    userId: v.id("users"),
+    // Project identification
+    key: v.string(), // Short key like "PROJ", "LIFE" (auto-generated from name)
+    name: v.string(),
+    description: v.optional(v.string()),
+    // Visual
+    icon: v.optional(v.string()), // Emoji or icon name
+    color: v.optional(v.string()), // Hex color
+    // Status and tracking
+    status: projectStatusValidator,
+    health: projectHealthValidator,
+    priority: priorityValidator,
+    // Dates
+    startDate: v.optional(v.number()), // Unix timestamp
+    targetDate: v.optional(v.number()), // Target completion date
+    completedAt: v.optional(v.number()),
+    // Computed (denormalized for performance)
+    issueCount: v.number(),
+    completedIssueCount: v.number(),
+    // Next issue number (for auto-incrementing)
+    nextIssueNumber: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    archivedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_archived", ["userId", "archivedAt"])
+    .index("by_key", ["userId", "key"]),
+
+  // ==================== CYCLES/SPRINTS ====================
+  lifeos_pmCycles: defineTable({
+    userId: v.id("users"),
+    projectId: v.optional(v.id("lifeos_pmProjects")), // Optional: cycles can be project-wide or standalone
+    // Cycle identification
+    number: v.number(), // Cycle number (1, 2, 3...)
+    name: v.optional(v.string()), // Optional custom name
+    description: v.optional(v.string()),
+    // Date range
+    startDate: v.number(),
+    endDate: v.number(),
+    // Status
+    status: cycleStatusValidator,
+    // Goals for the cycle
+    goals: v.optional(v.array(v.string())),
+    // Computed (denormalized)
+    issueCount: v.number(),
+    completedIssueCount: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_dates", ["userId", "startDate", "endDate"]),
+
+  // ==================== ISSUES/TASKS ====================
+  lifeos_pmIssues: defineTable({
+    userId: v.id("users"),
+    projectId: v.optional(v.id("lifeos_pmProjects")),
+    cycleId: v.optional(v.id("lifeos_pmCycles")),
+    parentId: v.optional(v.id("lifeos_pmIssues")), // For sub-issues
+    // Issue identification
+    identifier: v.string(), // e.g., "PROJ-123" (project key + number)
+    number: v.number(), // Sequential number within project
+    // Content
+    title: v.string(),
+    description: v.optional(v.string()), // Markdown supported
+    // Status and priority
+    status: issueStatusValidator,
+    priority: priorityValidator,
+    // Estimation
+    estimate: v.optional(v.number()), // Story points or hours
+    // Labels (stored as array of label IDs)
+    labelIds: v.array(v.id("lifeos_pmLabels")),
+    // Dates
+    dueDate: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    // Ordering for manual sorting within columns
+    sortOrder: v.number(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
+    .index("by_cycle", ["cycleId"])
+    .index("by_parent", ["parentId"])
+    .index("by_status", ["userId", "status"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_identifier", ["userId", "identifier"])
+    .index("by_project_number", ["projectId", "number"])
+    .index("by_sort_order", ["userId", "status", "sortOrder"]),
+
+  // ==================== LABELS ====================
+  lifeos_pmLabels: defineTable({
+    userId: v.id("users"),
+    projectId: v.optional(v.id("lifeos_pmProjects")), // null = workspace-wide label
+    name: v.string(),
+    color: v.string(), // Hex color
+    description: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
+    .index("by_name", ["userId", "name"]),
+};
