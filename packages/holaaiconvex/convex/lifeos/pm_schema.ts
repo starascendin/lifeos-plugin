@@ -102,8 +102,6 @@ export const pmTables = {
     completedIssueCount: v.number(),
     // Next issue number (for auto-incrementing)
     nextIssueNumber: v.number(),
-    // Cycle settings (per-project configuration)
-    cycleSettings: v.optional(cycleSettingsValidator),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -246,4 +244,14 @@ export const pmTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_date", ["userId", "date"]),
+
+  // ==================== USER SETTINGS ====================
+  lifeos_pmUserSettings: defineTable({
+    userId: v.id("users"),
+    // Cycle settings (global)
+    cycleSettings: v.optional(cycleSettingsValidator),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 };

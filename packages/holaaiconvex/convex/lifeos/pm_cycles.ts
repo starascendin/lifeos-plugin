@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query, internalMutation } from "../_generated/server";
 import { requireUser } from "../_lib/auth";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import {
   cycleStatusValidator,
   cycleRetrospectiveValidator,
@@ -372,11 +372,10 @@ export const updateCycleCounts = mutation({
 });
 
 /**
- * Generate multiple cycles for a project based on its cycle settings
+ * Generate multiple cycles based on global user settings
  */
 export const generateCycles = mutation({
   args: {
-    projectId: v.id("lifeos_pmProjects"),
     count: v.optional(v.number()), // Override default count
     startFrom: v.optional(v.number()), // Override start date (timestamp)
   },
@@ -384,17 +383,17 @@ export const generateCycles = mutation({
     const user = await requireUser(ctx);
     const now = Date.now();
 
-    // Get project with cycleSettings
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.userId !== user._id) {
-      throw new Error("Project not found or access denied");
-    }
+    // Get user settings for cycle configuration
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
 
-    // Use project settings or defaults
-    const duration = project.cycleSettings?.duration ?? "2_weeks";
-    const startDay = project.cycleSettings?.startDay ?? "monday";
+    // Use user settings or defaults
+    const duration = userSettings?.cycleSettings?.duration ?? "2_weeks";
+    const startDay = userSettings?.cycleSettings?.startDay ?? "monday";
     const count =
-      args.count ?? project.cycleSettings?.defaultCyclesToCreate ?? 4;
+      args.count ?? userSettings?.cycleSettings?.defaultCyclesToCreate ?? 4;
 
     // Calculate duration in milliseconds
     const durationMs =
@@ -421,10 +420,10 @@ export const generateCycles = mutation({
     startDateObj.setHours(0, 0, 0, 0);
     startDate = startDateObj.getTime();
 
-    // Get existing max cycle number for this project
+    // Get existing max cycle number globally for this user
     const existingCycles = await ctx.db
       .query("lifeos_pmCycles")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
     let nextNumber =
       existingCycles.reduce((max, c) => Math.max(max, c.number), 0) + 1;
@@ -445,7 +444,6 @@ export const generateCycles = mutation({
 
       const cycleId = await ctx.db.insert("lifeos_pmCycles", {
         userId: user._id,
-        projectId: args.projectId,
         number: nextNumber++,
         startDate: cycleStartDate,
         endDate: cycleEndDate,
@@ -459,5 +457,275 @@ export const generateCycles = mutation({
     }
 
     return cycleIds;
+  },
+});
+
+/**
+ * Ensure there are upcoming cycles - auto-generate if needed
+ * Called on app load and by cron job
+ * Returns the number of cycles generated (0 if none needed)
+ */
+export const ensureUpcomingCycles = mutation({
+  args: {
+    minUpcoming: v.optional(v.number()), // Minimum upcoming cycles to maintain (default: 2)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+    const minUpcoming = args.minUpcoming ?? 2;
+
+    // Get user settings
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    // If no settings configured, don't auto-generate
+    if (!userSettings?.cycleSettings) {
+      return { generated: 0, reason: "no_settings" };
+    }
+
+    // Count upcoming cycles
+    const upcomingCycles = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", user._id).eq("status", "upcoming")
+      )
+      .collect();
+
+    // If we have enough upcoming cycles, no need to generate
+    if (upcomingCycles.length >= minUpcoming) {
+      return { generated: 0, reason: "sufficient_cycles" };
+    }
+
+    // Calculate how many cycles to generate
+    const cyclesToGenerate = userSettings.cycleSettings.defaultCyclesToCreate;
+
+    // Find the latest cycle end date to start from
+    const allCycles = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    let startFrom: number | undefined;
+    if (allCycles.length > 0) {
+      const latestEndDate = Math.max(...allCycles.map((c) => c.endDate));
+      // Start from the day after the latest cycle ends
+      startFrom = latestEndDate + 1;
+    }
+
+    // Use settings
+    const duration = userSettings.cycleSettings.duration;
+    const startDay = userSettings.cycleSettings.startDay;
+
+    // Calculate duration in milliseconds
+    const durationMs =
+      duration === "1_week"
+        ? 7 * 24 * 60 * 60 * 1000
+        : 14 * 24 * 60 * 60 * 1000;
+
+    // Find next start date based on startDay
+    let startDate = startFrom ?? now;
+    const targetDayNum = startDay === "sunday" ? 0 : 1;
+    const currentDate = new Date(startDate);
+    const currentDay = currentDate.getDay();
+    const daysUntilTarget = (targetDayNum - currentDay + 7) % 7;
+
+    // If today is the target day and no startFrom provided, use next week
+    if (daysUntilTarget === 0 && !startFrom) {
+      startDate += 7 * 24 * 60 * 60 * 1000;
+    } else if (daysUntilTarget > 0) {
+      startDate += daysUntilTarget * 24 * 60 * 60 * 1000;
+    }
+
+    // Normalize to start of day (midnight)
+    const startDateObj = new Date(startDate);
+    startDateObj.setHours(0, 0, 0, 0);
+    startDate = startDateObj.getTime();
+
+    // Get existing max cycle number
+    let nextNumber =
+      allCycles.reduce((max, c) => Math.max(max, c.number), 0) + 1;
+
+    // Generate cycles
+    const cycleIds = [];
+    for (let i = 0; i < cyclesToGenerate; i++) {
+      const cycleStartDate = startDate + i * durationMs;
+      const cycleEndDate = cycleStartDate + durationMs - 1;
+
+      // Determine status based on current date
+      let status: "upcoming" | "active" | "completed" = "upcoming";
+      if (now >= cycleStartDate && now <= cycleEndDate) {
+        status = "active";
+      } else if (now > cycleEndDate) {
+        status = "completed";
+      }
+
+      const cycleId = await ctx.db.insert("lifeos_pmCycles", {
+        userId: user._id,
+        number: nextNumber++,
+        startDate: cycleStartDate,
+        endDate: cycleEndDate,
+        status,
+        issueCount: 0,
+        completedIssueCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      cycleIds.push(cycleId);
+    }
+
+    return { generated: cycleIds.length, reason: "auto_generated", cycleIds };
+  },
+});
+
+// ==================== INTERNAL MUTATIONS (for cron jobs) ====================
+
+/**
+ * Internal: Process a single user for cycle auto-generation
+ * Called by the cron job
+ */
+export const _autoGenerateCyclesForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    minUpcoming: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Get user settings
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    // If no settings configured, skip
+    if (!userSettings?.cycleSettings) {
+      return { generated: 0, reason: "no_settings" };
+    }
+
+    // First, update cycle statuses based on current date
+    const allCycles = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const cycle of allCycles) {
+      let newStatus: "upcoming" | "active" | "completed" = cycle.status;
+
+      if (now < cycle.startDate) {
+        newStatus = "upcoming";
+      } else if (now >= cycle.startDate && now <= cycle.endDate) {
+        newStatus = "active";
+      } else if (now > cycle.endDate) {
+        newStatus = "completed";
+      }
+
+      if (newStatus !== cycle.status) {
+        await ctx.db.patch(cycle._id, {
+          status: newStatus,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Count upcoming cycles (after status update)
+    const upcomingCycles = allCycles.filter(
+      (c) => now < c.startDate || (now >= c.startDate && now <= c.endDate && c.status !== "completed")
+    );
+    const actualUpcoming = upcomingCycles.filter((c) => now < c.startDate);
+
+    // If we have enough upcoming cycles, no need to generate
+    if (actualUpcoming.length >= args.minUpcoming) {
+      return { generated: 0, reason: "sufficient_cycles" };
+    }
+
+    // Calculate how many cycles to generate
+    const cyclesToGenerate = userSettings.cycleSettings.defaultCyclesToCreate;
+
+    // Find the latest cycle end date to start from
+    let startFrom: number | undefined;
+    if (allCycles.length > 0) {
+      const latestEndDate = Math.max(...allCycles.map((c) => c.endDate));
+      startFrom = latestEndDate + 1;
+    }
+
+    // Use settings
+    const duration = userSettings.cycleSettings.duration;
+    const startDay = userSettings.cycleSettings.startDay;
+
+    // Calculate duration in milliseconds
+    const durationMs =
+      duration === "1_week"
+        ? 7 * 24 * 60 * 60 * 1000
+        : 14 * 24 * 60 * 60 * 1000;
+
+    // Find next start date based on startDay
+    let startDate = startFrom ?? now;
+    const targetDayNum = startDay === "sunday" ? 0 : 1;
+    const currentDate = new Date(startDate);
+    const currentDay = currentDate.getDay();
+    const daysUntilTarget = (targetDayNum - currentDay + 7) % 7;
+
+    if (daysUntilTarget === 0 && !startFrom) {
+      startDate += 7 * 24 * 60 * 60 * 1000;
+    } else if (daysUntilTarget > 0) {
+      startDate += daysUntilTarget * 24 * 60 * 60 * 1000;
+    }
+
+    // Normalize to start of day (midnight)
+    const startDateObj = new Date(startDate);
+    startDateObj.setHours(0, 0, 0, 0);
+    startDate = startDateObj.getTime();
+
+    // Get existing max cycle number
+    let nextNumber =
+      allCycles.reduce((max, c) => Math.max(max, c.number), 0) + 1;
+
+    // Generate cycles
+    let generated = 0;
+    for (let i = 0; i < cyclesToGenerate; i++) {
+      const cycleStartDate = startDate + i * durationMs;
+      const cycleEndDate = cycleStartDate + durationMs - 1;
+
+      let status: "upcoming" | "active" | "completed" = "upcoming";
+      if (now >= cycleStartDate && now <= cycleEndDate) {
+        status = "active";
+      } else if (now > cycleEndDate) {
+        status = "completed";
+      }
+
+      await ctx.db.insert("lifeos_pmCycles", {
+        userId: args.userId,
+        number: nextNumber++,
+        startDate: cycleStartDate,
+        endDate: cycleEndDate,
+        status,
+        issueCount: 0,
+        completedIssueCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      generated++;
+    }
+
+    return { generated, reason: "auto_generated" };
+  },
+});
+
+/**
+ * Internal: Get all users with cycle settings for cron processing
+ */
+export const _getUsersWithCycleSettings = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .collect();
+
+    // Return user IDs that have cycle settings configured
+    return allSettings
+      .filter((s) => s.cycleSettings)
+      .map((s) => s.userId);
   },
 });

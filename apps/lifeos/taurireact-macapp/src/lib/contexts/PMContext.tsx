@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id, Doc } from "@holaai/convex";
@@ -76,11 +76,13 @@ interface PMContextValue {
   issuesByStatus:
     | Record<IssueStatus, Doc<"lifeos_pmIssues">[]>
     | undefined;
+  userSettings: Doc<"lifeos_pmUserSettings"> | null | undefined;
 
   // Loading states
   isLoadingProjects: boolean;
   isLoadingCycles: boolean;
   isLoadingIssues: boolean;
+  isLoadingUserSettings: boolean;
 
   // Mutations
   createProject: ReturnType<typeof useMutation>;
@@ -99,6 +101,9 @@ interface PMContextValue {
   generateCycles: ReturnType<typeof useMutation>;
 
   createLabel: ReturnType<typeof useMutation>;
+
+  updateUserSettings: ReturnType<typeof useMutation>;
+  ensureUpcomingCycles: ReturnType<typeof useMutation>;
 }
 
 const PMContext = createContext<PMContextValue | null>(null);
@@ -121,6 +126,7 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
     projectId: filters.projectId,
     cycleId: filters.cycleId,
   });
+  const userSettings = useQuery(api.lifeos.pm_user_settings.getUserSettings, {});
 
   // Mutations - Projects
   const createProject = useMutation(api.lifeos.pm_projects.createProject);
@@ -142,6 +148,26 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
 
   // Mutations - Labels
   const createLabel = useMutation(api.lifeos.pm_labels.createLabel);
+
+  // Mutations - User Settings
+  const updateUserSettings = useMutation(api.lifeos.pm_user_settings.updateUserSettings);
+
+  // Mutations - Cycle Auto-generation
+  const ensureUpcomingCycles = useMutation(api.lifeos.pm_cycles.ensureUpcomingCycles);
+
+  // Auto-check and generate cycles on load (only once)
+  const hasCheckedCycles = useRef(false);
+  useEffect(() => {
+    if (userSettings !== undefined && !hasCheckedCycles.current) {
+      hasCheckedCycles.current = true;
+      // Only run if user has cycle settings configured
+      if (userSettings?.cycleSettings) {
+        ensureUpcomingCycles({ minUpcoming: 2 }).catch((err) => {
+          console.error("Failed to ensure upcoming cycles:", err);
+        });
+      }
+    }
+  }, [userSettings, ensureUpcomingCycles]);
 
   const setFilters = useCallback((newFilters: FilterState) => {
     setFiltersState(newFilters);
@@ -170,9 +196,11 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
     currentCycle,
     labels,
     issuesByStatus,
+    userSettings,
     isLoadingProjects: projects === undefined,
     isLoadingCycles: cycles === undefined,
     isLoadingIssues: issuesByStatus === undefined,
+    isLoadingUserSettings: userSettings === undefined,
     createProject,
     updateProject,
     archiveProject,
@@ -186,6 +214,8 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
     deleteCycle,
     generateCycles,
     createLabel,
+    updateUserSettings,
+    ensureUpcomingCycles,
   };
 
   return <PMContext.Provider value={value}>{children}</PMContext.Provider>;

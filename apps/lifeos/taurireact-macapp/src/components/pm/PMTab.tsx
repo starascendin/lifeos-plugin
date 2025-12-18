@@ -14,11 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Kanban, FolderKanban, RefreshCw } from "lucide-react";
+import { Plus, Filter, Kanban, FolderKanban, RefreshCw, Settings } from "lucide-react";
 import { useState } from "react";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { CreateIssueDialog } from "./CreateIssueDialog";
 import { CreateCycleDialog } from "./CreateCycleDialog";
+import { CycleSettingsModal } from "./CycleSettingsModal";
 import { PomodoroWidget, PomodoroStatsMini } from "./pomodoro";
 import type { Id } from "@holaai/convex";
 
@@ -32,6 +33,7 @@ export function PMTab() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateIssue, setShowCreateIssue] = useState(false);
   const [showCreateCycle, setShowCreateCycle] = useState(false);
+  const [showCycleSettings, setShowCycleSettings] = useState(false);
 
   // Determine current view from URL
   const currentView: ViewType =
@@ -136,10 +138,20 @@ export function PMTab() {
             </Button>
           )}
           {currentView === "cycles" && (
-            <Button onClick={() => setShowCreateCycle(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Cycle
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowCycleSettings(true)}
+                title="Cycle Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <Button onClick={() => setShowCreateCycle(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Cycle
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -170,6 +182,10 @@ export function PMTab() {
       <CreateCycleDialog
         open={showCreateCycle}
         onOpenChange={setShowCreateCycle}
+      />
+      <CycleSettingsModal
+        open={showCycleSettings}
+        onOpenChange={setShowCycleSettings}
       />
 
       {/* Issue Detail Panel */}
