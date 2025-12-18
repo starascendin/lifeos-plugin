@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { RefreshCw, Wand2 } from "lucide-react";
 
 interface CycleSettingsModalProps {
@@ -30,12 +29,11 @@ export function CycleSettingsModal({
   open,
   onOpenChange,
 }: CycleSettingsModalProps) {
-  const { userSettings, updateUserSettings, generateCycles, ensureUpcomingCycles, isLoadingUserSettings } = usePM();
+  const { userSettings, updateUserSettings, generateCycles, isLoadingUserSettings } = usePM();
 
   const [duration, setDuration] = useState<CycleDuration>("2_weeks");
   const [startDay, setStartDay] = useState<CycleStartDay>("monday");
   const [defaultCyclesToCreate, setDefaultCyclesToCreate] = useState(4);
-  const [autoEnsureCycles, setAutoEnsureCycles] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [cyclesToGenerate, setCyclesToGenerate] = useState(4);
@@ -60,10 +58,6 @@ export function CycleSettingsModal({
           defaultCyclesToCreate,
         },
       });
-      // Auto-ensure cycles if enabled
-      if (autoEnsureCycles) {
-        await ensureUpcomingCycles({ minUpcoming: 2 });
-      }
     } catch (error) {
       console.error("Failed to save settings:", error);
     } finally {
@@ -172,23 +166,6 @@ export function CycleSettingsModal({
               <p className="text-xs text-muted-foreground">
                 Number of cycles to create when generating (1-12)
               </p>
-            </div>
-
-            {/* Auto-ensure cycles toggle */}
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div className="space-y-0.5">
-                <Label htmlFor="autoEnsure" className="text-sm font-medium">
-                  Auto-generate when low
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Automatically create cycles when running low on upcoming ones
-                </p>
-              </div>
-              <Switch
-                id="autoEnsure"
-                checked={autoEnsureCycles}
-                onCheckedChange={setAutoEnsureCycles}
-              />
             </div>
 
             <Button

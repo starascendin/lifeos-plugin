@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { X, Trash2, RefreshCw, Clock, Play, CheckCircle } from "lucide-react";
@@ -8,6 +8,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -52,6 +62,9 @@ export function CycleDetailPanel() {
     deleteCycle,
   } = usePM();
 
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const cycle = useQuery(
     api.lifeos.pm_cycles.getCycle,
     selectedCycleForDetail ? { cycleId: selectedCycleForDetail } : "skip"
@@ -87,17 +100,24 @@ export function CycleDetailPanel() {
     await updateCycle({ cycleId: selectedCycleForDetail, retrospective });
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!selectedCycleForDetail) return;
-    if (
-      !confirm(
-        "Are you sure you want to delete this cycle? Issues will be unassigned from this cycle."
-      )
-    )
-      return;
+    setShowDeleteDialog(true);
+  };
 
-    await deleteCycle({ cycleId: selectedCycleForDetail });
-    setSelectedCycleForDetail(null);
+  const handleConfirmDelete = async () => {
+    if (!selectedCycleForDetail) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteCycle({ cycleId: selectedCycleForDetail });
+      setShowDeleteDialog(false);
+      setSelectedCycleForDetail(null);
+    } catch (error) {
+      console.error("Failed to delete cycle:", error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const formatDate = (timestamp: number) => {
@@ -114,6 +134,7 @@ export function CycleDetailPanel() {
   };
 
   return (
+    <>
     <Sheet
       open={!!selectedCycleForDetail}
       onOpenChange={(open) => !open && handleClose()}
@@ -126,10 +147,11 @@ export function CycleDetailPanel() {
           </SheetTitle>
           <div className="flex items-center gap-1">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -237,5 +259,29 @@ export function CycleDetailPanel() {
         )}
       </SheetContent>
     </Sheet>
+
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Cycle</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this cycle? Issues will be
+            unassigned from this cycle but not deleted.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmDelete}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }

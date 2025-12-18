@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id, Doc } from "@holaai/convex";
@@ -152,22 +152,8 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
   // Mutations - User Settings
   const updateUserSettings = useMutation(api.lifeos.pm_user_settings.updateUserSettings);
 
-  // Mutations - Cycle Auto-generation
+  // Mutations - Cycle Auto-generation (used by cron, available for manual trigger if needed)
   const ensureUpcomingCycles = useMutation(api.lifeos.pm_cycles.ensureUpcomingCycles);
-
-  // Auto-check and generate cycles on load (only once)
-  const hasCheckedCycles = useRef(false);
-  useEffect(() => {
-    if (userSettings !== undefined && !hasCheckedCycles.current) {
-      hasCheckedCycles.current = true;
-      // Only run if user has cycle settings configured
-      if (userSettings?.cycleSettings) {
-        ensureUpcomingCycles({ minUpcoming: 2 }).catch((err) => {
-          console.error("Failed to ensure upcoming cycles:", err);
-        });
-      }
-    }
-  }, [userSettings, ensureUpcomingCycles]);
 
   const setFilters = useCallback((newFilters: FilterState) => {
     setFiltersState(newFilters);
