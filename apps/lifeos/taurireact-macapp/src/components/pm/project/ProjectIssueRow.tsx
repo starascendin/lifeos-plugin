@@ -1,6 +1,7 @@
 import { Calendar } from "lucide-react";
 import { usePM, STATUS_CONFIG, PRIORITY_CONFIG, IssueStatus, Priority } from "@/lib/contexts/PMContext";
 import { StatusSelect, PrioritySelect, LabelDisplay } from "../shared";
+import { StartPomodoroButton } from "../pomodoro";
 import { cn } from "@/lib/utils";
 import type { Doc } from "@holaai/convex";
 
@@ -33,10 +34,18 @@ export function ProjectIssueRow({ issue, isSelected }: ProjectIssueRowProps) {
     <div
       onClick={() => setSelectedIssueId(issue._id)}
       className={cn(
-        "grid grid-cols-[80px,1fr,130px,100px,100px] items-center gap-4 px-4 py-2.5 border-b border-border cursor-pointer transition-colors hover:bg-muted/50",
+        "grid grid-cols-[32px,80px,1fr,130px,100px,100px] items-center gap-4 px-4 py-2.5 border-b border-border cursor-pointer transition-colors hover:bg-muted/50",
         isSelected && "bg-muted"
       )}
     >
+      {/* Pomodoro Button */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <StartPomodoroButton issueId={issue._id} size="sm" />
+      </div>
+
       {/* Identifier */}
       <div className="text-xs font-medium text-muted-foreground">
         {issue.identifier}

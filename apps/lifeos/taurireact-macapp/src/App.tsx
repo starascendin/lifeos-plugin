@@ -4,6 +4,7 @@ import { AuthGate } from "./components/auth/AuthGate";
 import { SignIn } from "./components/auth/SignIn";
 import { MainContent } from "./components/MainContent";
 import { SyncProvider } from "./lib/contexts/SyncContext";
+import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import "./App.css";
 
@@ -41,9 +42,11 @@ function App() {
       </SignedOut>
       <SignedIn>
         <AuthGate>
-          <SyncProvider>
-            <MainContent />
-          </SyncProvider>
+          <PomodoroProvider>
+            <SyncProvider>
+              <MainContent />
+            </SyncProvider>
+          </PomodoroProvider>
         </AuthGate>
       </SignedIn>
     </ThemeProvider>

@@ -25,7 +25,7 @@ const STATUS_CONFIG: Record<CycleStatus, { label: string; icon: LucideIcon; colo
 };
 
 export function CycleList() {
-  const { cycles, isLoadingCycles, currentCycle } = usePM();
+  const { cycles, isLoadingCycles, setSelectedCycleForDetail } = usePM();
 
   if (isLoadingCycles) {
     return (
@@ -84,7 +84,8 @@ export function CycleList() {
             return (
               <div
                 key={cycle._id}
-                className="rounded-lg border-2 border-green-500/30 bg-green-500/5 p-6"
+                onClick={() => setSelectedCycleForDetail(cycle._id)}
+                className="cursor-pointer rounded-lg border-2 border-green-500/30 bg-green-500/5 p-6 transition-colors hover:bg-green-500/10"
               >
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -155,7 +156,8 @@ export function CycleList() {
               return (
                 <div
                   key={cycle._id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
+                  onClick={() => setSelectedCycleForDetail(cycle._id)}
+                  className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -207,7 +209,8 @@ export function CycleList() {
               return (
                 <div
                   key={cycle._id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-card/50 p-4 opacity-70"
+                  onClick={() => setSelectedCycleForDetail(cycle._id)}
+                  className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-card/50 p-4 opacity-70 transition-opacity hover:opacity-100"
                 >
                   <div className="flex items-center gap-3">
                     <div

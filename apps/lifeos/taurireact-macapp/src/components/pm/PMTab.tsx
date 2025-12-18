@@ -5,6 +5,7 @@ import { ProjectList } from "./ProjectList";
 import { CycleList } from "./CycleList";
 import { ProjectDetailView } from "./project/ProjectDetailView";
 import { IssueDetailPanel } from "./issue/IssueDetailPanel";
+import { CycleDetailPanel } from "./cycle/CycleDetailPanel";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -18,6 +19,7 @@ import { useState } from "react";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { CreateIssueDialog } from "./CreateIssueDialog";
 import { CreateCycleDialog } from "./CreateCycleDialog";
+import { PomodoroWidget, PomodoroStatsMini } from "./pomodoro";
 import type { Id } from "@holaai/convex";
 
 type ViewType = "board" | "projects" | "cycles";
@@ -87,7 +89,13 @@ export function PMTab() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Pomodoro Widget */}
+          <PomodoroWidget />
+
+          {/* Pomodoro Stats Mini (when idle) */}
+          <PomodoroStatsMini />
+
           {/* Project Filter (for board view) */}
           {currentView === "board" && projects && projects.length > 0 && (
             <Select
@@ -166,6 +174,9 @@ export function PMTab() {
 
       {/* Issue Detail Panel */}
       <IssueDetailPanel />
+
+      {/* Cycle Detail Panel */}
+      <CycleDetailPanel />
     </div>
   );
 }

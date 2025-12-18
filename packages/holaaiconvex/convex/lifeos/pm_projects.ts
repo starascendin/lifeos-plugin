@@ -6,6 +6,7 @@ import {
   priorityValidator,
   projectStatusValidator,
   projectHealthValidator,
+  cycleSettingsValidator,
 } from "./pm_schema";
 
 // ==================== HELPERS ====================
@@ -210,6 +211,7 @@ export const updateProject = mutation({
     priority: v.optional(priorityValidator),
     startDate: v.optional(v.number()),
     targetDate: v.optional(v.number()),
+    cycleSettings: v.optional(cycleSettingsValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -238,6 +240,8 @@ export const updateProject = mutation({
     if (args.priority !== undefined) updates.priority = args.priority;
     if (args.startDate !== undefined) updates.startDate = args.startDate;
     if (args.targetDate !== undefined) updates.targetDate = args.targetDate;
+    if (args.cycleSettings !== undefined)
+      updates.cycleSettings = args.cycleSettings;
 
     await ctx.db.patch(args.projectId, updates);
     return args.projectId;

@@ -101,7 +101,8 @@ export function ProjectIssuesList({ projectId, issues }: ProjectIssuesListProps)
       </div>
 
       {/* Table Header */}
-      <div className="grid grid-cols-[80px,1fr,130px,100px,100px] items-center gap-4 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+      <div className="grid grid-cols-[32px,80px,1fr,130px,100px,100px] items-center gap-4 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+        <div></div>
         <div>ID</div>
         <div>Title</div>
         <div>Status</div>

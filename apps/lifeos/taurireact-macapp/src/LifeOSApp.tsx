@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { SignIn } from "./components/auth/SignIn";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
+import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
@@ -44,16 +45,18 @@ export default function LifeOSApp() {
         </SignedOut>
         <SignedIn>
           <AuthGate>
-            <Routes>
-              <Route index element={<LifeOSDashboard />} />
-              <Route path="chatnexus" element={<LifeOSChatNexus />} />
-              <Route path="pm" element={<LifeOSPM />} />
-              <Route path="pm/:view" element={<LifeOSPM />} />
-              <Route path="pm/:view/:id" element={<LifeOSPM />} />
-              <Route path="pm-ai" element={<LifeOSPMAI />} />
-              <Route path="settings" element={<LifeOSSettings />} />
-              <Route path="*" element={<Navigate to="/lifeos" replace />} />
-            </Routes>
+            <PomodoroProvider>
+              <Routes>
+                <Route index element={<LifeOSDashboard />} />
+                <Route path="chatnexus" element={<LifeOSChatNexus />} />
+                <Route path="pm" element={<LifeOSPM />} />
+                <Route path="pm/:view" element={<LifeOSPM />} />
+                <Route path="pm/:view/:id" element={<LifeOSPM />} />
+                <Route path="pm-ai" element={<LifeOSPMAI />} />
+                <Route path="settings" element={<LifeOSSettings />} />
+                <Route path="*" element={<Navigate to="/lifeos" replace />} />
+              </Routes>
+            </PomodoroProvider>
           </AuthGate>
         </SignedIn>
       </TooltipProvider>

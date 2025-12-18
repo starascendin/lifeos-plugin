@@ -23,6 +23,21 @@ export type ProjectStatus =
 
 export type CycleStatus = "upcoming" | "active" | "completed";
 
+export type CycleDuration = "1_week" | "2_weeks";
+export type CycleStartDay = "sunday" | "monday";
+
+export interface CycleSettings {
+  duration: CycleDuration;
+  startDay: CycleStartDay;
+  defaultCyclesToCreate: number;
+}
+
+export interface CycleRetrospective {
+  whatWentWell?: string;
+  whatCouldImprove?: string;
+  actionItems?: string[];
+}
+
 export type ViewType = "board" | "projects" | "cycles";
 
 export interface FilterState {
@@ -45,6 +60,8 @@ interface PMContextValue {
   setSelectedCycleId: (id: Id<"lifeos_pmCycles"> | null) => void;
   selectedIssueId: Id<"lifeos_pmIssues"> | null;
   setSelectedIssueId: (id: Id<"lifeos_pmIssues"> | null) => void;
+  selectedCycleForDetail: Id<"lifeos_pmCycles"> | null;
+  setSelectedCycleForDetail: (id: Id<"lifeos_pmCycles"> | null) => void;
 
   // Filters
   filters: FilterState;
@@ -79,6 +96,7 @@ interface PMContextValue {
   createCycle: ReturnType<typeof useMutation>;
   updateCycle: ReturnType<typeof useMutation>;
   deleteCycle: ReturnType<typeof useMutation>;
+  generateCycles: ReturnType<typeof useMutation>;
 
   createLabel: ReturnType<typeof useMutation>;
 }
@@ -91,6 +109,7 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
   const [selectedProjectId, setSelectedProjectId] = useState<Id<"lifeos_pmProjects"> | null>(null);
   const [selectedCycleId, setSelectedCycleId] = useState<Id<"lifeos_pmCycles"> | null>(null);
   const [selectedIssueId, setSelectedIssueId] = useState<Id<"lifeos_pmIssues"> | null>(null);
+  const [selectedCycleForDetail, setSelectedCycleForDetail] = useState<Id<"lifeos_pmCycles"> | null>(null);
   const [filters, setFiltersState] = useState<FilterState>({});
 
   // Queries
@@ -119,6 +138,7 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
   const createCycle = useMutation(api.lifeos.pm_cycles.createCycle);
   const updateCycle = useMutation(api.lifeos.pm_cycles.updateCycle);
   const deleteCycle = useMutation(api.lifeos.pm_cycles.deleteCycle);
+  const generateCycles = useMutation(api.lifeos.pm_cycles.generateCycles);
 
   // Mutations - Labels
   const createLabel = useMutation(api.lifeos.pm_labels.createLabel);
@@ -140,6 +160,8 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
     setSelectedCycleId,
     selectedIssueId,
     setSelectedIssueId,
+    selectedCycleForDetail,
+    setSelectedCycleForDetail,
     filters,
     setFilters,
     clearFilters,
@@ -162,6 +184,7 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
     createCycle,
     updateCycle,
     deleteCycle,
+    generateCycles,
     createLabel,
   };
 

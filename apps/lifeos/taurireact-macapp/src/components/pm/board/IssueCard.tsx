@@ -4,6 +4,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import { PRIORITY_CONFIG, usePM, Priority } from "@/lib/contexts/PMContext";
 import { Calendar } from "lucide-react";
+import { StartPomodoroButton } from "../pomodoro";
 
 interface IssueCardProps {
   issue: Doc<"lifeos_pmIssues">;
@@ -79,11 +80,25 @@ export function IssueCard({ issue, isDragging }: IssueCardProps) {
           )}
         </div>
 
-        {issue.estimate && (
-          <div className="rounded bg-muted px-1.5 py-0.5 text-xs">
-            {issue.estimate}pt
+        <div className="flex items-center gap-1">
+          <div
+            onClick={(e) => {
+              console.log("[IssueCard] Wrapper onClick - stopping propagation");
+              e.stopPropagation();
+            }}
+            onPointerDown={(e) => {
+              console.log("[IssueCard] Wrapper onPointerDown - stopping propagation");
+              e.stopPropagation();
+            }}
+          >
+            <StartPomodoroButton issueId={issue._id} size="sm" />
           </div>
-        )}
+          {issue.estimate && (
+            <div className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              {issue.estimate}pt
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Labels */}

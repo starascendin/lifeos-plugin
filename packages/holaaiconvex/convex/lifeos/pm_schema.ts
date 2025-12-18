@@ -47,6 +47,35 @@ export const cycleStatusValidator = v.union(
   v.literal("completed")
 );
 
+export const cycleDurationValidator = v.union(
+  v.literal("1_week"),
+  v.literal("2_weeks")
+);
+
+export const cycleStartDayValidator = v.union(
+  v.literal("sunday"),
+  v.literal("monday")
+);
+
+export const cycleSettingsValidator = v.object({
+  duration: cycleDurationValidator,
+  startDay: cycleStartDayValidator,
+  defaultCyclesToCreate: v.number(),
+});
+
+export const cycleRetrospectiveValidator = v.object({
+  whatWentWell: v.optional(v.string()),
+  whatCouldImprove: v.optional(v.string()),
+  actionItems: v.optional(v.array(v.string())),
+});
+
+export const pomodoroStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("paused"),
+  v.literal("completed"),
+  v.literal("abandoned")
+);
+
 // ==================== TABLE DEFINITIONS ====================
 
 export const pmTables = {
@@ -73,6 +102,8 @@ export const pmTables = {
     completedIssueCount: v.number(),
     // Next issue number (for auto-incrementing)
     nextIssueNumber: v.number(),
+    // Cycle settings (per-project configuration)
+    cycleSettings: v.optional(cycleSettingsValidator),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -98,6 +129,8 @@ export const pmTables = {
     status: cycleStatusValidator,
     // Goals for the cycle
     goals: v.optional(v.array(v.string())),
+    // Retrospective (filled at cycle end)
+    retrospective: v.optional(cycleRetrospectiveValidator),
     // Computed (denormalized)
     issueCount: v.number(),
     completedIssueCount: v.number(),
@@ -162,4 +195,55 @@ export const pmTables = {
     .index("by_user", ["userId"])
     .index("by_project", ["projectId"])
     .index("by_name", ["userId", "name"]),
+
+  // ==================== POMODORO SESSIONS ====================
+  lifeos_pmPomodoroSessions: defineTable({
+    userId: v.id("users"),
+    issueId: v.optional(v.id("lifeos_pmIssues")), // Optional: can have "free" pomodoros
+    projectId: v.optional(v.id("lifeos_pmProjects")), // Denormalized for easier queries
+    // Session configuration
+    durationMinutes: v.number(), // Default 25
+    breakMinutes: v.number(), // Default 5
+    // Session state
+    status: pomodoroStatusValidator,
+    // Timing
+    startedAt: v.number(), // When the pomodoro started
+    pausedAt: v.optional(v.number()), // When paused (if paused)
+    completedAt: v.optional(v.number()), // When completed/abandoned
+    totalPausedMs: v.number(), // Total time spent paused
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_issue", ["issueId"])
+    .index("by_user_date", ["userId", "startedAt"])
+    .index("by_project", ["projectId"]),
+
+  // ==================== POMODORO DAILY STATS ====================
+  lifeos_pmPomodoroDailyStats: defineTable({
+    userId: v.id("users"),
+    date: v.string(), // YYYY-MM-DD format
+    // Counts
+    completedCount: v.number(),
+    abandonedCount: v.number(),
+    // Time tracking (in milliseconds)
+    totalFocusTimeMs: v.number(),
+    // Breakdown by issue (top issues worked on)
+    issueBreakdown: v.array(
+      v.object({
+        issueId: v.id("lifeos_pmIssues"),
+        issueIdentifier: v.string(), // Denormalized for display
+        issueTitle: v.string(),
+        completedCount: v.number(),
+        totalFocusTimeMs: v.number(),
+      })
+    ),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"]),
 };

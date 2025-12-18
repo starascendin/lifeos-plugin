@@ -2,7 +2,10 @@ import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { requireUser } from "../_lib/auth";
 import { Doc } from "../_generated/dataModel";
-import { cycleStatusValidator } from "./pm_schema";
+import {
+  cycleStatusValidator,
+  cycleRetrospectiveValidator,
+} from "./pm_schema";
 
 // ==================== QUERIES ====================
 
@@ -235,6 +238,7 @@ export const updateCycle = mutation({
     endDate: v.optional(v.number()),
     status: v.optional(cycleStatusValidator),
     goals: v.optional(v.array(v.string())),
+    retrospective: v.optional(cycleRetrospectiveValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -255,6 +259,8 @@ export const updateCycle = mutation({
     if (args.endDate !== undefined) updates.endDate = args.endDate;
     if (args.status !== undefined) updates.status = args.status;
     if (args.goals !== undefined) updates.goals = args.goals;
+    if (args.retrospective !== undefined)
+      updates.retrospective = args.retrospective;
 
     await ctx.db.patch(args.cycleId, updates);
     return args.cycleId;
@@ -362,5 +368,96 @@ export const updateCycleCounts = mutation({
       completedIssueCount,
       updatedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Generate multiple cycles for a project based on its cycle settings
+ */
+export const generateCycles = mutation({
+  args: {
+    projectId: v.id("lifeos_pmProjects"),
+    count: v.optional(v.number()), // Override default count
+    startFrom: v.optional(v.number()), // Override start date (timestamp)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    // Get project with cycleSettings
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== user._id) {
+      throw new Error("Project not found or access denied");
+    }
+
+    // Use project settings or defaults
+    const duration = project.cycleSettings?.duration ?? "2_weeks";
+    const startDay = project.cycleSettings?.startDay ?? "monday";
+    const count =
+      args.count ?? project.cycleSettings?.defaultCyclesToCreate ?? 4;
+
+    // Calculate duration in milliseconds
+    const durationMs =
+      duration === "1_week"
+        ? 7 * 24 * 60 * 60 * 1000
+        : 14 * 24 * 60 * 60 * 1000;
+
+    // Find next start date based on startDay
+    let startDate = args.startFrom ?? now;
+    const targetDayNum = startDay === "sunday" ? 0 : 1;
+    const currentDate = new Date(startDate);
+    const currentDay = currentDate.getDay();
+    const daysUntilTarget = (targetDayNum - currentDay + 7) % 7;
+
+    // If today is the target day and no startFrom provided, use next week's target day
+    if (daysUntilTarget === 0 && !args.startFrom) {
+      startDate += 7 * 24 * 60 * 60 * 1000;
+    } else if (daysUntilTarget > 0) {
+      startDate += daysUntilTarget * 24 * 60 * 60 * 1000;
+    }
+
+    // Normalize to start of day (midnight)
+    const startDateObj = new Date(startDate);
+    startDateObj.setHours(0, 0, 0, 0);
+    startDate = startDateObj.getTime();
+
+    // Get existing max cycle number for this project
+    const existingCycles = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    let nextNumber =
+      existingCycles.reduce((max, c) => Math.max(max, c.number), 0) + 1;
+
+    // Generate cycles
+    const cycleIds = [];
+    for (let i = 0; i < count; i++) {
+      const cycleStartDate = startDate + i * durationMs;
+      const cycleEndDate = cycleStartDate + durationMs - 1; // End 1ms before next cycle starts
+
+      // Determine status based on current date
+      let status: "upcoming" | "active" | "completed" = "upcoming";
+      if (now >= cycleStartDate && now <= cycleEndDate) {
+        status = "active";
+      } else if (now > cycleEndDate) {
+        status = "completed";
+      }
+
+      const cycleId = await ctx.db.insert("lifeos_pmCycles", {
+        userId: user._id,
+        projectId: args.projectId,
+        number: nextNumber++,
+        startDate: cycleStartDate,
+        endDate: cycleEndDate,
+        status,
+        issueCount: 0,
+        completedIssueCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      cycleIds.push(cycleId);
+    }
+
+    return cycleIds;
   },
 });
