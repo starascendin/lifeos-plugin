@@ -12,4 +12,11 @@ crons.daily(
   internal.lifeos.pm_crons.autoGenerateCyclesJob
 );
 
+// Run daily at 0:30 AM UTC to record cycle snapshots for burnup charts
+crons.daily(
+  "lifeos-pm-record-cycle-snapshots",
+  { hourUTC: 0, minuteUTC: 30 },
+  internal.lifeos.pm_crons.recordCycleSnapshotsJob
+);
+
 export default crons;

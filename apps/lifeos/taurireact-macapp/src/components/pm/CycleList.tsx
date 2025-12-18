@@ -1,4 +1,6 @@
 import { usePM, CycleStatus } from "@/lib/contexts/PMContext";
+import { MoreHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { RefreshCw, Play, CheckCircle, Clock, LucideIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -25,7 +27,7 @@ const STATUS_CONFIG: Record<CycleStatus, { label: string; icon: LucideIcon; colo
 };
 
 export function CycleList() {
-  const { cycles, isLoadingCycles, setSelectedCycleForDetail } = usePM();
+  const { cycles, isLoadingCycles, setSelectedCycleForDetail, openCycleDetailView } = usePM();
 
   if (isLoadingCycles) {
     return (
@@ -84,7 +86,7 @@ export function CycleList() {
             return (
               <div
                 key={cycle._id}
-                onClick={() => setSelectedCycleForDetail(cycle._id)}
+                onClick={() => openCycleDetailView(cycle._id)}
                 className="cursor-pointer rounded-lg border-2 border-green-500/30 bg-green-500/5 p-6 transition-colors hover:bg-green-500/10"
               >
                 <div className="mb-4 flex items-center justify-between">
@@ -106,6 +108,17 @@ export function CycleList() {
                     <span className={statusConfig.color}>
                       {statusConfig.label}
                     </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCycleForDetail(cycle._id);
+                      }}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
 
@@ -156,7 +169,7 @@ export function CycleList() {
               return (
                 <div
                   key={cycle._id}
-                  onClick={() => setSelectedCycleForDetail(cycle._id)}
+                  onClick={() => openCycleDetailView(cycle._id)}
                   className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
                 >
                   <div className="flex items-center gap-3">
@@ -184,6 +197,17 @@ export function CycleList() {
                     <span className={statusConfig.color}>
                       {statusConfig.label}
                     </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCycleForDetail(cycle._id);
+                      }}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               );
@@ -209,7 +233,7 @@ export function CycleList() {
               return (
                 <div
                   key={cycle._id}
-                  onClick={() => setSelectedCycleForDetail(cycle._id)}
+                  onClick={() => openCycleDetailView(cycle._id)}
                   className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-card/50 p-4 opacity-70 transition-opacity hover:opacity-100"
                 >
                   <div className="flex items-center gap-3">
@@ -232,7 +256,7 @@ export function CycleList() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-3 text-sm">
                     <span className="text-muted-foreground">
                       {cycle.completedIssueCount}/{cycle.issueCount} issues
                     </span>
@@ -242,6 +266,17 @@ export function CycleList() {
                         {progress}%
                       </span>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCycleForDetail(cycle._id);
+                      }}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               );

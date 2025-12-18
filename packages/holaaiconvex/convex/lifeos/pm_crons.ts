@@ -37,3 +37,40 @@ export const autoGenerateCyclesJob = internalAction({
     return { usersProcessed: userIds.length, totalGenerated };
   },
 });
+
+/**
+ * Cron job action to record daily snapshots for all active cycles
+ * Runs daily at 0:30 AM UTC
+ */
+export const recordCycleSnapshotsJob = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ cyclesProcessed: number }> => {
+    // Get all active cycles
+    const activeCycles: { cycleId: Id<"lifeos_pmCycles">; userId: Id<"users"> }[] =
+      await ctx.runMutation(
+        internal.lifeos.pm_cycle_snapshots._getActiveCyclesForSnapshot,
+        {}
+      );
+
+    console.log(
+      `[Snapshot Cron] Processing ${activeCycles.length} active cycles`
+    );
+
+    for (const { cycleId, userId } of activeCycles) {
+      try {
+        await ctx.runMutation(
+          internal.lifeos.pm_cycle_snapshots._recordSnapshotInternal,
+          { cycleId, userId }
+        );
+      } catch (error) {
+        console.error(
+          `[Snapshot Cron] Error recording snapshot for cycle ${cycleId}:`,
+          error
+        );
+      }
+    }
+
+    console.log(`[Snapshot Cron] Completed. Cycles processed: ${activeCycles.length}`);
+    return { cyclesProcessed: activeCycles.length };
+  },
+});

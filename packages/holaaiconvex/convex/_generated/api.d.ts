@@ -37,6 +37,7 @@ import type * as lifeos_lib_pm_tools from "../lifeos/lib/pm_tools.js";
 import type * as lifeos_pm_ai from "../lifeos/pm_ai.js";
 import type * as lifeos_pm_ai_internal from "../lifeos/pm_ai_internal.js";
 import type * as lifeos_pm_crons from "../lifeos/pm_crons.js";
+import type * as lifeos_pm_cycle_snapshots from "../lifeos/pm_cycle_snapshots.js";
 import type * as lifeos_pm_cycles from "../lifeos/pm_cycles.js";
 import type * as lifeos_pm_issues from "../lifeos/pm_issues.js";
 import type * as lifeos_pm_labels from "../lifeos/pm_labels.js";
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   "lifeos/pm_ai": typeof lifeos_pm_ai;
   "lifeos/pm_ai_internal": typeof lifeos_pm_ai_internal;
   "lifeos/pm_crons": typeof lifeos_pm_crons;
+  "lifeos/pm_cycle_snapshots": typeof lifeos_pm_cycle_snapshots;
   "lifeos/pm_cycles": typeof lifeos_pm_cycles;
   "lifeos/pm_issues": typeof lifeos_pm_issues;
   "lifeos/pm_labels": typeof lifeos_pm_labels;

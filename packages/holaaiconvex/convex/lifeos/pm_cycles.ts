@@ -7,6 +7,8 @@ import {
   cycleRetrospectiveValidator,
 } from "./pm_schema";
 
+type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled";
+
 // ==================== QUERIES ====================
 
 /**
@@ -157,6 +159,180 @@ export const getCycleWithIssues = query({
       ...cycle,
       issues,
       completionPercentage,
+    };
+  },
+});
+
+/**
+ * Get cycle with full breakdown data for the detail view
+ * Includes stats, issues grouped by status, and breakdowns by priority/label/project
+ */
+export const getCycleWithBreakdowns = query({
+  args: {
+    cycleId: v.id("lifeos_pmCycles"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle || cycle.userId !== user._id) {
+      return null;
+    }
+
+    // Get all issues in this cycle
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .collect();
+
+    // Filter by user
+    const userIssues = issues.filter((i) => i.userId === user._id);
+
+    // Calculate stats
+    const scopeCount = userIssues.length;
+    const startedCount = userIssues.filter(
+      (i) => i.status === "in_progress" || i.status === "in_review"
+    ).length;
+    const completedCount = userIssues.filter((i) => i.status === "done").length;
+    const todoCount = userIssues.filter(
+      (i) => i.status === "backlog" || i.status === "todo"
+    ).length;
+
+    // Calculate weekdays remaining
+    const now = new Date();
+    const endDate = new Date(cycle.endDate);
+    let weekdaysLeft = 0;
+    const current = new Date(now);
+    current.setHours(0, 0, 0, 0);
+
+    while (current <= endDate) {
+      const day = current.getDay();
+      if (day !== 0 && day !== 6) weekdaysLeft++;
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Group issues by status
+    const issuesByStatus: Record<IssueStatus, typeof userIssues> = {
+      backlog: [],
+      todo: [],
+      in_progress: [],
+      in_review: [],
+      done: [],
+      cancelled: [],
+    };
+    for (const issue of userIssues) {
+      issuesByStatus[issue.status as IssueStatus].push(issue);
+    }
+
+    // Sort each group by sortOrder
+    for (const status of Object.keys(issuesByStatus) as IssueStatus[]) {
+      issuesByStatus[status].sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+
+    // Group by priority
+    const priorityCounts: Record<string, number> = {
+      urgent: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      none: 0,
+    };
+    for (const issue of userIssues) {
+      priorityCounts[issue.priority] = (priorityCounts[issue.priority] || 0) + 1;
+    }
+    const byPriority = Object.entries(priorityCounts)
+      .filter(([_, count]) => count > 0)
+      .map(([priority, count]) => ({
+        priority,
+        count,
+        percent: scopeCount > 0 ? Math.round((count / scopeCount) * 100) : 0,
+      }));
+
+    // Group by label
+    const labelCounts: Map<string, { labelId: Id<"lifeos_pmLabels">; count: number }> = new Map();
+    for (const issue of userIssues) {
+      for (const labelId of issue.labelIds) {
+        const existing = labelCounts.get(labelId);
+        if (existing) {
+          existing.count++;
+        } else {
+          labelCounts.set(labelId, { labelId, count: 1 });
+        }
+      }
+    }
+
+    // Fetch label details
+    const byLabel = await Promise.all(
+      Array.from(labelCounts.values()).map(async ({ labelId, count }) => {
+        const label = await ctx.db.get(labelId);
+        return {
+          labelId,
+          labelName: label?.name ?? "Unknown",
+          color: label?.color ?? "#888888",
+          count,
+          percent: scopeCount > 0 ? Math.round((count / scopeCount) * 100) : 0,
+        };
+      })
+    );
+
+    // Group by project
+    const projectCounts: Map<string, { projectId: Id<"lifeos_pmProjects">; count: number }> = new Map();
+    const noProjectCount = userIssues.filter((i) => !i.projectId).length;
+
+    for (const issue of userIssues) {
+      if (issue.projectId) {
+        const existing = projectCounts.get(issue.projectId);
+        if (existing) {
+          existing.count++;
+        } else {
+          projectCounts.set(issue.projectId, { projectId: issue.projectId, count: 1 });
+        }
+      }
+    }
+
+    // Fetch project details
+    const byProject = await Promise.all(
+      Array.from(projectCounts.values()).map(async ({ projectId, count }) => {
+        const project = await ctx.db.get(projectId);
+        return {
+          projectId,
+          projectName: project?.name ?? "Unknown",
+          color: project?.color,
+          count,
+          percent: scopeCount > 0 ? Math.round((count / scopeCount) * 100) : 0,
+        };
+      })
+    );
+
+    // Add "No project" entry if there are unassigned issues
+    if (noProjectCount > 0) {
+      byProject.push({
+        projectId: null as unknown as Id<"lifeos_pmProjects">,
+        projectName: "No project",
+        color: undefined,
+        count: noProjectCount,
+        percent: scopeCount > 0 ? Math.round((noProjectCount / scopeCount) * 100) : 0,
+      });
+    }
+
+    return {
+      cycle,
+      issues: userIssues,
+      issuesByStatus,
+      stats: {
+        scopeCount,
+        startedCount,
+        completedCount,
+        todoCount,
+        weekdaysLeft,
+        capacityPercent: scopeCount > 0 ? Math.round((completedCount / scopeCount) * 100) : 0,
+        startedPercent: scopeCount > 0 ? Math.round((startedCount / scopeCount) * 100) : 0,
+      },
+      breakdowns: {
+        byPriority,
+        byLabel,
+        byProject,
+      },
     };
   },
 });

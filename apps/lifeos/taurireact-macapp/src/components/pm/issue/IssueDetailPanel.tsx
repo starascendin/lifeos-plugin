@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id } from "@holaai/convex";
@@ -9,6 +9,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { usePM, IssueStatus, Priority } from "@/lib/contexts/PMContext";
 import { IssueHeader } from "./IssueHeader";
@@ -17,6 +27,8 @@ import { IssueProperties } from "./IssueProperties";
 
 export function IssueDetailPanel() {
   const { selectedIssueId, setSelectedIssueId, deleteIssue } = usePM();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const issue = useQuery(
     api.lifeos.pm_issues.getIssue,
@@ -25,6 +37,8 @@ export function IssueDetailPanel() {
 
   const updateIssue = useMutation(api.lifeos.pm_issues.updateIssue);
   const updateIssueStatus = useMutation(api.lifeos.pm_issues.updateIssueStatus);
+  const moveIssueToProject = useMutation(api.lifeos.pm_issues.moveIssueToProject);
+  const moveIssueToCycle = useMutation(api.lifeos.pm_issues.moveIssueToCycle);
 
   // Handle Escape key to close
   useEffect(() => {
@@ -69,18 +83,46 @@ export function IssueDetailPanel() {
     cycleId?: Id<"lifeos_pmCycles">;
   }) => {
     if (!selectedIssueId) return;
-    await updateIssue({ issueId: selectedIssueId, ...updates });
+
+    // Handle project change with dedicated mutation
+    if ("projectId" in updates) {
+      await moveIssueToProject({ issueId: selectedIssueId, projectId: updates.projectId });
+      return;
+    }
+
+    // Handle cycle change with dedicated mutation
+    if ("cycleId" in updates) {
+      await moveIssueToCycle({ issueId: selectedIssueId, cycleId: updates.cycleId });
+      return;
+    }
+
+    // Handle other updates
+    const { projectId, cycleId, ...otherUpdates } = updates;
+    await updateIssue({ issueId: selectedIssueId, ...otherUpdates });
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!selectedIssueId) return;
-    if (!confirm("Are you sure you want to delete this issue?")) return;
+    setShowDeleteDialog(true);
+  };
 
-    await deleteIssue({ issueId: selectedIssueId });
-    setSelectedIssueId(null);
+  const handleConfirmDelete = async () => {
+    if (!selectedIssueId) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteIssue({ issueId: selectedIssueId });
+      setShowDeleteDialog(false);
+      setSelectedIssueId(null);
+    } catch (error) {
+      console.error("Failed to delete issue:", error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
+    <>
     <Sheet open={!!selectedIssueId} onOpenChange={(open) => !open && handleClose()}>
       <SheetContent className="w-[600px] sm:max-w-[600px] p-0 flex flex-col">
         {/* Header */}
@@ -90,10 +132,11 @@ export function IssueDetailPanel() {
           </SheetTitle>
           <div className="flex items-center gap-1">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -138,5 +181,28 @@ export function IssueDetailPanel() {
         )}
       </SheetContent>
     </Sheet>
+
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Issue</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this issue? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmDelete}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

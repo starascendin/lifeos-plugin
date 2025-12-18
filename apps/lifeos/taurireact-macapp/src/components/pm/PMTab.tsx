@@ -6,6 +6,7 @@ import { CycleList } from "./CycleList";
 import { ProjectDetailView } from "./project/ProjectDetailView";
 import { IssueDetailPanel } from "./issue/IssueDetailPanel";
 import { CycleDetailPanel } from "./cycle/CycleDetailPanel";
+import { CycleDetailView } from "./cycle/CycleDetailView";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -28,7 +29,7 @@ type ViewType = "board" | "projects" | "cycles";
 export function PMTab() {
   const { view, id } = useParams<{ view?: string; id?: string }>();
   const navigate = useNavigate();
-  const { projects, filters, setFilters, clearFilters } = usePM();
+  const { projects, filters, setFilters, clearFilters, viewingCycleId } = usePM();
 
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateIssue, setShowCreateIssue] = useState(false);
@@ -53,8 +54,8 @@ export function PMTab() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header - hide when viewing project details */}
-      {!isProjectDetail && (
+      {/* Header - hide when viewing project or cycle details */}
+      {!isProjectDetail && !viewingCycleId && (
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold">Project Management</h1>
@@ -159,7 +160,9 @@ export function PMTab() {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {isProjectDetail && projectId ? (
+        {viewingCycleId ? (
+          <CycleDetailView />
+        ) : isProjectDetail && projectId ? (
           <ProjectDetailView projectId={projectId} />
         ) : (
           <>

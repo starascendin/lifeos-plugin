@@ -254,4 +254,21 @@ export const pmTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // ==================== CYCLE SNAPSHOTS (for burnup charts) ====================
+  lifeos_pmCycleSnapshots: defineTable({
+    userId: v.id("users"),
+    cycleId: v.id("lifeos_pmCycles"),
+    // Date in YYYY-MM-DD format
+    date: v.string(),
+    // Issue counts at this point in time
+    scopeCount: v.number(), // Total issues in cycle
+    startedCount: v.number(), // in_progress + in_review
+    completedCount: v.number(), // done
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_cycle", ["cycleId"])
+    .index("by_cycle_date", ["cycleId", "date"])
+    .index("by_user", ["userId"]),
 };

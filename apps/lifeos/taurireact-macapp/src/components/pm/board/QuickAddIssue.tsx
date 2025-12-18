@@ -24,6 +24,7 @@ export function QuickAddIssue({ status, onClose }: QuickAddIssueProps) {
         title: title.trim(),
         status,
         projectId: filters.projectId,
+        cycleId: filters.cycleId,
       });
       setTitle("");
       onClose();
