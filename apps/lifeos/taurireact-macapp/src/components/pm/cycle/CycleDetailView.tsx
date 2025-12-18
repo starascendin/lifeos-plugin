@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
-import type { Id, Doc } from "@holaai/convex";
+import type { Id } from "@holaai/convex";
 import {
   ArrowLeft,
   RefreshCw,
@@ -10,38 +10,12 @@ import {
   CheckCircle,
   MoreHorizontal,
 } from "lucide-react";
-import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragStartEvent,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  usePM,
-  IssueStatus,
-  STATUS_CONFIG,
-  CycleStatus,
-} from "@/lib/contexts/PMContext";
-import { KanbanColumn } from "../board/KanbanColumn";
-import { IssueCard } from "../board/IssueCard";
+import { usePM, IssueStatus, CycleStatus } from "@/lib/contexts/PMContext";
+import { KanbanBoardBase } from "../board/KanbanBoardBase";
 import { CycleBreakdownPanel } from "./CycleBreakdownPanel";
 import { cn } from "@/lib/utils";
-
-const COLUMNS: IssueStatus[] = [
-  "backlog",
-  "todo",
-  "in_progress",
-  "in_review",
-  "done",
-];
 
 const CYCLE_STATUS_CONFIG: Record<
   CycleStatus,
@@ -77,10 +51,6 @@ export function CycleDetailView() {
     setSelectedCycleForDetail,
   } = usePM();
 
-  const [activeIssue, setActiveIssue] = useState<Doc<"lifeos_pmIssues"> | null>(
-    null
-  );
-
   const cycleData = useQuery(
     api.lifeos.pm_cycles.getCycleWithBreakdowns,
     viewingCycleId ? { cycleId: viewingCycleId } : "skip"
@@ -90,15 +60,11 @@ export function CycleDetailView() {
     api.lifeos.pm_cycle_snapshots.recordSnapshot
   );
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+  const handleStatusChange = useCallback(
+    async (issueId: Id<"lifeos_pmIssues">, status: IssueStatus) => {
+      await updateIssueStatus({ issueId, status });
+    },
+    [updateIssueStatus]
   );
 
   // Set cycle filter when entering view
@@ -127,52 +93,6 @@ export function CycleDetailView() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeCycleDetailView]);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const issueId = active.id as string;
-
-    if (cycleData?.issuesByStatus) {
-      for (const status of COLUMNS) {
-        const issue = cycleData.issuesByStatus[status]?.find(
-          (i) => i._id === issueId
-        );
-        if (issue) {
-          setActiveIssue(issue);
-          break;
-        }
-      }
-    }
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveIssue(null);
-
-    if (!over) return;
-
-    const issueId = active.id as string;
-    const overId = over.id as string;
-
-    if (COLUMNS.includes(overId as IssueStatus)) {
-      const newStatus = overId as IssueStatus;
-
-      if (cycleData?.issuesByStatus) {
-        for (const status of COLUMNS) {
-          const issue = cycleData.issuesByStatus[status]?.find(
-            (i) => i._id === issueId
-          );
-          if (issue && issue.status !== newStatus) {
-            await updateIssueStatus({
-              issueId: issueId as Id<"lifeos_pmIssues">,
-              status: newStatus,
-            });
-            break;
-          }
-        }
-      }
-    }
-  };
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString("en-US", {
@@ -269,27 +189,11 @@ export function CycleDetailView() {
       <div className="flex flex-1 overflow-hidden">
         {/* Kanban Board */}
         <div className="flex-1 overflow-hidden">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex h-full gap-4 overflow-x-auto p-4">
-              {COLUMNS.map((status) => (
-                <KanbanColumn
-                  key={status}
-                  status={status}
-                  issues={issuesByStatus[status] || []}
-                  config={STATUS_CONFIG[status]}
-                />
-              ))}
-            </div>
-
-            <DragOverlay>
-              {activeIssue && <IssueCard issue={activeIssue} isDragging />}
-            </DragOverlay>
-          </DndContext>
+          <KanbanBoardBase
+            issuesByStatus={issuesByStatus}
+            onStatusChange={handleStatusChange}
+            className="p-4"
+          />
         </div>
 
         {/* Breakdown Panel */}

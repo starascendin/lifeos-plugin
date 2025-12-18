@@ -15,20 +15,29 @@ interface KanbanColumnProps {
   status: IssueStatus;
   issues: Doc<"lifeos_pmIssues">[];
   config: { label: string; color: string; bgColor: string };
+  isDropTarget?: boolean;
 }
 
-export function KanbanColumn({ status, issues, config }: KanbanColumnProps) {
+export function KanbanColumn({
+  status,
+  issues,
+  config,
+  isDropTarget = false,
+}: KanbanColumnProps) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { setNodeRef, isOver } = useDroppable({
     id: status,
   });
 
+  // Show highlight when dragging over this column
+  const showDropHighlight = isOver || isDropTarget;
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex h-full w-72 flex-shrink-0 flex-col rounded-lg bg-muted/30",
-        isOver && "ring-2 ring-primary/50"
+        "flex h-full w-72 flex-shrink-0 flex-col rounded-lg bg-muted/30 transition-all duration-150",
+        showDropHighlight && "ring-2 ring-primary/50 bg-primary/5"
       )}
     >
       {/* Column Header */}
