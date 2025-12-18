@@ -1,3 +1,4 @@
+import React, { useState, useCallback, useMemo } from "react";
 import { IssueStatus } from "@/lib/contexts/PMContext";
 import type { Doc } from "@holaai/convex";
 import { useDroppable } from "@dnd-kit/core";
@@ -9,7 +10,6 @@ import { IssueCard } from "./IssueCard";
 import { QuickAddIssue } from "./QuickAddIssue";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
-import { useState } from "react";
 
 interface KanbanColumnProps {
   status: IssueStatus;
@@ -18,7 +18,7 @@ interface KanbanColumnProps {
   isDropTarget?: boolean;
 }
 
-export function KanbanColumn({
+export const KanbanColumn = React.memo(function KanbanColumn({
   status,
   issues,
   config,
@@ -31,6 +31,17 @@ export function KanbanColumn({
 
   // Show highlight when dragging over this column
   const showDropHighlight = isOver || isDropTarget;
+
+  const handleAddClick = useCallback(() => {
+    setShowQuickAdd(true);
+  }, []);
+
+  const handleQuickAddClose = useCallback(() => {
+    setShowQuickAdd(false);
+  }, []);
+
+  // Memoize sortable items to prevent unnecessary re-renders
+  const sortableItems = useMemo(() => issues.map((i) => i._id), [issues]);
 
   return (
     <div
@@ -50,12 +61,10 @@ export function KanbanColumn({
             )}
           />
           <span className="font-medium text-sm">{config.label}</span>
-          <span className="text-muted-foreground text-xs">
-            {issues.length}
-          </span>
+          <span className="text-muted-foreground text-xs">{issues.length}</span>
         </div>
         <button
-          onClick={() => setShowQuickAdd(true)}
+          onClick={handleAddClick}
           className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <Plus className="h-4 w-4" />
@@ -64,20 +73,14 @@ export function KanbanColumn({
 
       {/* Issues */}
       <div className="flex-1 space-y-2 overflow-y-auto px-2 pb-2">
-        <SortableContext
-          items={issues.map((i) => i._id)}
-          strategy={verticalListSortingStrategy}
-        >
+        <SortableContext items={sortableItems} strategy={verticalListSortingStrategy}>
           {issues.map((issue) => (
             <IssueCard key={issue._id} issue={issue} />
           ))}
         </SortableContext>
 
         {showQuickAdd && (
-          <QuickAddIssue
-            status={status}
-            onClose={() => setShowQuickAdd(false)}
-          />
+          <QuickAddIssue status={status} onClose={handleQuickAddClose} />
         )}
 
         {issues.length === 0 && !showQuickAdd && (
@@ -88,4 +91,4 @@ export function KanbanColumn({
       </div>
     </div>
   );
-}
+});

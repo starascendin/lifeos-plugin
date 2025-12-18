@@ -1,3 +1,4 @@
+import React, { useCallback } from "react";
 import type { Doc } from "@holaai/convex";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -11,7 +12,10 @@ interface IssueCardProps {
   isDragging?: boolean;
 }
 
-export function IssueCard({ issue, isDragging }: IssueCardProps) {
+export const IssueCard = React.memo(function IssueCard({
+  issue,
+  isDragging,
+}: IssueCardProps) {
   const { setSelectedIssueId } = usePM();
   const {
     attributes,
@@ -34,13 +38,25 @@ export function IssueCard({ issue, isDragging }: IssueCardProps) {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
+  const handleCardClick = useCallback(() => {
+    setSelectedIssueId(issue._id);
+  }, [setSelectedIssueId, issue._id]);
+
+  const handleButtonWrapperClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  const handleButtonWrapperPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+  }, []);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      onClick={() => setSelectedIssueId(issue._id)}
+      onClick={handleCardClick}
       className={cn(
         "cursor-pointer rounded-lg border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md",
         (isDragging || isSortableDragging) && "opacity-50 shadow-lg",
@@ -53,12 +69,7 @@ export function IssueCard({ issue, isDragging }: IssueCardProps) {
           {issue.identifier}
         </span>
         {issue.priority !== "none" && (
-          <span
-            className={cn(
-              "text-xs font-bold",
-              priorityConfig.color
-            )}
-          >
+          <span className={cn("text-xs font-bold", priorityConfig.color)}>
             {priorityConfig.icon}
           </span>
         )}
@@ -82,14 +93,8 @@ export function IssueCard({ issue, isDragging }: IssueCardProps) {
 
         <div className="flex items-center gap-1">
           <div
-            onClick={(e) => {
-              console.log("[IssueCard] Wrapper onClick - stopping propagation");
-              e.stopPropagation();
-            }}
-            onPointerDown={(e) => {
-              console.log("[IssueCard] Wrapper onPointerDown - stopping propagation");
-              e.stopPropagation();
-            }}
+            onClick={handleButtonWrapperClick}
+            onPointerDown={handleButtonWrapperPointerDown}
           >
             <StartPomodoroButton issueId={issue._id} size="sm" />
           </div>
@@ -109,4 +114,4 @@ export function IssueCard({ issue, isDragging }: IssueCardProps) {
       )}
     </div>
   );
-}
+});

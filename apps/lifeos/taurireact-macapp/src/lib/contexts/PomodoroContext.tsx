@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
 } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
@@ -77,8 +78,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     });
   }, [activePomodoroData, todayStats]);
 
-  // Debug logging - log every render
-  console.log("[PomodoroContext] Render - activePomodoroData:", activePomodoroData, "todayStats:", todayStats);
 
   // Convex mutations
   const startPomodoroMutation = useMutation(
@@ -273,31 +272,56 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const sessionDurationMinutes = session?.durationMinutes ?? durationMinutes;
   const sessionBreakMinutes = session?.breakMinutes ?? breakMinutes;
 
-  const state: PomodoroState = {
-    status,
-    sessionId: session?._id ?? null,
-    issueId: session?.issueId ?? null,
-    issue: issue ?? null,
-    project: project ?? null,
-    remainingMs: remainingMs ?? 0,
-    totalDurationMs: sessionDurationMinutes * 60 * 1000,
-    breakRemainingMs: breakRemainingMs ?? 0,
-    durationMinutes: sessionDurationMinutes,
-    breakMinutes: sessionBreakMinutes,
-  };
+  const state = useMemo<PomodoroState>(
+    () => ({
+      status,
+      sessionId: session?._id ?? null,
+      issueId: session?.issueId ?? null,
+      issue: issue ?? null,
+      project: project ?? null,
+      remainingMs: remainingMs ?? 0,
+      totalDurationMs: sessionDurationMinutes * 60 * 1000,
+      breakRemainingMs: breakRemainingMs ?? 0,
+      durationMinutes: sessionDurationMinutes,
+      breakMinutes: sessionBreakMinutes,
+    }),
+    [
+      status,
+      session?._id,
+      session?.issueId,
+      issue,
+      project,
+      remainingMs,
+      breakRemainingMs,
+      sessionDurationMinutes,
+      sessionBreakMinutes,
+    ]
+  );
 
-  const value: PomodoroContextValue = {
-    state,
-    startPomodoro,
-    pausePomodoro,
-    resumePomodoro,
-    abandonPomodoro,
-    skipBreak,
-    setDuration: setDurationMinutes,
-    setBreakDuration: setBreakMinutes,
-    todayStats,
-    isLoading: activePomodoroData === undefined,
-  };
+  const value = useMemo<PomodoroContextValue>(
+    () => ({
+      state,
+      startPomodoro,
+      pausePomodoro,
+      resumePomodoro,
+      abandonPomodoro,
+      skipBreak,
+      setDuration: setDurationMinutes,
+      setBreakDuration: setBreakMinutes,
+      todayStats,
+      isLoading: activePomodoroData === undefined,
+    }),
+    [
+      state,
+      startPomodoro,
+      pausePomodoro,
+      resumePomodoro,
+      abandonPomodoro,
+      skipBreak,
+      todayStats,
+      activePomodoroData,
+    ]
+  );
 
   return (
     <PomodoroContext.Provider value={value}>

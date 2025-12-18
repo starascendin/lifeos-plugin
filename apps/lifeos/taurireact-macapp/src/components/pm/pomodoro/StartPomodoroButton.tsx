@@ -1,3 +1,4 @@
+import React, { useCallback } from "react";
 import { Play, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,15 +25,12 @@ interface StartPomodoroButtonProps {
  * - Active indicator (timer icon) if this issue has the running pomodoro
  * - Disabled if another pomodoro is already active
  */
-export function StartPomodoroButton({
+export const StartPomodoroButton = React.memo(function StartPomodoroButton({
   issueId,
   size = "sm",
   className,
 }: StartPomodoroButtonProps) {
   const { state, startPomodoro, isLoading } = usePomodoro();
-
-  // Debug: log on every render
-  console.log("[StartPomodoroButton] Rendering", { issueId, isLoading, status: state.status });
 
   const isThisIssueActive = state.issueId === issueId;
   const hasOtherActive =
@@ -40,16 +38,23 @@ export function StartPomodoroButton({
     !isThisIssueActive;
   const isIdle = state.status === "idle";
 
-  const handleClick = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
-    if (isIdle && !isLoading) {
-      try {
-        await startPomodoro(issueId);
-      } catch (error) {
-        console.error("[Pomodoro] Failed to start:", error);
+  const handleClick = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation(); // Prevent card click
+      if (isIdle && !isLoading) {
+        try {
+          await startPomodoro(issueId);
+        } catch (error) {
+          console.error("[Pomodoro] Failed to start:", error);
+        }
       }
-    }
-  };
+    },
+    [isIdle, isLoading, startPomodoro, issueId]
+  );
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+  }, []);
 
   const iconSize = size === "sm" ? "h-3 w-3" : "h-4 w-4";
   const buttonSize = size === "sm" ? "h-6 w-6" : "h-8 w-8";
@@ -68,17 +73,8 @@ export function StartPomodoroButton({
               isDisabled && "opacity-50",
               className
             )}
-            onClick={(e) => {
-              console.log("[StartPomodoroButton] onClick fired");
-              handleClick(e);
-            }}
-            onMouseDown={(e) => {
-              console.log("[StartPomodoroButton] onMouseDown fired");
-            }}
-            onPointerDown={(e) => {
-              console.log("[StartPomodoroButton] onPointerDown fired");
-              e.stopPropagation();
-            }}
+            onClick={handleClick}
+            onPointerDown={handlePointerDown}
             disabled={isDisabled}
           >
             {isThisIssueActive ? (
@@ -100,7 +96,7 @@ export function StartPomodoroButton({
       </Tooltip>
     </TooltipProvider>
   );
-}
+});
 
 /**
  * QuickStartButton - Button to start a free pomodoro (not linked to an issue)

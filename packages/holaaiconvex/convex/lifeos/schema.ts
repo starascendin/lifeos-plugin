@@ -1,6 +1,7 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { chatnexusTables } from "./chatnexus_schema";
+import { habitsTables } from "./habits_schema";
 import { pmTables } from "./pm_schema";
 
 /**
@@ -14,6 +15,8 @@ export const lifeosTables = {
   ...chatnexusTables,
   // Project Management tables
   ...pmTables,
+  // Habit Tracker tables
+  ...habitsTables,
   // ==================== YOUTUBE PLAYLISTS ====================
   life_youtubePlaylists: defineTable({
     // User who owns this playlist sync

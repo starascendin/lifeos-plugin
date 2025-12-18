@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay, closestCorners } from "@dnd-kit/core";
+import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { KanbanColumn } from "./KanbanColumn";
 import { IssueCard } from "./IssueCard";
@@ -49,7 +49,7 @@ export function KanbanBoardBase({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}

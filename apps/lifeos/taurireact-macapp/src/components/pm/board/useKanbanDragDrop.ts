@@ -71,24 +71,38 @@ export function useKanbanDragDrop({
   );
 
   // Handle drag over - track drop target for visual feedback
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { over } = event;
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { over } = event;
 
-    if (!over) {
-      setDropTargetStatus(null);
-      return;
-    }
+      if (!over) {
+        setDropTargetStatus(null);
+        return;
+      }
 
-    const overId = over.id as string;
+      const overId = over.id as string;
 
-    // Check if hovering over a column
-    if (KANBAN_COLUMNS.includes(overId as IssueStatus)) {
-      setDropTargetStatus(overId as IssueStatus);
-    } else {
-      // Hovering over an issue card - find which column it's in
-      setDropTargetStatus(null);
-    }
-  }, []);
+      // Check if hovering over a column directly
+      if (KANBAN_COLUMNS.includes(overId as IssueStatus)) {
+        setDropTargetStatus(overId as IssueStatus);
+      } else {
+        // Hovering over a card - get its container (column) from sortable data
+        const sortableData = over.data.current?.sortable as
+          | { containerId?: string }
+          | undefined;
+        if (sortableData?.containerId) {
+          setDropTargetStatus(sortableData.containerId as IssueStatus);
+        } else {
+          // Fallback: find the issue to get its column
+          const issue = findIssue(overId);
+          if (issue) {
+            setDropTargetStatus(issue.status as IssueStatus);
+          }
+        }
+      }
+    },
+    [findIssue]
+  );
 
   // Handle drag end - update issue status if dropped on a different column
   const handleDragEnd = useCallback(
@@ -104,16 +118,30 @@ export function useKanbanDragDrop({
       const issueId = active.id as string;
       const overId = over.id as string;
 
-      // Check if dropped over a column
-      if (KANBAN_COLUMNS.includes(overId as IssueStatus)) {
-        const newStatus = overId as IssueStatus;
-        const issue = findIssue(issueId);
+      // Determine the target column
+      let targetStatus: IssueStatus | null = null;
 
-        if (issue && issue.status !== newStatus) {
-          await onStatusChange(
-            issueId as Id<"lifeos_pmIssues">,
-            newStatus
-          );
+      if (KANBAN_COLUMNS.includes(overId as IssueStatus)) {
+        targetStatus = overId as IssueStatus;
+      } else {
+        // Dropped on a card - get container from sortable data or find issue
+        const sortableData = over.data.current?.sortable as
+          | { containerId?: string }
+          | undefined;
+        if (sortableData?.containerId) {
+          targetStatus = sortableData.containerId as IssueStatus;
+        } else {
+          const overIssue = findIssue(overId);
+          if (overIssue) {
+            targetStatus = overIssue.status as IssueStatus;
+          }
+        }
+      }
+
+      if (targetStatus) {
+        const issue = findIssue(issueId);
+        if (issue && issue.status !== targetStatus) {
+          await onStatusChange(issueId as Id<"lifeos_pmIssues">, targetStatus);
         }
       }
     },

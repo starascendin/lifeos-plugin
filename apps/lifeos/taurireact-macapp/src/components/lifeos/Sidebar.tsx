@@ -32,6 +32,7 @@ import {
   RefreshCw,
   Settings,
   Sun,
+  Target,
   User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -77,6 +78,7 @@ export function Sidebar() {
       ],
     },
     { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
+    { name: "Habits", href: "/lifeos/habits", icon: Target },
     { name: "Settings", href: "/lifeos/settings", icon: Settings },
   ];
 
