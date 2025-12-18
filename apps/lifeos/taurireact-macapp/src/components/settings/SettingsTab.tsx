@@ -1,3 +1,5 @@
+import { useTheme } from "../../lib/contexts/ThemeContext";
+
 const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
 
@@ -31,6 +33,7 @@ function getClerkDomain(): string {
 export function SettingsTab() {
   const environment = getEnvironment();
   const clerkDomain = getClerkDomain();
+  const { theme, setTheme } = useTheme();
 
   const envColors: Record<string, string> = {
     development: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
@@ -49,6 +52,50 @@ export function SettingsTab() {
           >
             {environment.toUpperCase()}
           </span>
+        </div>
+
+        {/* Theme Selection */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-medium text-[var(--text-primary)]">
+            Appearance
+          </h2>
+          <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
+            <div className="text-xs text-[var(--text-secondary)] mb-2">
+              Theme
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setTheme("light")}
+                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  theme === "light"
+                    ? "bg-[var(--app-accent)] text-white"
+                    : "bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--app-border)]"
+                }`}
+              >
+                Light
+              </button>
+              <button
+                onClick={() => setTheme("dark")}
+                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  theme === "dark"
+                    ? "bg-[var(--app-accent)] text-white"
+                    : "bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--app-border)]"
+                }`}
+              >
+                Dark
+              </button>
+              <button
+                onClick={() => setTheme("system")}
+                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  theme === "system"
+                    ? "bg-[var(--app-accent)] text-white"
+                    : "bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--app-border)]"
+                }`}
+              >
+                System
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Environment Variables */}

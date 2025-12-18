@@ -4,6 +4,7 @@ import { AuthGate } from "./components/auth/AuthGate";
 import { SignIn } from "./components/auth/SignIn";
 import { MainContent } from "./components/MainContent";
 import { SyncProvider } from "./lib/contexts/SyncContext";
+import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import "./App.css";
 
 // Check if running in Tauri
@@ -34,7 +35,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <ThemeProvider defaultTheme="system">
       <SignedOut>
         <SignIn />
       </SignedOut>
@@ -45,7 +46,7 @@ function App() {
           </SyncProvider>
         </AuthGate>
       </SignedIn>
-    </>
+    </ThemeProvider>
   );
 }
 
