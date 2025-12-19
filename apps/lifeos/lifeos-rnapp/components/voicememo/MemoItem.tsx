@@ -1,5 +1,5 @@
 import { useColor } from '@/hooks/useColor';
-import { View, ViewStyle, Pressable, Platform, TextInput } from 'react-native';
+import { View, ViewStyle, Pressable, Platform, TextInput, TouchableOpacity } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
 import { Play, Pause, Trash2, Pencil, Check, X, Cloud, CloudOff, RefreshCw } from 'lucide-react-native';
@@ -133,17 +133,6 @@ export function MemoItem({
     onRetryTranscription?.(memo.id);
   }, [onRetryTranscription, memo.id]);
 
-  const tapGesture = Gesture.Tap()
-    .onEnd(() => {
-      runOnJS(handleExpand)();
-    });
-
-  const longPressGesture = Gesture.LongPress()
-    .minDuration(500)
-    .onEnd(() => {
-      runOnJS(handleStartEdit)();
-    });
-
   const panGesture = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .onUpdate((event) => {
@@ -167,11 +156,6 @@ export function MemoItem({
         deleteOpacity.value = withTiming(0);
       }
     });
-
-  const composedGesture = Gesture.Race(
-    longPressGesture,
-    Gesture.Exclusive(panGesture, tapGesture)
-  );
 
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
@@ -216,9 +200,14 @@ export function MemoItem({
         <Icon name={Trash2} size={24} color="#FFFFFF" />
       </Animated.View>
 
-      <GestureDetector gesture={composedGesture}>
+      <GestureDetector gesture={panGesture}>
         <Animated.View style={[containerStyle, containerAnimatedStyle]}>
-          <View style={rowStyle}>
+          <TouchableOpacity
+            onPress={handleExpand}
+            onLongPress={handleStartEdit}
+            activeOpacity={0.7}
+          >
+            <View style={rowStyle}>
               {/* Play indicator / waveform */}
               <View
                 style={{
@@ -322,7 +311,8 @@ export function MemoItem({
                   <Icon name={Pencil} size={18} color={textMuted} />
                 </Pressable>
               )}
-          </View>
+            </View>
+          </TouchableOpacity>
 
           {/* Expanded playback controls */}
           {isExpanded && isLoaded && (
