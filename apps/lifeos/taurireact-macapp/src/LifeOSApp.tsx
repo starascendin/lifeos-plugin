@@ -9,6 +9,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
+import { LifeOSLLMCouncil } from "./components/lifeos/LLMCouncil";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
@@ -50,6 +51,7 @@ export default function LifeOSApp() {
               <Routes>
                 <Route index element={<LifeOSDashboard />} />
                 <Route path="chatnexus" element={<LifeOSChatNexus />} />
+                <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
                 <Route path="pm" element={<LifeOSPM />} />
                 <Route path="pm/:view" element={<LifeOSPM />} />
                 <Route path="pm/:view/:id" element={<LifeOSPM />} />

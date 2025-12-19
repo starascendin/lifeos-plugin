@@ -12,7 +12,7 @@ import { v } from "convex/values";
 // Shared validators for reuse
 const panelConfigValidator = v.object({
   panelId: v.string(), // UUID for panel
-  modelId: v.string(), // OpenRouter model ID (e.g., "openai/gpt-4o")
+  modelId: v.string(), //  model ID (e.g., "openai/gpt-4o")
   modelProvider: v.string(), // Provider name (e.g., "openai", "anthropic")
   modelDisplayName: v.string(), // Display name (e.g., "GPT-4o")
   position: v.number(), // Panel position (0-3)

@@ -34,6 +34,7 @@ import {
   Sun,
   Target,
   User,
+  Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -67,6 +68,7 @@ export function Sidebar() {
   const navigation: NavItem[] = [
     { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
     { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
+    { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
     {
       name: "Projects",
       href: "/lifeos/pm",
