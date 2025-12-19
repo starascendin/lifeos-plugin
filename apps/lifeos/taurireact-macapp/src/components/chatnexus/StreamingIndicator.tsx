@@ -1,3 +1,6 @@
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 interface StreamingIndicatorProps {
   content: string;
   isLoading: boolean;
@@ -16,8 +19,10 @@ export function StreamingIndicator({ content, isLoading }: StreamingIndicatorPro
           </div>
         ) : (
           <>
-            <div className="whitespace-pre-wrap break-words text-sm">
-              {content}
+            <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {content}
+              </ReactMarkdown>
             </div>
             <div className="inline-block w-2 h-4 bg-primary ml-1 animate-pulse" />
           </>

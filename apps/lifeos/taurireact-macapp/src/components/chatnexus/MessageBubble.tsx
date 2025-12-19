@@ -1,5 +1,7 @@
 import type { Doc } from "@holaai/convex";
 import { cn } from "@/lib/utils";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type Message = Doc<"lifeos_chatnexusMessages">;
 
@@ -21,9 +23,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
       >
         {/* Message content */}
-        <div className="whitespace-pre-wrap break-words text-sm">
-          {message.content}
-        </div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap break-words text-sm">
+            {message.content}
+          </div>
+        ) : (
+          <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
 
         {/* Error indicator */}
         {message.error && (

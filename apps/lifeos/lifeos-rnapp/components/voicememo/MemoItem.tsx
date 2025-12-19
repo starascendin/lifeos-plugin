@@ -133,7 +133,19 @@ export function MemoItem({
     onRetryTranscription?.(memo.id);
   }, [onRetryTranscription, memo.id]);
 
+  const tapGesture = Gesture.Tap()
+    .onEnd(() => {
+      runOnJS(handleExpand)();
+    });
+
+  const longPressGesture = Gesture.LongPress()
+    .minDuration(500)
+    .onEnd(() => {
+      runOnJS(handleStartEdit)();
+    });
+
   const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10])
     .onUpdate((event) => {
       // Only allow swiping left
       if (event.translationX < 0) {
@@ -155,6 +167,11 @@ export function MemoItem({
         deleteOpacity.value = withTiming(0);
       }
     });
+
+  const composedGesture = Gesture.Race(
+    longPressGesture,
+    Gesture.Exclusive(panGesture, tapGesture)
+  );
 
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
@@ -199,10 +216,9 @@ export function MemoItem({
         <Icon name={Trash2} size={24} color="#FFFFFF" />
       </Animated.View>
 
-      <GestureDetector gesture={panGesture}>
+      <GestureDetector gesture={composedGesture}>
         <Animated.View style={[containerStyle, containerAnimatedStyle]}>
-          <Pressable onPress={handleExpand} onLongPress={handleStartEdit}>
-            <View style={rowStyle}>
+          <View style={rowStyle}>
               {/* Play indicator / waveform */}
               <View
                 style={{
@@ -306,8 +322,7 @@ export function MemoItem({
                   <Icon name={Pencil} size={18} color={textMuted} />
                 </Pressable>
               )}
-            </View>
-          </Pressable>
+          </View>
 
           {/* Expanded playback controls */}
           {isExpanded && isLoaded && (
