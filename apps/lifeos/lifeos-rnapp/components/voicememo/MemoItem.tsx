@@ -2,7 +2,7 @@ import { useColor } from '@/hooks/useColor';
 import { View, ViewStyle, Pressable, Platform, TextInput } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
-import { Play, Pause, Trash2, Pencil, Check, X, Cloud, CloudOff } from 'lucide-react-native';
+import { Play, Pause, Trash2, Pencil, Check, X, Cloud, CloudOff, RefreshCw } from 'lucide-react-native';
 import { VoiceMemo } from '@/utils/voicememo/storage';
 import {
   formatDurationShort,
@@ -331,8 +331,8 @@ export function MemoItem({
                 onRetry={handleRetryTranscription}
               />
 
-              {/* Sync button for local memos */}
-              {memo.syncStatus === 'local' && onSync && (
+              {/* Sync button for local or failed memos */}
+              {(memo.syncStatus === 'local' || memo.syncStatus === 'error') && onSync && (
                 <Pressable
                   onPress={handleSync}
                   style={{
@@ -340,19 +340,26 @@ export function MemoItem({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    backgroundColor: blueColor + '20',
+                    backgroundColor: memo.syncStatus === 'error' ? redColor + '20' : blueColor + '20',
                     paddingVertical: 10,
                     paddingHorizontal: 16,
                     borderRadius: 8,
                     marginTop: 12,
                   }}
                 >
-                  <Icon name={Cloud} size={16} color={blueColor} />
+                  <Icon
+                    name={memo.syncStatus === 'error' ? RefreshCw : Cloud}
+                    size={16}
+                    color={memo.syncStatus === 'error' ? redColor : blueColor}
+                  />
                   <Text
                     variant="body"
-                    style={{ color: blueColor, fontWeight: '500' }}
+                    style={{
+                      color: memo.syncStatus === 'error' ? redColor : blueColor,
+                      fontWeight: '500',
+                    }}
                   >
-                    Sync to Cloud
+                    {memo.syncStatus === 'error' ? 'Retry Sync' : 'Sync to Cloud'}
                   </Text>
                 </Pressable>
               )}

@@ -6,17 +6,20 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, X } from "lucide-react";
 
 interface PanelActionsProps {
   panelId: string;
 }
 
 export function PanelActions({ panelId }: PanelActionsProps) {
-  const { messages, panelConfigs } = useChatNexus();
+  const { messages, panelConfigs, removePanel, streamState } = useChatNexus();
   const [copied, setCopied] = useState(false);
 
   const config = panelConfigs.find((p) => p.panelId === panelId);
+  const canRemovePanel = panelConfigs.length > 1;
+  const panelStream = streamState[panelId];
+  const isStreaming = panelStream?.status === "pending" || panelStream?.status === "streaming";
 
   // Get all assistant messages for this panel
   const panelMessages = messages?.filter(
@@ -57,6 +60,24 @@ export function PanelActions({ panelId }: PanelActionsProps) {
         </TooltipTrigger>
         <TooltipContent>Copy last response</TooltipContent>
       </Tooltip>
+
+      {/* Remove panel */}
+      {canRemovePanel && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => removePanel(panelId)}
+              disabled={isStreaming}
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Remove panel</TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 }

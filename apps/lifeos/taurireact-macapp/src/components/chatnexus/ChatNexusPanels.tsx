@@ -1,17 +1,27 @@
 import { useChatNexus } from "../../lib/contexts/ChatNexusContext";
 import { ChatPanel } from "./ChatPanel";
-import { LAYOUT_CONFIGS } from "../../lib/constants/models";
+
+// Get grid class based on actual panel count
+function getGridClass(panelCount: number): string {
+  switch (panelCount) {
+    case 1:
+      return "grid grid-cols-1";
+    case 2:
+      return "grid grid-cols-2";
+    case 3:
+      return "grid grid-cols-3";
+    case 4:
+      return "grid grid-cols-2 grid-rows-2";
+    default:
+      // Fallback for any other count
+      return panelCount <= 2 ? "grid grid-cols-2" : "grid grid-cols-3";
+  }
+}
 
 export function ChatNexusPanels() {
-  const { layoutType, panelConfigs } = useChatNexus();
+  const { panelConfigs } = useChatNexus();
 
-  const gridConfig = LAYOUT_CONFIGS[layoutType];
-
-  // For grid-2x2, we need special handling for 2 rows
-  const gridClass =
-    layoutType === "grid-2x2"
-      ? "grid grid-cols-2 grid-rows-2"
-      : `grid ${gridConfig.gridCols}`;
+  const gridClass = getGridClass(panelConfigs.length);
 
   return (
     <div className={`h-full p-2 gap-2 ${gridClass}`}>

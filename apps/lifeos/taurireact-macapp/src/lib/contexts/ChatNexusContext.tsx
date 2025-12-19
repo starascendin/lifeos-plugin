@@ -70,6 +70,7 @@ interface ChatNexusContextValue {
   setLayoutType: (type: LayoutType) => void;
   updatePanelModel: (panelId: string, model: ModelOption) => void;
   applyTierToAllPanels: (tier: ModelTier) => void;
+  removePanel: (panelId: string) => void;
   sendMessage: (content: string) => Promise<void>;
   archiveConversation: (id: Id<"lifeos_chatnexusConversations">) => Promise<void>;
   deleteConversation: (id: Id<"lifeos_chatnexusConversations">) => Promise<void>;
@@ -435,6 +436,44 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
     ]
   );
 
+  const removePanel = useCallback(
+    (panelId: string) => {
+      // Don't remove if only one panel left
+      if (panelConfigs.length <= 1) return;
+
+      // Don't remove if panel is currently streaming
+      const panelStream = streamState[panelId];
+      if (panelStream?.status === "pending" || panelStream?.status === "streaming") {
+        return;
+      }
+
+      // Filter out the panel and re-number positions
+      const newConfigs = panelConfigs
+        .filter((config) => config.panelId !== panelId)
+        .map((config, index) => ({
+          ...config,
+          position: index,
+        }));
+
+      setPanelConfigs(newConfigs);
+
+      // Clear stream state for removed panel
+      setStreamState((prev) => {
+        const { [panelId]: _, ...rest } = prev;
+        return rest;
+      });
+
+      // Update conversation if one is selected
+      if (currentConversationId) {
+        updateConversationMutation({
+          conversationId: currentConversationId,
+          panelConfigs: newConfigs,
+        });
+      }
+    },
+    [panelConfigs, streamState, currentConversationId, updateConversationMutation]
+  );
+
   const createConversation = useCallback(async () => {
     const conversationId = await createConversationMutation({
       title: "New Chat",
@@ -699,6 +738,7 @@ export function ChatNexusProvider({ children }: { children: ReactNode }) {
     setLayoutType,
     updatePanelModel,
     applyTierToAllPanels,
+    removePanel,
     sendMessage,
     archiveConversation,
     deleteConversation,
