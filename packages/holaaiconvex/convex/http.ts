@@ -621,13 +621,24 @@ ${anonymizedResponses}
 
 ---
 
-Please evaluate each response based on:
-1. Accuracy and correctness
-2. Completeness and depth
-3. Clarity and organization
-4. Helpfulness and practicality
+## Evaluation Instructions
 
-After your evaluation, provide a final ranking of all responses from best to worst.
+For EACH response, provide a detailed evaluation using the following table format:
+
+### Response [Letter]
+
+| Aspect | Points For (Strengths) | Points Against (Weaknesses) |
+|--------|----------------------|---------------------------|
+| **Accuracy** | [What is correct/accurate] | [Any errors or inaccuracies] |
+| **Completeness** | [What is thorough/comprehensive] | [What is missing or lacking] |
+| **Clarity** | [What is well-explained/organized] | [What is confusing or unclear] |
+| **Practicality** | [What is useful/actionable] | [What is impractical or unhelpful] |
+
+**Summary:** [1-2 sentence overall assessment]
+
+---
+
+After evaluating ALL responses with the table format above, provide your final ranking.
 
 **IMPORTANT:** You MUST end your response with a line in this exact format:
 FINAL RANKING: ${labels.slice(0, stage1Responses.length).join(" > ")}

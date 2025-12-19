@@ -2,6 +2,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -9,7 +15,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLLMCouncil } from "@/lib/contexts/LLMCouncilContext";
 import { cn } from "@/lib/utils";
-import { Plus, MessageSquare, MoreHorizontal, Archive, Trash2, Edit2 } from "lucide-react";
+import {
+  Plus,
+  MessageSquare,
+  MoreHorizontal,
+  Archive,
+  Trash2,
+  Edit2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import type { Id } from "@holaai/convex";
 
 export function ConversationSidebar() {
@@ -22,6 +37,8 @@ export function ConversationSidebar() {
     deleteConversation,
     updateConversationTitle,
     isDeliberating,
+    sidebarCollapsed,
+    toggleSidebar,
   } = useLLMCouncil();
 
   const [editingId, setEditingId] = useState<Id<"lifeos_llmcouncilConversations"> | null>(null);
@@ -76,10 +93,93 @@ export function ConversationSidebar() {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
+  // Collapsed view - narrow icon-only sidebar
+  if (sidebarCollapsed) {
+    return (
+      <TooltipProvider delayDuration={0}>
+        <div className="w-12 border-r flex flex-col bg-muted/30 transition-all duration-300">
+          {/* Header with expand button and new conversation button */}
+          <div className="p-2 border-b flex flex-col items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={toggleSidebar}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Expand sidebar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleNewConversation}
+                  disabled={isDeliberating}
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">New Council</TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Conversation icons */}
+          <ScrollArea className="flex-1">
+            <div className="p-1 space-y-1">
+              {conversations?.map((conversation) => (
+                <Tooltip key={conversation._id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-8 w-8 w-full",
+                        currentConversationId === conversation._id
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-accent/50"
+                      )}
+                      onClick={() => loadConversation(conversation._id)}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-[200px]">
+                    <div className="font-medium">{conversation.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatDate(conversation.updatedAt)}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      </TooltipProvider>
+    );
+  }
+
+  // Expanded view - full sidebar
   return (
-    <div className="w-64 border-r flex flex-col bg-muted/30">
-      {/* Header with new conversation button */}
+    <div className="w-64 border-r flex flex-col bg-muted/30 transition-all duration-300">
+      {/* Header with collapse button and new conversation button */}
       <div className="p-3 border-b">
+        <div className="flex items-center gap-2 mb-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={toggleSidebar}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium">Conversations</span>
+        </div>
         <Button
           onClick={handleNewConversation}
           disabled={isDeliberating}

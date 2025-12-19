@@ -91,6 +91,11 @@ interface LLMCouncilContextValue {
   deliberationState: DeliberationState;
   isDeliberating: boolean;
 
+  // Sidebar state
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+
   // Actions
   createConversation: () => Promise<Id<"lifeos_llmcouncilConversations">>;
   loadConversation: (id: Id<"lifeos_llmcouncilConversations">) => void;
@@ -174,6 +179,26 @@ export function LLMCouncilProvider({ children }: { children: ReactNode }) {
     stage1Responses: [],
     stage2Evaluations: [],
   });
+
+  // Sidebar collapse state with localStorage persistence
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("llmcouncil-sidebar-collapsed");
+      return stored === "true";
+    }
+    return false;
+  });
+
+  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setSidebarCollapsedState(collapsed);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("llmcouncil-sidebar-collapsed", String(collapsed));
+    }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  }, [sidebarCollapsed, setSidebarCollapsed]);
 
   // Convex queries
   const conversations = useQuery(api.lifeos.llmcouncil.getConversations, {
@@ -620,6 +645,11 @@ export function LLMCouncilProvider({ children }: { children: ReactNode }) {
     // Deliberation state
     deliberationState,
     isDeliberating,
+
+    // Sidebar state
+    sidebarCollapsed,
+    toggleSidebar,
+    setSidebarCollapsed,
 
     // Actions
     createConversation,

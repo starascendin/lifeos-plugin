@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, Trophy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+// Table styling is applied via prose classes
 import type {
   Stage2Evaluation,
   AggregateRanking,
@@ -163,19 +164,19 @@ export function Stage2Panel({
               </div>
             )}
 
-            <ScrollArea className="h-48 rounded-md border p-4">
+            <div className="rounded-md border p-4 max-h-[500px] overflow-y-auto">
               {evaluation.error ? (
                 <div className="text-destructive text-sm">
                   {evaluation.error}
                 </div>
               ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown>
+                <div className="prose prose-sm dark:prose-invert max-w-none prose-table:text-sm prose-th:bg-muted prose-th:p-2 prose-td:p-2 prose-table:border prose-th:border prose-td:border">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {deanonymizeText(evaluation.evaluation)}
                   </ReactMarkdown>
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </TabsContent>
         ))}
       </Tabs>
