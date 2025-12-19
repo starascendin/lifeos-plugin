@@ -111,36 +111,6 @@ export const WHITELISTED_MODELS: ModelOption[] = [
     name: "GPT-5 Nano",
     description: "Ultra-fast GPT-5",
   },
-  {
-    id: "openai/gpt-4.1",
-    provider: "openai",
-    name: "GPT-4.1",
-    description: "GPT-4.1 base model",
-  },
-  {
-    id: "openai/gpt-4.1-mini",
-    provider: "openai",
-    name: "GPT-4.1 Mini",
-    description: "Fast GPT-4.1",
-  },
-  {
-    id: "openai/gpt-4.1-nano",
-    provider: "openai",
-    name: "GPT-4.1 Nano",
-    description: "Ultra-fast GPT-4.1",
-  },
-  {
-    id: "openai/gpt-4o",
-    provider: "openai",
-    name: "GPT-4o",
-    description: "GPT-4 Omni multimodal",
-  },
-  {
-    id: "openai/gpt-4o-mini",
-    provider: "openai",
-    name: "GPT-4o Mini",
-    description: "Fast and very affordable",
-  },
   // ==================== Google ====================
   {
     id: "google/gemini-3-pro-preview",

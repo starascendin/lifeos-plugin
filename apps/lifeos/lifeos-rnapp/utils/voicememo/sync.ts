@@ -1,4 +1,4 @@
-import { readAsStringAsync, EncodingType } from 'expo-file-system/legacy';
+import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { Id } from '@holaai/convex/_generated/dataModel';
 
 /**
@@ -15,33 +15,21 @@ export async function uploadAudioToConvex(
   // Get the upload URL from Convex
   const uploadUrl = await generateUploadUrl();
 
-  // Read the file as base64
-  const base64Data = await readAsStringAsync(localUri, {
-    encoding: EncodingType.Base64,
-  });
-
-  // Convert base64 to blob
-  const binaryString = atob(base64Data);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  const blob = new Blob([bytes], { type: 'audio/mp4' });
-
-  // Upload to Convex storage
-  const response = await fetch(uploadUrl, {
-    method: 'POST',
+  // Upload file directly using expo-file-system
+  // This avoids the Blob API which doesn't support ArrayBuffer in React Native
+  const response = await uploadAsync(uploadUrl, localUri, {
+    httpMethod: 'POST',
+    uploadType: FileSystemUploadType.BINARY_CONTENT,
     headers: {
       'Content-Type': 'audio/mp4',
     },
-    body: blob,
   });
 
-  if (!response.ok) {
+  if (response.status < 200 || response.status >= 300) {
     throw new Error(`Failed to upload audio: ${response.status}`);
   }
 
-  const result = await response.json();
+  const result = JSON.parse(response.body);
   return result.storageId as Id<'_storage'>;
 }
 
