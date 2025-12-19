@@ -18,7 +18,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         className={cn(
           "max-w-[85%] rounded-lg px-4 py-2",
           isUser
-            ? "bg-primary text-primary-foreground"
+            ? "bg-secondary text-secondary-foreground"
             : "bg-muted text-foreground"
         )}
       >
@@ -44,7 +44,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <div
           className={cn(
             "text-xs mt-1",
-            isUser ? "text-primary-foreground/60" : "text-muted-foreground"
+            isUser ? "text-secondary-foreground/60" : "text-muted-foreground"
           )}
         >
           {formatTime(message.createdAt)}
