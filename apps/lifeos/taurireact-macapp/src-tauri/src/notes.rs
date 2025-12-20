@@ -738,6 +738,282 @@ pub async fn get_exported_notes() -> Result<Vec<AppleNote>, String> {
     Ok(result)
 }
 
+/// Result for internal background notes sync
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NotesBackgroundSyncResult {
+    pub exported_count: i32,
+    pub skipped_count: i32,
+    pub total_processed: i32,
+}
+
+/// Get the last notes sync timestamp from database
+fn get_last_notes_sync_time(conn: &Connection) -> Option<i64> {
+    conn.query_row(
+        "SELECT synced_at FROM notes_sync_history ORDER BY synced_at DESC LIMIT 1",
+        [],
+        |row| row.get(0),
+    )
+    .ok()
+}
+
+/// Record a notes sync in the history
+fn record_notes_sync(conn: &Connection, result: &NotesBackgroundSyncResult) -> Result<(), String> {
+    // Create sync history table if not exists
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notes_sync_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            exported_count INTEGER NOT NULL,
+            skipped_count INTEGER NOT NULL,
+            total_processed INTEGER NOT NULL,
+            synced_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        )",
+        [],
+    )
+    .map_err(|e| format!("Failed to create notes_sync_history table: {}", e))?;
+
+    conn.execute(
+        "INSERT INTO notes_sync_history (exported_count, skipped_count, total_processed) VALUES (?1, ?2, ?3)",
+        params![result.exported_count, result.skipped_count, result.total_processed],
+    )
+    .map_err(|e| format!("Failed to record notes sync: {}", e))?;
+
+    // Keep only last 10 syncs
+    conn.execute(
+        "DELETE FROM notes_sync_history WHERE id NOT IN (SELECT id FROM notes_sync_history ORDER BY synced_at DESC LIMIT 10)",
+        [],
+    )
+    .map_err(|e| format!("Failed to cleanup old notes sync history: {}", e))?;
+
+    Ok(())
+}
+
+/// Check if notes sync should run (once per day)
+pub fn should_run_notes_sync() -> bool {
+    let db_path = match get_notes_db_path() {
+        Some(path) => path,
+        None => return true, // Run if we can't determine path
+    };
+
+    if !db_path.exists() {
+        return true; // Run if database doesn't exist
+    }
+
+    let conn = match Connection::open(&db_path) {
+        Ok(c) => c,
+        Err(_) => return true, // Run if we can't open database
+    };
+
+    // Initialize sync history table
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS notes_sync_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            exported_count INTEGER NOT NULL,
+            skipped_count INTEGER NOT NULL,
+            total_processed INTEGER NOT NULL,
+            synced_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        )",
+        [],
+    );
+
+    let last_sync = get_last_notes_sync_time(&conn);
+
+    match last_sync {
+        Some(timestamp) => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+
+            // Check if more than 24 hours have passed (86400 seconds)
+            let hours_since_sync = (now - timestamp) / 3600;
+            hours_since_sync >= 24
+        }
+        None => true, // Run if no previous sync
+    }
+}
+
+/// Internal notes export function for background sync (no AppHandle required)
+/// Exports notes modified in the last 30 days
+pub fn export_notes_internal() -> Result<NotesBackgroundSyncResult, String> {
+    // Ensure data directory exists
+    let data_dir =
+        get_notes_data_dir().ok_or_else(|| "Could not determine app data directory".to_string())?;
+    fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data directory: {}", e))?;
+
+    // Initialize database
+    let db_path =
+        get_notes_db_path().ok_or_else(|| "Could not determine database path".to_string())?;
+
+    // Ensure parent directory exists
+    if let Some(parent) = db_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create database directory: {}", e))?;
+    }
+
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    init_database(&conn)?;
+
+    // Process folders first
+    let raw_folders = extract_folders()?;
+    let sorted_folders = topological_sort(raw_folders);
+
+    let mut folder_long_ids_to_id: HashMap<String, i64> = HashMap::new();
+    let mut folder_ids_to_names: HashMap<i64, String> = HashMap::new();
+
+    for folder in sorted_folders {
+        let parent_id = folder
+            .parent
+            .as_ref()
+            .and_then(|p| folder_long_ids_to_id.get(p).copied());
+
+        conn.execute(
+            "INSERT INTO folders (long_id, name, parent_id) VALUES (?1, ?2, ?3)
+             ON CONFLICT(long_id) DO UPDATE SET name = excluded.name, parent_id = excluded.parent_id",
+            params![folder.long_id, folder.name, parent_id],
+        )
+        .map_err(|e| format!("Failed to insert folder: {}", e))?;
+
+        let id: i64 = conn
+            .query_row(
+                "SELECT id FROM folders WHERE long_id = ?1",
+                params![folder.long_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Failed to get folder id: {}", e))?;
+
+        folder_long_ids_to_id.insert(folder.long_id.clone(), id);
+        folder_ids_to_names.insert(id, folder.name.clone());
+    }
+
+    // Get existing notes for comparison
+    let mut existing_notes: HashMap<String, String> = HashMap::new();
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, updated FROM notes")
+            .map_err(|e| format!("Failed to prepare query: {}", e))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| format!("Failed to query existing notes: {}", e))?;
+
+        for (id, updated) in rows.flatten() {
+            existing_notes.insert(id, updated);
+        }
+    }
+
+    // Generate split token
+    let split: String = (0..16)
+        .map(|_| format!("{:x}", rand::random::<u8>() % 16))
+        .collect();
+
+    // Export notes from last 30 days for background sync
+    let script = get_extract_script_days(30).replace("{split}", &split);
+
+    // Process notes
+    let mut exported_count = 0;
+    let mut skipped_count = 0;
+    let mut processed_count = 0;
+
+    let lines = execute_applescript_streaming(&script)?;
+    let mut current_note: HashMap<String, String> = HashMap::new();
+    let mut body_lines: Vec<String> = Vec::new();
+
+    for line in lines {
+        let line_stripped = line.trim_end();
+
+        if line_stripped == format!("{}{}", split, split) {
+            // End of note
+            if let Some(id) = current_note.get("id") {
+                let note_updated = current_note.get("updated").cloned().unwrap_or_default();
+
+                // Check if note needs updating
+                let needs_update = match existing_notes.get(id) {
+                    Some(existing_updated) => existing_updated != &note_updated,
+                    None => true,
+                };
+
+                if needs_update {
+                    let folder_long_id = current_note.get("folder").cloned().unwrap_or_default();
+                    let folder_id = folder_long_ids_to_id.get(&folder_long_id).copied();
+                    let folder_name = folder_id
+                        .and_then(|id| folder_ids_to_names.get(&id))
+                        .cloned()
+                        .unwrap_or_else(|| "Uncategorized".to_string());
+
+                    let note = AppleNote {
+                        id: id.clone(),
+                        title: current_note.get("title").cloned().unwrap_or_default(),
+                        body: body_lines.join("\n"),
+                        created: current_note.get("created").cloned().unwrap_or_default(),
+                        updated: note_updated.clone(),
+                        folder_id,
+                        folder_long_id,
+                        markdown_path: None,
+                    };
+
+                    // Create markdown file
+                    let markdown_path = create_markdown_file(&note, &data_dir, &folder_name)?;
+                    let markdown_path_str = markdown_path.to_string_lossy().to_string();
+
+                    // Save to database
+                    conn.execute(
+                        "INSERT OR REPLACE INTO notes (id, created, updated, folder_id, title, body, markdown_path)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                        params![
+                            note.id,
+                            note.created,
+                            note.updated,
+                            note.folder_id,
+                            note.title,
+                            note.body,
+                            markdown_path_str
+                        ],
+                    )
+                    .map_err(|e| format!("Failed to insert note: {}", e))?;
+
+                    exported_count += 1;
+                } else {
+                    skipped_count += 1;
+                }
+
+                processed_count += 1;
+            }
+
+            current_note.clear();
+            body_lines.clear();
+            continue;
+        }
+
+        // Parse note fields
+        let mut found_key = false;
+        for key in &["id", "title", "folder", "created", "updated"] {
+            let prefix = format!("{}-{}: ", split, key);
+            if line_stripped.starts_with(&prefix) {
+                let value = line_stripped[prefix.len()..].to_string();
+                current_note.insert(key.to_string(), value);
+                found_key = true;
+                break;
+            }
+        }
+
+        if !found_key {
+            body_lines.push(line_stripped.to_string());
+        }
+    }
+
+    let result = NotesBackgroundSyncResult {
+        exported_count,
+        skipped_count,
+        total_processed: processed_count,
+    };
+
+    // Record the sync
+    record_notes_sync(&conn, &result)?;
+
+    Ok(result)
+}
+
 /// Get all exported folders from local database
 #[command]
 pub async fn get_exported_folders() -> Result<Vec<AppleFolder>, String> {
