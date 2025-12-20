@@ -8,19 +8,20 @@ Clerk:
 
 
 Convex:
-- it uses 2 PROJECTS:
-    - holaaiconvex-staging (packages/holaaiconvex)
+- 1 CODEBASE (packages/holaaiconvex) deploys to 2 PROJECTS:
+    - holaaiconvex-staging project:
         - beaming-giraffe-300 -- dev cloud  (MY DEV ENV)
-        - adorable-firefly-704 -- production cloud (MY STAGINIG ENV)
-    - holaconvex-prod (packages/holaaiconvex_prod)
+        - adorable-firefly-704 -- production cloud (MY STAGING ENV)
+        - deploy: `pnpm --filter @holaai/convex dev` or `pnpm --filter @holaai/convex deploy`
+    - holaconvex-prod project:
         - keen-nightingale-310 -- dev cloud (NOT USED)
-        - production id -- agreeable-ibex-949 (MY PRODUCTION ENV)
-    - holaaiconvex-staging and holaconvex-prod should have same parity based on the git workflow dev -> staging -> prod (main branch)
+        - agreeable-ibex-949 -- production cloud (MY PRODUCTION ENV)
+        - deploy: `pnpm --filter @holaai/convex deploy:prod`
 
 
-Vecel:
+Vercel:
 - 1 app "holaai-tanstack"
-    - environement:
+    - environment:
         - preview -- for dev branch
         - staging -- for staging branch
         - production -- for main branch

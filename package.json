@@ -17,8 +17,7 @@
     "ios": "pnpm --filter @holaai/rnapp ios",
     "android": "pnpm --filter @holaai/rnapp android",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "convex:sync-to-prod": "bash scripts/convex-sync-to-prod.sh"
+    "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "typescript": "~5.9.2",

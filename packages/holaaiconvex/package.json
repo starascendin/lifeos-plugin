@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "convex dev",
     "dev:once": "convex dev --once",
+    "dev:prod": "dotenv -e .env.production -- bash -c 'echo \"=> Target: $CONVEX_URL (PROD)\" && convex dev'",
+    "dev:prod:once": "dotenv -e .env.production -- bash -c 'echo \"=> Target: $CONVEX_URL (PROD)\" && convex dev --once'",
+    "convex:deploy": "dotenv -e .env.local -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (STAGING)\" && convex deploy'",
+    "convex:deploy:prod": "dotenv -e .env.production -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (PROD)\" && convex deploy'",
     "typecheck": "tsc --noEmit",
     "seed:prod": "./scripts/seed-prod.sh",
     "seed:dev": "./scripts/seed-prod.sh --dev",
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "dotenv-cli": "^11.0.0",
     "typescript": "~5.9.2"
   }
 }
