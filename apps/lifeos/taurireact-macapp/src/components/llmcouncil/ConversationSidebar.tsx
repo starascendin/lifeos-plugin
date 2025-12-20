@@ -129,36 +129,29 @@ export function ConversationSidebar() {
             </Tooltip>
           </div>
 
-          {/* Conversation icons */}
-          <ScrollArea className="flex-1">
-            <div className="p-1 space-y-1">
-              {conversations?.map((conversation) => (
-                <Tooltip key={conversation._id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-8 w-8 w-full",
-                        currentConversationId === conversation._id
-                          ? "bg-accent text-accent-foreground"
-                          : "hover:bg-accent/50"
-                      )}
-                      onClick={() => loadConversation(conversation._id)}
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-[200px]">
-                    <div className="font-medium">{conversation.title}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatDate(conversation.updatedAt)}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-          </ScrollArea>
+          {/* Conversations icon - expands sidebar when clicked */}
+          <div className="p-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 w-full hover:bg-accent/50"
+                  onClick={toggleSidebar}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <div className="font-medium">Conversations</div>
+                {conversations && conversations.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+                  </div>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </TooltipProvider>
     );
