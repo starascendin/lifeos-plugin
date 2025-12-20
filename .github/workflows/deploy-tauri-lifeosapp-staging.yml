@@ -34,6 +34,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Deploy Convex to Staging
+        working-directory: packages/holaaiconvex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          echo "=> Deploying to: https://adorable-firefly-704.convex.cloud (STAGING)"
+          npx convex deploy
+
       - name: Install Vercel CLI
         run: npm install -g vercel
 
