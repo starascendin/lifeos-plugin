@@ -1,7 +1,7 @@
 import { Drawer } from 'expo-router/drawer';
 import { useColor } from '@/hooks/useColor';
 import { DrawerContent } from '@/components/drawer/DrawerContent';
-import { Home, Settings, Mic } from 'lucide-react-native';
+import { Home, Settings, Mic, BookOpen } from 'lucide-react-native';
 import { Icon } from '@/components/ui/icon';
 
 export default function DrawerLayout() {
@@ -42,6 +42,17 @@ export default function DrawerLayout() {
           title: 'Home',
           drawerIcon: ({ color, size }) => (
             <Icon name={Home} color={color} size={size} />
+          ),
+        }}
+      />
+
+      <Drawer.Screen
+        name='journal'
+        options={{
+          drawerLabel: 'Journal',
+          title: 'Journal',
+          drawerIcon: ({ color, size }) => (
+            <Icon name={BookOpen} color={color} size={size} />
           ),
         }}
       />
