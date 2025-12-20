@@ -36,9 +36,8 @@ jobs:
 
       - name: Deploy Convex to Dev
         working-directory: packages/holaaiconvex
-        env:
-          CONVEX_DEPLOYMENT: dev:beaming-giraffe-300
         run: |
+          echo "CONVEX_DEPLOYMENT=dev:beaming-giraffe-300" > .env.local
           echo "=> Deploying to: https://beaming-giraffe-300.convex.cloud (DEV)"
           npx convex dev --once
 
