@@ -4,7 +4,7 @@ mod notes;
 mod screentime;
 mod youtube;
 
-use notes::{count_apple_notes, export_apple_notes, get_exported_folders, get_exported_notes};
+use notes::{count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders, get_exported_notes, should_run_notes_sync};
 use screentime::{
     check_screentime_permission, get_device_id, get_screentime_daily_stats,
     get_screentime_recent_summaries, get_screentime_sync_history, list_screentime_devices,
@@ -109,6 +109,49 @@ pub fn run() {
 
                     // Wait 30 minutes before next sync
                     sleep(Duration::from_secs(30 * 60)).await;
+                }
+            });
+
+            // Start background notes export scheduler (once per day)
+            tauri::async_runtime::spawn(async {
+                // Initial delay of 30 seconds before first check
+                sleep(Duration::from_secs(30)).await;
+
+                loop {
+                    // Check if we should run notes sync (once per day)
+                    let should_sync = tauri::async_runtime::spawn_blocking(should_run_notes_sync)
+                        .await
+                        .unwrap_or(false);
+
+                    if should_sync {
+                        println!("[Background Sync] Running scheduled notes export (daily)...");
+
+                        // Run the export in a blocking task since it uses SQLite and AppleScript
+                        let result = tauri::async_runtime::spawn_blocking(export_notes_internal).await;
+
+                        match result {
+                            Ok(Ok(sync_result)) => {
+                                println!(
+                                    "[Background Sync] Notes export complete: {} exported, {} unchanged, {} total",
+                                    sync_result.exported_count,
+                                    sync_result.skipped_count,
+                                    sync_result.total_processed
+                                );
+                            }
+                            Ok(Err(e)) => {
+                                println!("[Background Sync] Notes export failed: {}", e);
+                            }
+                            Err(e) => {
+                                println!("[Background Sync] Notes export task error: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("[Background Sync] Notes export skipped (already synced today)");
+                    }
+
+                    // Check every hour if we need to run notes sync
+                    // This ensures we catch the 24-hour mark even if app was closed
+                    sleep(Duration::from_secs(60 * 60)).await;
                 }
             });
 
