@@ -11,6 +11,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@clerk/clerk-expo';
 import { RadialMenuItem } from './RadialMenuItem';
 import { VoiceMemoModal } from './VoiceMemoModal';
 import { QuickNoteModal } from './QuickNoteModal';
@@ -39,13 +40,14 @@ export function QuickAddFAB({
   const [showVoiceMemoModal, setShowVoiceMemoModal] = useState(false);
   const [showQuickNoteModal, setShowQuickNoteModal] = useState(false);
 
+  const { userId } = useAuth();
   const primary = useColor('primary');
   const card = useColor('card');
   const text = useColor('text');
   const redColor = useColor('red');
   const blueColor = useColor('blue');
 
-  const { addMemo } = useVoiceMemoStorage();
+  const { addMemo } = useVoiceMemoStorage(userId ?? null);
   const { addNote } = useQuickNotes();
 
   // Animation values

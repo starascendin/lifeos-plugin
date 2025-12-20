@@ -8,6 +8,7 @@ import {
   moveToMemoDirectory,
   generateMemoFilename,
   generateUUID,
+  migrateLegacyMemos,
 } from '@/utils/voicememo/storage';
 import { generateDefaultName } from '@/utils/voicememo/format';
 
@@ -20,13 +21,17 @@ interface UseVoiceMemoStorageReturn {
   refreshMemos: () => Promise<void>;
 }
 
-export function useVoiceMemoStorage(): UseVoiceMemoStorageReturn {
+export function useVoiceMemoStorage(userId: string | null): UseVoiceMemoStorageReturn {
   const [memos, setMemos] = useState<VoiceMemo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshMemos = useCallback(async () => {
+    if (!userId) {
+      setMemos([]);
+      return;
+    }
     try {
-      const loadedMemos = await loadMemoMetadata();
+      const loadedMemos = await loadMemoMetadata(userId);
       // Migrate old memos that don't have syncStatus
       const migratedMemos = loadedMemos.map((memo) => ({
         ...memo,
@@ -38,12 +43,19 @@ export function useVoiceMemoStorage(): UseVoiceMemoStorageReturn {
     } catch (error) {
       console.error('Failed to load memos:', error);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     const initialize = async () => {
+      if (!userId) {
+        setMemos([]);
+        setIsLoading(false);
+        return;
+      }
       try {
-        await initializeStorage();
+        // Migrate any legacy memos from shared storage to user-specific storage
+        await migrateLegacyMemos(userId);
+        await initializeStorage(userId);
         await refreshMemos();
       } catch (error) {
         console.error('Failed to initialize storage:', error);
@@ -52,13 +64,17 @@ export function useVoiceMemoStorage(): UseVoiceMemoStorageReturn {
       }
     };
 
+    setIsLoading(true);
     initialize();
-  }, [refreshMemos]);
+  }, [userId, refreshMemos]);
 
   const addMemo = useCallback(
     async (sourceUri: string, duration: number): Promise<VoiceMemo> => {
+      if (!userId) {
+        throw new Error('User ID is required to add a memo');
+      }
       const filename = generateMemoFilename();
-      const uri = await moveToMemoDirectory(sourceUri, filename);
+      const uri = await moveToMemoDirectory(userId, sourceUri, filename);
 
       const now = Date.now();
       const newMemo: VoiceMemo = {
@@ -72,16 +88,19 @@ export function useVoiceMemoStorage(): UseVoiceMemoStorageReturn {
       };
 
       const updatedMemos = [newMemo, ...memos];
-      await saveMemoMetadata(updatedMemos);
+      await saveMemoMetadata(userId, updatedMemos);
       setMemos(updatedMemos);
 
       return newMemo;
     },
-    [memos]
+    [userId, memos]
   );
 
   const updateMemo = useCallback(
     async (id: string, updates: Partial<VoiceMemo>) => {
+      if (!userId) {
+        throw new Error('User ID is required to update a memo');
+      }
       const updatedMemos = memos.map((memo) => {
         if (memo.id === id) {
           return {
@@ -93,24 +112,27 @@ export function useVoiceMemoStorage(): UseVoiceMemoStorageReturn {
         return memo;
       });
 
-      await saveMemoMetadata(updatedMemos);
+      await saveMemoMetadata(userId, updatedMemos);
       setMemos(updatedMemos);
     },
-    [memos]
+    [userId, memos]
   );
 
   const deleteMemo = useCallback(
     async (id: string) => {
+      if (!userId) {
+        throw new Error('User ID is required to delete a memo');
+      }
       const memoToDelete = memos.find((m) => m.id === id);
       if (!memoToDelete) return;
 
       await deleteMemoFile(memoToDelete.uri);
 
       const updatedMemos = memos.filter((m) => m.id !== id);
-      await saveMemoMetadata(updatedMemos);
+      await saveMemoMetadata(userId, updatedMemos);
       setMemos(updatedMemos);
     },
-    [memos]
+    [userId, memos]
   );
 
   return {

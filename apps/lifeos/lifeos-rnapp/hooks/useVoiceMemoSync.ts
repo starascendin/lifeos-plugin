@@ -1,13 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useAction } from 'convex/react';
+import { useAuth } from '@clerk/clerk-expo';
 import { api } from '@holaai/convex/_generated/api';
 import { Id } from '@holaai/convex/_generated/dataModel';
 import { useVoiceMemoStorage } from './useVoiceMemoStorage';
-import {
-  VoiceMemo,
-  saveMemoMetadata,
-  deleteMemoFile,
-} from '@/utils/voicememo/storage';
+import { VoiceMemo } from '@/utils/voicememo/storage';
 import { uploadAudioToConvex } from '@/utils/voicememo/sync';
 
 export interface SyncedVoiceMemo extends VoiceMemo {
@@ -30,6 +27,8 @@ interface UseVoiceMemoSyncReturn {
 }
 
 export function useVoiceMemoSync(): UseVoiceMemoSyncReturn {
+  const { userId } = useAuth();
+
   const {
     memos: localMemos,
     isLoading: isLocalLoading,
@@ -37,7 +36,7 @@ export function useVoiceMemoSync(): UseVoiceMemoSyncReturn {
     updateMemo: updateLocalMemo,
     deleteMemo: deleteLocalMemo,
     refreshMemos: refreshLocalMemos,
-  } = useVoiceMemoStorage();
+  } = useVoiceMemoStorage(userId ?? null);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncingMemoIds, setSyncingMemoIds] = useState<Set<string>>(new Set());
