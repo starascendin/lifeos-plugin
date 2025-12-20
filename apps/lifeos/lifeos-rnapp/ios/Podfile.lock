@@ -6,6 +6,9 @@ PODS:
     - ReactCommon/turbomodule/core
   - EXConstants (18.0.10):
     - ExpoModulesCore
+  - EXImageLoader (5.1.0):
+    - ExpoModulesCore
+    - React-Core
   - EXJSONUtils (0.15.0)
   - EXManifests (1.0.9):
     - ExpoModulesCore
@@ -209,6 +212,10 @@ PODS:
     - ExpoModulesCore
   - ExpoBlur (15.0.7):
     - ExpoModulesCore
+  - ExpoCamera (17.0.10):
+    - ExpoModulesCore
+    - ZXingObjC/OneD
+    - ZXingObjC/PDF417
   - ExpoClipboard (8.0.8):
     - ExpoModulesCore
   - ExpoCrypto (15.0.7):
@@ -233,6 +240,8 @@ PODS:
     - SDWebImageAVIFCoder (~> 0.11.0)
     - SDWebImageSVGCoder (~> 1.7.0)
     - SDWebImageWebPCoder (~> 0.14.6)
+  - ExpoImagePicker (16.1.4):
+    - ExpoModulesCore
   - ExpoKeepAwake (15.0.7):
     - ExpoModulesCore
   - ExpoLinking (8.0.9):
@@ -2383,11 +2392,17 @@ PODS:
     - SDWebImage/Core (~> 5.17)
   - WebRTC-SDK (137.7151.04)
   - Yoga (0.0.0)
+  - ZXingObjC/Core (3.6.9)
+  - ZXingObjC/OneD (3.6.9):
+    - ZXingObjC/Core
+  - ZXingObjC/PDF417 (3.6.9):
+    - ZXingObjC/Core
 
 DEPENDENCIES:
   - "EXApplication (from `../../../../node_modules/.pnpm/expo-application@7.0.7_expo@54.0.26/node_modules/expo-application/ios`)"
   - "EXAV (from `../../../../node_modules/.pnpm/expo-av@15.0.2_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__reac_3c238403f7c837b43355063ffc1c7877/node_modules/expo-av/ios`)"
   - "EXConstants (from `../../../../node_modules/.pnpm/expo-constants@18.0.10_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/expo-constants/ios`)"
+  - "EXImageLoader (from `../../../../node_modules/.pnpm/expo-image-loader@5.1.0_expo@54.0.26/node_modules/expo-image-loader/ios`)"
   - "EXJSONUtils (from `../../../../node_modules/.pnpm/expo-json-utils@0.15.0/node_modules/expo-json-utils/ios`)"
   - "EXManifests (from `../../../../node_modules/.pnpm/expo-manifests@1.0.9_expo@54.0.26/node_modules/expo-manifests/ios`)"
   - "Expo (from `../../../../node_modules/.pnpm/expo@54.0.26_@babel+core@7.28.5_@expo+metro-runtime@6.1.2_expo-router@6.0.16_react-nati_6c220c9b1c510154614aa1271e88beb9/node_modules/expo`)"
@@ -2397,6 +2412,7 @@ DEPENDENCIES:
   - "expo-dev-menu-interface (from `../../../../node_modules/.pnpm/expo-dev-menu-interface@2.0.0_expo@54.0.26/node_modules/expo-dev-menu-interface/ios`)"
   - "ExpoAsset (from `../../../../node_modules/.pnpm/expo-asset@12.0.10_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-asset/ios`)"
   - "ExpoBlur (from `../../../../node_modules/.pnpm/expo-blur@15.0.7_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-blur/ios`)"
+  - "ExpoCamera (from `../../../../node_modules/.pnpm/expo-camera@17.0.10_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__e7638a40026aa83ea941e7edbbc511d2/node_modules/expo-camera/ios`)"
   - "ExpoClipboard (from `../../../../node_modules/.pnpm/expo-clipboard@8.0.8_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-clipboard/ios`)"
   - "ExpoCrypto (from `../../../../node_modules/.pnpm/expo-crypto@15.0.7_expo@54.0.26/node_modules/expo-crypto/ios`)"
   - "ExpoDevice (from `../../../../node_modules/.pnpm/expo-device@8.0.9_expo@54.0.26/node_modules/expo-device/ios`)"
@@ -2406,6 +2422,7 @@ DEPENDENCIES:
   - "ExpoHaptics (from `../../../../node_modules/.pnpm/expo-haptics@15.0.7_expo@54.0.26/node_modules/expo-haptics/ios`)"
   - "ExpoHead (from `../../../../node_modules/.pnpm/expo-router@6.0.16_2a3f45a8b96e31e7197947d41f0e1693/node_modules/expo-router/ios`)"
   - "ExpoImage (from `../../../../node_modules/.pnpm/expo-image@3.0.10_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__r_6aaf521da9f0a1f4f2de4676fdf7e08a/node_modules/expo-image/ios`)"
+  - "ExpoImagePicker (from `../../../../node_modules/.pnpm/expo-image-picker@16.1.4_expo@54.0.26/node_modules/expo-image-picker/ios`)"
   - "ExpoKeepAwake (from `../../../../node_modules/.pnpm/expo-keep-awake@15.0.7_expo@54.0.26_react@19.1.0/node_modules/expo-keep-awake/ios`)"
   - "ExpoLinking (from `../../../../node_modules/.pnpm/expo-linking@8.0.9_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-linking/ios`)"
   - "ExpoModulesCore (from `../../../../node_modules/.pnpm/expo-modules-core@3.0.27_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-modules-core`)"
@@ -2507,6 +2524,7 @@ SPEC REPOS:
     - SDWebImageSVGCoder
     - SDWebImageWebPCoder
     - WebRTC-SDK
+    - ZXingObjC
 
 EXTERNAL SOURCES:
   EXApplication:
@@ -2515,6 +2533,8 @@ EXTERNAL SOURCES:
     :path: "../../../../node_modules/.pnpm/expo-av@15.0.2_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__reac_3c238403f7c837b43355063ffc1c7877/node_modules/expo-av/ios"
   EXConstants:
     :path: "../../../../node_modules/.pnpm/expo-constants@18.0.10_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0_/node_modules/expo-constants/ios"
+  EXImageLoader:
+    :path: "../../../../node_modules/.pnpm/expo-image-loader@5.1.0_expo@54.0.26/node_modules/expo-image-loader/ios"
   EXJSONUtils:
     :path: "../../../../node_modules/.pnpm/expo-json-utils@0.15.0/node_modules/expo-json-utils/ios"
   EXManifests:
@@ -2533,6 +2553,8 @@ EXTERNAL SOURCES:
     :path: "../../../../node_modules/.pnpm/expo-asset@12.0.10_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-asset/ios"
   ExpoBlur:
     :path: "../../../../node_modules/.pnpm/expo-blur@15.0.7_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-blur/ios"
+  ExpoCamera:
+    :path: "../../../../node_modules/.pnpm/expo-camera@17.0.10_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__e7638a40026aa83ea941e7edbbc511d2/node_modules/expo-camera/ios"
   ExpoClipboard:
     :path: "../../../../node_modules/.pnpm/expo-clipboard@8.0.8_expo@54.0.26_react-native@0.81.5_@babel+core@7.28.5_@types+react@19.1.17_react@19.1.0__react@19.1.0/node_modules/expo-clipboard/ios"
   ExpoCrypto:
@@ -2551,6 +2573,8 @@ EXTERNAL SOURCES:
     :path: "../../../../node_modules/.pnpm/expo-router@6.0.16_2a3f45a8b96e31e7197947d41f0e1693/node_modules/expo-router/ios"
   ExpoImage:
     :path: "../../../../node_modules/.pnpm/expo-image@3.0.10_expo@54.0.26_react-native-web@0.21.2_react-dom@19.1.0_react@19.1.0__r_6aaf521da9f0a1f4f2de4676fdf7e08a/node_modules/expo-image/ios"
+  ExpoImagePicker:
+    :path: "../../../../node_modules/.pnpm/expo-image-picker@16.1.4_expo@54.0.26/node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../../../../node_modules/.pnpm/expo-keep-awake@15.0.7_expo@54.0.26_react@19.1.0/node_modules/expo-keep-awake/ios"
   ExpoLinking:
@@ -2735,6 +2759,7 @@ SPEC CHECKSUMS:
   EXApplication: 296622817d459f46b6c5fe8691f4aac44d2b79e7
   EXAV: 4c41f0a6ae54a0b96597abc90e37962ab2ee0d85
   EXConstants: fd688cef4e401dcf798a021cfb5d87c890c30ba3
+  EXImageLoader: 4d3d3284141f1a45006cc4d0844061c182daf7ee
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd
   EXManifests: 26e15640538c3d5ef028077ebcaf004b744d4932
   Expo: 7af24402df45b9384900104e88a11896ffc48161
@@ -2744,6 +2769,7 @@ SPEC CHECKSUMS:
   expo-dev-menu-interface: 600df12ea01efecdd822daaf13cc0ac091775533
   ExpoAsset: d839c8eae8124470332408427327e8f88beb2dfd
   ExpoBlur: 2dd8f64aa31f5d405652c21d3deb2d2588b1852f
+  ExpoCamera: 6a326deb45ba840749652e4c15198317aa78497e
   ExpoClipboard: b36b287d8356887844bb08ed5c84b5979bb4dd1e
   ExpoCrypto: c1fbce112d1b6b79652bbe380b4fd4cc91676595
   ExpoDevice: 148accb4071873d19fba80a2506c58ffa433d620
@@ -2753,6 +2779,7 @@ SPEC CHECKSUMS:
   ExpoHaptics: 807476b0c39e9d82b7270349d6487928ce32df84
   ExpoHead: fc0185d5c2a51ea599aff223aba5d61782301044
   ExpoImage: 9c3428921c536ab29e5c6721d001ad5c1f469566
+  ExpoImagePicker: 0963da31800c906e01c03e25d7c849f16ebf02a2
   ExpoKeepAwake: 1a2e820692e933c94a565ec3fbbe38ac31658ffe
   ExpoLinking: 77455aa013e9b6a3601de03ecfab09858ee1b031
   ExpoModulesCore: bdc95c6daa1639e235a16350134152a0b28e5c72
@@ -2850,6 +2877,7 @@ SPEC CHECKSUMS:
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   WebRTC-SDK: 40d4f5ba05cadff14e4db5614aec402a633f007e
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
+  ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5
 
 PODFILE CHECKSUM: 46823734ce1ba6231efdd3687d41ba691d18ef4c
 
