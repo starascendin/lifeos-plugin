@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>LLM Council</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --chatgpt-color: #10a37f;
+      --claude-color: #d97706;
+      --gemini-color: #8b5cf6;
+    }
+
+    body {
+      background: #0a0a0a;
+      color: #e5e5e5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    .glass {
+      background: rgba(30, 30, 30, 0.8);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stage-card {
+      background: rgba(40, 40, 40, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .tab-active {
+      background: rgba(255, 255, 255, 0.1);
+      border-bottom: 2px solid #8b5cf6;
+    }
+
+    .model-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 9999px;
+    }
+
+    .chatgpt { background: rgba(16, 163, 127, 0.2); color: #10a37f; }
+    .claude { background: rgba(217, 119, 6, 0.2); color: #d97706; }
+    .gemini { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; }
+
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+      font-weight: 600;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .markdown-content h1 { font-size: 1.5rem; }
+    .markdown-content h2 { font-size: 1.25rem; }
+    .markdown-content h3 { font-size: 1.1rem; }
+    .markdown-content p { margin-bottom: 0.75rem; }
+    .markdown-content ul, .markdown-content ol { margin-left: 1.5rem; margin-bottom: 0.75rem; }
+    .markdown-content li { margin-bottom: 0.25rem; }
+    .markdown-content code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+      font-size: 0.875em;
+    }
+    .markdown-content pre {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin-bottom: 0.75rem;
+    }
+    .markdown-content pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .spinner {
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #8b5cf6;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Safe area for iPhone notch */
+    .safe-area-top { padding-top: env(safe-area-inset-top); }
+    .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  </style>
+</head>
+<body class="safe-area-top safe-area-bottom">
+  <div id="app" class="flex flex-col h-screen h-[100dvh]">
+    <!-- Header -->
+    <header class="glass sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
+      <h1 class="text-lg font-semibold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+        LLM Council
+      </h1>
+      <div class="flex items-center gap-2">
+        <select id="tier" class="bg-neutral-800 text-sm rounded-lg px-2 py-1 border border-neutral-700">
+          <option value="mini">Mini</option>
+          <option value="normal" selected>Normal</option>
+          <option value="pro">Pro</option>
+        </select>
+        <select id="chairman" class="bg-neutral-800 text-sm rounded-lg px-2 py-1 border border-neutral-700">
+          <option value="chatgpt">ChatGPT</option>
+          <option value="claude" selected>Claude</option>
+          <option value="gemini">Gemini</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Messages Container -->
+    <main id="messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <!-- Welcome message -->
+      <div id="welcome" class="text-center py-12 text-neutral-500">
+        <div class="text-4xl mb-4">🏛️</div>
+        <p class="text-lg">Ask the Council a question</p>
+        <p class="text-sm mt-2">Three AI models will debate and synthesize an answer</p>
+      </div>
+    </main>
+
+    <!-- Input Area -->
+    <div class="glass sticky bottom-0 px-4 py-3 safe-area-bottom">
+      <form id="queryForm" class="flex gap-2">
+        <input
+          type="text"
+          id="queryInput"
+          placeholder="Ask the council..."
+          class="flex-1 bg-neutral-800 rounded-xl px-4 py-3 text-base border border-neutral-700 focus:outline-none focus:border-purple-500"
+          autocomplete="off"
+          autocapitalize="sentences"
+        />
+        <button
+          type="submit"
+          id="submitBtn"
+          class="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-4 py-3 font-medium transition-colors"
+        >
+          Ask
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let isLoading = false;
+
+    // Elements
+    const messagesEl = document.getElementById('messages');
+    const welcomeEl = document.getElementById('welcome');
+    const queryForm = document.getElementById('queryForm');
+    const queryInput = document.getElementById('queryInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const tierSelect = document.getElementById('tier');
+    const chairmanSelect = document.getElementById('chairman');
+
+    // Model config
+    const MODEL_CONFIG = {
+      chatgpt: { name: 'ChatGPT', icon: 'G', class: 'chatgpt' },
+      claude: { name: 'Claude', icon: 'A', class: 'claude' },
+      gemini: { name: 'Gemini', icon: '✦', class: 'gemini' }
+    };
+
+    // Initialize marked
+    marked.setOptions({
+      breaks: true,
+      gfm: true
+    });
+
+    // Form submit
+    queryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const query = queryInput.value.trim();
+      if (!query || isLoading) return;
+
+      isLoading = true;
+      submitBtn.disabled = true;
+      queryInput.value = '';
+      welcomeEl.style.display = 'none';
+
+      // Add user message
+      addUserMessage(query);
+
+      // Add assistant message with loading state
+      const assistantEl = addAssistantMessage();
+
+      try {
+        const response = await fetch('/prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            tier: tierSelect.value,
+            chairman: chairmanSelect.value,
+            timeout: 300000
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          renderCouncilResult(assistantEl, data);
+        } else {
+          renderError(assistantEl, data.error || 'Request failed');
+        }
+      } catch (error) {
+        renderError(assistantEl, error.message || 'Network error');
+      } finally {
+        isLoading = false;
+        submitBtn.disabled = false;
+        scrollToBottom();
+      }
+    });
+
+    function addUserMessage(content) {
+      const el = document.createElement('div');
+      el.className = 'fade-in flex justify-end';
+      el.innerHTML = `
+        <div class="max-w-[85%] bg-purple-600/20 border border-purple-500/30 rounded-2xl rounded-br-md px-4 py-3">
+          <p class="text-neutral-100">${escapeHtml(content)}</p>
+        </div>
+      `;
+      messagesEl.appendChild(el);
+      scrollToBottom();
+    }
+
+    function addAssistantMessage() {
+      const el = document.createElement('div');
+      el.className = 'fade-in space-y-3';
+      el.innerHTML = `
+        <div class="stage-card rounded-2xl p-4">
+          <div class="flex items-center gap-2 text-neutral-400">
+            <div class="spinner"></div>
+            <span>Council is deliberating...</span>
+          </div>
+        </div>
+      `;
+      messagesEl.appendChild(el);
+      scrollToBottom();
+      return el;
+    }
+
+    function renderCouncilResult(el, data) {
+      const { stage1, stage2, stage3, metadata, duration } = data;
+
+      el.innerHTML = `
+        <!-- Stage 1: Individual Responses -->
+        <div class="stage-card rounded-2xl overflow-hidden">
+          <div class="px-4 py-2 border-b border-neutral-700/50 flex items-center gap-2">
+            <span class="text-purple-400 font-medium">Stage 1</span>
+            <span class="text-neutral-500 text-sm">Individual Responses</span>
+          </div>
+          <div class="stage1-tabs flex border-b border-neutral-700/50"></div>
+          <div class="stage1-content p-4"></div>
+        </div>
+
+        <!-- Stage 2: Rankings -->
+        <div class="stage-card rounded-2xl overflow-hidden">
+          <div class="px-4 py-2 border-b border-neutral-700/50 flex items-center gap-2">
+            <span class="text-purple-400 font-medium">Stage 2</span>
+            <span class="text-neutral-500 text-sm">Peer Rankings</span>
+          </div>
+          <div class="stage2-tabs flex border-b border-neutral-700/50"></div>
+          <div class="stage2-content p-4"></div>
+          ${metadata?.aggregateRankings ? `
+            <div class="px-4 pb-4">
+              <div class="text-sm text-neutral-400 mb-2">Aggregate Rankings:</div>
+              <div class="flex flex-wrap gap-2">
+                ${metadata.aggregateRankings.map((r, i) => `
+                  <span class="model-badge ${MODEL_CONFIG[r.llmType]?.class || ''}">
+                    #${i + 1} ${r.model} (${r.averageRank.toFixed(1)})
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Stage 3: Chairman Synthesis -->
+        <div class="stage-card rounded-2xl overflow-hidden">
+          <div class="px-4 py-2 border-b border-neutral-700/50 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 font-medium">Stage 3</span>
+              <span class="text-neutral-500 text-sm">Chairman Synthesis</span>
+            </div>
+            <span class="model-badge ${MODEL_CONFIG[stage3?.llmType]?.class || ''}">
+              ${stage3?.model || 'Unknown'}
+            </span>
+          </div>
+          <div class="p-4 markdown-content">
+            ${marked.parse(stage3?.response || 'No response')}
+          </div>
+        </div>
+
+        ${duration ? `
+          <div class="text-center text-sm text-neutral-500">
+            Completed in ${(duration / 1000).toFixed(1)}s
+          </div>
+        ` : ''}
+      `;
+
+      // Render Stage 1 tabs
+      if (stage1?.length) {
+        renderTabs(el, '.stage1-tabs', '.stage1-content', stage1, (item) => ({
+          label: item.model,
+          llmType: item.llmType,
+          content: item.response
+        }));
+      }
+
+      // Render Stage 2 tabs
+      if (stage2?.length) {
+        renderTabs(el, '.stage2-tabs', '.stage2-content', stage2, (item) => ({
+          label: item.model,
+          llmType: item.llmType,
+          content: item.ranking
+        }));
+      }
+    }
+
+    function renderTabs(container, tabsSelector, contentSelector, items, mapFn) {
+      const tabsEl = container.querySelector(tabsSelector);
+      const contentEl = container.querySelector(contentSelector);
+
+      const mapped = items.map(mapFn);
+      let activeIndex = 0;
+
+      function renderContent(index) {
+        contentEl.innerHTML = `
+          <div class="markdown-content">
+            ${marked.parse(mapped[index].content || 'No content')}
+          </div>
+        `;
+      }
+
+      function renderTabs() {
+        tabsEl.innerHTML = mapped.map((item, i) => `
+          <button
+            class="px-4 py-2 text-sm font-medium transition-colors ${i === activeIndex ? 'tab-active text-white' : 'text-neutral-400 hover:text-neutral-200'}"
+            data-index="${i}"
+          >
+            <span class="model-badge ${MODEL_CONFIG[item.llmType]?.class || ''}">${item.label}</span>
+          </button>
+        `).join('');
+
+        tabsEl.querySelectorAll('button').forEach(btn => {
+          btn.addEventListener('click', () => {
+            activeIndex = parseInt(btn.dataset.index);
+            renderTabs();
+            renderContent(activeIndex);
+          });
+        });
+      }
+
+      renderTabs();
+      renderContent(activeIndex);
+    }
+
+    function renderError(el, message) {
+      el.innerHTML = `
+        <div class="stage-card rounded-2xl p-4 border-red-500/30 bg-red-500/10">
+          <div class="flex items-center gap-2 text-red-400">
+            <span>⚠️</span>
+            <span>${escapeHtml(message)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function scrollToBottom() {
+      setTimeout(() => {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }, 100);
+    }
+  </script>
+</body>
+</html>

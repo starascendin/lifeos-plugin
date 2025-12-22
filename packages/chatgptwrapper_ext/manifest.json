@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Wrapper",
-  "version": "1.0.0",
+  "name": "ChatGPT Wrapper Tailsacle",
+  "version": "1.0.3",
   "description": "Simple chat interface using your existing ChatGPT session",
   "permissions": [
     "storage",
