@@ -114,12 +114,12 @@ export function CouncilContainer() {
                   {msg.loading?.stage3 && (
                     <div className="stage-loading">
                       <div className="spinner" />
-                      <span>Stage 3: Chairman synthesizing final answer...</span>
+                      <span>Stage 3: All models synthesizing final answers...</span>
                     </div>
                   )}
 
                   {/* Stage 3 Results */}
-                  {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
+                  {msg.stage3 && <Stage3 responses={msg.stage3} />}
 
                   {/* Error */}
                   {msg.error && (

@@ -24,13 +24,12 @@ import type {
 
 export interface CouncilConfig {
   tier: Tier;
-  chairman: LLMType;
 }
 
 export interface CouncilResult {
   stage1: Stage1Result[];
   stage2: Stage2Result[];
-  stage3: Stage3Result;
+  stage3: Stage3Result[];
   metadata: {
     labelToModel: Record<string, { model: string; llmType: LLMType }>;
     aggregateRankings: AggregateRanking[];
@@ -108,7 +107,7 @@ export async function runCouncilHeadless(
     throw new Error('Query cannot be empty');
   }
 
-  const { tier, chairman } = config;
+  const { tier } = config;
   const models = MODEL_TIERS[tier];
   const llmTypes: LLMType[] = ['chatgpt', 'claude', 'gemini'];
 
@@ -161,26 +160,35 @@ export async function runCouncilHeadless(
 
   onProgress?.('stage2', `Got ${stage2Results.length} rankings`);
 
-  // Stage 3: Chairman synthesizes the final answer
-  onProgress?.('stage3', `${LLM_CONFIG[chairman].name} synthesizing...`);
+  // Stage 3: All LLMs synthesize as chairmen in parallel
+  onProgress?.('stage3', 'All models synthesizing final answers...');
 
   const synthesisPrompt = buildSynthesisPrompt(query, stage1Results, stage2Results);
-  const chairmanModel = models[chairman];
 
-  const stage3Result = await queryLLM(chairman, chairmanModel, synthesisPrompt);
+  const stage3Promises = llmTypes.map((llmType) =>
+    queryLLM(llmType, models[llmType], synthesisPrompt)
+      .then((result): Stage3Result => ({
+        model: result.model,
+        llmType: result.llmType,
+        response: result.response
+      }))
+      .catch((err) => {
+        console.error(`Stage 3 ${llmType} error:`, err);
+        return null;
+      })
+  );
 
-  const finalStage3: Stage3Result = {
-    model: stage3Result.model,
-    llmType: stage3Result.llmType,
-    response: stage3Result.response
-  };
+  const stage3RawResults = await Promise.all(stage3Promises);
+  const stage3Results: Stage3Result[] = stage3RawResults.filter(
+    (r): r is Stage3Result => r !== null
+  );
 
   onProgress?.('stage3', 'Complete');
 
   return {
     stage1: stage1Results,
     stage2: stage2Results,
-    stage3: finalStage3,
+    stage3: stage3Results,
     metadata: {
       labelToModel,
       aggregateRankings

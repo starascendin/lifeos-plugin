@@ -4,7 +4,6 @@ import { LayoutSelector } from './LayoutSelector';
 import { TierSelector } from './TierSelector';
 import { AuthStatus } from './AuthStatus';
 import { CouncilHistory } from './CouncilHistory';
-import { ChairmanSelector } from './ChairmanSelector';
 
 export function Sidebar() {
   const currentTab = useAppStore((state) => state.currentTab);
@@ -14,12 +13,7 @@ export function Sidebar() {
       <div className="logo">LLM Hub</div>
       <TabSelector />
       {currentTab === 'chat' && <LayoutSelector />}
-      {currentTab === 'council' && (
-        <>
-          <CouncilHistory />
-          <ChairmanSelector />
-        </>
-      )}
+      {currentTab === 'council' && <CouncilHistory />}
       <TierSelector />
       <AuthStatus />
     </aside>

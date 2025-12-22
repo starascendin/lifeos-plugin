@@ -29,7 +29,7 @@ export const CHATGPT_MODELS: ModelOption[] = [
 ];
 
 export const CLAUDE_MODELS: ModelOption[] = [
-  { value: 'claude-haiku-4-5-20241022', label: 'Haiku 4.5' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
   { value: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5' },
   { value: 'claude-opus-4-5-20251101', label: 'Opus 4.5' }
 ];
@@ -43,7 +43,7 @@ export const GEMINI_MODELS: ModelOption[] = [
 export const MODEL_TIERS: Record<Tier, Record<LLMType, string>> = {
   mini: {
     chatgpt: 'gpt-4o',
-    claude: 'claude-haiku-4-5-20241022',
+    claude: 'claude-haiku-4-5-20251001',
     gemini: 'gemini-3-flash'
   },
   normal: {

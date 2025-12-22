@@ -1,5 +1,5 @@
 import type { CouncilMessage } from '../store/councilStore';
-import type { LLMType, Tier } from '../config/llm';
+import type { Tier } from '../config/llm';
 
 /**
  * A saved council conversation
@@ -9,7 +9,6 @@ export interface SavedCouncilConversation {
   title: string;
   createdAt: number;
   updatedAt: number;
-  chairman: LLMType;
   tier: Tier;
   messages: CouncilMessage[];
   messageCount: number;

@@ -64,7 +64,6 @@ async function queryLLM(
 
 export function useCouncil() {
   const currentTier = useAppStore((state) => state.currentTier);
-  const chairman = useCouncilStore((state) => state.chairman);
   const addUserMessage = useCouncilStore((state) => state.addUserMessage);
   const addAssistantMessage = useCouncilStore((state) => state.addAssistantMessage);
   const updateMessage = useCouncilStore((state) => state.updateMessage);
@@ -142,20 +141,29 @@ export function useCouncil() {
         loading: { stage1: false, stage2: false, stage3: true }
       });
 
-      // Stage 3: Chairman synthesizes the final answer
+      // Stage 3: All LLMs synthesize as chairmen in parallel
       const synthesisPrompt = buildSynthesisPrompt(query, stage1Results, stage2Results);
-      const chairmanModel = models[chairman];
 
-      const stage3Result = await queryLLM(chairman, chairmanModel, synthesisPrompt);
+      const stage3Promises = llmTypes.map((llmType) =>
+        queryLLM(llmType, models[llmType], synthesisPrompt)
+          .then((result): Stage3Result => ({
+            model: result.model,
+            llmType: result.llmType,
+            response: result.response
+          }))
+          .catch((err) => {
+            console.error(`Stage 3 ${llmType} error:`, err);
+            return null;
+          })
+      );
 
-      const finalStage3: Stage3Result = {
-        model: stage3Result.model,
-        llmType: stage3Result.llmType,
-        response: stage3Result.response
-      };
+      const stage3RawResults = await Promise.all(stage3Promises);
+      const stage3Results: Stage3Result[] = stage3RawResults.filter(
+        (r): r is Stage3Result => r !== null
+      );
 
       updateMessage(assistantId, {
-        stage3: finalStage3,
+        stage3: stage3Results,
         loading: { stage1: false, stage2: false, stage3: false }
       });
 
@@ -168,7 +176,7 @@ export function useCouncil() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentTier, chairman, addUserMessage, addAssistantMessage, updateMessage, setIsLoading, currentConversationId, createNewConversation]);
+  }, [currentTier, addUserMessage, addAssistantMessage, updateMessage, setIsLoading, currentConversationId, createNewConversation]);
 
   return { runCouncil };
 }

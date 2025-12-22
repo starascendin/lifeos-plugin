@@ -22,7 +22,10 @@ import type {
   WSMessage,
   PromptRequestBody,
   PromptResponse,
-  HealthResponse
+  HealthResponse,
+  LLMAuthStatus,
+  ConversationSummary,
+  StoredConversation
 } from './types.js';
 
 const DEFAULT_PORT = 3456;
@@ -45,6 +48,35 @@ export function createCouncilServer(port: number = DEFAULT_PORT): { start: () =>
   let extensionSocket: WebSocket | null = null;
   const pendingRequests = new Map<string, PendingRequest>();
   const startTime = Date.now();
+
+  // Pending requests for proxied calls (history, auth status)
+  interface PendingProxyRequest {
+    resolve: (data: unknown) => void;
+    reject: (error: Error) => void;
+    timeoutId: NodeJS.Timeout;
+  }
+  const pendingProxyRequests = new Map<string, PendingProxyRequest>();
+  const PROXY_TIMEOUT = 10000; // 10 seconds
+
+  // Helper to send request to extension and wait for response
+  function requestFromExtension(type: WSMessage['type'], payload: unknown, requestId: string): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      if (!extensionSocket || extensionSocket.readyState !== WebSocket.OPEN) {
+        reject(new Error('Extension not connected'));
+        return;
+      }
+
+      const timeoutId = setTimeout(() => {
+        pendingProxyRequests.delete(requestId);
+        reject(new Error('Request timed out'));
+      }, PROXY_TIMEOUT);
+
+      pendingProxyRequests.set(requestId, { resolve, reject, timeoutId });
+
+      const message: WSMessage = { type, payload, requestId };
+      extensionSocket.send(JSON.stringify(message));
+    });
+  }
 
   // Middleware
   app.use(cors());
@@ -79,10 +111,105 @@ export function createCouncilServer(port: number = DEFAULT_PORT): { start: () =>
     res.json(response);
   });
 
+  // List all conversations (proxied to extension)
+  app.get('/conversations', async (_req, res) => {
+    if (!extensionSocket || extensionSocket.readyState !== WebSocket.OPEN) {
+      return res.status(503).json({
+        success: false,
+        error: 'Extension not connected'
+      });
+    }
+
+    try {
+      const requestId = uuidv4();
+      const conversations = await requestFromExtension('get_history_list', {}, requestId);
+      res.json({ success: true, conversations });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list conversations'
+      });
+    }
+  });
+
+  // Get single conversation (proxied to extension)
+  app.get('/conversations/:id', async (req, res) => {
+    if (!extensionSocket || extensionSocket.readyState !== WebSocket.OPEN) {
+      return res.status(503).json({
+        success: false,
+        error: 'Extension not connected'
+      });
+    }
+
+    try {
+      const requestId = uuidv4();
+      const conversation = await requestFromExtension('get_conversation', { id: req.params.id }, requestId);
+      if (conversation) {
+        res.json({ success: true, conversation });
+      } else {
+        res.status(404).json({ success: false, error: 'Conversation not found' });
+      }
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get conversation'
+      });
+    }
+  });
+
+  // Delete conversation (proxied to extension)
+  app.delete('/conversations/:id', async (req, res) => {
+    if (!extensionSocket || extensionSocket.readyState !== WebSocket.OPEN) {
+      return res.status(503).json({
+        success: false,
+        error: 'Extension not connected'
+      });
+    }
+
+    try {
+      const requestId = uuidv4();
+      const result = await requestFromExtension('delete_conversation', { id: req.params.id }, requestId) as { success: boolean };
+      if (result.success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ success: false, error: 'Conversation not found' });
+      }
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete conversation'
+      });
+    }
+  });
+
+  // Get LLM auth status (proxied to extension)
+  app.get('/auth-status', async (_req, res) => {
+    if (!extensionSocket || extensionSocket.readyState !== WebSocket.OPEN) {
+      return res.json({
+        success: true,
+        status: { chatgpt: false, claude: false, gemini: false },
+        extensionConnected: false
+      });
+    }
+
+    try {
+      const requestId = uuidv4();
+      const status = await requestFromExtension('get_auth_status', {}, requestId) as LLMAuthStatus;
+      res.json({ success: true, status, extensionConnected: true });
+    } catch (error) {
+      res.json({
+        success: true,
+        status: { chatgpt: false, claude: false, gemini: false },
+        extensionConnected: true,
+        error: error instanceof Error ? error.message : 'Failed to get status'
+      });
+    }
+  });
+
   // Main prompt endpoint
   app.post('/prompt', async (req, res) => {
     const body = req.body as PromptRequestBody;
-    const { query, tier = 'normal', chairman = 'claude', timeout = DEFAULT_TIMEOUT } = body;
+    const { query, tier = 'normal', timeout = DEFAULT_TIMEOUT } = body;
 
     // Validation
     if (!query || typeof query !== 'string' || !query.trim()) {
@@ -110,7 +237,6 @@ export function createCouncilServer(port: number = DEFAULT_PORT): { start: () =>
       requestId,
       query: query.trim(),
       tier,
-      chairman,
       timestamp: Date.now()
     };
 
@@ -121,6 +247,7 @@ export function createCouncilServer(port: number = DEFAULT_PORT): { start: () =>
       const response = await sendToExtension(councilRequest, effectiveTimeout);
 
       if (response.success) {
+        // Note: Conversation is now saved in the extension, not here
         const promptResponse: PromptResponse = {
           success: true,
           requestId,
@@ -208,11 +335,18 @@ export function createCouncilServer(port: number = DEFAULT_PORT): { start: () =>
         extensionSocket = null;
       }
 
-      // Reject all pending requests
+      // Reject all pending council requests
       for (const [requestId, pending] of pendingRequests) {
         clearTimeout(pending.timeoutId);
         pending.reject(new Error('Extension disconnected'));
         pendingRequests.delete(requestId);
+      }
+
+      // Reject all pending proxy requests
+      for (const [requestId, pending] of pendingProxyRequests) {
+        clearTimeout(pending.timeoutId);
+        pending.reject(new Error('Extension disconnected'));
+        pendingProxyRequests.delete(requestId);
       }
     });
 
@@ -250,13 +384,28 @@ export function createCouncilServer(port: number = DEFAULT_PORT): { start: () =>
         break;
       }
 
+      // Handle proxied responses from extension
+      case 'history_list':
+      case 'conversation_data':
+      case 'delete_result':
+      case 'auth_status': {
+        const requestId = message.requestId;
+        if (requestId && pendingProxyRequests.has(requestId)) {
+          const pending = pendingProxyRequests.get(requestId)!;
+          clearTimeout(pending.timeoutId);
+          pendingProxyRequests.delete(requestId);
+          pending.resolve(message.payload);
+        }
+        break;
+      }
+
       default:
         console.log('[Server] Unknown message type:', message.type);
     }
   }
 
   // Start server
-  function start() {
+  async function start() {
     server.listen(port, '0.0.0.0', () => {
       console.log(`
 ╔════════════════════════════════════════════════════════════╗

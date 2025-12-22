@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Wrapper",
-  "version": "1.0.0",
-  "description": "Simple chat interface using your existing ChatGPT session",
+  "name": "Hola LLM Council Wrapper",
+  "version": "1.0.1",
+  "description": "LM Counciler w Tailscale",
   "permissions": [
     "storage",
     "declarativeNetRequestWithHostAccess"

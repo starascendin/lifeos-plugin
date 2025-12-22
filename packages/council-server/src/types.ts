@@ -9,7 +9,6 @@ export interface CouncilRequest {
   requestId: string;
   query: string;
   tier?: Tier;
-  chairman?: LLMType;
   timestamp: number;
 }
 
@@ -50,7 +49,7 @@ export interface CouncilResponse {
   success: boolean;
   stage1?: Stage1Result[];
   stage2?: Stage2Result[];
-  stage3?: Stage3Result;
+  stage3?: Stage3Result[];
   metadata?: CouncilMetadata;
   error?: string;
   duration?: number;
@@ -63,15 +62,39 @@ export interface ProgressUpdate {
 }
 
 export interface WSMessage {
-  type: 'council_request' | 'council_response' | 'council_progress' | 'ping' | 'pong' | 'extension_ready';
+  type:
+    | 'council_request'
+    | 'council_response'
+    | 'council_progress'
+    | 'ping'
+    | 'pong'
+    | 'extension_ready'
+    // Auth status messages
+    | 'get_auth_status'
+    | 'auth_status'
+    // History messages
+    | 'get_history_list'
+    | 'history_list'
+    | 'get_conversation'
+    | 'conversation_data'
+    | 'delete_conversation'
+    | 'delete_result';
   payload?: unknown;
+  requestId?: string;  // For request/response correlation
+}
+
+// LLM auth status
+export interface LLMAuthStatus {
+  chatgpt: boolean;
+  claude: boolean;
+  gemini: boolean;
+  timestamp: number;
 }
 
 // HTTP request/response types
 export interface PromptRequestBody {
   query: string;
   tier?: Tier;
-  chairman?: LLMType;
   timeout?: number;
 }
 
@@ -80,7 +103,7 @@ export interface PromptResponse {
   requestId?: string;
   stage1?: Stage1Result[];
   stage2?: Stage2Result[];
-  stage3?: Stage3Result;
+  stage3?: Stage3Result[];
   metadata?: CouncilMetadata;
   error?: string;
   errorCode?: string;
@@ -91,4 +114,25 @@ export interface HealthResponse {
   status: 'ok';
   extensionConnected: boolean;
   uptime: number;
+}
+
+// Storage types
+export interface StoredConversation {
+  id: string;
+  query: string;
+  tier: Tier;
+  createdAt: number;
+  duration: number;
+  stage1: Stage1Result[];
+  stage2: Stage2Result[];
+  stage3: Stage3Result[];
+  metadata?: CouncilMetadata;
+}
+
+export interface ConversationSummary {
+  id: string;
+  query: string;
+  tier: Tier;
+  createdAt: number;
+  duration: number;
 }

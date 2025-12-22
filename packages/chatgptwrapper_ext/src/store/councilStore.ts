@@ -49,7 +49,7 @@ export interface CouncilMessage {
   content?: string;
   stage1?: Stage1Result[];
   stage2?: Stage2Result[];
-  stage3?: Stage3Result;
+  stage3?: Stage3Result[];
   metadata?: {
     labelToModel: Record<string, { model: string; llmType: LLMType }>;
     aggregateRankings: AggregateRanking[];
@@ -65,12 +65,10 @@ export interface CouncilMessage {
 interface CouncilState {
   messages: CouncilMessage[];
   isLoading: boolean;
-  chairman: LLMType;
   addUserMessage: (content: string) => string;
   addAssistantMessage: () => string;
   updateMessage: (id: string, updates: Partial<CouncilMessage>) => void;
   clearMessages: () => void;
-  setChairman: (llmType: LLMType) => void;
   setIsLoading: (isLoading: boolean) => void;
   setMessages: (messages: CouncilMessage[]) => void;
 }
@@ -78,7 +76,6 @@ interface CouncilState {
 export const useCouncilStore = create<CouncilState>((set) => ({
   messages: [],
   isLoading: false,
-  chairman: 'claude',
 
   addUserMessage: (content) => {
     const id = crypto.randomUUID();
@@ -111,8 +108,6 @@ export const useCouncilStore = create<CouncilState>((set) => ({
     })),
 
   clearMessages: () => set({ messages: [] }),
-
-  setChairman: (chairman) => set({ chairman }),
 
   setIsLoading: (isLoading) => set({ isLoading }),
 

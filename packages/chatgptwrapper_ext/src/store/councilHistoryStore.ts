@@ -92,9 +92,6 @@ export const useCouncilHistoryStore = create<CouncilHistoryState>((set, get) => 
           }
         }
 
-        // Restore chairman
-        councilStore.setChairman(conversation.chairman);
-
         set({
           currentConversationId: id,
           currentTitle: conversation.title
@@ -131,7 +128,6 @@ export const useCouncilHistoryStore = create<CouncilHistoryState>((set, get) => 
       title,
       createdAt: existingConversation?.createdAt || now,
       updatedAt: now,
-      chairman: councilStore.chairman,
       tier: appStore.currentTier,
       messages: councilStore.messages,
       messageCount: councilStore.messages.length
