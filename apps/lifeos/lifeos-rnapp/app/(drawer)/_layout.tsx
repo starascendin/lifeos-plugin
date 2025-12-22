@@ -49,8 +49,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name='journal'
         options={{
-          drawerLabel: 'Journal',
-          title: 'Journal',
+          drawerLabel: 'DayOne',
+          title: 'DayOne',
           drawerIcon: ({ color, size }) => (
             <Icon name={BookOpen} color={color} size={size} />
           ),

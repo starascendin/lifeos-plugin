@@ -44,6 +44,8 @@ export function CalendarStrip({
 
   const datesWithEntriesSet = new Set(datesWithEntries);
 
+  const todayString = formatDateToString(today);
+
   const handleSelectDate = useCallback(
     (dateString: string) => {
       if (Platform.OS === 'ios') {
@@ -54,20 +56,32 @@ export function CalendarStrip({
     [onSelectDate]
   );
 
+  const scrollToDate = useCallback((dateString: string, animated = true) => {
+    const index = dates.findIndex(
+      (d) => formatDateToString(d) === dateString
+    );
+    if (index !== -1 && flatListRef.current) {
+      flatListRef.current.scrollToIndex({
+        index,
+        animated,
+        viewPosition: 0.5,
+      });
+    }
+  }, [dates]);
+
+  const handleTodayPress = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onSelectDate(todayString);
+    scrollToDate(todayString);
+  }, [onSelectDate, todayString, scrollToDate]);
+
   // Scroll to selected date on mount
   useEffect(() => {
-    const selectedIndex = dates.findIndex(
-      (d) => formatDateToString(d) === selectedDate
-    );
-    if (selectedIndex !== -1 && flatListRef.current) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({
-          index: selectedIndex,
-          animated: false,
-          viewPosition: 0.5,
-        });
-      }, 100);
-    }
+    setTimeout(() => {
+      scrollToDate(selectedDate, false);
+    }, 100);
   }, []);
 
   const renderItem = useCallback(
@@ -157,8 +171,40 @@ export function CalendarStrip({
     paddingVertical: 8,
   };
 
+  const isSelectedToday = selectedDate === todayString;
+
   return (
     <View style={containerStyle}>
+      {/* Today button row */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          paddingHorizontal: 16,
+          paddingBottom: 8,
+        }}
+      >
+        <Pressable
+          onPress={handleTodayPress}
+          style={{
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 16,
+            backgroundColor: isSelectedToday ? primary : cardColor,
+          }}
+        >
+          <Text
+            variant="caption"
+            style={{
+              color: isSelectedToday ? primaryForeground : blue,
+              fontWeight: '600',
+              fontSize: 13,
+            }}
+          >
+            Today
+          </Text>
+        </Pressable>
+      </View>
       <FlatList
         ref={flatListRef}
         data={dates}

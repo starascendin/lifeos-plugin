@@ -255,3 +255,21 @@ export function getDatesWithEntries(entries: JournalEntry[]): string[] {
   const dates = new Set(entries.map((entry) => entry.date));
   return Array.from(dates).sort((a, b) => b.localeCompare(a));
 }
+
+/**
+ * Get an array of dates centered around a given date
+ * @param centerDate - The date to center around
+ * @param weeksRange - Number of weeks before and after the center date
+ */
+export function getScrollableDates(centerDate: Date, weeksRange: number): Date[] {
+  const dates: Date[] = [];
+  const daysRange = weeksRange * 7;
+
+  for (let i = -daysRange; i <= daysRange; i++) {
+    const date = new Date(centerDate);
+    date.setDate(centerDate.getDate() + i);
+    dates.push(date);
+  }
+
+  return dates;
+}

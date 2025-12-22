@@ -1,28 +1,24 @@
 import { Stack } from 'expo-router';
 import { useColor } from '@/hooks/useColor';
+import { DrawerToggleButton } from '@react-navigation/drawer';
 
 export default function JournalLayout() {
+  const text = useColor('text');
   const background = useColor('background');
-  const foreground = useColor('foreground');
 
   return (
     <Stack
       screenOptions={{
-        headerStyle: {
-          backgroundColor: background,
-        },
-        headerTintColor: foreground,
-        headerShadowVisible: false,
-        contentStyle: {
-          backgroundColor: background,
-        },
+        headerShown: true,
+        headerTintColor: text,
+        headerStyle: { backgroundColor: background },
       }}
     >
       <Stack.Screen
         name="index"
         options={{
-          title: 'Journal',
-          headerLargeTitle: true,
+          title: 'DayOne',
+          headerLeft: () => <DrawerToggleButton tintColor={text} />,
         }}
       />
       <Stack.Screen
@@ -36,6 +32,7 @@ export default function JournalLayout() {
         options={{
           title: 'New Entry',
           presentation: 'modal',
+          headerShown: false,
         }}
       />
     </Stack>

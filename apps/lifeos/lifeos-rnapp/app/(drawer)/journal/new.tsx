@@ -82,6 +82,7 @@ export default function NewEntryScreen() {
     setCaptureState('preview');
     setCapturedUri(null);
     setCaption('');
+    setNoteTitle('');
   }, []);
 
   const handleToggleFacing = useCallback(() => {
@@ -171,6 +172,7 @@ export default function NewEntryScreen() {
     setCapturedUri(null);
     setCaptureState('preview');
     setCaption('');
+    setNoteTitle('');
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -190,9 +192,20 @@ export default function NewEntryScreen() {
         }
         await addTextEntry(noteContent.trim(), noteTitle.trim() || undefined, date);
       } else if (mode === 'photo' && capturedUri) {
-        await addPhotoEntry(capturedUri, caption.trim() || undefined, date);
+        await addPhotoEntry(
+          capturedUri,
+          caption.trim() || undefined,
+          noteTitle.trim() || undefined,
+          date
+        );
       } else if (mode === 'video' && capturedUri) {
-        await addVideoEntry(capturedUri, undefined, caption.trim() || undefined, date);
+        await addVideoEntry(
+          capturedUri,
+          undefined,
+          caption.trim() || undefined,
+          noteTitle.trim() || undefined,
+          date
+        );
       }
 
       router.back();
@@ -263,56 +276,93 @@ export default function NewEntryScreen() {
 
     if (captureState === 'captured' && capturedUri) {
       return (
-        <View style={{ flex: 1 }}>
-          <Image
-            source={{ uri: capturedUri }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={100}
+        >
+          <ScrollView
             style={{ flex: 1 }}
-            contentFit="cover"
-          />
-
-          {/* Retake button */}
-          <Pressable
-            style={{
-              position: 'absolute',
-              top: 16,
-              left: 16,
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={handleRetake}
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
           >
-            <Icon name={RotateCcw} size={24} color="#FFFFFF" />
-          </Pressable>
+            {/* Preview image */}
+            <View style={{ height: 300, position: 'relative' }}>
+              <Image
+                source={{ uri: capturedUri }}
+                style={{ flex: 1 }}
+                contentFit="cover"
+              />
 
-          {/* Caption input */}
-          <View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: 'rgba(0,0,0,0.6)',
-              padding: 16,
-            }}
-          >
-            <TextInput
-              placeholder="Add a caption..."
-              placeholderTextColor="rgba(255,255,255,0.6)"
-              value={caption}
-              onChangeText={setCaption}
+              {/* Retake button */}
+              <Pressable
+                style={{
+                  position: 'absolute',
+                  top: 16,
+                  left: 16,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+                onPress={handleRetake}
+              >
+                <Icon name={RotateCcw} size={24} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
+            {/* Notes section */}
+            <View
               style={{
-                color: '#FFFFFF',
-                fontSize: 16,
-                paddingVertical: 8,
+                flex: 1,
+                padding: 16,
+                backgroundColor: backgroundColor,
               }}
-              multiline
-            />
-          </View>
-        </View>
+            >
+              <Text
+                variant="caption"
+                style={{
+                  color: textMuted,
+                  marginBottom: 8,
+                  fontWeight: '600',
+                }}
+              >
+                Add Notes (optional)
+              </Text>
+              <TextInput
+                placeholder="Title"
+                placeholderTextColor={textMuted}
+                value={noteTitle}
+                onChangeText={setNoteTitle}
+                style={{
+                  fontSize: 18,
+                  fontWeight: '600',
+                  color: textColor,
+                  paddingVertical: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: cardColor,
+                  marginBottom: 12,
+                }}
+              />
+              <TextInput
+                placeholder="Write your thoughts..."
+                placeholderTextColor={textMuted}
+                value={caption}
+                onChangeText={setCaption}
+                style={{
+                  fontSize: 16,
+                  color: textColor,
+                  lineHeight: 22,
+                  minHeight: 100,
+                  textAlignVertical: 'top',
+                }}
+                multiline
+              />
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       );
     }
 

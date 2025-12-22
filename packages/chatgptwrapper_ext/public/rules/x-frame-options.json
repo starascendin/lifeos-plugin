@@ -1,0 +1,23 @@
+[
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "X-Frame-Options",
+          "operation": "remove"
+        },
+        {
+          "header": "Content-Security-Policy",
+          "operation": "remove"
+        }
+      ]
+    },
+    "condition": {
+      "requestDomains": ["chatgpt.com", "openai.com"],
+      "resourceTypes": ["sub_frame", "main_frame"]
+    }
+  }
+]

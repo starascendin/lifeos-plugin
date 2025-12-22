@@ -23,12 +23,14 @@ interface UseJournalStorageReturn {
   addPhotoEntry: (
     sourceUri: string,
     caption?: string,
+    title?: string,
     date?: string
   ) => Promise<JournalEntry>;
   addVideoEntry: (
     sourceUri: string,
     thumbnailUri: string | undefined,
     caption?: string,
+    title?: string,
     date?: string
   ) => Promise<JournalEntry>;
   updateEntry: (id: string, updates: Partial<JournalEntry>) => Promise<void>;
@@ -108,6 +110,7 @@ export function useJournalStorage(userId: string | null): UseJournalStorageRetur
     async (
       sourceUri: string,
       caption?: string,
+      title?: string,
       date?: string
     ): Promise<JournalEntry> => {
       if (!userId) {
@@ -125,6 +128,7 @@ export function useJournalStorage(userId: string | null): UseJournalStorageRetur
         updatedAt: now,
         type: 'photo',
         mediaUri,
+        title,
         content: caption,
         syncStatus: 'local',
       };
@@ -143,6 +147,7 @@ export function useJournalStorage(userId: string | null): UseJournalStorageRetur
       sourceUri: string,
       thumbnailUri: string | undefined,
       caption?: string,
+      title?: string,
       date?: string
     ): Promise<JournalEntry> => {
       if (!userId) {
@@ -167,6 +172,7 @@ export function useJournalStorage(userId: string | null): UseJournalStorageRetur
         type: 'video',
         mediaUri,
         thumbnailUri: savedThumbnailUri,
+        title,
         content: caption,
         syncStatus: 'local',
       };

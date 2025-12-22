@@ -23,6 +23,7 @@ export default function JournalScreen() {
 
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'selected' | 'all'>('selected');
 
   const {
     entries,
@@ -82,7 +83,11 @@ export default function JournalScreen() {
   const selectedDateObj = parseDateString(selectedDate);
   const monthHeader = getMonthYearString(selectedDateObj);
 
-  // Sort dates with entries (newest first) for the timeline
+  // Get entries for the selected date
+  const selectedDateEntries = entriesByDate[selectedDate] || [];
+  const hasEntriesForSelectedDate = selectedDateEntries.length > 0;
+
+  // Sort all dates with entries (newest first) for the "all" view
   const sortedDates = [...datesWithEntries].sort((a, b) => b.localeCompare(a));
 
   return (
@@ -110,6 +115,55 @@ export default function JournalScreen() {
         datesWithEntries={datesWithEntries}
       />
 
+      {/* View mode toggle */}
+      <View
+        style={{
+          flexDirection: 'row',
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          gap: 8,
+        }}
+      >
+        <Pressable
+          onPress={() => setViewMode('selected')}
+          style={{
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 20,
+            backgroundColor: viewMode === 'selected' ? primary : cardColor,
+          }}
+        >
+          <Text
+            variant="caption"
+            style={{
+              color: viewMode === 'selected' ? primaryForeground : textMuted,
+              fontWeight: '600',
+            }}
+          >
+            Selected Day
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setViewMode('all')}
+          style={{
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 20,
+            backgroundColor: viewMode === 'all' ? primary : cardColor,
+          }}
+        >
+          <Text
+            variant="caption"
+            style={{
+              color: viewMode === 'all' ? primaryForeground : textMuted,
+              fontWeight: '600',
+            }}
+          >
+            All Entries
+          </Text>
+        </Pressable>
+      </View>
+
       {/* Timeline / Day cards */}
       <ScrollView
         style={{ flex: 1 }}
@@ -118,50 +172,99 @@ export default function JournalScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {sortedDates.length === 0 ? (
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-              paddingTop: 80,
-            }}
-          >
+        {viewMode === 'selected' ? (
+          // Selected date view
+          !hasEntriesForSelectedDate ? (
             <View
               style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: cardColor,
+                flex: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                marginBottom: 16,
+                paddingTop: 80,
               }}
             >
-              <Icon name={BookOpen} size={36} color={textMuted} />
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: cardColor,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <Icon name={BookOpen} size={36} color={textMuted} />
+              </View>
+              <Text
+                variant="heading"
+                style={{ marginBottom: 8, textAlign: 'center' }}
+              >
+                {selectedDate === getTodayDate() ? 'Start Your Journal' : 'No Entries'}
+              </Text>
+              <Text
+                variant="body"
+                style={{ color: textMuted, textAlign: 'center', maxWidth: 280 }}
+              >
+                {selectedDate === getTodayDate()
+                  ? 'Capture photos, videos, and notes to reflect on your day'
+                  : `No entries for ${formatDateDisplay(selectedDate)}`}
+              </Text>
             </View>
-            <Text
-              variant="heading"
-              style={{ marginBottom: 8, textAlign: 'center' }}
-            >
-              Start Your Journal
-            </Text>
-            <Text
-              variant="body"
-              style={{ color: textMuted, textAlign: 'center', maxWidth: 280 }}
-            >
-              Capture photos, videos, and notes to reflect on your day
-            </Text>
-          </View>
-        ) : (
-          sortedDates.map((date) => (
+          ) : (
             <DayCard
-              key={date}
-              date={date}
-              entries={entriesByDate[date] || []}
+              date={selectedDate}
+              entries={selectedDateEntries}
               onPress={handleDayPress}
             />
-          ))
+          )
+        ) : (
+          // All entries view
+          sortedDates.length === 0 ? (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: 80,
+              }}
+            >
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: cardColor,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <Icon name={BookOpen} size={36} color={textMuted} />
+              </View>
+              <Text
+                variant="heading"
+                style={{ marginBottom: 8, textAlign: 'center' }}
+              >
+                Start Your Journal
+              </Text>
+              <Text
+                variant="body"
+                style={{ color: textMuted, textAlign: 'center', maxWidth: 280 }}
+              >
+                Capture photos, videos, and notes to reflect on your day
+              </Text>
+            </View>
+          ) : (
+            sortedDates.map((date) => (
+              <DayCard
+                key={date}
+                date={date}
+                entries={entriesByDate[date] || []}
+                onPress={handleDayPress}
+              />
+            ))
+          )
         )}
       </ScrollView>
 
