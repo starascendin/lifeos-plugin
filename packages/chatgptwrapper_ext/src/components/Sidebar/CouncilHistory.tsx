@@ -1,13 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useCouncilHistoryStore } from '../../store/councilHistoryStore';
-import { useServerRequests, type ServerRequest } from '../../hooks/useServerRequests';
-
-/**
- * Check if we're running in server mode
- */
-function isServerMode(): boolean {
-  return typeof chrome === 'undefined' || !chrome.storage?.local;
-}
 
 function formatTimestamp(timestamp: number): string {
   const now = Date.now();
@@ -29,103 +21,11 @@ function formatTimestamp(timestamp: number): string {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function truncateQuery(query: string, maxLen: number = 40): string {
-  if (query.length <= maxLen) return query;
-  return query.slice(0, maxLen) + '...';
-}
-
-function StatusBadge({ status }: { status: ServerRequest['status'] }) {
-  const config = {
-    pending: { icon: '⏳', color: '#f59e0b', label: 'Pending' },
-    processing: { icon: '⏳', color: '#f59e0b', label: 'Processing' },
-    completed: { icon: '✓', color: '#22c55e', label: 'Completed' },
-    error: { icon: '✕', color: '#ef4444', label: 'Error' }
-  };
-
-  const { icon, color } = config[status];
-
-  return (
-    <span
-      className="status-badge"
-      style={{ color, marginRight: 6 }}
-      title={config[status].label}
-    >
-      {icon}
-    </span>
-  );
-}
-
-/**
- * Server mode history - shows requests from server persistence
- */
-function ServerHistory() {
-  const {
-    requests,
-    isLoading,
-    selectedRequestId,
-    selectRequest,
-    deleteRequest,
-    clearSelection
-  } = useServerRequests();
-
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (confirm('Delete this request?')) {
-      await deleteRequest(id);
-    }
-  };
-
-  return (
-    <div className="sidebar-section council-history">
-      <div className="council-history-header">
-        <span className="sidebar-title">Requests</span>
-        <button
-          className="new-conversation-btn"
-          onClick={clearSelection}
-          title="New request"
-        >
-          +
-        </button>
-      </div>
-
-      {isLoading && requests.length === 0 ? (
-        <div className="history-loading">Loading...</div>
-      ) : requests.length === 0 ? (
-        <div className="history-empty">No requests yet</div>
-      ) : (
-        <div className="conversation-list">
-          {requests.map((req) => (
-            <div
-              key={req.id}
-              className={`conversation-item ${req.id === selectedRequestId ? 'active' : ''}`}
-              onClick={() => selectRequest(req.id)}
-            >
-              <div className="conversation-title">
-                <StatusBadge status={req.status} />
-                {truncateQuery(req.query)}
-              </div>
-              <div className="conversation-meta">
-                {req.tier} · {formatTimestamp(req.createdAt)}
-              </div>
-              <button
-                className="conversation-delete"
-                onClick={(e) => handleDelete(e, req.id)}
-                title="Delete"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /**
  * Extension mode history - shows conversations from chrome.storage
+ * Works in both extension mode (direct storage) and server mode (via HTTP proxy)
  */
-function ExtensionHistory() {
+function ExtensionHistory({ isMobileOpen, onClose }: { isMobileOpen?: boolean; onClose?: () => void }) {
   const conversations = useCouncilHistoryStore((state) => state.conversations);
   const currentConversationId = useCouncilHistoryStore((state) => state.currentConversationId);
   const isHistoryLoading = useCouncilHistoryStore((state) => state.isHistoryLoading);
@@ -146,13 +46,32 @@ function ExtensionHistory() {
     }
   };
 
+  const handleSelectConversation = (id: string) => {
+    loadConversationById(id);
+    onClose?.(); // Close mobile drawer after selection
+  };
+
+  const handleNewConversation = () => {
+    createNewConversation();
+    onClose?.(); // Close mobile drawer after creating new
+  };
+
   return (
-    <div className="sidebar-section council-history">
+    <div
+      className={`sidebar-section council-history ${isMobileOpen ? 'mobile-open' : ''}`}
+      onClick={(e) => {
+        // Close when clicking the backdrop (not the content)
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      {isMobileOpen && (
+        <button className="mobile-history-close" onClick={onClose}>×</button>
+      )}
       <div className="council-history-header">
         <span className="sidebar-title">History</span>
         <button
           className="new-conversation-btn"
-          onClick={createNewConversation}
+          onClick={handleNewConversation}
           title="New conversation"
         >
           +
@@ -169,7 +88,7 @@ function ExtensionHistory() {
             <div
               key={conv.id}
               className={`conversation-item ${conv.id === currentConversationId ? 'active' : ''}`}
-              onClick={() => loadConversationById(conv.id)}
+              onClick={() => handleSelectConversation(conv.id)}
             >
               <div className="conversation-title">{conv.title}</div>
               <div className="conversation-meta">
@@ -196,8 +115,23 @@ function ExtensionHistory() {
  * In extension mode, it accesses chrome.storage directly
  */
 export function CouncilHistory() {
-  // Always use ExtensionHistory - it works in both modes:
-  // - Extension mode: direct chrome.storage access
-  // - Server mode: fetches via /conversations endpoint which proxies to extension
-  return <ExtensionHistory />;
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile toggle button - shown in sidebar on mobile */}
+      <button
+        className="mobile-history-toggle"
+        onClick={() => setIsMobileOpen(true)}
+      >
+        📋 History
+      </button>
+
+      {/* History component - inline on desktop, modal on mobile */}
+      <ExtensionHistory
+        isMobileOpen={isMobileOpen}
+        onClose={() => setIsMobileOpen(false)}
+      />
+    </>
+  );
 }
