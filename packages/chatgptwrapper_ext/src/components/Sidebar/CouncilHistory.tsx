@@ -1,5 +1,13 @@
 import { useEffect } from 'react';
 import { useCouncilHistoryStore } from '../../store/councilHistoryStore';
+import { useServerRequests, type ServerRequest } from '../../hooks/useServerRequests';
+
+/**
+ * Check if we're running in server mode
+ */
+function isServerMode(): boolean {
+  return typeof chrome === 'undefined' || !chrome.storage?.local;
+}
 
 function formatTimestamp(timestamp: number): string {
   const now = Date.now();
@@ -21,7 +29,103 @@ function formatTimestamp(timestamp: number): string {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-export function CouncilHistory() {
+function truncateQuery(query: string, maxLen: number = 40): string {
+  if (query.length <= maxLen) return query;
+  return query.slice(0, maxLen) + '...';
+}
+
+function StatusBadge({ status }: { status: ServerRequest['status'] }) {
+  const config = {
+    pending: { icon: '⏳', color: '#f59e0b', label: 'Pending' },
+    processing: { icon: '⏳', color: '#f59e0b', label: 'Processing' },
+    completed: { icon: '✓', color: '#22c55e', label: 'Completed' },
+    error: { icon: '✕', color: '#ef4444', label: 'Error' }
+  };
+
+  const { icon, color } = config[status];
+
+  return (
+    <span
+      className="status-badge"
+      style={{ color, marginRight: 6 }}
+      title={config[status].label}
+    >
+      {icon}
+    </span>
+  );
+}
+
+/**
+ * Server mode history - shows requests from server persistence
+ */
+function ServerHistory() {
+  const {
+    requests,
+    isLoading,
+    selectedRequestId,
+    selectRequest,
+    deleteRequest,
+    clearSelection
+  } = useServerRequests();
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (confirm('Delete this request?')) {
+      await deleteRequest(id);
+    }
+  };
+
+  return (
+    <div className="sidebar-section council-history">
+      <div className="council-history-header">
+        <span className="sidebar-title">Requests</span>
+        <button
+          className="new-conversation-btn"
+          onClick={clearSelection}
+          title="New request"
+        >
+          +
+        </button>
+      </div>
+
+      {isLoading && requests.length === 0 ? (
+        <div className="history-loading">Loading...</div>
+      ) : requests.length === 0 ? (
+        <div className="history-empty">No requests yet</div>
+      ) : (
+        <div className="conversation-list">
+          {requests.map((req) => (
+            <div
+              key={req.id}
+              className={`conversation-item ${req.id === selectedRequestId ? 'active' : ''}`}
+              onClick={() => selectRequest(req.id)}
+            >
+              <div className="conversation-title">
+                <StatusBadge status={req.status} />
+                {truncateQuery(req.query)}
+              </div>
+              <div className="conversation-meta">
+                {req.tier} · {formatTimestamp(req.createdAt)}
+              </div>
+              <button
+                className="conversation-delete"
+                onClick={(e) => handleDelete(e, req.id)}
+                title="Delete"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Extension mode history - shows conversations from chrome.storage
+ */
+function ExtensionHistory() {
   const conversations = useCouncilHistoryStore((state) => state.conversations);
   const currentConversationId = useCouncilHistoryStore((state) => state.currentConversationId);
   const isHistoryLoading = useCouncilHistoryStore((state) => state.isHistoryLoading);
@@ -84,4 +188,16 @@ export function CouncilHistory() {
       )}
     </div>
   );
+}
+
+/**
+ * Main CouncilHistory component - always uses extension history
+ * In server mode, it fetches via HTTP proxy to extension's chrome.storage
+ * In extension mode, it accesses chrome.storage directly
+ */
+export function CouncilHistory() {
+  // Always use ExtensionHistory - it works in both modes:
+  // - Extension mode: direct chrome.storage access
+  // - Server mode: fetches via /conversations endpoint which proxies to extension
+  return <ExtensionHistory />;
 }

@@ -2,6 +2,7 @@
 // Reads from ~/Library/Application Support/Knowledge/knowledgeC.db
 // Also reads device data from ~/Library/Biome/streams/restricted/App.InFocus
 
+use crate::app_category::get_app_category;
 use rusqlite::{Connection, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -107,6 +108,49 @@ fn get_app_screentime_db_path() -> Option<PathBuf> {
     })
 }
 
+/// Run category migration - update all existing sessions with new category names
+fn run_category_migration(conn: &Connection) -> Result<i32, String> {
+    // Get all unique bundle_ids from sessions
+    let mut stmt = conn
+        .prepare("SELECT DISTINCT bundle_id FROM sessions")
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let bundle_ids: Vec<String> = stmt
+        .query_map([], |row| row.get(0))
+        .map_err(|e| format!("Query error: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut updated = 0;
+
+    for bundle_id in &bundle_ids {
+        let new_category = get_app_category(bundle_id);
+
+        // Update sessions table
+        conn.execute(
+            "UPDATE sessions SET category = ?1 WHERE bundle_id = ?2",
+            [&new_category, bundle_id],
+        )
+        .ok();
+
+        // Update daily_summary table
+        conn.execute(
+            "UPDATE daily_summary SET category = ?1 WHERE bundle_id = ?2",
+            [&new_category, bundle_id],
+        )
+        .ok();
+
+        updated += 1;
+    }
+
+    println!(
+        "[ScreenTime DB] Updated categories for {} unique apps",
+        updated
+    );
+
+    Ok(updated)
+}
+
 /// Initialize our screentime database with schema
 fn init_screentime_database(db_path: &PathBuf) -> SqliteResult<()> {
     let conn = Connection::open(db_path)?;
@@ -204,6 +248,34 @@ fn init_screentime_database(db_path: &PathBuf) -> SqliteResult<()> {
         [],
     )?;
 
+    // Create schema_version table for migrations
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )",
+        [],
+    )?;
+
+    // Check current schema version and run migrations
+    let current_version: i32 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(version), 0) FROM schema_version",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    // Migration v1: Update categories to App Store names
+    if current_version < 1 {
+        println!("[ScreenTime DB] Running migration v1: Updating app categories...");
+        if let Err(e) = run_category_migration(&conn) {
+            println!("[ScreenTime DB] Migration v1 warning: {}", e);
+        }
+        conn.execute("INSERT INTO schema_version (version) VALUES (1)", [])?;
+        println!("[ScreenTime DB] Migration v1 complete");
+    }
+
     Ok(())
 }
 
@@ -275,7 +347,12 @@ fn get_device_bundle_ids_from_biome(device_id: &str) -> Vec<String> {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
             // Skip directories and non-SEGB files
-            if path.is_dir() || path.file_name().map(|n| n.to_string_lossy().starts_with('.')).unwrap_or(true) {
+            if path.is_dir()
+                || path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().starts_with('.'))
+                    .unwrap_or(true)
+            {
                 continue;
             }
 
@@ -460,94 +537,6 @@ fn get_app_name(bundle_id: &str) -> Option<String> {
     })
 }
 
-/// Get category for app bundle ID
-fn get_category(bundle_id: &str) -> Option<String> {
-    let categories: &[(&[&str], &str)] = &[
-        (
-            &[
-                "com.apple.Safari",
-                "com.google.Chrome",
-                "org.mozilla.firefox",
-                "com.brave.Browser",
-                "com.microsoft.edgemac",
-            ],
-            "Browsers",
-        ),
-        (
-            &[
-                "com.slack.Slack",
-                "com.tinyspeck.slackmacgap",
-                "com.microsoft.teams",
-                "com.hnc.Discord",
-                "com.apple.MobileSMS",
-                "us.zoom.xos",
-            ],
-            "Communication",
-        ),
-        (
-            &[
-                "com.apple.mail",
-                "com.microsoft.Outlook",
-                "com.google.Gmail",
-            ],
-            "Email",
-        ),
-        (
-            &[
-                "com.spotify.client",
-                "com.apple.Music",
-                "com.apple.TV",
-                "com.netflix.Netflix",
-                "com.apple.podcasts",
-            ],
-            "Entertainment",
-        ),
-        (
-            &[
-                "com.microsoft.VSCode",
-                "com.apple.dt.Xcode",
-                "com.apple.Terminal",
-                "com.googlecode.iterm2",
-                "com.jetbrains",
-                "com.github.GitHubClient",
-                "com.postmanlabs.mac",
-                "com.docker.docker",
-            ],
-            "Development",
-        ),
-        (
-            &[
-                "com.apple.Notes",
-                "com.apple.reminders",
-                "notion.id",
-                "md.obsidian",
-                "com.culturedcode.ThingsMac",
-                "com.todoist.mac.Todoist",
-                "com.linear",
-            ],
-            "Productivity",
-        ),
-        (&["com.figma.Desktop", "com.adobe", "com.sketch"], "Design"),
-        (
-            &[
-                "com.apple.finder",
-                "com.apple.systempreferences",
-                "com.apple.ActivityMonitor",
-            ],
-            "System",
-        ),
-        (&["com.anthropic.claudefordesktop", "com.openai.chat"], "AI"),
-    ];
-
-    for (ids, category) in categories {
-        if ids.iter().any(|id| bundle_id.contains(id)) {
-            return Some(category.to_string());
-        }
-    }
-
-    Some("Other".to_string())
-}
-
 // ============================================
 // SEGB File Parsing (Biome device data)
 // ============================================
@@ -594,11 +583,15 @@ fn parse_segb_file(file_path: &PathBuf, device_id: &str) -> Vec<SegbRecord> {
                     let bundle_start = bundle_search_start + 2;
 
                     if bundle_start + bundle_len <= data.len() {
-                        if let Ok(bundle_id) = std::str::from_utf8(&data[bundle_start..bundle_start + bundle_len]) {
+                        if let Ok(bundle_id) =
+                            std::str::from_utf8(&data[bundle_start..bundle_start + bundle_len])
+                        {
                             // Clean up bundle_id - remove trailing non-alphanumeric chars
                             let clean_bundle: String = bundle_id
                                 .chars()
-                                .take_while(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_')
+                                .take_while(|c| {
+                                    c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '_'
+                                })
                                 .collect();
 
                             if clean_bundle.starts_with("com.") && timestamp > 700000000.0 {
@@ -624,7 +617,11 @@ fn parse_segb_file(file_path: &PathBuf, device_id: &str) -> Vec<SegbRecord> {
 }
 
 /// Parse all SEGB files for a device directory
-fn parse_device_segb_files(device_dir: &PathBuf, device_id: &str, cutoff_timestamp: f64) -> Vec<SegbRecord> {
+fn parse_device_segb_files(
+    device_dir: &PathBuf,
+    device_id: &str,
+    cutoff_timestamp: f64,
+) -> Vec<SegbRecord> {
     let mut all_records = Vec::new();
 
     let entries = match fs::read_dir(device_dir) {
@@ -678,11 +675,13 @@ fn parse_all_biome_data(cutoff_timestamp: f64) -> Vec<SegbRecord> {
             for entry in entries.filter_map(|e| e.ok()) {
                 let path = entry.path();
                 if path.is_dir() {
-                    let device_id = path.file_name()
+                    let device_id = path
+                        .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_else(|| "unknown".to_string());
 
-                    let device_records = parse_device_segb_files(&path, &device_id, cutoff_timestamp);
+                    let device_records =
+                        parse_device_segb_files(&path, &device_id, cutoff_timestamp);
                     all_records.extend(device_records);
                 }
             }
@@ -698,7 +697,12 @@ fn calculate_segb_durations(records: &mut [SegbRecord]) -> Vec<(SegbRecord, f64)
 
     // Sort by device_id then timestamp
     records.sort_by(|a, b| {
-        (&a.device_id, a.timestamp.partial_cmp(&b.timestamp).unwrap_or(std::cmp::Ordering::Equal))
+        (
+            &a.device_id,
+            a.timestamp
+                .partial_cmp(&b.timestamp)
+                .unwrap_or(std::cmp::Ordering::Equal),
+        )
             .cmp(&(&b.device_id, std::cmp::Ordering::Equal))
     });
 
@@ -736,8 +740,8 @@ fn export_knowledge_db_sessions(
     our_conn: &Connection,
     since_timestamp: f64,
 ) -> Result<(i32, f64), String> {
-    let knowledge_db = get_knowledge_db_path()
-        .ok_or_else(|| "Could not find knowledgeC.db".to_string())?;
+    let knowledge_db =
+        get_knowledge_db_path().ok_or_else(|| "Could not find knowledgeC.db".to_string())?;
 
     let source_conn = Connection::open(&knowledge_db)
         .map_err(|e| format!("Failed to open knowledgeC.db: {}", e))?;
@@ -798,12 +802,16 @@ fn export_knowledge_db_sessions(
         }
 
         let device_id = device_id.unwrap_or_else(|| "local".to_string());
-        let device_id = if device_id.is_empty() { "local".to_string() } else { device_id };
+        let device_id = if device_id.is_empty() {
+            "local".to_string()
+        } else {
+            device_id
+        };
 
         let device_type = infer_device_type(&device_id);
         register_device(our_conn, &device_id, device_type).ok();
 
-        let category = get_category(&bundle_id).unwrap_or_else(|| "Other".to_string());
+        let category = get_app_category(&bundle_id);
 
         // Convert Mac timestamps to ISO datetime strings
         let start_datetime = mac_timestamp_to_datetime(start_mac);
@@ -842,10 +850,7 @@ fn mac_timestamp_to_datetime(mac_ts: f64) -> String {
 }
 
 /// Export Biome SEGB records to our database
-fn export_biome_records(
-    our_conn: &Connection,
-    since_timestamp: f64,
-) -> Result<i32, String> {
+fn export_biome_records(our_conn: &Connection, since_timestamp: f64) -> Result<i32, String> {
     let mut records = parse_all_biome_data(since_timestamp);
     let records_with_duration = calculate_segb_durations(&mut records);
 
@@ -870,7 +875,7 @@ fn export_biome_records(
 
         register_device(our_conn, &record.device_id, device_type).ok();
 
-        let category = get_category(&record.bundle_id).unwrap_or_else(|| "Other".to_string());
+        let category = get_app_category(&record.bundle_id);
 
         let datetime = mac_timestamp_to_datetime(record.timestamp);
 
@@ -946,8 +951,7 @@ pub fn sync_screentime_internal_with_source(source: &str) -> Result<SyncResult, 
     init_screentime_database(&db_path)
         .map_err(|e| format!("Failed to initialize database: {}", e))?;
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     // Get last sync timestamp
     let last_timestamp: f64 = conn
@@ -1039,8 +1043,7 @@ pub async fn get_screentime_sync_history() -> Result<Vec<SyncHistoryEntry>, Stri
     let db_path = get_app_screentime_db_path()
         .ok_or_else(|| "Could not determine app data directory".to_string())?;
 
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     // Check if table exists
     let table_exists: bool = conn
@@ -1160,7 +1163,7 @@ fn read_sessions_from_db(
         Ok(ScreenTimeSession {
             bundle_id: bundle_id.clone(),
             app_name: get_app_name(&bundle_id),
-            category: get_category(&bundle_id),
+            category: Some(get_app_category(&bundle_id)),
             start_time: start_time_ms,
             end_time: end_time_ms,
             duration_seconds,
@@ -1480,8 +1483,8 @@ pub async fn get_screentime_daily_stats(
     if let Some(stv_db_path) = get_app_screentime_db_path() {
         if let Ok(conn) = Connection::open(&stv_db_path) {
             // Build device filter - merge Mac devices (local + unknown) when querying for This Mac
-            let is_mac_query = device_id.is_none()
-                || device_id.as_ref().map(|id| id == "local").unwrap_or(false);
+            let is_mac_query =
+                device_id.is_none() || device_id.as_ref().map(|id| id == "local").unwrap_or(false);
 
             // Query from daily_summary table
             // For Mac, merge 'local' and 'unknown' devices together
@@ -1639,7 +1642,7 @@ pub async fn get_screentime_daily_stats(
     for row in rows.filter_map(|r| r.ok()) {
         let (bundle_id, seconds, session_count) = row;
         let app_name = get_app_name(&bundle_id).unwrap_or_else(|| bundle_id.clone());
-        let category = get_category(&bundle_id).unwrap_or_else(|| "Other".to_string());
+        let category = get_app_category(&bundle_id);
 
         total_seconds += seconds;
         *category_map.entry(category.clone()).or_insert(0) += seconds;
@@ -1692,8 +1695,8 @@ pub async fn get_screentime_recent_summaries(
     if let Some(stv_db_path) = get_app_screentime_db_path() {
         if let Ok(conn) = Connection::open(&stv_db_path) {
             // Merge Mac devices (local + unknown) when querying for This Mac
-            let is_mac_query = device_id.is_none()
-                || device_id.as_ref().map(|id| id == "local").unwrap_or(false);
+            let is_mac_query =
+                device_id.is_none() || device_id.as_ref().map(|id| id == "local").unwrap_or(false);
 
             // Query aggregated daily totals from daily_summary
             let query = if is_mac_query {
@@ -1797,4 +1800,19 @@ pub async fn get_screentime_recent_summaries(
         .collect();
 
     Ok(summaries)
+}
+
+/// Manually trigger category migration for all existing sessions
+/// This updates categories to match the new App Store category names
+#[command]
+pub async fn migrate_screentime_categories() -> Result<i32, String> {
+    let db_path = get_app_screentime_db_path()
+        .ok_or_else(|| "Could not determine app data directory".to_string())?;
+
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Clear the category cache to ensure fresh lookups
+    crate::app_category::clear_category_cache();
+
+    run_category_migration(&conn)
 }

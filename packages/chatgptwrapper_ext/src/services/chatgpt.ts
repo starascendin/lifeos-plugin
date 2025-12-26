@@ -1,11 +1,12 @@
 import { stripCitations } from '../utils/text';
 import { computeRequirementsToken, computeSentinelProofToken } from './proof-of-work';
 import type { StreamCallbacks, ChatGPTContext } from './types';
+import { generateUUID } from '../utils/uuid';
 
 function getDeviceId(): string {
   let id = localStorage.getItem('oai_device_id');
   if (!id) {
-    id = crypto.randomUUID();
+    id = generateUUID();
     localStorage.setItem('oai_device_id', id);
   }
   return id;
@@ -153,7 +154,7 @@ export async function sendChatGPTMessage(
 
   callbacks.onStatus?.('Sending...');
 
-  const messageId = crypto.randomUUID();
+  const messageId = generateUUID();
   const body = {
     action: 'next',
     messages: [{

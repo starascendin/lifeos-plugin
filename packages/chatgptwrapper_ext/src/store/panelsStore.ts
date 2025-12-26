@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { LLMType, Tier } from '../config/llm';
 import { MODEL_TIERS, LLM_PROVIDERS } from '../config/llm';
+import { generateUUID } from '../utils/uuid';
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -43,7 +44,7 @@ function createPanel(id: number, llmType: LLMType, tier: Tier): PanelState {
     llmType,
     model: MODEL_TIERS[tier][llmType],
     conversationId: null,
-    parentMessageId: crypto.randomUUID(),
+    parentMessageId: generateUUID(),
     claudeOrgUuid: null,
     geminiContextIds: ['', '', ''],
     messages: [],
@@ -120,7 +121,7 @@ export const usePanelsStore = create<PanelsState>((set, get) => ({
           ? {
               ...p,
               conversationId: null,
-              parentMessageId: crypto.randomUUID(),
+              parentMessageId: generateUUID(),
               claudeOrgUuid: null,
               geminiContextIds: ['', '', ''],
               messages: [],
@@ -166,7 +167,7 @@ export const usePanelsStore = create<PanelsState>((set, get) => ({
               llmType,
               model: MODEL_TIERS[tier][llmType],
               conversationId: null,
-              parentMessageId: crypto.randomUUID(),
+              parentMessageId: generateUUID(),
               claudeOrgUuid: null,
               geminiContextIds: ['', '', ''],
               messages: [],

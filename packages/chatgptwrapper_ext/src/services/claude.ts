@@ -1,5 +1,6 @@
 import { stripArtifactTags } from '../utils/text';
 import type { StreamCallbacks, ClaudeContext } from './types';
+import { generateUUID } from '../utils/uuid';
 
 let cachedOrgUuid: string | null = null;
 
@@ -24,7 +25,7 @@ export async function getClaudeOrgUuid(): Promise<string> {
 }
 
 async function createClaudeConversation(orgUuid: string, model: string): Promise<string> {
-  const uuid = crypto.randomUUID();
+  const uuid = generateUUID();
   const res = await fetch(`https://claude.ai/api/organizations/${orgUuid}/chat_conversations`, {
     method: 'POST',
     credentials: 'include',

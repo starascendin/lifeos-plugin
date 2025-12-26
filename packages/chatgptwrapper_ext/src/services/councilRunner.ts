@@ -21,6 +21,7 @@ import type {
   Stage3Result,
   AggregateRanking
 } from '../store/councilStore';
+import { generateUUID } from '../utils/uuid';
 
 export interface CouncilConfig {
   tier: Tier;
@@ -74,7 +75,7 @@ async function queryLLM(
       sendChatGPTMessage(
         prompt,
         model,
-        { conversationId: null, parentMessageId: crypto.randomUUID() },
+        { conversationId: null, parentMessageId: generateUUID() },
         callbacks
       ).catch(reject);
     } else if (llmType === 'claude') {

@@ -144,14 +144,22 @@ fn get_bundle_id() -> &'static str {
 
 /// Get the app data directory for notes storage
 fn get_notes_data_dir() -> Option<PathBuf> {
-    dirs::home_dir()
-        .map(|home| home.join(format!("Library/Application Support/{}/notes", get_bundle_id())))
+    dirs::home_dir().map(|home| {
+        home.join(format!(
+            "Library/Application Support/{}/notes",
+            get_bundle_id()
+        ))
+    })
 }
 
 /// Get the SQLite database path
 fn get_notes_db_path() -> Option<PathBuf> {
-    dirs::home_dir()
-        .map(|home| home.join(format!("Library/Application Support/{}/notes.db", get_bundle_id())))
+    dirs::home_dir().map(|home| {
+        home.join(format!(
+            "Library/Application Support/{}/notes.db",
+            get_bundle_id()
+        ))
+    })
 }
 
 /// Initialize the SQLite database schema

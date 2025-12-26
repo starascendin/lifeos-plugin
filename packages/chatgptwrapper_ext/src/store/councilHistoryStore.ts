@@ -12,6 +12,7 @@ import {
 } from '../services/councilStorage';
 import { useCouncilStore } from './councilStore';
 import { useAppStore } from './appStore';
+import { generateUUID } from '../utils/uuid';
 
 interface CouncilHistoryState {
   // State
@@ -56,7 +57,7 @@ export const useCouncilHistoryStore = create<CouncilHistoryState>((set, get) => 
     useCouncilStore.getState().clearMessages();
 
     // Generate new ID
-    const newId = crypto.randomUUID();
+    const newId = generateUUID();
 
     set({
       currentConversationId: newId,
@@ -114,7 +115,7 @@ export const useCouncilHistoryStore = create<CouncilHistoryState>((set, get) => 
     if (councilStore.messages.length === 0) return;
 
     // Generate or use existing ID
-    const id = currentConversationId || crypto.randomUUID();
+    const id = currentConversationId || generateUUID();
 
     // Find first user message for title
     const firstUserMessage = councilStore.messages.find((m) => m.role === 'user' && m.content);

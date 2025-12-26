@@ -1,21 +1,33 @@
 // LifeOS Nexus - Personal life operating system
 
+mod app_category;
+mod council_server;
 mod notes;
 mod screentime;
+mod voicememos;
 mod youtube;
 
-use notes::{count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders, get_exported_notes, should_run_notes_sync};
+use council_server::{get_council_server_status, start_council_server, stop_council_server};
+use notes::{
+    count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders,
+    get_exported_notes, should_run_notes_sync,
+};
 use screentime::{
     check_screentime_permission, get_device_id, get_screentime_daily_stats,
     get_screentime_recent_summaries, get_screentime_sync_history, list_screentime_devices,
-    read_screentime_sessions, sync_screentime_internal, sync_screentime_to_local_db,
+    migrate_screentime_categories, read_screentime_sessions, sync_screentime_internal,
+    sync_screentime_to_local_db,
 };
 use std::time::Duration;
-use tokio::time::sleep;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Manager,
+};
+use tokio::time::sleep;
+use voicememos::{
+    check_transcription_eligibility, get_voicememo, get_voicememos, sync_voicememos,
+    transcribe_voicememo, transcribe_voicememos_batch,
 };
 use youtube::fetch_youtube_transcript;
 
@@ -38,6 +50,7 @@ pub fn run() {
                 .with_tauri_store()
                 .build(),
         )
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             // Create menu items for tray context menu
             let sync_jobs =
@@ -166,11 +179,22 @@ pub fn run() {
             get_screentime_recent_summaries,
             get_screentime_sync_history,
             sync_screentime_to_local_db,
+            migrate_screentime_categories,
             count_apple_notes,
             export_apple_notes,
             get_exported_notes,
             get_exported_folders,
             fetch_youtube_transcript,
+            sync_voicememos,
+            get_voicememos,
+            get_voicememo,
+            transcribe_voicememo,
+            transcribe_voicememos_batch,
+            check_transcription_eligibility,
+            // Council Server
+            start_council_server,
+            stop_council_server,
+            get_council_server_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

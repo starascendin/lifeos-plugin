@@ -11,6 +11,11 @@ import { remoteCouncilClient } from '../services/remoteCouncil';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error' | 'server_unavailable';
 
+interface RemoteCouncilOptions {
+  serverUrl?: string;
+  enabled?: boolean;
+}
+
 interface RemoteCouncilState {
   status: ConnectionStatus;
   isConnected: boolean;
@@ -19,10 +24,17 @@ interface RemoteCouncilState {
 const DEFAULT_SERVER_URL = 'ws://localhost:3456/ws';
 const HEALTH_CHECK_URL = 'http://localhost:3456/health';
 
-export function useRemoteCouncil(serverUrl: string = DEFAULT_SERVER_URL): RemoteCouncilState {
+export function useRemoteCouncil(options: RemoteCouncilOptions = {}): RemoteCouncilState {
+  const { serverUrl = DEFAULT_SERVER_URL, enabled = true } = options;
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
 
   useEffect(() => {
+    // Skip connection entirely if not enabled (e.g., in server/browser mode)
+    if (!enabled) {
+      setStatus('disconnected');
+      return;
+    }
+
     let mounted = true;
 
     // Set up status callback
@@ -64,7 +76,7 @@ export function useRemoteCouncil(serverUrl: string = DEFAULT_SERVER_URL): Remote
       mounted = false;
       remoteCouncilClient.disconnect();
     };
-  }, [serverUrl]);
+  }, [serverUrl, enabled]);
 
   return {
     status,

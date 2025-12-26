@@ -1,37 +1,91 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { getAccessToken } from '../services/chatgpt';
 import { getClaudeOrgUuid } from '../services/claude';
 import { getGeminiRequestParams } from '../services/gemini';
 
+/**
+ * Check if we're running in server mode (no chrome APIs available).
+ */
+function isServerMode(): boolean {
+  return typeof chrome === 'undefined' || !chrome.storage?.local;
+}
+
 export function useAuthStatus() {
   const setAuthStatus = useAppStore((state) => state.setAuthStatus);
 
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        await getAccessToken();
-        setAuthStatus({ chatgpt: true });
-      } catch {
-        setAuthStatus({ chatgpt: false });
-      }
+  /**
+   * Check auth status via HTTP (for server mode).
+   */
+  const checkAuthViaServer = useCallback(async () => {
+    try {
+      const baseUrl = window.location.origin;
+      const response = await fetch(`${baseUrl}/auth-status`);
+      const data = await response.json();
 
-      try {
-        await getClaudeOrgUuid();
-        setAuthStatus({ claude: true });
-      } catch {
-        setAuthStatus({ claude: false });
+      if (data.success && data.status) {
+        setAuthStatus({
+          chatgpt: data.status.chatgpt,
+          claude: data.status.claude,
+          gemini: data.status.gemini
+        });
+      } else {
+        setAuthStatus({ chatgpt: false, claude: false, gemini: false });
       }
+    } catch (error) {
+      console.error('Failed to fetch auth status:', error);
+      setAuthStatus({ chatgpt: false, claude: false, gemini: false });
+    }
+  }, [setAuthStatus]);
 
-      try {
-        await getGeminiRequestParams();
-        setAuthStatus({ gemini: true });
-      } catch {
-        setAuthStatus({ gemini: false });
-      }
+  /**
+   * Check auth status directly (for extension mode).
+   */
+  const checkAuthDirect = useCallback(async () => {
+    try {
+      await getAccessToken();
+      setAuthStatus({ chatgpt: true });
+    } catch {
+      setAuthStatus({ chatgpt: false });
     }
 
+    try {
+      await getClaudeOrgUuid();
+      setAuthStatus({ claude: true });
+    } catch {
+      setAuthStatus({ claude: false });
+    }
+
+    try {
+      await getGeminiRequestParams();
+      setAuthStatus({ gemini: true });
+    } catch {
+      setAuthStatus({ gemini: false });
+    }
+  }, [setAuthStatus]);
+
+  useEffect(() => {
+    const checkAuth = isServerMode() ? checkAuthViaServer : checkAuthDirect;
+
+    // Initial check
     checkAuth();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    // Poll every 30 seconds in server mode
+    if (isServerMode()) {
+      const interval = setInterval(checkAuth, 30000);
+
+      // Pause polling when page is hidden
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          checkAuth();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [checkAuthViaServer, checkAuthDirect]);
 }

@@ -32,30 +32,40 @@ interface WSMessage {
   requestId?: string;
 }
 
-// Storage types for remote conversations
+// Storage types for remote conversations - matches SavedCouncilConversation format
 interface StoredConversation {
   id: string;
-  query: string;
-  tier: Tier;
+  title: string;
   createdAt: number;
-  duration: number;
-  stage1: CouncilResult['stage1'];
-  stage2: CouncilResult['stage2'];
-  stage3: CouncilResult['stage3'];
-  metadata?: CouncilResult['metadata'];
+  updatedAt: number;
+  tier: Tier;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content?: string;
+    stage1?: CouncilResult['stage1'];
+    stage2?: CouncilResult['stage2'];
+    stage3?: CouncilResult['stage3'];
+    metadata?: CouncilResult['metadata'];
+    loading?: { stage1: boolean; stage2: boolean; stage3: boolean };
+    timestamp: number;
+  }>;
+  messageCount: number;
 }
 
+// Matches ConversationIndex format
 interface ConversationSummary {
   id: string;
-  query: string;
-  tier: Tier;
+  title: string;
   createdAt: number;
-  duration: number;
+  updatedAt: number;
+  messageCount: number;
 }
 
+// Use the same storage keys as regular council mode so both modes share the same history
 const REMOTE_STORAGE_KEYS = {
-  CONVERSATION_INDEX: 'remote_conversation_index',
-  CONVERSATION_PREFIX: 'remote_conversation_'
+  CONVERSATION_INDEX: 'council_conversation_index',
+  CONVERSATION_PREFIX: 'council_conversation_'
 } as const;
 
 interface CouncilRequest {
@@ -314,17 +324,34 @@ class RemoteCouncilClient {
         duration
       });
 
-      // Save conversation to extension storage
+      // Save conversation to extension storage in SavedCouncilConversation format
+      const title = query.trim().length <= 50 ? query.trim() : query.trim().substring(0, 47) + '...';
+      const now = Date.now();
       await this.saveConversation({
         id: requestId,
-        query,
-        tier,
+        title,
         createdAt: startTime,
-        duration,
-        stage1: result.stage1,
-        stage2: result.stage2,
-        stage3: result.stage3,
-        metadata: result.metadata
+        updatedAt: now,
+        tier,
+        messages: [
+          {
+            id: `${requestId}-user`,
+            role: 'user',
+            content: query,
+            timestamp: startTime
+          },
+          {
+            id: `${requestId}-assistant`,
+            role: 'assistant',
+            stage1: result.stage1,
+            stage2: result.stage2,
+            stage3: result.stage3,
+            metadata: result.metadata,
+            loading: { stage1: false, stage2: false, stage3: false },
+            timestamp: now
+          }
+        ],
+        messageCount: 2
       });
 
       console.log('[RemoteCouncil] Council completed in', duration, 'ms');
@@ -428,16 +455,16 @@ class RemoteCouncilClient {
       const key = `${REMOTE_STORAGE_KEYS.CONVERSATION_PREFIX}${conversation.id}`;
       await chrome.storage.local.set({ [key]: conversation });
 
-      // Update the index
+      // Update the index with ConversationIndex format
       const index = await this.getHistoryList();
       const existingIdx = index.findIndex((c) => c.id === conversation.id);
 
       const summary: ConversationSummary = {
         id: conversation.id,
-        query: conversation.query,
-        tier: conversation.tier,
+        title: conversation.title,
         createdAt: conversation.createdAt,
-        duration: conversation.duration
+        updatedAt: conversation.updatedAt,
+        messageCount: conversation.messageCount
       };
 
       if (existingIdx >= 0) {
@@ -446,8 +473,8 @@ class RemoteCouncilClient {
         index.unshift(summary);
       }
 
-      // Sort by createdAt descending
-      index.sort((a, b) => b.createdAt - a.createdAt);
+      // Sort by updatedAt descending
+      index.sort((a, b) => b.updatedAt - a.updatedAt);
 
       await chrome.storage.local.set({ [REMOTE_STORAGE_KEYS.CONVERSATION_INDEX]: index });
       console.log('[RemoteCouncil] Saved conversation:', conversation.id);

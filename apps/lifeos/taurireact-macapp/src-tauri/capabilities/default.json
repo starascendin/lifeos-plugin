@@ -21,6 +21,7 @@
     "store:default",
     "oauth:allow-start",
     "oauth:allow-cancel",
-    "clerk:default"
+    "clerk:default",
+    "fs:allow-appdata-read-recursive"
   ]
 }

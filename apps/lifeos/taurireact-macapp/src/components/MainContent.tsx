@@ -7,9 +7,11 @@ import { VideoList } from "./youtube/VideoList";
 import { TranscriptView } from "./youtube/TranscriptView";
 import { ScreenTimeDashboard } from "./screentime/ScreenTimeDashboard";
 import { NotesTab } from "./notes/NotesTab";
+import { VoiceMemosTab } from "./voicememos/VoiceMemosTab";
 import { SettingsTab } from "./settings/SettingsTab";
+import { CouncilServerTab } from "./council/CouncilServerTab";
 
-type Tab = "youtube" | "screentime" | "notes" | "settings";
+type Tab = "youtube" | "screentime" | "notes" | "voicememos" | "council" | "settings";
 
 export function MainContent() {
   const [activeTab, setActiveTab] = useState<Tab>("youtube");
@@ -53,6 +55,12 @@ export function MainContent() {
     }
     if (activeTab === "notes") {
       return "Notes";
+    }
+    if (activeTab === "voicememos") {
+      return "Voice Memos";
+    }
+    if (activeTab === "council") {
+      return "Council Server";
     }
     if (showTranscript && selectedVideo) {
       return "Transcript";
@@ -125,6 +133,26 @@ export function MainContent() {
           Notes
         </button>
         <button
+          onClick={() => setActiveTab("voicememos")}
+          className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
+            activeTab === "voicememos"
+              ? "text-[var(--accent)] border-b-2 border-[var(--accent)]"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          Voice
+        </button>
+        <button
+          onClick={() => setActiveTab("council")}
+          className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
+            activeTab === "council"
+              ? "text-[var(--accent)] border-b-2 border-[var(--accent)]"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          Council
+        </button>
+        <button
           onClick={() => setActiveTab("settings")}
           className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
             activeTab === "settings"
@@ -140,6 +168,10 @@ export function MainContent() {
       <main className="flex-1 overflow-hidden p-3">
         {activeTab === "settings" ? (
           <SettingsTab />
+        ) : activeTab === "council" ? (
+          <CouncilServerTab />
+        ) : activeTab === "voicememos" ? (
+          <VoiceMemosTab />
         ) : activeTab === "notes" ? (
           <NotesTab />
         ) : activeTab === "screentime" ? (

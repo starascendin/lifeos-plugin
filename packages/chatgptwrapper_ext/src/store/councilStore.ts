@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { LLMType } from '../config/llm';
+import { generateUUID } from '../utils/uuid';
 
 export interface Stage1Result {
   model: string;
@@ -78,7 +79,7 @@ export const useCouncilStore = create<CouncilState>((set) => ({
   isLoading: false,
 
   addUserMessage: (content) => {
-    const id = crypto.randomUUID();
+    const id = generateUUID();
     set((state) => ({
       messages: [...state.messages, { id, role: 'user', content }]
     }));
@@ -86,7 +87,7 @@ export const useCouncilStore = create<CouncilState>((set) => ({
   },
 
   addAssistantMessage: () => {
-    const id = crypto.randomUUID();
+    const id = generateUUID();
     set((state) => ({
       messages: [
         ...state.messages,

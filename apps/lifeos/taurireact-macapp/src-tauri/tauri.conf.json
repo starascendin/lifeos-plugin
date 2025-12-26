@@ -37,7 +37,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com https://www.youtube.com ipc://localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; frame-src https://*.clerk.accounts.dev https://accounts.google.com"
+      "csp": "default-src 'self'; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com https://www.youtube.com https://api.groq.com ipc://localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob: asset: https://asset.localhost; font-src 'self' data:; frame-src https://*.clerk.accounts.dev https://accounts.google.com; media-src 'self' asset: https://asset.localhost blob:"
     }
   },
   "bundle": {
@@ -62,6 +62,7 @@
       "desktop": {
         "schemes": ["lifeos-nexus-dev"]
       }
-    }
+    },
+    "fs": {}
   }
 }
