@@ -23,3 +23,7 @@ export interface ClaudeContext {
 export interface GeminiContext {
   geminiContextIds: string[];
 }
+
+export interface XaiContext {
+  conversationHistory: ChatMessage[];
+}

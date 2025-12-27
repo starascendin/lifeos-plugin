@@ -6,7 +6,8 @@ export function AuthStatus() {
   const items = [
     { key: 'chatgpt', label: 'ChatGPT', ok: authStatus.chatgpt },
     { key: 'claude', label: 'Claude', ok: authStatus.claude },
-    { key: 'gemini', label: 'Gemini', ok: authStatus.gemini }
+    { key: 'gemini', label: 'Gemini', ok: authStatus.gemini },
+    { key: 'xai', label: 'Grok', ok: authStatus.xai }
   ];
 
   return (

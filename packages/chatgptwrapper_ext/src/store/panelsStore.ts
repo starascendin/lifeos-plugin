@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { LLMType, Tier } from '../config/llm';
 import { MODEL_TIERS, LLM_PROVIDERS } from '../config/llm';
 import { generateUUID } from '../utils/uuid';
+import type { ChatMessage } from '../services/types';
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -16,6 +17,7 @@ export interface PanelState {
   parentMessageId: string;
   claudeOrgUuid: string | null;
   geminiContextIds: string[];
+  xaiConversationHistory: ChatMessage[];
   messages: Message[];
   isLoading: boolean;
   error: string | null;
@@ -47,6 +49,7 @@ function createPanel(id: number, llmType: LLMType, tier: Tier): PanelState {
     parentMessageId: generateUUID(),
     claudeOrgUuid: null,
     geminiContextIds: ['', '', ''],
+    xaiConversationHistory: [],
     messages: [],
     isLoading: false,
     error: null,
@@ -124,6 +127,7 @@ export const usePanelsStore = create<PanelsState>((set, get) => ({
               parentMessageId: generateUUID(),
               claudeOrgUuid: null,
               geminiContextIds: ['', '', ''],
+              xaiConversationHistory: [],
               messages: [],
               error: null,
               status: null
@@ -170,6 +174,7 @@ export const usePanelsStore = create<PanelsState>((set, get) => ({
               parentMessageId: generateUUID(),
               claudeOrgUuid: null,
               geminiContextIds: ['', '', ''],
+              xaiConversationHistory: [],
               messages: [],
               error: null,
               status: null

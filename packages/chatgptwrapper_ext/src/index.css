@@ -1592,6 +1592,229 @@ body {
 }
 
 /* ========================================
+   xAI (Grok) Panel & Settings Styles
+   ======================================== */
+
+.panel.xai .panel-icon {
+  background: #1d9bf0;
+}
+
+.panel.xai .message.assistant .message-content {
+  border-left-color: #1d9bf0;
+}
+
+/* xAI Settings Trigger Button */
+.xai-settings-trigger {
+  margin-bottom: 16px;
+}
+
+.settings-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1d9bf0;
+  transition: all 0.15s;
+}
+
+.settings-btn:hover {
+  background: #f0f7ff;
+  border-color: #1d9bf0;
+}
+
+/* xAI Settings Modal Overlay */
+.xai-settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* xAI Settings Modal */
+.xai-settings-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.xai-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.xai-settings-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.xai-settings-header .close-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 24px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.xai-settings-header .close-btn:hover {
+  background: #e5e7eb;
+}
+
+.xai-settings-content {
+  padding: 20px;
+}
+
+.settings-description {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.settings-description a {
+  color: #1d9bf0;
+  text-decoration: none;
+}
+
+.settings-description a:hover {
+  text-decoration: underline;
+}
+
+.api-key-input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.api-key-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: #1d9bf0;
+}
+
+.toggle-btn {
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-btn:hover {
+  background: #e5e7eb;
+}
+
+.xai-settings-content .message {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.xai-settings-content .message.success {
+  background: #f0fff4;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.xai-settings-content .message.error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.save-btn {
+  flex: 1;
+  padding: 10px 16px;
+  background: #1d9bf0;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: #1a8cd8;
+}
+
+.save-btn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.remove-btn {
+  padding: 10px 16px;
+  background: #fff;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.remove-btn:hover {
+  background: #fef2f2;
+}
+
+.status-configured {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #f0fff4;
+  color: #166534;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 1px solid #86efac;
+}
+
+/* ========================================
    Server Mode Styles
    ======================================== */
 

@@ -10,7 +10,8 @@
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://claude.ai/*",
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://ai-gateway.vercel.sh/*"
   ],
   "background": {
     "service_worker": "background.js"

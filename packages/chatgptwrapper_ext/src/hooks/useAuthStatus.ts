@@ -3,6 +3,7 @@ import { useAppStore } from '../store/appStore';
 import { getAccessToken } from '../services/chatgpt';
 import { getClaudeOrgUuid } from '../services/claude';
 import { getGeminiRequestParams } from '../services/gemini';
+import { isXaiConfigured } from '../services/xai';
 
 /**
  * Check if we're running in server mode (no chrome APIs available).
@@ -27,14 +28,15 @@ export function useAuthStatus() {
         setAuthStatus({
           chatgpt: data.status.chatgpt,
           claude: data.status.claude,
-          gemini: data.status.gemini
+          gemini: data.status.gemini,
+          xai: data.status.xai
         });
       } else {
-        setAuthStatus({ chatgpt: false, claude: false, gemini: false });
+        setAuthStatus({ chatgpt: false, claude: false, gemini: false, xai: false });
       }
     } catch (error) {
       console.error('Failed to fetch auth status:', error);
-      setAuthStatus({ chatgpt: false, claude: false, gemini: false });
+      setAuthStatus({ chatgpt: false, claude: false, gemini: false, xai: false });
     }
   }, [setAuthStatus]);
 
@@ -61,6 +63,13 @@ export function useAuthStatus() {
       setAuthStatus({ gemini: true });
     } catch {
       setAuthStatus({ gemini: false });
+    }
+
+    try {
+      const configured = await isXaiConfigured();
+      setAuthStatus({ xai: configured });
+    } catch {
+      setAuthStatus({ xai: false });
     }
   }, [setAuthStatus]);
 

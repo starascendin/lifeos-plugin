@@ -7,6 +7,7 @@ interface AuthStatus {
   chatgpt: boolean;
   claude: boolean;
   gemini: boolean;
+  xai: boolean;
 }
 
 interface AppState {
@@ -24,7 +25,7 @@ export const useAppStore = create<AppState>((set) => ({
   currentTab: 'chat',
   currentLayout: 2,
   currentTier: 'normal',
-  authStatus: { chatgpt: false, claude: false, gemini: false },
+  authStatus: { chatgpt: false, claude: false, gemini: false, xai: false },
 
   setTab: (tab) => set({ currentTab: tab }),
 

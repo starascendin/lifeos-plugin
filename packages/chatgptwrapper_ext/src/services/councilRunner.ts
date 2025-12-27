@@ -6,6 +6,7 @@
 import { sendChatGPTMessage } from './chatgpt';
 import { sendClaudeMessage } from './claude';
 import { sendGeminiMessage } from './gemini';
+import { sendXaiMessage, isXaiConfigured } from './xai';
 import {
   buildRankingPrompt,
   buildSynthesisPrompt,
@@ -91,6 +92,13 @@ async function queryLLM(
         { geminiContextIds: ['', '', ''] },
         callbacks
       ).catch(reject);
+    } else if (llmType === 'xai') {
+      sendXaiMessage(
+        prompt,
+        model,
+        { conversationHistory: [] },
+        callbacks
+      ).catch(reject);
     }
   });
 }
@@ -110,7 +118,13 @@ export async function runCouncilHeadless(
 
   const { tier } = config;
   const models = MODEL_TIERS[tier];
+
+  // Determine available LLM types (xai requires API key)
   const llmTypes: LLMType[] = ['chatgpt', 'claude', 'gemini'];
+  const xaiConfigured = await isXaiConfigured();
+  if (xaiConfigured) {
+    llmTypes.push('xai');
+  }
 
   // Stage 1: Query all LLMs in parallel
   onProgress?.('stage1', 'Querying all models...');

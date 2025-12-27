@@ -3,6 +3,7 @@ import { usePanelsStore } from '../store/panelsStore';
 import { sendChatGPTMessage } from '../services/chatgpt';
 import { sendClaudeMessage } from '../services/claude';
 import { sendGeminiMessage } from '../services/gemini';
+import { sendXaiMessage } from '../services/xai';
 import type { StreamCallbacks } from '../services/types';
 
 export function useChat(panelId: number) {
@@ -67,6 +68,16 @@ export function useChat(panelId: number) {
           );
           updatePanel(panelId, {
             geminiContextIds: newContext.geminiContextIds
+          });
+        } else if (panel.llmType === 'xai') {
+          const newContext = await sendXaiMessage(
+            text,
+            panel.model,
+            { conversationHistory: panel.xaiConversationHistory },
+            callbacks
+          );
+          updatePanel(panelId, {
+            xaiConversationHistory: newContext.conversationHistory
           });
         }
       } catch (err) {

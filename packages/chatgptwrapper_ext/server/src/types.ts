@@ -3,7 +3,7 @@
  */
 
 export type Tier = 'mini' | 'normal' | 'pro';
-export type LLMType = 'chatgpt' | 'claude' | 'gemini';
+export type LLMType = 'chatgpt' | 'claude' | 'gemini' | 'xai';
 
 export interface CouncilRequest {
   requestId: string;
@@ -88,6 +88,7 @@ export interface LLMAuthStatus {
   chatgpt: boolean;
   claude: boolean;
   gemini: boolean;
+  xai: boolean;
   timestamp: number;
 }
 
