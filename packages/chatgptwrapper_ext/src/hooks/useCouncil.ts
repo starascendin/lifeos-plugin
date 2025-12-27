@@ -5,6 +5,7 @@ import { useCouncilHistoryStore } from '../store/councilHistoryStore';
 import { sendChatGPTMessage } from '../services/chatgpt';
 import { sendClaudeMessage } from '../services/claude';
 import { sendGeminiMessage } from '../services/gemini';
+import { sendXaiMessage, isXaiConfigured } from '../services/xai';
 import { buildRankingPrompt, buildSynthesisPrompt, parseRanking, parseEvaluations, calculateAggregateRankings } from '../services/council';
 import { MODEL_TIERS, LLM_CONFIG, type LLMType } from '../config/llm';
 import type { StreamCallbacks } from '../services/types';
@@ -72,17 +73,26 @@ async function queryLLM(
         { geminiContextIds: ['', '', ''] },
         callbacks
       ).catch(reject);
+    } else if (llmType === 'xai') {
+      sendXaiMessage(
+        prompt,
+        model,
+        { conversationHistory: [] },
+        callbacks
+      ).catch(reject);
     }
   });
 }
 
 export function useCouncil() {
   const currentTier = useAppStore((state) => state.currentTier);
+  const authStatus = useAppStore((state) => state.authStatus);
   const messages = useCouncilStore((state) => state.messages);
   const addUserMessage = useCouncilStore((state) => state.addUserMessage);
   const addAssistantMessage = useCouncilStore((state) => state.addAssistantMessage);
   const updateMessage = useCouncilStore((state) => state.updateMessage);
   const setIsLoading = useCouncilStore((state) => state.setIsLoading);
+  const selectedLLMs = useCouncilStore((state) => state.selectedLLMs);
   const currentConversationId = useCouncilHistoryStore((state) => state.currentConversationId);
   const createNewConversation = useCouncilHistoryStore((state) => state.createNewConversation);
 
@@ -169,6 +179,7 @@ export function useCouncil() {
         body: JSON.stringify({
           query: query.trim(),
           tier: currentTier,
+          selectedLLMs,
           timeout: 180000
         }),
         signal: controller.signal
@@ -227,7 +238,7 @@ export function useCouncil() {
 
       throw error;
     }
-  }, [currentTier, updateMessage]);
+  }, [currentTier, selectedLLMs, updateMessage]);
 
   /**
    * Run council directly using LLM APIs (for extension mode).
@@ -237,7 +248,22 @@ export function useCouncil() {
     assistantId: string
   ) => {
     const models = MODEL_TIERS[currentTier];
-    const llmTypes: LLMType[] = ['chatgpt', 'claude', 'gemini'];
+
+    // Use selected LLMs, filtered by auth status
+    // For xAI, also check if API key is configured
+    const xaiConfigured = await isXaiConfigured();
+    const llmTypes = selectedLLMs.filter((llm) => {
+      if (llm === 'xai') {
+        return authStatus.xai && xaiConfigured;
+      }
+      return authStatus[llm];
+    });
+
+    console.log('[Council] Selected LLMs:', selectedLLMs, 'Active LLMs:', llmTypes);
+
+    if (llmTypes.length < 2) {
+      throw new Error('At least 2 LLMs are required for the council. Please check your authentication status.');
+    }
 
     // Stage 1: Query all LLMs in parallel
     updateMessage(assistantId, { loading: { stage1: true, stage2: false, stage3: false } });
@@ -318,7 +344,7 @@ export function useCouncil() {
       stage3: stage3Results,
       loading: { stage1: false, stage2: false, stage3: false }
     });
-  }, [currentTier, updateMessage]);
+  }, [currentTier, selectedLLMs, authStatus, updateMessage]);
 
   const runCouncil = useCallback(async (query: string) => {
     if (!query.trim()) return;

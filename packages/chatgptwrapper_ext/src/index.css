@@ -801,6 +801,133 @@ body {
   max-width: 400px;
 }
 
+/* LLM Selector (Empty State) */
+.council-llm-selector {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  max-width: 400px;
+}
+
+.llm-selector-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.llm-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.llm-selector-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 13px;
+  color: #666;
+}
+
+.llm-selector-item:hover:not(.disabled) {
+  border-color: var(--llm-color, #2563eb);
+  background: #fafafa;
+}
+
+.llm-selector-item.selected {
+  border-color: var(--llm-color, #2563eb);
+  background: color-mix(in srgb, var(--llm-color, #2563eb) 10%, white);
+  color: #333;
+}
+
+.llm-selector-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f3f4f6;
+}
+
+.llm-selector-item .llm-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--llm-color, #666);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.llm-selector-item .llm-name {
+  flex: 1;
+}
+
+.llm-selector-item .llm-check {
+  color: var(--llm-color, #10b981);
+  font-weight: 600;
+}
+
+.llm-selector-item .llm-offline {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.llm-selector-hint {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+/* LLM Toggles (Header - Compact) */
+.council-llm-toggles-compact {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.llm-toggle-compact {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 2px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.llm-toggle-compact:hover:not(.disabled) {
+  border-color: var(--llm-color, #2563eb);
+}
+
+.llm-toggle-compact.selected {
+  border-color: var(--llm-color, #2563eb);
+  background: var(--llm-color, #2563eb);
+  color: white;
+}
+
+.llm-toggle-compact.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Council Messages */
 .council-message-group {
   margin-bottom: 24px;

@@ -66,17 +66,21 @@ export interface CouncilMessage {
 interface CouncilState {
   messages: CouncilMessage[];
   isLoading: boolean;
+  selectedLLMs: LLMType[];
   addUserMessage: (content: string) => string;
   addAssistantMessage: () => string;
   updateMessage: (id: string, updates: Partial<CouncilMessage>) => void;
   clearMessages: () => void;
   setIsLoading: (isLoading: boolean) => void;
   setMessages: (messages: CouncilMessage[]) => void;
+  setSelectedLLMs: (llms: LLMType[]) => void;
+  toggleLLM: (llm: LLMType) => void;
 }
 
 export const useCouncilStore = create<CouncilState>((set) => ({
   messages: [],
   isLoading: false,
+  selectedLLMs: ['chatgpt', 'claude', 'gemini'] as LLMType[],
 
   addUserMessage: (content) => {
     const id = generateUUID();
@@ -112,5 +116,21 @@ export const useCouncilStore = create<CouncilState>((set) => ({
 
   setIsLoading: (isLoading) => set({ isLoading }),
 
-  setMessages: (messages) => set({ messages })
+  setMessages: (messages) => set({ messages }),
+
+  setSelectedLLMs: (llms) => set({ selectedLLMs: llms }),
+
+  toggleLLM: (llm) =>
+    set((state) => {
+      const isSelected = state.selectedLLMs.includes(llm);
+      if (isSelected) {
+        // Don't allow deselecting if only 2 LLMs remain (min required for council)
+        if (state.selectedLLMs.length <= 2) {
+          return state;
+        }
+        return { selectedLLMs: state.selectedLLMs.filter((l) => l !== llm) };
+      } else {
+        return { selectedLLMs: [...state.selectedLLMs, llm] };
+      }
+    })
 }));

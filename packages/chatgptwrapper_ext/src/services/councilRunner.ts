@@ -26,6 +26,7 @@ import { generateUUID } from '../utils/uuid';
 
 export interface CouncilConfig {
   tier: Tier;
+  selectedLLMs?: LLMType[];
 }
 
 export interface CouncilResult {
@@ -116,14 +117,33 @@ export async function runCouncilHeadless(
     throw new Error('Query cannot be empty');
   }
 
-  const { tier } = config;
+  const { tier, selectedLLMs } = config;
   const models = MODEL_TIERS[tier];
 
-  // Determine available LLM types (xai requires API key)
-  const llmTypes: LLMType[] = ['chatgpt', 'claude', 'gemini'];
-  const xaiConfigured = await isXaiConfigured();
-  if (xaiConfigured) {
-    llmTypes.push('xai');
+  // Determine available LLM types
+  // Use selectedLLMs if provided, otherwise fall back to all available
+  let llmTypes: LLMType[];
+
+  if (selectedLLMs && selectedLLMs.length > 0) {
+    // Filter selectedLLMs to only include those that are available
+    const xaiConfigured = await isXaiConfigured();
+    llmTypes = selectedLLMs.filter((llm) => {
+      if (llm === 'xai') return xaiConfigured;
+      return true; // Other LLMs are assumed available (auth checked client-side)
+    });
+    console.log('[Council] Using selected LLMs:', llmTypes);
+  } else {
+    // Fallback: use all available LLMs
+    llmTypes = ['chatgpt', 'claude', 'gemini'];
+    const xaiConfigured = await isXaiConfigured();
+    if (xaiConfigured) {
+      llmTypes.push('xai');
+    }
+    console.log('[Council] Using all available LLMs:', llmTypes);
+  }
+
+  if (llmTypes.length < 2) {
+    throw new Error('At least 2 LLMs are required for the council');
   }
 
   // Stage 1: Query all LLMs in parallel
