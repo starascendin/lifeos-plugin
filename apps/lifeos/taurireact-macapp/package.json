@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:staging": "TAURI_BUILD_MODE=staging tauri build -c src-tauri/tauri.staging.conf.json",
-    "tauri:production": "TAURI_BUILD_MODE=production tauri build -c src-tauri/tauri.production.conf.json",
+    "tauri:production": "TAURI_BUILD_MODE=production VITE_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsucmpsYWJzLmRldiQ tauri build -c src-tauri/tauri.production.conf.json",
     "lint:rust": "cd src-tauri && cargo clippy --all -- -D warnings",
     "fmt:rust": "cd src-tauri && cargo fmt --all"
   },

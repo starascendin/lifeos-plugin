@@ -31,8 +31,8 @@ export function SignIn() {
         const { open } = await import("@tauri-apps/plugin-shell");
         const { start, onUrl, cancel } = await import("@fabianlars/tauri-plugin-oauth");
 
-        // Start the localhost OAuth server
-        const port = await start();
+        // Start the localhost OAuth server on a fixed port for consistent redirect URL
+        const port = await start({ ports: [3847] });
         portRef.current = port;
         console.log("[SignIn] OAuth server started on port:", port);
 
@@ -62,52 +62,99 @@ export function SignIn() {
           console.log("[SignIn] Localhost callback received:", url);
           try {
             // Parse the callback URL to get the rotating token nonce
+            // Check both query string and hash fragment (production may use different format)
             const callbackUrl = new URL(url);
-            const rotatingTokenNonce = callbackUrl.searchParams.get("rotating_token_nonce");
+            let rotatingTokenNonce = callbackUrl.searchParams.get("rotating_token_nonce");
 
-            if (!rotatingTokenNonce) {
-              throw new Error("Missing rotating_token_nonce in callback URL");
+            // If not in query string, check hash fragment
+            if (!rotatingTokenNonce && callbackUrl.hash) {
+              const hashParams = new URLSearchParams(callbackUrl.hash.slice(1));
+              rotatingTokenNonce = hashParams.get("rotating_token_nonce");
             }
 
-            console.log("[SignIn] Got rotatingTokenNonce, reloading signIn...");
+            console.log("[SignIn] Callback URL parsed - query:", callbackUrl.search, "hash:", callbackUrl.hash);
 
-            // Reload sign-in with nonce to complete OAuth handshake
-            const reloadedSignIn = await signIn.reload({ rotatingTokenNonce });
-            console.log("[SignIn] Reloaded signIn status:", reloadedSignIn.status);
-            console.log("[SignIn] firstFactorVerification.status:", reloadedSignIn.firstFactorVerification?.status);
+            if (rotatingTokenNonce) {
+              // Dev mode: Use the nonce to complete authentication
+              console.log("[SignIn] Got rotatingTokenNonce, reloading signIn...");
 
-            // Check if this is a "transfer" scenario (new user needs to sign up)
-            if (reloadedSignIn.firstFactorVerification?.status === "transferable") {
-              console.log("[SignIn] Transfer scenario - user needs to sign up");
+              const reloadedSignIn = await signIn.reload({ rotatingTokenNonce });
+              console.log("[SignIn] Reloaded signIn status:", reloadedSignIn.status);
+              console.log("[SignIn] firstFactorVerification.status:", reloadedSignIn.firstFactorVerification?.status);
 
-              if (!signUp) {
-                throw new Error("signUp not available for transfer");
-              }
+              // Check if this is a "transfer" scenario (new user needs to sign up)
+              if (reloadedSignIn.firstFactorVerification?.status === "transferable") {
+                console.log("[SignIn] Transfer scenario - user needs to sign up");
 
-              // Create sign-up via transfer from sign-in attempt
-              const newSignUp = await signUp.create({ transfer: true });
-              console.log("[SignIn] SignUp created with transfer, status:", newSignUp.status);
+                if (!signUp) {
+                  throw new Error("signUp not available for transfer");
+                }
 
-              // Reload sign-up with nonce to complete OAuth flow
-              const reloadedSignUp = await newSignUp.reload({ rotatingTokenNonce });
-              console.log("[SignIn] SignUp reloaded, createdSessionId:", reloadedSignUp.createdSessionId);
+                const newSignUp = await signUp.create({ transfer: true });
+                console.log("[SignIn] SignUp created with transfer, status:", newSignUp.status);
 
-              if (reloadedSignUp.createdSessionId) {
-                await clerk.setActive({ session: reloadedSignUp.createdSessionId });
-                console.log("[SignIn] Session activated from signUp");
+                const reloadedSignUp = await newSignUp.reload({ rotatingTokenNonce });
+                console.log("[SignIn] SignUp reloaded, createdSessionId:", reloadedSignUp.createdSessionId);
+
+                if (reloadedSignUp.createdSessionId) {
+                  await clerk.setActive({ session: reloadedSignUp.createdSessionId });
+                  console.log("[SignIn] Session activated from signUp");
+                } else {
+                  throw new Error("No session ID after signUp reload");
+                }
               } else {
-                throw new Error("No session ID after signUp reload");
+                // Normal sign-in flow - existing user
+                console.log("[SignIn] Normal sign-in flow, createdSessionId:", reloadedSignIn.createdSessionId);
+
+                if (reloadedSignIn.createdSessionId) {
+                  await clerk.setActive({ session: reloadedSignIn.createdSessionId });
+                  console.log("[SignIn] Session activated from signIn");
+                } else {
+                  throw new Error("No session ID after signIn reload");
+                }
               }
             } else {
-              // Normal sign-in flow - existing user
-              console.log("[SignIn] Normal sign-in flow, createdSessionId:", reloadedSignIn.createdSessionId);
+              // Production mode: No nonce in callback, try polling signIn status
+              console.log("[SignIn] No nonce in callback (production mode), polling signIn status...");
 
-              if (reloadedSignIn.createdSessionId) {
-                await clerk.setActive({ session: reloadedSignIn.createdSessionId });
-                console.log("[SignIn] Session activated from signIn");
-              } else {
-                throw new Error("No session ID after signIn reload");
+              // Poll the signIn status - Clerk may have updated it server-side
+              let attempts = 0;
+              const maxAttempts = 10;
+              const pollInterval = 1000;
+
+              while (attempts < maxAttempts) {
+                attempts++;
+                console.log(`[SignIn] Polling attempt ${attempts}/${maxAttempts}...`);
+
+                // Reload without nonce to check current status
+                const reloadedSignIn = await signIn.reload();
+                console.log("[SignIn] Polled status:", reloadedSignIn.status, "firstFactor:", reloadedSignIn.firstFactorVerification?.status);
+
+                if (reloadedSignIn.status === "complete" && reloadedSignIn.createdSessionId) {
+                  await clerk.setActive({ session: reloadedSignIn.createdSessionId });
+                  console.log("[SignIn] Session activated via polling");
+                  return;
+                }
+
+                if (reloadedSignIn.firstFactorVerification?.status === "transferable") {
+                  console.log("[SignIn] Transfer scenario detected via polling");
+                  if (!signUp) throw new Error("signUp not available for transfer");
+
+                  const newSignUp = await signUp.create({ transfer: true });
+                  const reloadedSignUp = await newSignUp.reload();
+
+                  if (reloadedSignUp.createdSessionId) {
+                    await clerk.setActive({ session: reloadedSignUp.createdSessionId });
+                    console.log("[SignIn] Session activated from signUp via polling");
+                    return;
+                  }
+                }
+
+                // Wait before next poll
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
               }
+
+              throw new Error("OAuth completed but session not created after polling. Check Clerk production configuration.");
             }
           } catch (err) {
             console.error("[SignIn] Error processing callback:", err);

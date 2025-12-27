@@ -31,7 +31,14 @@ import {
   AlertTriangle,
   Clock,
   HardDrive,
+  Info,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { readFile } from "@tauri-apps/plugin-fs";
 
 type ViewFilter = "all" | "transcribed" | "not_transcribed";
@@ -141,6 +148,36 @@ export function VoiceMemosTab() {
             <div className="flex items-center gap-2">
               <Mic className="h-5 w-5 text-muted-foreground" />
               <span className="font-medium">Voice Memos</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-xs">
+                    <div className="space-y-2">
+                      <p>
+                        <strong>How it works:</strong> Syncs voice memos from macOS Voice Memos app
+                        and allows transcription using AI.
+                      </p>
+                      <p>
+                        <strong>Storage:</strong> Audio files are copied locally to app data
+                        directory. Metadata stored in local SQLite database. No cloud sync.
+                      </p>
+                      <p>
+                        <strong>Transcription:</strong> Uses Groq&apos;s{" "}
+                        <code className="bg-muted px-1 rounded">whisper-large-v3-turbo</code> model.
+                        Max file size: 25 MB.
+                      </p>
+                      <p>
+                        <strong>API Key:</strong> Reads{" "}
+                        <code className="bg-muted px-1 rounded">GROQ_API_KEY</code> from{" "}
+                        <code className="bg-muted px-1 rounded">.env</code> file in the app
+                        directory.
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Badge variant="secondary">{memos.length} synced</Badge>
             </div>
 
