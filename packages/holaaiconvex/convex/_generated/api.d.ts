@@ -35,6 +35,7 @@ import type * as lifeos_agenda from "../lifeos/agenda.js";
 import type * as lifeos_chatnexus from "../lifeos/chatnexus.js";
 import type * as lifeos_chatnexus_schema from "../lifeos/chatnexus_schema.js";
 import type * as lifeos_demo_agent from "../lifeos/demo_agent.js";
+import type * as lifeos_demo_agent_schema from "../lifeos/demo_agent_schema.js";
 import type * as lifeos_habits from "../lifeos/habits.js";
 import type * as lifeos_habits_categories from "../lifeos/habits_categories.js";
 import type * as lifeos_habits_checkins from "../lifeos/habits_checkins.js";
@@ -92,6 +93,7 @@ declare const fullApi: ApiFromModules<{
   "lifeos/chatnexus": typeof lifeos_chatnexus;
   "lifeos/chatnexus_schema": typeof lifeos_chatnexus_schema;
   "lifeos/demo_agent": typeof lifeos_demo_agent;
+  "lifeos/demo_agent_schema": typeof lifeos_demo_agent_schema;
   "lifeos/habits": typeof lifeos_habits;
   "lifeos/habits_categories": typeof lifeos_habits_categories;
   "lifeos/habits_checkins": typeof lifeos_habits_checkins;

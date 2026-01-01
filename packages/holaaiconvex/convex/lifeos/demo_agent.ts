@@ -6,9 +6,10 @@
 import { Agent } from "@convex-dev/agent";
 import { gateway } from "@ai-sdk/gateway";
 import { v } from "convex/values";
-import { action } from "../_generated/server";
-import { components } from "../_generated/api";
+import { action, internalMutation, internalQuery } from "../_generated/server";
+import { components, internal } from "../_generated/api";
 import { demoTools } from "./lib/demo_tools";
+import { vTokenUsage } from "./demo_agent_schema";
 
 // ==================== AVAILABLE MODELS ====================
 
@@ -30,6 +31,64 @@ export type DemoAgentModelId = (typeof DEMO_AGENT_MODELS)[number];
 
 // Default model if none specified
 const DEFAULT_MODEL: DemoAgentModelId = "openai/gpt-5-nano";
+
+// ==================== INTERNAL MUTATIONS FOR USAGE TRACKING ====================
+
+/**
+ * Save token usage to the database
+ * Called by the usageHandler in the Agent
+ */
+export const saveUsage = internalMutation({
+  args: {
+    threadId: v.string(),
+    agentName: v.string(),
+    model: v.string(),
+    provider: v.string(),
+    usage: vTokenUsage,
+    providerMetadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("lifeos_demoAgentUsage", {
+      threadId: args.threadId,
+      agentName: args.agentName,
+      model: args.model,
+      provider: args.provider,
+      usage: args.usage,
+      providerMetadata: args.providerMetadata,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Get total usage for a thread
+ */
+export const getThreadUsage = internalQuery({
+  args: {
+    threadId: v.string(),
+  },
+  handler: async (ctx, { threadId }) => {
+    const usageRecords = await ctx.db
+      .query("lifeos_demoAgentUsage")
+      .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+      .collect();
+
+    // Aggregate all usage records
+    const totalUsage = usageRecords.reduce(
+      (acc, record) => ({
+        promptTokens: acc.promptTokens + record.usage.promptTokens,
+        completionTokens: acc.completionTokens + record.usage.completionTokens,
+        totalTokens: acc.totalTokens + record.usage.totalTokens,
+      }),
+      { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+    );
+
+    return {
+      usage: totalUsage,
+      recordCount: usageRecords.length,
+    };
+  },
+});
 
 // ==================== AGENT INSTRUCTIONS ====================
 
@@ -64,6 +123,31 @@ function createDemoAgent(modelId: DemoAgentModelId = DEFAULT_MODEL) {
     // 2. Receive tool result(s)
     // 3. Generate final text response
     maxSteps: 5,
+    // Track token usage - saves to database for each LLM call
+    usageHandler: async (ctx, args) => {
+      const { usage, model, provider, agentName, threadId } = args;
+
+      // Usage object may have different property names depending on AI SDK version
+      // Cast to any to safely access properties
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const usageAny = usage as any;
+      const promptTokens = usageAny.promptTokens ?? usageAny.inputTokens ?? 0;
+      const completionTokens = usageAny.completionTokens ?? usageAny.outputTokens ?? 0;
+
+      // Save usage to database
+      await ctx.runMutation(internal.lifeos.demo_agent.saveUsage, {
+        threadId: threadId ?? "unknown",
+        agentName: agentName ?? "Demo Assistant",
+        model: model ?? modelId,
+        provider: provider ?? modelId.split("/")[0],
+        usage: {
+          promptTokens,
+          completionTokens,
+          totalTokens: promptTokens + completionTokens,
+        },
+        providerMetadata: args.providerMetadata,
+      });
+    },
   });
 }
 
@@ -130,21 +214,11 @@ export const sendMessage = action({
     const extractedToolResults: Array<{ name: string; result: unknown }> = [];
     const textParts: string[] = [];
 
-    // Aggregate token usage across all steps
-    let totalPromptTokens = 0;
-    let totalCompletionTokens = 0;
-
     if (anyResult.steps && Array.isArray(anyResult.steps)) {
       for (const step of anyResult.steps) {
         // Check for text in step.text (the LLM's text response in this step)
         if (step.text && typeof step.text === "string" && step.text.trim()) {
           textParts.push(step.text);
-        }
-
-        // Aggregate token usage from each step
-        if (step.usage) {
-          totalPromptTokens += step.usage.promptTokens || 0;
-          totalCompletionTokens += step.usage.completionTokens || 0;
         }
 
         if (step.content && Array.isArray(step.content)) {
@@ -170,24 +244,20 @@ export const sendMessage = action({
       }
     }
 
-    // Also check top-level usage if available
-    if (anyResult.usage) {
-      totalPromptTokens = anyResult.usage.promptTokens || totalPromptTokens;
-      totalCompletionTokens = anyResult.usage.completionTokens || totalCompletionTokens;
-    }
-
     // Use result.text if available, otherwise join text parts from steps
     const finalText = result.text || textParts.join("\n");
+
+    // Fetch usage from database (saved by usageHandler)
+    const usageData = await ctx.runQuery(
+      internal.lifeos.demo_agent.getThreadUsage,
+      { threadId }
+    );
 
     return {
       text: finalText,
       toolCalls: extractedToolCalls,
       toolResults: extractedToolResults,
-      usage: {
-        promptTokens: totalPromptTokens,
-        completionTokens: totalCompletionTokens,
-        totalTokens: totalPromptTokens + totalCompletionTokens,
-      },
+      usage: usageData.usage,
       modelUsed: validModelId,
     };
   },
