@@ -160,6 +160,8 @@ export const pmTables = {
     estimate: v.optional(v.number()), // Story points or hours
     // Labels (stored as array of label IDs)
     labelIds: v.array(v.id("lifeos_pmLabels")),
+    // Daily Agenda - Top priority flag for "Top 3" tasks
+    isTopPriority: v.optional(v.boolean()),
     // Dates
     dueDate: v.optional(v.number()),
     completedAt: v.optional(v.number()),
@@ -177,7 +179,9 @@ export const pmTables = {
     .index("by_project_status", ["projectId", "status"])
     .index("by_identifier", ["userId", "identifier"])
     .index("by_project_number", ["projectId", "number"])
-    .index("by_sort_order", ["userId", "status", "sortOrder"]),
+    .index("by_sort_order", ["userId", "status", "sortOrder"])
+    .index("by_user_due_date", ["userId", "dueDate"])
+    .index("by_user_top_priority", ["userId", "isTopPriority"]),
 
   // ==================== LABELS ====================
   lifeos_pmLabels: defineTable({
@@ -271,4 +275,18 @@ export const pmTables = {
     .index("by_cycle", ["cycleId"])
     .index("by_cycle_date", ["cycleId", "date"])
     .index("by_user", ["userId"]),
+
+  // ==================== DAILY SUMMARIES (for Agenda Daily View) ====================
+  lifeos_dailySummaries: defineTable({
+    userId: v.id("users"),
+    date: v.string(), // YYYY-MM-DD format
+    // AI-generated summary
+    aiSummary: v.optional(v.string()),
+    generatedAt: v.optional(v.number()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"]),
 };

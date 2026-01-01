@@ -63,7 +63,6 @@ export const sendMessage = action({
     const { thread } = await demoAgent.continueThread(ctx, { threadId });
     const result = await thread.generateText({
       prompt: message,
-      maxSteps: 5, // Allow multi-step: tool call → result → LLM response
     });
 
     // Debug: Log the entire result structure to find where text lives

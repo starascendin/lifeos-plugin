@@ -712,3 +712,99 @@ export const bulkUpdateIssues = mutation({
     return { updatedCount: args.issueIds.length };
   },
 });
+
+// ==================== DAILY AGENDA QUERIES ====================
+
+/**
+ * Get tasks due on a specific date (for Daily Agenda view)
+ * Returns tasks that are not done/cancelled and have dueDate matching the given date
+ */
+export const getTasksForDate = query({
+  args: {
+    date: v.string(), // YYYY-MM-DD format
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Parse the date to get start and end timestamps for the day
+    const startOfDay = new Date(args.date).setHours(0, 0, 0, 0);
+    const endOfDay = new Date(args.date).setHours(23, 59, 59, 999);
+
+    // Get all issues for the user
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Filter by due date and exclude completed/cancelled
+    const tasksForDate = allIssues.filter((issue) => {
+      if (!issue.dueDate) return false;
+      if (issue.status === "done" || issue.status === "cancelled") return false;
+      return issue.dueDate >= startOfDay && issue.dueDate <= endOfDay;
+    });
+
+    // Sort by priority (urgent first) then by sortOrder
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+    return tasksForDate.sort((a, b) => {
+      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.sortOrder - b.sortOrder;
+    });
+  },
+});
+
+/**
+ * Get top priority tasks (marked for "Top 3" in Daily Agenda)
+ * Returns active tasks with isTopPriority=true
+ */
+export const getTopPriorityTasks = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user_top_priority", (q) =>
+        q.eq("userId", user._id).eq("isTopPriority", true)
+      )
+      .collect();
+
+    // Exclude completed/cancelled
+    const activeTasks = allIssues.filter(
+      (issue) => issue.status !== "done" && issue.status !== "cancelled"
+    );
+
+    // Sort by priority then sortOrder
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+    return activeTasks.sort((a, b) => {
+      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.sortOrder - b.sortOrder;
+    });
+  },
+});
+
+/**
+ * Toggle top priority status for an issue (for Daily Agenda "Top 3" selection)
+ */
+export const toggleTopPriority = mutation({
+  args: {
+    issueId: v.id("lifeos_pmIssues"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.userId !== user._id) {
+      throw new Error("Issue not found or access denied");
+    }
+
+    await ctx.db.patch(args.issueId, {
+      isTopPriority: !issue.isTopPriority,
+      updatedAt: now,
+    });
+
+    return { issueId: args.issueId, isTopPriority: !issue.isTopPriority };
+  },
+});

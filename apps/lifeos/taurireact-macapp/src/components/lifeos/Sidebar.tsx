@@ -18,6 +18,7 @@ import { useClerk, useUser } from "@clerk/clerk-react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Bot,
+  Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -69,6 +70,7 @@ export function Sidebar() {
 
   const navigation: NavItem[] = [
     { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
+    { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
     { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
     { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
     {

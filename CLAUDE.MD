@@ -8,3 +8,6 @@
 
 For Lifeos Tauri app, read:
 - apps/lifeos/taurireact-macapp/CLAUDE.md
+
+For any development in convex, make sure:
+- all lint/build/ typecheck issues are corrected

@@ -180,6 +180,69 @@ export const getHabitWithStats = query({
   },
 });
 
+// ==================== DAILY AGENDA QUERIES ====================
+
+/**
+ * Get habits scheduled for a specific date (for Daily Agenda view)
+ * Filters by frequency (daily habits always included, weekly habits only on target days)
+ */
+export const getHabitsForDate = query({
+  args: {
+    date: v.string(), // YYYY-MM-DD format
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Get all active habits
+    const habits = await ctx.db
+      .query("lifeos_habits")
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", user._id).eq("isActive", true)
+      )
+      .collect();
+
+    // Filter out archived habits
+    const activeHabits = habits.filter((h) => !h.archivedAt);
+
+    // Parse the date
+    const targetDate = new Date(args.date);
+
+    // Filter by schedule
+    const scheduledHabits = activeHabits.filter((habit) =>
+      isHabitScheduledForDateInternal(habit, targetDate)
+    );
+
+    // Sort by sortOrder
+    return scheduledHabits.sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+});
+
+/**
+ * Internal helper to check if habit is scheduled for a date
+ */
+function isHabitScheduledForDateInternal(
+  habit: Doc<"lifeos_habits">,
+  date: Date
+): boolean {
+  if (habit.frequency === "daily") return true;
+
+  if (habit.frequency === "weekly" && habit.targetDays) {
+    const dayNames = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ] as const;
+    const dayOfWeek = dayNames[date.getDay()];
+    return habit.targetDays.includes(dayOfWeek);
+  }
+
+  return false;
+}
+
 // ==================== MUTATIONS ====================
 
 /**
