@@ -2,6 +2,7 @@ import { useAgenda, formatDisplayDate, isToday } from "@/lib/contexts/AgendaCont
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { DailyView } from "./daily/DailyView";
+import { IssueDetailPanel } from "@/components/pm/issue/IssueDetailPanel";
 
 export function AgendaTab() {
   const {
@@ -68,6 +69,9 @@ export function AgendaTab() {
           </div>
         )}
       </div>
+
+      {/* Issue Detail Panel */}
+      <IssueDetailPanel />
     </div>
   );
 }

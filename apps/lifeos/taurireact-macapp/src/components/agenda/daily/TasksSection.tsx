@@ -1,4 +1,5 @@
 import { useAgenda } from "@/lib/contexts/AgendaContext";
+import { usePM } from "@/lib/contexts/PMContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +12,7 @@ interface TaskItemProps {
   task: Doc<"lifeos_pmIssues">;
   onToggleStatus: () => void;
   onToggleStar: () => void;
+  onClick: () => void;
   showStar?: boolean;
 }
 
@@ -26,16 +28,24 @@ function TaskItem({
   task,
   onToggleStatus,
   onToggleStar,
+  onClick,
   showStar = true,
 }: TaskItemProps) {
   const isDone = task.status === "done";
   const isStarred = task.isTopPriority;
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group">
+    <div
+      className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
+      onClick={onClick}
+    >
       <Checkbox
         checked={isDone}
-        onCheckedChange={onToggleStatus}
+        onCheckedChange={(checked) => {
+          // Prevent opening sidebar when clicking checkbox
+          onToggleStatus();
+        }}
+        onClick={(e) => e.stopPropagation()}
         className="h-5 w-5"
       />
       <div className="flex-1 min-w-0">
@@ -86,6 +96,8 @@ export function TasksSection() {
     updateIssueStatus,
     toggleTopPriority,
   } = useAgenda();
+
+  const { setSelectedIssueId } = usePM();
 
   const handleToggleStatus = async (task: Doc<"lifeos_pmIssues">) => {
     const newStatus = task.status === "done" ? "todo" : "done";
@@ -139,6 +151,7 @@ export function TasksSection() {
                       task={task}
                       onToggleStatus={() => handleToggleStatus(task)}
                       onToggleStar={() => handleToggleStar(task._id)}
+                      onClick={() => setSelectedIssueId(task._id)}
                       showStar={true}
                     />
                   ))}
@@ -164,6 +177,7 @@ export function TasksSection() {
                       task={task}
                       onToggleStatus={() => handleToggleStatus(task)}
                       onToggleStar={() => handleToggleStar(task._id)}
+                      onClick={() => setSelectedIssueId(task._id)}
                       showStar={top3Tasks.length < 3}
                     />
                   ))}
