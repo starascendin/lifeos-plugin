@@ -6,6 +6,8 @@
 
 
 
+- for all AI calls, we want to use vercel AI gateway as much as possible
+
 For Lifeos Tauri app, read:
 - apps/lifeos/taurireact-macapp/CLAUDE.md
 

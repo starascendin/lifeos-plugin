@@ -10,12 +10,30 @@ import { action } from "../_generated/server";
 import { components } from "../_generated/api";
 import { demoTools } from "./lib/demo_tools";
 
-// ==================== AGENT DEFINITION ====================
+// ==================== AVAILABLE MODELS ====================
 
-export const demoAgent = new Agent(components.agent, {
-  name: "Demo Assistant",
-  languageModel: gateway("openai/gpt-4o-mini"),
-  instructions: `You are a helpful demo assistant showcasing AI agent capabilities with tool use.
+/**
+ * Whitelisted models for the demo agent
+ * Format: provider/model-name (Vercel AI Gateway format)
+ */
+export const DEMO_AGENT_MODELS = [
+  "openai/gpt-5-nano",
+  "google/gemini-2.5-flash-lite",
+  "xai/grok-4.1-fast-reasoning",
+  "openai/gpt-5-mini",
+  "openai/gpt-5.1-codex-mini",
+  "google/gemini-3-flash",
+  "anthropic/claude-haiku-4.5",
+] as const;
+
+export type DemoAgentModelId = (typeof DEMO_AGENT_MODELS)[number];
+
+// Default model if none specified
+const DEFAULT_MODEL: DemoAgentModelId = "openai/gpt-5-nano";
+
+// ==================== AGENT INSTRUCTIONS ====================
+
+const AGENT_INSTRUCTIONS = `You are a helpful demo assistant showcasing AI agent capabilities with tool use.
 
 Available tools:
 - get_weather: Get current weather for any city (returns temperature, condition, humidity)
@@ -27,9 +45,30 @@ Guidelines:
 - Be helpful, concise, and friendly
 - IMPORTANT: After using any tool, you MUST ALWAYS provide a natural language response explaining the result to the user. Never end your response with just a tool call.
 - If a tool returns an error, explain what went wrong and how to fix it
-- You can use multiple tools in a single response if needed`,
-  tools: demoTools,
-});
+- You can use multiple tools in a single response if needed`;
+
+// ==================== AGENT FACTORY ====================
+
+/**
+ * Create a demo agent with a specific model
+ * Uses the gateway provider to connect to Vercel AI Gateway
+ */
+function createDemoAgent(modelId: DemoAgentModelId = DEFAULT_MODEL) {
+  return new Agent(components.agent, {
+    name: "Demo Assistant",
+    languageModel: gateway(modelId),
+    instructions: AGENT_INSTRUCTIONS,
+    tools: demoTools,
+    // Allow multiple steps so the model can:
+    // 1. Make tool call(s)
+    // 2. Receive tool result(s)
+    // 3. Generate final text response
+    maxSteps: 5,
+  });
+}
+
+// Default agent instance for backward compatibility
+export const demoAgent = createDemoAgent(DEFAULT_MODEL);
 
 // ==================== EXPOSED ACTIONS ====================
 
@@ -46,57 +85,66 @@ export const createThread = action({
 
 /**
  * Send a message to the Demo AI and get a response
+ * Supports dynamic model selection and returns token usage
  */
 export const sendMessage = action({
   args: {
     threadId: v.string(),
     message: v.string(),
+    modelId: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { threadId, message }
+    { threadId, message, modelId }
   ): Promise<{
     text: string;
     toolCalls?: Array<{ name: string; args: unknown }>;
     toolResults?: Array<{ name: string; result: unknown }>;
+    usage?: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
+    modelUsed: string;
   }> => {
-    const { thread } = await demoAgent.continueThread(ctx, { threadId });
+    // Validate and use the specified model, or fall back to default
+    const validModelId = (
+      modelId && DEMO_AGENT_MODELS.includes(modelId as DemoAgentModelId)
+        ? modelId
+        : DEFAULT_MODEL
+    ) as DemoAgentModelId;
+
+    // Create agent with specified model
+    const agent = createDemoAgent(validModelId);
+
+    const { thread } = await agent.continueThread(ctx, { threadId });
     const result = await thread.generateText({
       prompt: message,
     });
 
-    // Debug: Log the entire result structure to find where text lives
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const anyResult = result as any;
-    console.log("=== generateText result ===");
-    console.log("result.text:", result.text);
-    console.log("result keys:", Object.keys(result));
-    if (anyResult.steps) {
-      console.log("steps count:", anyResult.steps.length);
-      anyResult.steps.forEach((step: any, i: number) => {
-        console.log(`step[${i}] keys:`, Object.keys(step));
-        console.log(`step[${i}].text:`, step.text);
-        console.log(`step[${i}].finishReason:`, step.finishReason);
-        if (step.content) {
-          console.log(`step[${i}].content:`, JSON.stringify(step.content, null, 2));
-        }
-      });
-    }
-    if (anyResult.response) {
-      console.log("response keys:", Object.keys(anyResult.response));
-    }
-    console.log("=== end result ===");
 
     // Extract tool calls, results, and text from steps[].content[]
     const extractedToolCalls: Array<{ name: string; args: unknown }> = [];
     const extractedToolResults: Array<{ name: string; result: unknown }> = [];
     const textParts: string[] = [];
 
+    // Aggregate token usage across all steps
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+
     if (anyResult.steps && Array.isArray(anyResult.steps)) {
       for (const step of anyResult.steps) {
         // Check for text in step.text (the LLM's text response in this step)
         if (step.text && typeof step.text === "string" && step.text.trim()) {
           textParts.push(step.text);
+        }
+
+        // Aggregate token usage from each step
+        if (step.usage) {
+          totalPromptTokens += step.usage.promptTokens || 0;
+          totalCompletionTokens += step.usage.completionTokens || 0;
         }
 
         if (step.content && Array.isArray(step.content)) {
@@ -122,15 +170,25 @@ export const sendMessage = action({
       }
     }
 
+    // Also check top-level usage if available
+    if (anyResult.usage) {
+      totalPromptTokens = anyResult.usage.promptTokens || totalPromptTokens;
+      totalCompletionTokens = anyResult.usage.completionTokens || totalCompletionTokens;
+    }
+
     // Use result.text if available, otherwise join text parts from steps
     const finalText = result.text || textParts.join("\n");
-    console.log("finalText:", finalText);
-    console.log("textParts:", textParts);
 
     return {
       text: finalText,
       toolCalls: extractedToolCalls,
       toolResults: extractedToolResults,
+      usage: {
+        promptTokens: totalPromptTokens,
+        completionTokens: totalCompletionTokens,
+        totalTokens: totalPromptTokens + totalCompletionTokens,
+      },
+      modelUsed: validModelId,
     };
   },
 });

@@ -12,14 +12,21 @@ interface HabitCheckItemProps {
 }
 
 function HabitCheckItem({ habit, isChecked, onToggle }: HabitCheckItemProps) {
+  const handleClick = (e: React.MouseEvent) => {
+    // Prevent double-triggering when clicking the checkbox
+    e.stopPropagation();
+    onToggle();
+  };
+
   return (
     <div
       className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-      onClick={onToggle}
+      onClick={handleClick}
     >
       <Checkbox
         checked={isChecked}
-        onCheckedChange={onToggle}
+        onCheckedChange={() => onToggle()}
+        onClick={(e) => e.stopPropagation()}
         className="h-5 w-5"
       />
       <span className="text-lg">{habit.icon}</span>

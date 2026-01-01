@@ -283,6 +283,15 @@ export const pmTables = {
     // AI-generated summary
     aiSummary: v.optional(v.string()),
     generatedAt: v.optional(v.number()),
+    // Model and usage info
+    model: v.optional(v.string()), // e.g., "openai/gpt-4o-mini"
+    usage: v.optional(
+      v.object({
+        promptTokens: v.number(),
+        completionTokens: v.number(),
+        totalTokens: v.number(),
+      })
+    ),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),

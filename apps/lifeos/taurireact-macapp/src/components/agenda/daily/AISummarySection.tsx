@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, RefreshCw, Calendar } from "lucide-react";
+import { ModelSelector, UsageDisplay } from "../ModelSelector";
 
 export function AISummarySection() {
   const {
@@ -11,6 +12,8 @@ export function AISummarySection() {
     isGeneratingSummary,
     generateSummary,
     currentDate,
+    selectedModel,
+    setSelectedModel,
   } = useAgenda();
 
   const hasSummary = dailySummary?.aiSummary;
@@ -34,22 +37,29 @@ export function AISummarySection() {
             <Sparkles className="h-5 w-5 text-violet-500" />
             {isTodayView ? "Today's Summary" : "Daily Summary"}
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={generateSummary}
-            disabled={isGeneratingSummary}
-            className="gap-2"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isGeneratingSummary ? "animate-spin" : ""}`}
+          <div className="flex items-center gap-2">
+            <ModelSelector
+              value={selectedModel}
+              onChange={setSelectedModel}
+              disabled={isGeneratingSummary}
             />
-            {isGeneratingSummary
-              ? "Generating..."
-              : hasSummary
-                ? "Regenerate"
-                : "Generate"}
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={generateSummary}
+              disabled={isGeneratingSummary}
+              className="gap-2"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isGeneratingSummary ? "animate-spin" : ""}`}
+              />
+              {isGeneratingSummary
+                ? "Generating..."
+                : hasSummary
+                  ? "Regenerate"
+                  : "Generate"}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -62,17 +72,23 @@ export function AISummarySection() {
           <div className="flex items-center gap-3 py-4">
             <div className="h-6 w-6 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
             <span className="text-muted-foreground">
-              Generating AI summary...
+              Generating AI summary with {selectedModel.split("/")[1]}...
             </span>
           </div>
         ) : hasSummary ? (
           <div>
             <p className="text-sm leading-relaxed">{dailySummary.aiSummary}</p>
-            {dailySummary.generatedAt && (
-              <p className="text-xs text-muted-foreground mt-3">
-                Generated at {formatGeneratedTime(dailySummary.generatedAt)}
-              </p>
-            )}
+            <div className="flex items-center justify-between mt-3">
+              <UsageDisplay
+                usage={dailySummary.usage ?? null}
+                model={dailySummary.model}
+              />
+              {dailySummary.generatedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Generated at {formatGeneratedTime(dailySummary.generatedAt)}
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <div className="text-center py-6">

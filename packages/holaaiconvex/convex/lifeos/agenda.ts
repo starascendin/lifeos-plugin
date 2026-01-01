@@ -34,6 +34,22 @@ export const getDailySummary = query({
 
 // ==================== MUTATIONS ====================
 
+// Supported models for AI Gateway
+export const SUPPORTED_MODELS = [
+  "openai/gpt-4o-mini",
+  "google/gemini-2.5-flash-lite",
+  "xai/grok-4.1-fast-non-reasoning",
+] as const;
+
+export type SupportedModel = (typeof SUPPORTED_MODELS)[number];
+
+// Usage info type
+interface UsageInfo {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 /**
  * Save or update daily summary (public mutation)
  */
@@ -41,6 +57,14 @@ export const saveDailySummary = mutation({
   args: {
     date: v.string(), // YYYY-MM-DD format
     aiSummary: v.string(),
+    model: v.optional(v.string()),
+    usage: v.optional(
+      v.object({
+        promptTokens: v.number(),
+        completionTokens: v.number(),
+        totalTokens: v.number(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -57,6 +81,8 @@ export const saveDailySummary = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
         generatedAt: now,
         updatedAt: now,
       });
@@ -66,6 +92,8 @@ export const saveDailySummary = mutation({
         userId: user._id,
         date: args.date,
         aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
         generatedAt: now,
         createdAt: now,
         updatedAt: now,
@@ -82,6 +110,14 @@ export const internalSaveDailySummary = internalMutation({
     userId: v.id("users"),
     date: v.string(),
     aiSummary: v.string(),
+    model: v.optional(v.string()),
+    usage: v.optional(
+      v.object({
+        promptTokens: v.number(),
+        completionTokens: v.number(),
+        totalTokens: v.number(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -96,6 +132,8 @@ export const internalSaveDailySummary = internalMutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
         generatedAt: now,
         updatedAt: now,
       });
@@ -105,6 +143,8 @@ export const internalSaveDailySummary = internalMutation({
         userId: args.userId,
         date: args.date,
         aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
         generatedAt: now,
         createdAt: now,
         updatedAt: now,
@@ -115,15 +155,25 @@ export const internalSaveDailySummary = internalMutation({
 
 // ==================== ACTIONS ====================
 
+// Response type for generateDailySummary
+interface GenerateSummaryResult {
+  summary: string;
+  model: string;
+  usage: UsageInfo | null;
+}
+
 /**
- * Generate AI summary for a specific date
- * This action fetches data and generates a summary using OpenAI
+ * Generate AI summary for a specific date using Vercel AI Gateway
+ * Supports multiple models: openai/gpt-4o-mini, google/gemini-2.5-flash-lite, xai/grok-4.1-fast-non-reasoning
  */
 export const generateDailySummary = action({
   args: {
     date: v.string(), // YYYY-MM-DD format
+    model: v.optional(v.string()), // Model to use (defaults to openai/gpt-4o-mini)
   },
-  handler: async (ctx, args): Promise<{ summary: string }> => {
+  handler: async (ctx, args): Promise<GenerateSummaryResult> => {
+    const selectedModel = args.model || "openai/gpt-4o-mini";
+
     // Get today's habits
     const habits: Doc<"lifeos_habits">[] = await ctx.runQuery(
       api.lifeos.habits.getHabitsForDate,
@@ -172,37 +222,41 @@ export const generateDailySummary = action({
       topPriorityCount,
     });
 
-    // Get the user ID for saving - we need to get it from the auth context
-    // For actions, we need to pass it through or get it another way
-    // We'll use the public mutation which handles auth
-    const saveViaPublicMutation = async (summary: string) => {
+    // Save helper function
+    const saveViaPublicMutation = async (
+      summary: string,
+      model: string,
+      usage: UsageInfo | null
+    ) => {
       await ctx.runMutation(api.lifeos.agenda.saveDailySummary, {
         date: args.date,
         aiSummary: summary,
+        model,
+        usage: usage ?? undefined,
       });
     };
 
-    // Call OpenAI API
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    if (!openaiApiKey) {
+    // Call Vercel AI Gateway
+    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY;
+    if (!aiGatewayApiKey) {
       // Return a simple summary if no API key
       const fallbackSummary = `Today (${args.date}): ${totalHabits} habits scheduled (${habitCompletionCount} completed), ${totalTasks} tasks due, ${topPriorityCount} top priorities.`;
 
-      await saveViaPublicMutation(fallbackSummary);
-      return { summary: fallbackSummary };
+      await saveViaPublicMutation(fallbackSummary, "fallback", null);
+      return { summary: fallbackSummary, model: "fallback", usage: null };
     }
 
     try {
       const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
+        "https://gateway.ai.vercel.com/v1/chat/completions",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${openaiApiKey}`,
+            Authorization: `Bearer ${aiGatewayApiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: selectedModel,
             messages: [
               {
                 role: "system",
@@ -221,7 +275,8 @@ export const generateDailySummary = action({
       );
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -229,15 +284,24 @@ export const generateDailySummary = action({
         data.choices?.[0]?.message?.content ||
         "Unable to generate summary at this time.";
 
-      // Save the summary
-      await saveViaPublicMutation(aiSummary);
-      return { summary: aiSummary };
+      // Extract usage info
+      const usage: UsageInfo | null = data.usage
+        ? {
+            promptTokens: data.usage.prompt_tokens || 0,
+            completionTokens: data.usage.completion_tokens || 0,
+            totalTokens: data.usage.total_tokens || 0,
+          }
+        : null;
+
+      // Save the summary with model and usage info
+      await saveViaPublicMutation(aiSummary, selectedModel, usage);
+      return { summary: aiSummary, model: selectedModel, usage };
     } catch (error) {
       console.error("Error generating AI summary:", error);
       const fallbackSummary = `Today: ${totalHabits} habits scheduled, ${totalTasks} tasks due, ${topPriorityCount} top priorities.`;
 
-      await saveViaPublicMutation(fallbackSummary);
-      return { summary: fallbackSummary };
+      await saveViaPublicMutation(fallbackSummary, "fallback", null);
+      return { summary: fallbackSummary, model: "fallback", usage: null };
     }
   },
 });
@@ -255,6 +319,16 @@ interface SummaryContext {
   topPriorityCount: number;
 }
 
+function formatTaskWithDescription(task: Doc<"lifeos_pmIssues">): string {
+  const desc = task.description?.trim();
+  if (desc) {
+    // Truncate long descriptions to keep prompt size manageable
+    const truncatedDesc = desc.length > 150 ? desc.slice(0, 150) + "..." : desc;
+    return `- ${task.title}: ${truncatedDesc}`;
+  }
+  return `- ${task.title}`;
+}
+
 function buildSummaryPrompt(context: SummaryContext): string {
   const {
     date,
@@ -267,14 +341,18 @@ function buildSummaryPrompt(context: SummaryContext): string {
   } = context;
 
   const habitNames = habits.map((h) => h.name).join(", ");
-  const topTaskNames = topPriorityTasks
+
+  // Format top priority tasks with descriptions
+  const topTasksFormatted = topPriorityTasks
     .slice(0, 3)
-    .map((t) => t.title)
-    .join(", ");
-  const taskNames = context.tasks
+    .map(formatTaskWithDescription)
+    .join("\n");
+
+  // Format other tasks with descriptions
+  const otherTasksFormatted = context.tasks
     .slice(0, 5)
-    .map((t) => t.title)
-    .join(", ");
+    .map(formatTaskWithDescription)
+    .join("\n");
 
   return `Please provide a brief, encouraging daily summary for ${date}:
 
@@ -282,10 +360,10 @@ HABITS (${habitCompletionCount}/${totalHabits} completed):
 ${habitNames || "None scheduled"}
 
 TOP PRIORITIES (${topPriorityCount}):
-${topTaskNames || "None set"}
+${topTasksFormatted || "None set"}
 
 TASKS DUE TODAY (${totalTasks}):
-${taskNames || "None due"}
+${otherTasksFormatted || "None due"}
 
 Provide a 2-3 sentence summary that:
 1. Acknowledges progress on habits

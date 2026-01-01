@@ -111,14 +111,27 @@ export function TasksSection() {
     await toggleTopPriority({ issueId });
   };
 
-  // Get top 3 starred tasks
-  const top3Tasks = topPriorityTasks?.slice(0, 3) ?? [];
+  // Get top 3 starred tasks (not completed)
+  const top3Tasks =
+    topPriorityTasks?.filter((t) => t.status !== "done").slice(0, 3) ?? [];
 
-  // Get other tasks (due today but not in top 3)
+  // Get other tasks (due today but not in top 3, not completed)
   const otherTasks =
     todaysTasks?.filter(
-      (t) => !top3Tasks.find((top) => top._id === t._id)
+      (t) =>
+        t.status !== "done" && !top3Tasks.find((top) => top._id === t._id)
     ) ?? [];
+
+  // Get completed tasks (from both today's tasks and top priority, deduplicated)
+  const completedTasks = [
+    ...(todaysTasks?.filter((t) => t.status === "done") ?? []),
+    ...(topPriorityTasks?.filter(
+      (t) => t.status === "done" && !todaysTasks?.find((td) => td._id === t._id)
+    ) ?? []),
+  ];
+
+  // Count active (non-completed) tasks
+  const activeTaskCount = top3Tasks.length + otherTasks.length;
 
   return (
     <Card>
@@ -185,14 +198,38 @@ export function TasksSection() {
               </div>
             )}
 
-            {/* Empty state */}
-            {top3Tasks.length === 0 && otherTasks.length === 0 && (
+            {/* Empty state for active tasks */}
+            {activeTaskCount === 0 && completedTasks.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <ListTodo className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No tasks due today</p>
                 <p className="text-xs mt-1">
                   Add due dates to your tasks to see them here
                 </p>
+              </div>
+            )}
+
+            {/* Completed Tasks Section */}
+            {completedTasks.length > 0 && (
+              <div className="pt-2 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Completed ({completedTasks.length})
+                  </h4>
+                </div>
+                <div className="space-y-1 opacity-75">
+                  {completedTasks.map((task) => (
+                    <TaskItem
+                      key={task._id}
+                      task={task}
+                      onToggleStatus={() => handleToggleStatus(task)}
+                      onToggleStar={() => handleToggleStar(task._id)}
+                      onClick={() => setSelectedIssueId(task._id)}
+                      showStar={false}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </>

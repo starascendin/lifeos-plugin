@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import { User, Bot, Wrench, CheckCircle2 } from "lucide-react";
+import { User, Bot, Wrench, CheckCircle2, Coins } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { AIAgentMessage } from "@/lib/contexts/AIAgentContext";
+import { AIAgentMessage, TokenUsage } from "@/lib/contexts/AIAgentContext";
 
 interface AIAgentChatProps {
   messages: AIAgentMessage[];
@@ -60,6 +61,27 @@ function ToolCallDisplay({ toolCalls, toolResults }: {
   );
 }
 
+function MessageTokenUsage({ usage }: { usage?: TokenUsage }) {
+  if (!usage || usage.totalTokens === 0) return null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70 mt-0.5">
+          <Coins className="h-2.5 w-2.5" />
+          <span>{usage.totalTokens.toLocaleString()}</span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="text-xs">
+        <div className="space-y-0.5">
+          <div>Prompt: {usage.promptTokens.toLocaleString()}</div>
+          <div>Completion: {usage.completionTokens.toLocaleString()}</div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function MessageBubble({ message }: { message: AIAgentMessage }) {
   const isUser = message.role === "user";
 
@@ -101,9 +123,15 @@ function MessageBubble({ message }: { message: AIAgentMessage }) {
             toolResults={message.toolResults}
           />
         </Card>
-        <span className="text-xs text-muted-foreground mt-1">
-          {formatTime(message.timestamp)}
-        </span>
+        <div className={cn(
+          "flex items-center gap-2 mt-1",
+          isUser ? "flex-row-reverse" : "flex-row"
+        )}>
+          <span className="text-xs text-muted-foreground">
+            {formatTime(message.timestamp)}
+          </span>
+          {!isUser && <MessageTokenUsage usage={message.usage} />}
+        </div>
       </div>
     </div>
   );

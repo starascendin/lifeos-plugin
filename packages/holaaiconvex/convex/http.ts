@@ -1055,8 +1055,8 @@ http.route({
  * Accessible externally via HTTP POST
  * Requires X-API-Key header
  *
- * Request body: { threadId: string, message: string }
- * Response: { text: string, toolCalls?: [...], toolResults?: [...] } or { error: string }
+ * Request body: { threadId: string, message: string, modelId?: string }
+ * Response: { text: string, toolCalls?: [...], toolResults?: [...], usage?: {...}, modelUsed: string } or { error: string }
  */
 http.route({
   path: "/demo-agent/send-message",
@@ -1079,9 +1079,10 @@ http.route({
     try {
       // Parse request body
       const body = await request.json();
-      const { threadId, message } = body as {
+      const { threadId, message, modelId } = body as {
         threadId: string;
         message: string;
+        modelId?: string;
       };
 
       if (!threadId || !message) {
@@ -1094,10 +1095,11 @@ http.route({
         );
       }
 
-      // Send message via the agent action
+      // Send message via the agent action with optional model selection
       const result = await ctx.runAction(api.lifeos.demo_agent.sendMessage, {
         threadId,
         message,
+        modelId,
       });
 
       return new Response(JSON.stringify(result), {

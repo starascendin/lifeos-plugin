@@ -717,11 +717,13 @@ export const bulkUpdateIssues = mutation({
 
 /**
  * Get tasks due on a specific date (for Daily Agenda view)
- * Returns tasks that are not done/cancelled and have dueDate matching the given date
+ * Returns tasks with dueDate matching the given date
+ * By default excludes done/cancelled, use includeCompleted=true for completed tasks
  */
 export const getTasksForDate = query({
   args: {
     date: v.string(), // YYYY-MM-DD format
+    includeCompleted: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -736,10 +738,13 @@ export const getTasksForDate = query({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
-    // Filter by due date and exclude completed/cancelled
+    // Filter by due date
     const tasksForDate = allIssues.filter((issue) => {
       if (!issue.dueDate) return false;
-      if (issue.status === "done" || issue.status === "cancelled") return false;
+      // Always exclude cancelled
+      if (issue.status === "cancelled") return false;
+      // Exclude done unless includeCompleted is true
+      if (!args.includeCompleted && issue.status === "done") return false;
       return issue.dueDate >= startOfDay && issue.dueDate <= endOfDay;
     });
 

@@ -8,6 +8,7 @@ import React, {
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id, Doc } from "@holaai/convex";
+import type { SupportedModelId } from "@/components/agenda/ModelSelector";
 
 // Types
 export type ViewMode = "daily" | "weekly" | "monthly";
@@ -41,6 +42,10 @@ interface AgendaContextValue {
   isGeneratingSummary: boolean;
   generateSummary: () => Promise<void>;
 
+  // Model selection
+  selectedModel: SupportedModelId;
+  setSelectedModel: (model: SupportedModelId) => void;
+
   // Mutations
   toggleHabitCheckIn: ReturnType<typeof useMutation>;
   updateIssueStatus: ReturnType<typeof useMutation>;
@@ -71,6 +76,9 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   });
   const [viewMode, setViewMode] = useState<ViewMode>("daily");
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<SupportedModelId>(
+    "openai/gpt-4o-mini"
+  );
 
   // Calculate date string for queries
   const dateString = useMemo(() => formatDateStr(currentDate), [currentDate]);
@@ -88,9 +96,10 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     }
   );
 
-  // Tasks queries
+  // Tasks queries (include completed to show in "Completed" section)
   const todaysTasks = useQuery(api.lifeos.pm_issues.getTasksForDate, {
     date: dateString,
+    includeCompleted: true,
   });
 
   const topPriorityTasks = useQuery(api.lifeos.pm_issues.getTopPriorityTasks, {});
@@ -114,13 +123,13 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const generateSummary = useCallback(async () => {
     setIsGeneratingSummary(true);
     try {
-      await generateDailySummaryAction({ date: dateString });
+      await generateDailySummaryAction({ date: dateString, model: selectedModel });
     } catch (error) {
       console.error("Failed to generate summary:", error);
     } finally {
       setIsGeneratingSummary(false);
     }
-  }, [generateDailySummaryAction, dateString]);
+  }, [generateDailySummaryAction, dateString, selectedModel]);
 
   // Navigation helpers
   const goToToday = useCallback(() => {
@@ -189,6 +198,10 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     isLoadingSummary: dailySummary === undefined,
     isGeneratingSummary,
     generateSummary,
+
+    // Model selection
+    selectedModel,
+    setSelectedModel,
 
     // Mutations
     toggleHabitCheckIn,

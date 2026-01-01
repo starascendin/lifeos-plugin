@@ -7,9 +7,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { AIAgentProvider, useAIAgent } from "@/lib/contexts/AIAgentContext";
+import { AIAgentProvider, useAIAgent, AI_AGENT_MODELS } from "@/lib/contexts/AIAgentContext";
 import { AIAgentChat } from "./AIAgentChat";
 import { AIAgentInput } from "./AIAgentInput";
+import { AIAgentModelSelector } from "./AIAgentModelSelector";
+import { AIAgentTokenUsage } from "./AIAgentTokenUsage";
 
 function AIAgentContent() {
   const {
@@ -18,12 +20,15 @@ function AIAgentContent() {
     isLoading,
     error,
     apiKey,
+    selectedModelId,
     setApiKey,
     createThread,
     sendMessage,
     clearMessages,
     clearError,
   } = useAIAgent();
+
+  const selectedModel = AI_AGENT_MODELS.find((m) => m.id === selectedModelId);
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
@@ -48,7 +53,7 @@ function AIAgentContent() {
             <Bot className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold">AI Agent Convex</h1>
+            <h1 className="text-xl font-semibold">AI Agent</h1>
             <p className="text-sm text-muted-foreground">
               Demo agent with tool use capabilities
             </p>
@@ -56,6 +61,13 @@ function AIAgentContent() {
         </div>
 
         <div className="flex items-center gap-2">
+          {apiKey && (
+            <>
+              <AIAgentModelSelector disabled={isLoading} />
+              <AIAgentTokenUsage compact />
+            </>
+          )}
+
           {apiKey && (
             <Badge variant="outline" className="text-green-600 border-green-600">
               <Key className="h-3 w-3 mr-1" />
@@ -180,15 +192,13 @@ function AIAgentContent() {
       {/* Footer Info */}
       <div className="mt-4 text-center text-xs text-muted-foreground">
         <p>
-          Powered by <strong>Convex AI Agent</strong> with GPT-4o-mini
+          Powered by <strong>Convex AI Agent</strong> via Vercel AI Gateway
         </p>
         <p className="mt-1">
-          HTTP endpoints:{" "}
-          <code className="bg-muted px-1 rounded">/demo-agent/create-thread</code> &{" "}
-          <code className="bg-muted px-1 rounded">/demo-agent/send-message</code>
-        </p>
-        <p className="mt-1">
-          Requires header: <code className="bg-muted px-1 rounded">X-API-Key</code>
+          Model:{" "}
+          <code className="bg-muted px-1 rounded">
+            {selectedModel?.name || selectedModelId}
+          </code>
         </p>
       </div>
     </div>
