@@ -11,8 +11,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTheme } from "@/lib/contexts/ThemeContext";
+import { useApiKeys } from "@/lib/hooks/useApiKeys";
 import { useUser } from "@clerk/clerk-react";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Check, Eye, EyeOff, ExternalLink, Key, Loader2, Monitor, Moon, Sun, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function LifeOSSettings() {
   return (
@@ -106,6 +108,23 @@ function SettingsContent() {
         </CardContent>
       </Card>
 
+      {/* API Keys Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            API Keys
+          </CardTitle>
+          <CardDescription>
+            Configure API keys for external services. Keys are stored securely
+            in your local app data.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ApiKeysSection />
+        </CardContent>
+      </Card>
+
       {/* Convex Configuration */}
       <Card>
         <CardHeader>
@@ -146,6 +165,150 @@ function SettingsContent() {
           </p>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ApiKeysSection() {
+  const {
+    groqApiKey,
+    hasGroqApiKey,
+    isLoading,
+    isSaving,
+    error,
+    saveGroqApiKey,
+    deleteGroqApiKey,
+  } = useApiKeys();
+
+  const [inputValue, setInputValue] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Initialize input with existing key
+  useEffect(() => {
+    if (groqApiKey) {
+      setInputValue(groqApiKey);
+    }
+  }, [groqApiKey]);
+
+  const openFullDiskAccessSettings = async () => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_full_disk_access_settings");
+    } catch (e) {
+      console.error("Failed to open settings:", e);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!inputValue.trim()) return;
+
+    const success = await saveGroqApiKey(inputValue.trim());
+    if (success) {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    }
+  };
+
+  const handleDelete = async () => {
+    const success = await deleteGroqApiKey();
+    if (success) {
+      setInputValue("");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>Loading API keys...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Groq API Key */}
+      <div className="space-y-2">
+        <Label htmlFor="groq-api-key">Groq API Key</Label>
+        <p className="text-sm text-muted-foreground">
+          Required for voice memo transcription using Whisper. Get your key from{" "}
+          <a
+            href="https://console.groq.com/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            console.groq.com
+          </a>
+        </p>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              id="groq-api-key"
+              type={showKey ? "text" : "password"}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="gsk_..."
+              className="pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+              onClick={() => setShowKey(!showKey)}
+            >
+              {showKey ? (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          </div>
+          <Button onClick={handleSave} disabled={isSaving || !inputValue.trim()}>
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : saveSuccess ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              "Save"
+            )}
+          </Button>
+          {hasGroqApiKey && (
+            <Button variant="outline" onClick={handleDelete} disabled={isSaving}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        {hasGroqApiKey && (
+          <p className="flex items-center gap-1 text-sm text-green-600">
+            <Check className="h-3 w-3" />
+            API key configured
+          </p>
+        )}
+      </div>
+
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+
+      {/* Full Disk Access */}
+      <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+        <p className="text-sm text-muted-foreground">
+          <strong>Note:</strong> Full Disk Access may be required for the app to
+          save settings in production builds.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={openFullDiskAccessSettings}
+          className="gap-2"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Open Full Disk Access Settings
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useConvex } from "convex/react";
 import {
   type VoiceMemo,
   type VoiceMemosSyncProgress,
   type TranscriptionProgress,
+  type TranscriptionResult,
+  type ConvexSyncProgress,
   initialSyncProgress,
+  initialConvexSyncProgress,
   syncVoiceMemos,
   getVoiceMemos,
   transcribeVoiceMemosBatch,
+  syncTranscriptsToConvex,
   getMemoDisplayName,
   formatMemoDuration,
   formatMemoDate,
@@ -32,6 +37,8 @@ import {
   Clock,
   HardDrive,
   Info,
+  Cloud,
+  Upload,
 } from "lucide-react";
 import {
   Tooltip,
@@ -41,16 +48,19 @@ import {
 } from "@/components/ui/tooltip";
 import { readFile } from "@tauri-apps/plugin-fs";
 
-type ViewFilter = "all" | "transcribed" | "not_transcribed";
+type ViewFilter = "all" | "transcribed" | "not_transcribed" | "cloud_only";
 
 export function VoiceMemosTab() {
   const [memos, setMemos] = useState<VoiceMemo[]>([]);
   const [syncProgress, setSyncProgress] = useState<VoiceMemosSyncProgress>(initialSyncProgress);
+  const [convexSyncProgress, setConvexSyncProgress] = useState<ConvexSyncProgress>(initialConvexSyncProgress);
   const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress | null>(null);
+  const [transcriptionErrors, setTranscriptionErrors] = useState<TranscriptionResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const convex = useConvex();
 
   // Load memos on mount
   const loadMemos = useCallback(async () => {
@@ -69,11 +79,17 @@ export function VoiceMemosTab() {
     loadMemos();
   }, [loadMemos]);
 
-  // Handle sync
+  // Handle sync from macOS Voice Memos
   const handleSync = async () => {
     setSyncProgress({ ...initialSyncProgress, status: "syncing" });
     await syncVoiceMemos(setSyncProgress);
     await loadMemos();
+  };
+
+  // Handle sync transcripts to Convex cloud
+  const handleSyncToConvex = async () => {
+    setConvexSyncProgress({ ...initialConvexSyncProgress, status: "preparing" });
+    await syncTranscriptsToConvex(convex, setConvexSyncProgress);
   };
 
   // Handle transcription
@@ -82,14 +98,30 @@ export function VoiceMemosTab() {
 
     setIsTranscribing(true);
     setTranscriptionProgress(null);
+    setTranscriptionErrors([]);
 
     try {
       const memoIds = Array.from(selectedIds);
-      await transcribeVoiceMemosBatch(memoIds, setTranscriptionProgress);
+      const results = await transcribeVoiceMemosBatch(memoIds, setTranscriptionProgress);
+
+      // Capture any failed transcriptions
+      const failed = results.filter(r => !r.success && r.error);
+      if (failed.length > 0) {
+        setTranscriptionErrors(failed);
+        console.error("Transcription errors:", failed);
+      }
+
       await loadMemos();
       setSelectedIds(new Set());
     } catch (error) {
       console.error("Transcription error:", error);
+      setTranscriptionErrors([{
+        memo_id: 0,
+        transcription: "",
+        language: null,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      }]);
     } finally {
       setIsTranscribing(false);
       setTranscriptionProgress(null);
@@ -124,6 +156,7 @@ export function VoiceMemosTab() {
   const filteredMemos = memos.filter((memo) => {
     if (viewFilter === "transcribed") return memo.transcription;
     if (viewFilter === "not_transcribed") return !memo.transcription;
+    if (viewFilter === "cloud_only") return !memo.local_path;
     return true;
   });
 
@@ -132,6 +165,7 @@ export function VoiceMemosTab() {
   // Calculate counts
   const transcribedCount = memos.filter((m) => m.transcription).length;
   const notTranscribedCount = memos.filter((m) => !m.transcription).length;
+  const cloudOnlyCount = memos.filter((m) => !m.local_path).length;
 
   // Calculate progress percentage
   const getSyncProgressPercentage = () => {
@@ -166,13 +200,11 @@ export function VoiceMemosTab() {
                       <p>
                         <strong>Transcription:</strong> Uses Groq&apos;s{" "}
                         <code className="bg-muted px-1 rounded">whisper-large-v3-turbo</code> model.
-                        Max file size: 25 MB.
+                        Max file size: 100 MB.
                       </p>
                       <p>
-                        <strong>API Key:</strong> Reads{" "}
-                        <code className="bg-muted px-1 rounded">GROQ_API_KEY</code> from{" "}
-                        <code className="bg-muted px-1 rounded">.env</code> file in the app
-                        directory.
+                        <strong>API Key:</strong> Configure your Groq API key in{" "}
+                        <strong>Settings &gt; API Keys</strong>.
                       </p>
                     </div>
                   </TooltipContent>
@@ -298,6 +330,117 @@ export function VoiceMemosTab() {
                 <p className="text-xs text-muted-foreground mt-1 capitalize">
                   {transcriptionProgress.status}...
                 </p>
+                {transcriptionProgress.status === "error" && transcriptionProgress.error && (
+                  <div className="flex items-center gap-2 text-destructive mt-1">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="text-xs">{transcriptionProgress.error}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Transcription errors summary */}
+            {transcriptionErrors.length > 0 && !isTranscribing && (
+              <div className="mt-3 pt-3 border-t">
+                <div className="flex items-center gap-2 text-destructive mb-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    {transcriptionErrors.length} transcription{transcriptionErrors.length > 1 ? "s" : ""} failed
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-6 px-2 text-xs"
+                    onClick={() => setTranscriptionErrors([])}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {transcriptionErrors.map((err, idx) => (
+                    <p key={idx} className="text-xs text-destructive">
+                      {err.memo_id > 0 ? `Memo ${err.memo_id}: ` : ""}{err.error}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sync to Cloud Controls */}
+      {transcribedCount > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Sync transcripts to cloud</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-xs">
+                      <p>
+                        Syncs transcript text and metadata to Convex cloud.
+                        Audio files are NOT uploaded.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
+              <Button
+                onClick={handleSyncToConvex}
+                disabled={convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing"}
+                size="sm"
+                variant="outline"
+              >
+                {convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Sync to Cloud ({transcribedCount})
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Progress indicator */}
+            {convexSyncProgress.status !== "idle" && (
+              <div className="mt-3 pt-3 border-t">
+                {(convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing") && convexSyncProgress.total > 0 && (
+                  <div className="mb-2 space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {convexSyncProgress.current} / {convexSyncProgress.total}
+                      </span>
+                      <span>{Math.round((convexSyncProgress.current / convexSyncProgress.total) * 100)}%</span>
+                    </div>
+                    <Progress value={(convexSyncProgress.current / convexSyncProgress.total) * 100} className="h-2" />
+                  </div>
+                )}
+                <p className="text-sm truncate">{convexSyncProgress.currentMemo}</p>
+                {convexSyncProgress.status === "complete" && (
+                  <div className="flex items-center gap-2 text-green-600 mt-1">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-xs">
+                      {convexSyncProgress.synced} synced, {convexSyncProgress.skipped} already existed
+                    </span>
+                  </div>
+                )}
+                {convexSyncProgress.status === "error" && (
+                  <div className="flex items-center gap-2 text-destructive mt-1">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="text-xs">Error: {convexSyncProgress.error}</span>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -328,6 +471,16 @@ export function VoiceMemosTab() {
           >
             Not Transcribed ({notTranscribedCount})
           </Badge>
+          {cloudOnlyCount > 0 && (
+            <Badge
+              variant={viewFilter === "cloud_only" ? "default" : "outline"}
+              className="cursor-pointer flex-shrink-0"
+              onClick={() => setViewFilter("cloud_only")}
+            >
+              <Cloud className="h-3 w-3 mr-1" />
+              iCloud Only ({cloudOnlyCount})
+            </Badge>
+          )}
         </div>
       )}
 
@@ -386,8 +539,12 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const displayName = getMemoDisplayName(memo);
+  const isCloudOnly = !memo.local_path;
   const canTranscribe = memo.local_path && !memo.transcription && !exceedsGroqLimit(memo.file_size);
   const isTooLarge = exceedsGroqLimit(memo.file_size);
+
+  // Extract file format from original path
+  const fileFormat = memo.original_path?.split('.').pop()?.toUpperCase() || 'Unknown';
 
   // Load audio file and create blob URL
   const loadAudio = async () => {
@@ -396,7 +553,8 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
     setIsLoadingAudio(true);
     try {
       const data = await readFile(memo.local_path);
-      const blob = new Blob([data], { type: "audio/m4a" });
+      // Use audio/mp4 which is more broadly compatible, or let browser auto-detect
+      const blob = new Blob([data], { type: "audio/mp4" });
       const url = URL.createObjectURL(blob);
       setAudioSrc(url);
     } catch (error) {
@@ -462,13 +620,19 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
             <div className="flex justify-between items-start gap-2">
               <h4 className="font-medium text-sm truncate flex-1">{displayName}</h4>
               <div className="flex items-center gap-2 flex-shrink-0">
+                {isCloudOnly && (
+                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                    <Cloud className="h-3 w-3 mr-1" />
+                    iCloud Only
+                  </Badge>
+                )}
                 {memo.transcription && (
                   <Badge variant="secondary" className="text-xs">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Transcribed
                   </Badge>
                 )}
-                {isTooLarge && (
+                {isTooLarge && !isCloudOnly && (
                   <Badge variant="destructive" className="text-xs">
                     <AlertTriangle className="h-3 w-3 mr-1" />
                     Too Large
@@ -490,6 +654,9 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
                   {formatFileSize(memo.file_size)}
                 </span>
               )}
+              <Badge variant="outline" className="text-xs font-mono">
+                {fileFormat}
+              </Badge>
             </div>
 
             {/* Audio player */}
@@ -550,10 +717,18 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
               </div>
             )}
 
+            {/* Cloud-only message */}
+            {isCloudOnly && (
+              <p className="mt-2 text-xs text-blue-600">
+                This recording is stored in iCloud. Open the Voice Memos app on your Mac to download
+                it locally, then sync again.
+              </p>
+            )}
+
             {/* Too large warning */}
-            {isTooLarge && (
+            {isTooLarge && !isCloudOnly && (
               <p className="mt-2 text-xs text-destructive">
-                This file exceeds the 25 MB limit for transcription. Consider trimming it in the
+                This file exceeds the 100 MB limit for transcription. Consider trimming it in the
                 Voice Memos app.
               </p>
             )}

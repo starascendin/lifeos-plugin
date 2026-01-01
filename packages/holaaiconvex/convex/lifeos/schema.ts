@@ -205,8 +205,8 @@ export const lifeosTables = {
     localId: v.string(),
     // User-editable name
     name: v.string(),
-    // Convex file storage ID for the audio file
-    storageId: v.id("_storage"),
+    // Convex file storage ID for the audio file (optional for transcript-only syncs)
+    storageId: v.optional(v.id("_storage")),
     // Duration in milliseconds
     duration: v.number(),
     // Transcription status

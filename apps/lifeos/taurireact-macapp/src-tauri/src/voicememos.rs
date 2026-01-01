@@ -1,10 +1,11 @@
 // Voice Memos export and transcription module
 // Reads from macOS Voice Memos database and supports Groq Whisper transcription
 
+use crate::api_keys::get_groq_api_key_internal;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{command, AppHandle, Emitter};
 
 // Mac epoch offset (seconds between 1970-01-01 and 2001-01-01)
@@ -193,7 +194,7 @@ struct RawVoiceMemo {
     custom_label: Option<String>,
     date: f64, // Mac epoch timestamp
     duration: f64,
-    path: String, // Relative path in Apple's directory
+    path: Option<String>, // Relative path in Apple's directory (None for cloud-only)
 }
 
 /// Read voice memos from Apple's database
@@ -219,11 +220,12 @@ fn read_source_voicememos() -> Result<Vec<RawVoiceMemo>, String> {
     conn.pragma_update(None, "journal_mode", "WAL").ok();
 
     // ZUNIQUEID is the UUID column, ZCUSTOMLABEL contains user-assigned name (if any)
+    // Include cloud-only recordings (ZPATH IS NULL) to show all memos
     let mut stmt = conn
         .prepare(
             "SELECT Z_PK, ZUNIQUEID, ZCUSTOMLABEL, ZDATE, ZDURATION, ZPATH
              FROM ZCLOUDRECORDING
-             WHERE ZPATH IS NOT NULL AND ZEVICTIONDATE IS NULL
+             WHERE ZEVICTIONDATE IS NULL
              ORDER BY ZDATE DESC",
         )
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
@@ -236,7 +238,7 @@ fn read_source_voicememos() -> Result<Vec<RawVoiceMemo>, String> {
                 custom_label: row.get(2)?,
                 date: row.get(3)?,
                 duration: row.get(4)?,
-                path: row.get(5)?,
+                path: row.get(5)?, // Now Option<String> - NULL for cloud-only
             })
         })
         .map_err(|e| format!("Failed to query voice memos: {}", e))?
@@ -247,7 +249,14 @@ fn read_source_voicememos() -> Result<Vec<RawVoiceMemo>, String> {
 }
 
 /// Copy a voice memo file to our local storage
-fn copy_memo_file(raw_memo: &RawVoiceMemo) -> Result<(PathBuf, i64), String> {
+/// Returns Ok(Some((path, size))) if file was copied, Ok(None) if cloud-only
+fn copy_memo_file(raw_memo: &RawVoiceMemo) -> Result<Option<(PathBuf, i64)>, String> {
+    // If no path, this is a cloud-only recording
+    let memo_path = match &raw_memo.path {
+        Some(p) => p,
+        None => return Ok(None), // Cloud-only, no local file available
+    };
+
     let source_dir = get_voicememos_source_dir().ok_or("Could not determine source directory")?;
     let dest_dir = get_voicememos_data_dir().ok_or("Could not determine destination directory")?;
 
@@ -256,7 +265,7 @@ fn copy_memo_file(raw_memo: &RawVoiceMemo) -> Result<(PathBuf, i64), String> {
         .map_err(|e| format!("Failed to create destination directory: {}", e))?;
 
     // Source file path
-    let source_path = source_dir.join(&raw_memo.path);
+    let source_path = source_dir.join(memo_path);
     if !source_path.exists() {
         return Err(format!("Source file not found: {:?}", source_path));
     }
@@ -274,7 +283,7 @@ fn copy_memo_file(raw_memo: &RawVoiceMemo) -> Result<(PathBuf, i64), String> {
     if dest_path.exists() {
         if let Ok(dest_metadata) = fs::metadata(&dest_path) {
             if dest_metadata.len() == metadata.len() {
-                return Ok((dest_path, file_size));
+                return Ok(Some((dest_path, file_size)));
             }
         }
     }
@@ -282,7 +291,7 @@ fn copy_memo_file(raw_memo: &RawVoiceMemo) -> Result<(PathBuf, i64), String> {
     // Copy file
     fs::copy(&source_path, &dest_path).map_err(|e| format!("Failed to copy file: {}", e))?;
 
-    Ok((dest_path, file_size))
+    Ok(Some((dest_path, file_size)))
 }
 
 /// Sync voice memos from macOS to local database
@@ -347,13 +356,40 @@ fn sync_voicememos_internal(app: &AppHandle) -> Result<VoiceMemosExportResult, S
             )
             .ok();
 
-        if existing.is_some() {
+        if let Some(existing_id) = existing {
+            // Check if this was a cloud-only memo that now has a local file
+            let has_local: bool = conn
+                .query_row(
+                    "SELECT local_path IS NOT NULL FROM voicememos WHERE id = ?1",
+                    params![existing_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(true);
+
+            if !has_local && raw_memo.path.is_some() {
+                // Cloud-only memo now has local file, update it
+                if let Ok(Some((path, size))) = copy_memo_file(raw_memo) {
+                    let _ = conn.execute(
+                        "UPDATE voicememos SET local_path = ?1, file_size = ?2, original_path = ?3, updated_at = ?4 WHERE id = ?5",
+                        params![
+                            path.to_string_lossy().to_string(),
+                            size,
+                            &raw_memo.path,
+                            now,
+                            existing_id
+                        ],
+                    );
+                    exported_count += 1;
+                    continue;
+                }
+            }
+
             skipped_count += 1;
             continue;
         }
 
-        // Copy the file
-        let (local_path, file_size) = match copy_memo_file(raw_memo) {
+        // Try to copy the file (returns None for cloud-only recordings)
+        let copy_result = match copy_memo_file(raw_memo) {
             Ok(result) => result,
             Err(e) => {
                 eprintln!("Failed to copy memo {}: {}", raw_memo.unique_id, e);
@@ -364,7 +400,13 @@ fn sync_voicememos_internal(app: &AppHandle) -> Result<VoiceMemosExportResult, S
         // Convert Mac epoch to Unix timestamp (milliseconds)
         let unix_timestamp_ms = ((raw_memo.date + MAC_EPOCH_OFFSET as f64) * 1000.0) as i64;
 
-        // Insert into our database
+        // Extract local_path and file_size (None for cloud-only)
+        let (local_path, file_size) = match copy_result {
+            Some((path, size)) => (Some(path.to_string_lossy().to_string()), Some(size)),
+            None => (None, None), // Cloud-only recording
+        };
+
+        // Insert into our database (including cloud-only memos)
         let result = conn.execute(
             "INSERT INTO voicememos (uuid, custom_label, date, duration, original_path, local_path, file_size, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -374,7 +416,7 @@ fn sync_voicememos_internal(app: &AppHandle) -> Result<VoiceMemosExportResult, S
                 unix_timestamp_ms,
                 raw_memo.duration,
                 &raw_memo.path,
-                local_path.to_string_lossy().to_string(),
+                local_path,
                 file_size,
                 now,
                 now,
@@ -517,14 +559,14 @@ pub fn check_transcription_eligibility(memo_id: i64) -> Result<TranscriptionElig
                 });
             }
 
-            // Check file size (25 MB limit for Groq)
-            let max_size: i64 = 25 * 1024 * 1024; // 25 MB
+            // Check file size (100 MB limit for Groq paid accounts)
+            let max_size: i64 = 100 * 1024 * 1024; // 100 MB
             if let Some(size) = file_size {
                 if size > max_size {
                     return Ok(TranscriptionEligibility {
                         eligible: false,
                         reason: Some(format!(
-                            "File too large ({:.1} MB). Maximum is 25 MB.",
+                            "File too large ({:.1} MB). Maximum is 100 MB.",
                             size as f64 / (1024.0 * 1024.0)
                         )),
                         file_size: Some(size),
@@ -541,15 +583,73 @@ pub fn check_transcription_eligibility(memo_id: i64) -> Result<TranscriptionElig
     }
 }
 
+/// Find ffmpeg binary path
+/// Checks common installation locations since Tauri apps don't inherit shell PATH
+fn find_ffmpeg() -> Result<PathBuf, String> {
+    // Common ffmpeg locations on macOS
+    let common_paths = [
+        "/opt/homebrew/bin/ffmpeg", // Apple Silicon Homebrew
+        "/usr/local/bin/ffmpeg",    // Intel Homebrew
+        "/usr/bin/ffmpeg",          // System
+    ];
+
+    for path in common_paths {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    // Fall back to PATH lookup (unlikely to work in Tauri but worth trying)
+    Err("ffmpeg not found. Install with: brew install ffmpeg".to_string())
+}
+
+/// Preprocess audio file to reduce size for transcription
+/// Converts to 16KHz mono MP3 at 64kbps for maximum compression
+/// Whisper works well with compressed audio since it resamples anyway
+fn preprocess_audio_for_transcription(input_path: &Path) -> Result<PathBuf, String> {
+    let ffmpeg_path = find_ffmpeg()?;
+
+    let temp_dir = std::env::temp_dir();
+    let file_name = input_path.file_stem().unwrap_or_default().to_string_lossy();
+    let output_path = temp_dir.join(format!("{}_preprocessed.mp3", file_name));
+
+    let output = std::process::Command::new(&ffmpeg_path)
+        .args([
+            "-i",
+            input_path.to_str().unwrap(),
+            "-ar",
+            "16000", // 16KHz sample rate (Whisper's internal rate)
+            "-ac",
+            "1", // Mono
+            "-c:a",
+            "libmp3lame", // MP3 codec for maximum compression
+            "-b:a",
+            "64k", // 64kbps bitrate - good enough for speech
+            "-y",  // Overwrite if exists
+            output_path.to_str().unwrap(),
+        ])
+        .output()
+        .map_err(|e| format!("Failed to run ffmpeg: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "ffmpeg preprocessing failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(output_path)
+}
+
 /// Transcribe a single voice memo using Groq API
 #[command]
 pub async fn transcribe_voicememo(
     app: AppHandle,
     memo_id: i64,
 ) -> Result<TranscriptionResult, String> {
-    // Get API key from environment
-    let api_key =
-        std::env::var("GROQ_API_KEY").map_err(|_| "GROQ_API_KEY environment variable not set")?;
+    // Get API key from store (falls back to env var for development)
+    let api_key = get_groq_api_key_internal(&app)?;
 
     // Get memo details
     let memo = get_voicememo(memo_id)?.ok_or("Memo not found")?;
@@ -565,15 +665,38 @@ pub async fn transcribe_voicememo(
     let metadata =
         fs::metadata(&file_path).map_err(|e| format!("Failed to read file metadata: {}", e))?;
     let file_size = metadata.len();
-    let max_size: u64 = 25 * 1024 * 1024; // 25 MB
+    let max_size: u64 = 100 * 1024 * 1024; // 100 MB
     if file_size > max_size {
         return Err(format!(
-            "File too large ({:.1} MB). Maximum is 25 MB.",
+            "File too large ({:.1} MB). Maximum is 100 MB.",
             file_size as f64 / (1024.0 * 1024.0)
         ));
     }
 
     let memo_name = memo.custom_label.unwrap_or_else(|| "Recording".to_string());
+
+    // Preprocess large files to reduce size (Groq direct upload limit is ~25MB)
+    let preprocess_threshold: u64 = 20 * 1024 * 1024; // 20 MB
+    let (upload_path, cleanup_path): (PathBuf, Option<PathBuf>) =
+        if file_size > preprocess_threshold {
+            // Emit preprocessing status
+            let _ = app.emit(
+                "voicememos-transcription-progress",
+                TranscriptionProgress {
+                    memo_id,
+                    memo_name: memo_name.clone(),
+                    status: "preprocessing".to_string(),
+                    current: 0,
+                    total: 1,
+                    error: None,
+                },
+            );
+
+            let preprocessed = preprocess_audio_for_transcription(&file_path)?;
+            (preprocessed.clone(), Some(preprocessed))
+        } else {
+            (file_path.clone(), None)
+        };
 
     // Emit progress
     let _ = app.emit(
@@ -590,12 +713,22 @@ pub async fn transcribe_voicememo(
 
     // Read file bytes
     let file_bytes =
-        fs::read(&file_path).map_err(|e| format!("Failed to read audio file: {}", e))?;
+        fs::read(&upload_path).map_err(|e| format!("Failed to read audio file: {}", e))?;
+
+    // Track upload file size for error messages
+    let upload_size = file_bytes.len();
+
+    // Determine MIME type based on file extension
+    let (file_name, mime_type) = match upload_path.extension().and_then(|e| e.to_str()) {
+        Some("mp3") => ("audio.mp3", "audio/mpeg"),
+        Some("flac") => ("audio.flac", "audio/flac"),
+        _ => ("audio.m4a", "audio/m4a"),
+    };
 
     // Create multipart form
     let file_part = reqwest::multipart::Part::bytes(file_bytes)
-        .file_name("audio.m4a")
-        .mime_str("audio/m4a")
+        .file_name(file_name)
+        .mime_str(mime_type)
         .map_err(|e| format!("Failed to create file part: {}", e))?;
 
     let form = reqwest::multipart::Form::new()
@@ -616,15 +749,25 @@ pub async fn transcribe_voicememo(
         },
     );
 
-    // Call Groq API
-    let client = reqwest::Client::new();
+    // Call Groq API with timeout (5 minutes for large files)
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
     let response = client
         .post("https://api.groq.com/openai/v1/audio/transcriptions")
         .header("Authorization", format!("Bearer {}", api_key))
         .multipart(form)
         .send()
         .await
-        .map_err(|e| format!("Failed to call Groq API: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to call Groq API: {}. File size: {:.2} MB",
+                e,
+                upload_size as f64 / (1024.0 * 1024.0)
+            )
+        })?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -656,6 +799,11 @@ pub async fn transcribe_voicememo(
         params![&result.text, &result.language, now, now, memo_id],
     )
     .map_err(|e| format!("Failed to save transcription: {}", e))?;
+
+    // Cleanup preprocessed temp file if created
+    if let Some(path) = cleanup_path {
+        let _ = fs::remove_file(path);
+    }
 
     // Emit completion
     let _ = app.emit(

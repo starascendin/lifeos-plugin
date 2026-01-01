@@ -1,4 +1,5 @@
 import { SidebarProvider } from "@/lib/contexts/SidebarContext";
+import { CommandMenu } from "./CommandMenu";
 import { Sidebar } from "./Sidebar";
 
 interface AppShellProps {
@@ -8,6 +9,7 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   return (
     <SidebarProvider>
+      <CommandMenu />
       <div className="flex h-screen overflow-hidden bg-sidebar/30">
         <div className="p-2">
           <Sidebar />

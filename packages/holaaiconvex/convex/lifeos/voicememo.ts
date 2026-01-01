@@ -101,8 +101,10 @@ export const deleteMemo = mutation({
       throw new Error("Memo not found or access denied");
     }
 
-    // Delete storage file
-    await ctx.storage.delete(memo.storageId);
+    // Delete storage file if it exists
+    if (memo.storageId) {
+      await ctx.storage.delete(memo.storageId);
+    }
 
     // Delete memo record
     await ctx.db.delete(args.memoId);
@@ -164,11 +166,11 @@ export const getMemos = query({
       .order("desc")
       .take(limit);
 
-    // Generate URLs for audio files
+    // Generate URLs for audio files (if they exist)
     return Promise.all(
       memos.map(async (memo) => ({
         ...memo,
-        audioUrl: await ctx.storage.getUrl(memo.storageId),
+        audioUrl: memo.storageId ? await ctx.storage.getUrl(memo.storageId) : null,
       }))
     );
   },
@@ -191,7 +193,7 @@ export const getMemo = query({
 
     return {
       ...memo,
-      audioUrl: await ctx.storage.getUrl(memo.storageId),
+      audioUrl: memo.storageId ? await ctx.storage.getUrl(memo.storageId) : null,
     };
   },
 });
@@ -219,8 +221,96 @@ export const getMemoByLocalId = query({
 
     return {
       ...memo,
-      audioUrl: await ctx.storage.getUrl(memo.storageId),
+      audioUrl: memo.storageId ? await ctx.storage.getUrl(memo.storageId) : null,
     };
+  },
+});
+
+/**
+ * Get all localIds that have been synced (for deduplication check)
+ */
+export const getSyncedLocalIds = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+
+    const memos = await ctx.db
+      .query("life_voiceMemos")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    return memos.map((m) => m.localId);
+  },
+});
+
+/**
+ * Batch upsert transcribed voice memos (transcript only, no audio)
+ * Creates or updates memos based on localId (deduplication)
+ */
+export const upsertTranscriptBatch = mutation({
+  args: {
+    memos: v.array(
+      v.object({
+        localId: v.string(),
+        name: v.string(),
+        duration: v.number(),
+        transcript: v.string(),
+        language: v.optional(v.string()),
+        clientCreatedAt: v.number(),
+        clientUpdatedAt: v.number(),
+        transcribedAt: v.optional(v.number()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    let insertedCount = 0;
+    let updatedCount = 0;
+
+    for (const memo of args.memos) {
+      // Check if memo already exists (deduplication by localId)
+      const existing = await ctx.db
+        .query("life_voiceMemos")
+        .withIndex("by_user_localId", (q) =>
+          q.eq("userId", user._id).eq("localId", memo.localId)
+        )
+        .unique();
+
+      if (existing) {
+        // Update if transcript changed or is newer
+        if (memo.clientUpdatedAt > existing.clientUpdatedAt) {
+          await ctx.db.patch(existing._id, {
+            name: memo.name,
+            transcript: memo.transcript,
+            language: memo.language,
+            transcriptionStatus: "completed",
+            clientUpdatedAt: memo.clientUpdatedAt,
+            updatedAt: now,
+          });
+          updatedCount++;
+        }
+      } else {
+        // Insert new memo (transcript-only, no storageId)
+        await ctx.db.insert("life_voiceMemos", {
+          userId: user._id,
+          localId: memo.localId,
+          name: memo.name,
+          duration: memo.duration,
+          transcriptionStatus: "completed",
+          transcript: memo.transcript,
+          language: memo.language,
+          clientCreatedAt: memo.clientCreatedAt,
+          clientUpdatedAt: memo.clientUpdatedAt,
+          createdAt: now,
+          updatedAt: now,
+        });
+        insertedCount++;
+      }
+    }
+
+    return { insertedCount, updatedCount };
   },
 });
 

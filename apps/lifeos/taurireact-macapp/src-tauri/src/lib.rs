@@ -1,13 +1,22 @@
 // LifeOS Nexus - Personal life operating system
 
+mod api_keys;
 mod app_category;
 mod council_server;
+mod livekit;
 mod notes;
 mod screentime;
 mod voicememos;
 mod youtube;
 
-use council_server::{get_council_server_status, start_council_server, stop_council_server};
+use api_keys::{
+    delete_groq_api_key, get_groq_api_key, open_full_disk_access_settings, save_groq_api_key,
+};
+use council_server::{
+    get_council_server_status, start_council_server, start_server_internal, stop_council_server,
+    COUNCIL_PORT,
+};
+use livekit::{generate_livekit_token, get_livekit_config};
 use notes::{
     count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders,
     get_exported_notes, should_run_notes_sync,
@@ -24,6 +33,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager,
 };
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tokio::time::sleep;
 use voicememos::{
     check_transcription_eligibility, get_voicememo, get_voicememos, sync_voicememos,
@@ -54,12 +64,13 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_macos_permissions::init())
         .setup(|app| {
             // Create menu items for tray context menu
             let sync_jobs =
-                MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs", true, None::<&str>)?;
+                MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs\t⌘1", true, None::<&str>)?;
             let lifeos_app =
-                MenuItem::with_id(app, "lifeos_app", "LifeOS App", true, None::<&str>)?;
+                MenuItem::with_id(app, "lifeos_app", "LifeOS App\t⌘2", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
             // Build context menu
@@ -94,6 +105,37 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Register global keyboard shortcuts
+            // Cmd+1 for Background Sync Jobs window
+            let shortcut_1 = Shortcut::new(Some(Modifiers::META), Code::Digit1);
+            // Cmd+2 for LifeOS App window
+            let shortcut_2 = Shortcut::new(Some(Modifiers::META), Code::Digit2);
+
+            let app_handle = app.handle().clone();
+            app.handle().plugin(
+                tauri_plugin_global_shortcut::Builder::new()
+                    .with_handler(move |_app, shortcut, _event| {
+                        if shortcut == &shortcut_1 {
+                            // Show/focus the main LifeOS Nexus window (Background Sync Jobs)
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        } else if shortcut == &shortcut_2 {
+                            // Show/focus the LifeOS window
+                            if let Some(window) = app_handle.get_webview_window("lifeos") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    })
+                    .build(),
+            )?;
+
+            // Register the shortcuts
+            app.global_shortcut().register(shortcut_1)?;
+            app.global_shortcut().register(shortcut_2)?;
 
             // Start background screentime sync scheduler (every 30 minutes)
             tauri::async_runtime::spawn(async {
@@ -171,6 +213,23 @@ pub fn run() {
                 }
             });
 
+            // Start Council server automatically on app launch
+            tauri::async_runtime::spawn(async {
+                // Short delay to let the app fully initialize
+                sleep(Duration::from_secs(3)).await;
+
+                println!(
+                    "[Council Server] Starting server automatically on port {}...",
+                    COUNCIL_PORT
+                );
+
+                if let Err(e) = start_server_internal(COUNCIL_PORT).await {
+                    eprintln!("[Council Server] Failed to start: {}", e);
+                } else {
+                    println!("[Council Server] Started successfully on port {}", COUNCIL_PORT);
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -198,6 +257,14 @@ pub fn run() {
             start_council_server,
             stop_council_server,
             get_council_server_status,
+            // API Keys
+            save_groq_api_key,
+            get_groq_api_key,
+            delete_groq_api_key,
+            open_full_disk_access_settings,
+            // LiveKit
+            generate_livekit_token,
+            get_livekit_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

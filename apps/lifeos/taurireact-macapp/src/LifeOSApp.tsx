@@ -13,6 +13,8 @@ import { LifeOSLLMCouncil } from "./components/lifeos/LLMCouncil";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
+import { LifeOSVoiceAgent } from "./components/lifeos/VoiceAgent";
+import { LifeOSAIAgent } from "./components/lifeos/AIAgent";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -57,6 +59,8 @@ export default function LifeOSApp() {
                 <Route path="pm/:view/:id" element={<LifeOSPM />} />
                 <Route path="pm-ai" element={<LifeOSPMAI />} />
                 <Route path="habits" element={<LifeOSHabits />} />
+                <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
+                <Route path="aiagent" element={<LifeOSAIAgent />} />
                 <Route path="settings" element={<LifeOSSettings />} />
                 <Route path="*" element={<Navigate to="/lifeos" replace />} />
               </Routes>

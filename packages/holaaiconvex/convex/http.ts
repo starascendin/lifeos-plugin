@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 const http = httpRouter();
@@ -976,5 +976,158 @@ function calculateAggregateRankings(
 
   return results;
 }
+
+// ==================== DEMO AGENT HTTP API ====================
+
+// Hardcoded API key for demo agent endpoints
+// In production, use environment variables: process.env.DEMO_AGENT_API_KEY
+const DEMO_AGENT_API_KEY = "demo-agent-secret-key-2024";
+
+/**
+ * Validate API key from request headers
+ */
+function validateDemoAgentApiKey(request: Request): boolean {
+  const apiKey = request.headers.get("X-API-Key") || request.headers.get("x-api-key");
+  return apiKey === DEMO_AGENT_API_KEY;
+}
+
+/**
+ * Create a new thread for Demo AI chat
+ * Accessible externally via HTTP POST
+ * Requires X-API-Key header
+ *
+ * Response: { threadId: string } or { error: string }
+ */
+http.route({
+  path: "/demo-agent/create-thread",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+    };
+
+    // Validate API key
+    if (!validateDemoAgentApiKey(request)) {
+      return new Response(JSON.stringify({ error: "Invalid or missing API key" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      // Create a new thread via the agent action
+      const result = await ctx.runAction(api.lifeos.demo_agent.createThread, {});
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Internal server error";
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+// Handle CORS preflight for create-thread
+http.route({
+  path: "/demo-agent/create-thread",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+      },
+    });
+  }),
+});
+
+/**
+ * Send a message to the Demo AI and get a response
+ * Accessible externally via HTTP POST
+ * Requires X-API-Key header
+ *
+ * Request body: { threadId: string, message: string }
+ * Response: { text: string, toolCalls?: [...], toolResults?: [...] } or { error: string }
+ */
+http.route({
+  path: "/demo-agent/send-message",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+    };
+
+    // Validate API key
+    if (!validateDemoAgentApiKey(request)) {
+      return new Response(JSON.stringify({ error: "Invalid or missing API key" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      // Parse request body
+      const body = await request.json();
+      const { threadId, message } = body as {
+        threadId: string;
+        message: string;
+      };
+
+      if (!threadId || !message) {
+        return new Response(
+          JSON.stringify({ error: "Missing required fields: threadId and message" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Send message via the agent action
+      const result = await ctx.runAction(api.lifeos.demo_agent.sendMessage, {
+        threadId,
+        message,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Internal server error";
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+// Handle CORS preflight for send-message
+http.route({
+  path: "/demo-agent/send-message",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+      },
+    });
+  }),
+});
 
 export default http;

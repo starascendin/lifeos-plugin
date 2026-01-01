@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { ConvexReactClient } from "convex/react";
+import { api } from "@holaai/convex";
 
 // Types matching Rust structs
 export interface VoiceMemo {
@@ -70,6 +72,26 @@ export const initialSyncProgress: VoiceMemosSyncProgress = {
   current: 0,
   total: 0,
   exported: 0,
+  skipped: 0,
+  currentMemo: "",
+};
+
+// Progress type for syncing to Convex cloud
+export interface ConvexSyncProgress {
+  status: "idle" | "preparing" | "syncing" | "complete" | "error";
+  current: number;
+  total: number;
+  synced: number;
+  skipped: number;
+  currentMemo: string;
+  error?: string;
+}
+
+export const initialConvexSyncProgress: ConvexSyncProgress = {
+  status: "idle",
+  current: 0,
+  total: 0,
+  synced: 0,
   skipped: 0,
   currentMemo: "",
 };
@@ -183,6 +205,131 @@ export async function getVoiceMemos(): Promise<VoiceMemo[]> {
 export async function getVoiceMemo(memoId: number): Promise<VoiceMemo | null> {
   if (!isTauri) return null;
   return await invoke<VoiceMemo | null>("get_voicememo", { memoId });
+}
+
+// ==================== Convex Cloud Sync Functions ====================
+
+/**
+ * Sync transcribed voice memos to Convex cloud
+ * Only syncs transcript text and metadata, NOT audio files
+ */
+export async function syncTranscriptsToConvex(
+  client: ConvexReactClient,
+  onProgress?: (progress: ConvexSyncProgress) => void
+): Promise<{ synced: number; skipped: number; error?: string }> {
+  if (!isTauri) {
+    return { synced: 0, skipped: 0, error: "Not running in Tauri" };
+  }
+
+  let progress: ConvexSyncProgress = { ...initialConvexSyncProgress };
+
+  const updateProgress = (updates: Partial<ConvexSyncProgress>) => {
+    progress = { ...progress, ...updates };
+    onProgress?.(progress);
+  };
+
+  try {
+    updateProgress({ status: "preparing", currentMemo: "Loading transcribed memos..." });
+
+    // Get all local memos
+    const localMemos = await getVoiceMemos();
+
+    // Filter to only transcribed memos
+    const transcribedMemos = localMemos.filter((m) => m.transcription);
+
+    if (transcribedMemos.length === 0) {
+      updateProgress({
+        status: "complete",
+        currentMemo: "No transcribed memos to sync",
+      });
+      return { synced: 0, skipped: 0 };
+    }
+
+    updateProgress({
+      total: transcribedMemos.length,
+      currentMemo: `Found ${transcribedMemos.length} transcribed memos`,
+    });
+
+    // Get already synced localIds to skip duplicates (optimization)
+    let syncedLocalIds: string[] = [];
+    try {
+      syncedLocalIds = await client.query(api.lifeos.voicememo.getSyncedLocalIds, {});
+    } catch {
+      // First sync or not authenticated, continue with empty list
+    }
+
+    const syncedSet = new Set(syncedLocalIds);
+
+    // Filter out already synced memos
+    const memosToSync = transcribedMemos.filter((m) => !syncedSet.has(m.uuid));
+
+    if (memosToSync.length === 0) {
+      updateProgress({
+        status: "complete",
+        skipped: transcribedMemos.length,
+        currentMemo: "All memos already synced",
+      });
+      return { synced: 0, skipped: transcribedMemos.length };
+    }
+
+    updateProgress({
+      status: "syncing",
+      total: memosToSync.length,
+      currentMemo: `Syncing ${memosToSync.length} memos...`,
+    });
+
+    // Batch upsert (50 at a time)
+    const BATCH_SIZE = 50;
+    let totalSynced = 0;
+
+    for (let i = 0; i < memosToSync.length; i += BATCH_SIZE) {
+      const batch = memosToSync.slice(i, i + BATCH_SIZE);
+
+      updateProgress({
+        current: i,
+        currentMemo: `Syncing ${i + 1}-${Math.min(i + BATCH_SIZE, memosToSync.length)}...`,
+      });
+
+      const result = await client.mutation(api.lifeos.voicememo.upsertTranscriptBatch, {
+        memos: batch.map((m) => ({
+          localId: m.uuid,
+          name: m.custom_label || `Recording - ${formatMemoDateTime(m.date)}`,
+          duration: m.duration * 1000, // Convert seconds to ms
+          transcript: m.transcription!,
+          language: m.transcription_language ?? undefined,
+          clientCreatedAt: m.date,
+          clientUpdatedAt: m.transcribed_at ?? m.date,
+          transcribedAt: m.transcribed_at ?? undefined,
+        })),
+      });
+
+      totalSynced += result.insertedCount + result.updatedCount;
+
+      updateProgress({
+        synced: totalSynced,
+        current: Math.min(i + BATCH_SIZE, memosToSync.length),
+      });
+    }
+
+    const skipped = transcribedMemos.length - memosToSync.length;
+
+    updateProgress({
+      status: "complete",
+      synced: totalSynced,
+      skipped,
+      currentMemo: `Synced ${totalSynced} memos${skipped > 0 ? `, ${skipped} already existed` : ""}`,
+    });
+
+    return { synced: totalSynced, skipped };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    updateProgress({
+      status: "error",
+      error: errorMsg,
+      currentMemo: `Error: ${errorMsg}`,
+    });
+    return { synced: 0, skipped: 0, error: errorMsg };
+  }
 }
 
 // ==================== Transcription Functions ====================
@@ -366,11 +513,11 @@ export function formatFileSize(bytes: number | null): string {
 }
 
 /**
- * Check if a file size exceeds the Groq limit (25 MB)
+ * Check if a file size exceeds the Groq limit (100 MB for paid accounts)
  */
 export function exceedsGroqLimit(bytes: number | null): boolean {
   if (bytes === null) return false;
-  return bytes > 25 * 1024 * 1024;
+  return bytes > 100 * 1024 * 1024;
 }
 
 /**

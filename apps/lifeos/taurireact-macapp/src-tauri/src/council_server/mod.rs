@@ -14,6 +14,9 @@ use server::{start_server, stop_server, DEFAULT_PORT};
 use state::{is_server_running, SERVER_STATE};
 use types::CouncilServerStatus;
 
+// Re-export for background startup
+pub use server::{start_server as start_server_internal, DEFAULT_PORT as COUNCIL_PORT};
+
 /// Start the council HTTP+WebSocket server on port 3456
 #[tauri::command]
 pub async fn start_council_server() -> Result<bool, String> {

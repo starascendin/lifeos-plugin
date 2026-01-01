@@ -22,6 +22,8 @@
     "oauth:allow-start",
     "oauth:allow-cancel",
     "clerk:default",
-    "fs:allow-appdata-read-recursive"
+    "fs:allow-appdata-read-recursive",
+    "global-shortcut:default",
+    "macos-permissions:default"
   ]
 }

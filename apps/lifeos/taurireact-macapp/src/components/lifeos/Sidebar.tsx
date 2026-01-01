@@ -22,6 +22,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Cpu,
+  Headphones,
   Kanban,
   LayoutDashboard,
   ListTodo,
@@ -81,6 +83,8 @@ export function Sidebar() {
     },
     { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
     { name: "Habits", href: "/lifeos/habits", icon: Target },
+    { name: "Voice Agent", href: "/lifeos/voiceagent", icon: Headphones },
+    { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
     { name: "Settings", href: "/lifeos/settings", icon: Settings },
   ];
 

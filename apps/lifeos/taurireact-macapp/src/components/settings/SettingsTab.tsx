@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useTheme } from "../../lib/contexts/ThemeContext";
+import { useApiKeys } from "../../lib/hooks/useApiKeys";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
@@ -138,6 +140,9 @@ export function SettingsTab() {
           </div>
         </div>
 
+        {/* API Keys */}
+        <ApiKeysSection />
+
         {/* App Info */}
         <div className="space-y-4">
           <h2 className="text-sm font-medium text-[var(--text-primary)]">
@@ -153,6 +158,152 @@ export function SettingsTab() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ApiKeysSection() {
+  const {
+    groqApiKey,
+    hasGroqApiKey,
+    isLoading,
+    isSaving,
+    error,
+    saveGroqApiKey,
+    deleteGroqApiKey,
+  } = useApiKeys();
+
+  const [inputValue, setInputValue] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (groqApiKey) {
+      setInputValue(groqApiKey);
+    }
+  }, [groqApiKey]);
+
+  const handleSave = async () => {
+    if (!inputValue.trim()) return;
+    const success = await saveGroqApiKey(inputValue.trim());
+    if (success) {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    }
+  };
+
+  const handleDelete = async () => {
+    const success = await deleteGroqApiKey();
+    if (success) {
+      setInputValue("");
+    }
+  };
+
+  const openFullDiskAccessSettings = async () => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_full_disk_access_settings");
+    } catch (e) {
+      console.error("Failed to open settings:", e);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-sm font-medium text-[var(--text-primary)]">
+          API Keys
+        </h2>
+        <div className="bg-[var(--bg-secondary)] rounded-lg p-3 text-sm text-[var(--text-secondary)]">
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-medium text-[var(--text-primary)]">
+        API Keys
+      </h2>
+
+      {/* Groq API Key */}
+      <div className="bg-[var(--bg-secondary)] rounded-lg p-3 space-y-3">
+        <div>
+          <div className="text-xs text-[var(--text-secondary)] mb-1">
+            Groq API Key
+          </div>
+          <div className="text-xs text-[var(--text-secondary)] mb-2">
+            Required for voice memo transcription.{" "}
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--app-accent)] hover:underline"
+            >
+              Get your key →
+            </a>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type={showKey ? "text" : "password"}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="gsk_..."
+              className="w-full px-3 py-2 text-sm rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--app-border)] focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)] pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              {showKey ? "Hide" : "Show"}
+            </button>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={isSaving || !inputValue.trim()}
+            className="px-3 py-2 text-sm font-medium rounded-md bg-[var(--app-accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? "..." : saveSuccess ? "✓" : "Save"}
+          </button>
+          {hasGroqApiKey && (
+            <button
+              onClick={handleDelete}
+              disabled={isSaving}
+              className="px-3 py-2 text-sm font-medium rounded-md bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+
+        {hasGroqApiKey && (
+          <div className="text-xs text-green-400 flex items-center gap-1">
+            ✓ API key configured
+          </div>
+        )}
+
+        {error && (
+          <div className="text-xs text-red-400">{error}</div>
+        )}
+      </div>
+
+      {/* Full Disk Access */}
+      <div className="bg-[var(--bg-secondary)] rounded-lg p-3 space-y-2">
+        <div className="text-xs text-[var(--text-secondary)]">
+          <strong>Note:</strong> Full Disk Access may be required for the app to save settings.
+        </div>
+        <button
+          onClick={openFullDiskAccessSettings}
+          className="px-3 py-2 text-xs font-medium rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--app-border)] hover:bg-[var(--app-border)] flex items-center gap-2"
+        >
+          ↗ Open Full Disk Access Settings
+        </button>
       </div>
     </div>
   );
