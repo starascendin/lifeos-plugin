@@ -771,6 +771,7 @@ body {
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  isolation: isolate;
 }
 
 .council-empty {
@@ -942,6 +943,91 @@ body {
 
 .council-assistant-message {
   padding: 16px 0;
+  display: flex;
+  gap: 12px;
+}
+
+.council-stages-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Stage Navigation */
+.stage-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 28px;
+  position: sticky;
+  top: 16px;
+  align-self: flex-start;
+  z-index: 10;
+}
+
+.stage-nav-bar {
+  width: 6px;
+  height: 32px;
+  border-radius: 3px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  background: #d1d5db;
+  opacity: 0.4;
+}
+
+.stage-nav-bar:nth-child(1) { background: #3b82f6; }
+.stage-nav-bar:nth-child(2) { background: #8b5cf6; }
+.stage-nav-bar:nth-child(3) { background: #22c55e; }
+
+.stage-nav-bar.available {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.stage-nav-bar.available:hover {
+  transform: scaleX(1.5);
+}
+
+.stage-nav-bar.loading {
+  opacity: 0.5;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.stage-nav-bar:disabled {
+  cursor: default;
+}
+
+/* Tooltip */
+.stage-nav-tooltip {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+
+.stage-nav-tooltip::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-right-color: #1f2937;
+}
+
+.stage-nav-bar:hover .stage-nav-tooltip {
+  opacity: 1;
 }
 
 .message-label {
@@ -995,6 +1081,8 @@ body {
   padding: 12px 16px;
   border-radius: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  position: relative;
+  z-index: 200;
 }
 
 .council-input {
@@ -1462,6 +1550,19 @@ body {
 
 .eval-section.weaknesses li {
   color: #b91c1c;
+}
+
+.eval-section.points-added {
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+}
+
+.eval-section.points-added h5 {
+  color: #047857;
+}
+
+.eval-section.points-added li {
+  color: #059669;
 }
 
 .eval-section.points-docked {

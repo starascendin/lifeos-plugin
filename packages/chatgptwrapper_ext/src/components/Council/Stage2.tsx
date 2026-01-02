@@ -104,6 +104,17 @@ function EvaluationCard({
           </div>
         )}
 
+        {evaluation.pointsAdded && evaluation.pointsAdded.length > 0 && (
+          <div className="eval-section points-added">
+            <h5>Points Added</h5>
+            <ul>
+              {evaluation.pointsAdded.map((p, i) => (
+                <li key={i}>{p}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {evaluation.pointsDocked.length > 0 && (
           <div className="eval-section points-docked">
             <h5>Points Docked</h5>

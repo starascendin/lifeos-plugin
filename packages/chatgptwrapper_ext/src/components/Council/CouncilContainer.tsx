@@ -8,6 +8,7 @@ import { useCouncilAutoSave } from '../../hooks/useCouncilAutoSave';
 import { Stage1 } from './Stage1';
 import { Stage2 } from './Stage2';
 import { Stage3 } from './Stage3';
+import { StageNav } from './StageNav';
 import { CouncilInputBar } from './CouncilInputBar';
 import { LLM_CONFIG, type LLMType } from '../../config/llm';
 
@@ -140,53 +141,75 @@ export function CouncilContainer() {
                 </div>
               ) : (
                 <div className="council-assistant-message">
-                  <div className="message-label">LLM Council</div>
+                  <StageNav
+                    messageId={msg.id}
+                    hasStage1={!!msg.stage1?.length}
+                    hasStage2={!!msg.stage2?.length}
+                    hasStage3={!!msg.stage3?.length}
+                    loadingStage1={msg.loading?.stage1}
+                    loadingStage2={msg.loading?.stage2}
+                    loadingStage3={msg.loading?.stage3}
+                  />
 
-                  {/* Stage 1 Loading */}
-                  {msg.loading?.stage1 && (
-                    <div className="stage-loading">
-                      <div className="spinner" />
-                      <span>Stage 1: Collecting individual responses...</span>
-                    </div>
-                  )}
+                  <div className="council-stages-content">
+                    <div className="message-label">LLM Council</div>
 
-                  {/* Stage 1 Results */}
-                  {msg.stage1 && <Stage1 responses={msg.stage1} />}
+                    {/* Stage 1 Loading */}
+                    {msg.loading?.stage1 && (
+                      <div className="stage-loading">
+                        <div className="spinner" />
+                        <span>Stage 1: Collecting individual responses...</span>
+                      </div>
+                    )}
 
-                  {/* Stage 2 Loading */}
-                  {msg.loading?.stage2 && (
-                    <div className="stage-loading">
-                      <div className="spinner" />
-                      <span>Stage 2: Peer rankings in progress...</span>
-                    </div>
-                  )}
+                    {/* Stage 1 Results */}
+                    {msg.stage1 && (
+                      <div id={`${msg.id}-stage1`}>
+                        <Stage1 responses={msg.stage1} />
+                      </div>
+                    )}
 
-                  {/* Stage 2 Results */}
-                  {msg.stage2 && (
-                    <Stage2
-                      rankings={msg.stage2}
-                      labelToModel={msg.metadata?.labelToModel}
-                      aggregateRankings={msg.metadata?.aggregateRankings}
-                    />
-                  )}
+                    {/* Stage 2 Loading */}
+                    {msg.loading?.stage2 && (
+                      <div className="stage-loading">
+                        <div className="spinner" />
+                        <span>Stage 2: Peer rankings in progress...</span>
+                      </div>
+                    )}
 
-                  {/* Stage 3 Loading */}
-                  {msg.loading?.stage3 && (
-                    <div className="stage-loading">
-                      <div className="spinner" />
-                      <span>Stage 3: All models synthesizing final answers...</span>
-                    </div>
-                  )}
+                    {/* Stage 2 Results */}
+                    {msg.stage2 && (
+                      <div id={`${msg.id}-stage2`}>
+                        <Stage2
+                          rankings={msg.stage2}
+                          labelToModel={msg.metadata?.labelToModel}
+                          aggregateRankings={msg.metadata?.aggregateRankings}
+                        />
+                      </div>
+                    )}
 
-                  {/* Stage 3 Results */}
-                  {msg.stage3 && <Stage3 responses={msg.stage3} />}
+                    {/* Stage 3 Loading */}
+                    {msg.loading?.stage3 && (
+                      <div className="stage-loading">
+                        <div className="spinner" />
+                        <span>Stage 3: All models synthesizing final answers...</span>
+                      </div>
+                    )}
 
-                  {/* Error */}
-                  {msg.error && (
-                    <div className="council-error">
-                      Error: {msg.error}
-                    </div>
-                  )}
+                    {/* Stage 3 Results */}
+                    {msg.stage3 && (
+                      <div id={`${msg.id}-stage3`}>
+                        <Stage3 responses={msg.stage3} />
+                      </div>
+                    )}
+
+                    {/* Error */}
+                    {msg.error && (
+                      <div className="council-error">
+                        Error: {msg.error}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -20,6 +20,7 @@ export interface ResponseEvaluation {
   totalScore: number;
   strengths: string[];
   weaknesses: string[];
+  pointsAdded: string[];
   pointsDocked: string[];
 }
 

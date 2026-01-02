@@ -33,29 +33,45 @@ ${responsesText}
 
 Your task: Evaluate each response using a structured format with scores from 1-5 for each criterion.
 
+**SCORING SCALE (use 3 as baseline):**
+- 5 = Excellent - Exceptional quality, goes above and beyond
+- 4 = Good - Above average, notably strong
+- 3 = Average - Meets expectations, baseline acceptable quality
+- 2 = Below Average - Has notable deficiencies
+- 1 = Poor - Seriously flawed or inadequate
+
+**IMPORTANT SCORING RULES:**
+- A score of 3 should be your baseline for acceptable responses
+- Reserve 4 and 5 for genuinely strong aspects - you MUST provide specific reasons why it exceeds baseline
+- Use 2 and 1 for genuine weaknesses - you MUST explain what specific issues caused points to be docked
+- Do NOT inflate scores - average responses should receive 3s
+
 For EACH response, provide an evaluation in this EXACT format:
 
 === EVALUATION: Response X ===
-| Criterion | Score | Assessment |
-|-----------|-------|------------|
-| Accuracy | [1-5] | [Brief assessment] |
-| Completeness | [1-5] | [Brief assessment] |
-| Clarity | [1-5] | [Brief assessment] |
-| Relevance | [1-5] | [Brief assessment] |
-| Reasoning | [1-5] | [Brief assessment] |
+| Criterion | Score | Justification |
+|-----------|-------|---------------|
+| Accuracy | [1-5] | [If 4-5: specific reasons why it excels. If 1-2: specific issues that caused deduction. If 3: why it meets baseline.] |
+| Completeness | [1-5] | [If 4-5: specific reasons why it excels. If 1-2: specific issues that caused deduction. If 3: why it meets baseline.] |
+| Clarity | [1-5] | [If 4-5: specific reasons why it excels. If 1-2: specific issues that caused deduction. If 3: why it meets baseline.] |
+| Relevance | [1-5] | [If 4-5: specific reasons why it excels. If 1-2: specific issues that caused deduction. If 3: why it meets baseline.] |
+| Reasoning | [1-5] | [If 4-5: specific reasons why it excels. If 1-2: specific issues that caused deduction. If 3: why it meets baseline.] |
 
-STRENGTHS:
-- [Strength 1]
-- [Strength 2]
+STRENGTHS (specific examples that earned high scores):
+- [Strength 1 with reference to content]
+- [Strength 2 with reference to content]
 
-WEAKNESSES:
-- [Weakness 1]
-- [Weakness 2]
+WEAKNESSES (specific issues that caused point deductions):
+- [Weakness 1 with reference to content]
+- [Weakness 2 with reference to content]
 
-POINTS DOCKED:
-- [Reason for point deduction, if any]
+POINTS ADDED (reasons for scores above 3 baseline):
+- [Criterion]: [Specific reason why this exceeded baseline and earned 4 or 5]
 
-TOTAL SCORE: [Sum of all scores, max 25]
+POINTS DOCKED (reasons for scores below 3 baseline):
+- [Criterion]: [Specific reason why this fell below baseline and earned 1 or 2]
+
+TOTAL SCORE: [Sum of all scores, max 25. Note: 15/25 = baseline average]
 === END EVALUATION ===
 
 After evaluating ALL responses, provide your final ranking:
@@ -154,6 +170,7 @@ export function parseEvaluations(rankingText: string): ResponseEvaluation[] {
       totalScore: 0,
       strengths: [],
       weaknesses: [],
+      pointsAdded: [],
       pointsDocked: []
     };
 
@@ -194,8 +211,20 @@ export function parseEvaluations(rankingText: string): ResponseEvaluation[] {
       }
     }
 
+    // Parse POINTS ADDED
+    const addedMatch = evalBlock.match(/POINTS ADDED[^:]*:\s*([\s\S]*?)(?:POINTS DOCKED|TOTAL SCORE:|$)/i);
+    if (addedMatch) {
+      const lines = addedMatch[1].split('\n');
+      for (const line of lines) {
+        const cleaned = line.replace(/^[-*•]\s*/, '').trim();
+        if (cleaned && !cleaned.startsWith('|') && cleaned.toLowerCase() !== 'none' && cleaned.toLowerCase() !== 'n/a') {
+          evaluation.pointsAdded.push(cleaned);
+        }
+      }
+    }
+
     // Parse POINTS DOCKED
-    const dockedMatch = evalBlock.match(/POINTS DOCKED:\s*([\s\S]*?)(?:TOTAL SCORE:|$)/i);
+    const dockedMatch = evalBlock.match(/POINTS DOCKED[^:]*:\s*([\s\S]*?)(?:TOTAL SCORE:|$)/i);
     if (dockedMatch) {
       const lines = dockedMatch[1].split('\n');
       for (const line of lines) {

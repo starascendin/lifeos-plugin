@@ -89,6 +89,30 @@ function EvaluationCard({ evaluation, labelToModel }: {
               </ul>
             </div>
           )}
+
+          {/* Points Added */}
+          {evaluation.pointsAdded && evaluation.pointsAdded.length > 0 && (
+            <div>
+              <h5 className="text-xs font-medium text-emerald-600 mb-1">Points Added</h5>
+              <ul className="text-xs text-muted-foreground space-y-0.5">
+                {evaluation.pointsAdded.map((p, i) => (
+                  <li key={i}>• {p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Points Docked */}
+          {evaluation.pointsDocked && evaluation.pointsDocked.length > 0 && (
+            <div>
+              <h5 className="text-xs font-medium text-orange-600 mb-1">Points Docked</h5>
+              <ul className="text-xs text-muted-foreground space-y-0.5">
+                {evaluation.pointsDocked.map((p, i) => (
+                  <li key={i}>• {p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
