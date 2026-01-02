@@ -67,44 +67,46 @@ function ExtensionHistory({ isMobileOpen, onClose }: { isMobileOpen?: boolean; o
       {isMobileOpen && (
         <button className="mobile-history-close" onClick={onClose}>×</button>
       )}
-      <div className="council-history-header">
-        <span className="sidebar-title">History</span>
-        <button
-          className="new-conversation-btn"
-          onClick={handleNewConversation}
-          title="New conversation"
-        >
-          +
-        </button>
-      </div>
-
-      {isHistoryLoading ? (
-        <div className="history-loading">Loading...</div>
-      ) : conversations.length === 0 ? (
-        <div className="history-empty">No conversations yet</div>
-      ) : (
-        <div className="conversation-list">
-          {conversations.map((conv) => (
-            <div
-              key={conv.id}
-              className={`conversation-item ${conv.id === currentConversationId ? 'active' : ''}`}
-              onClick={() => handleSelectConversation(conv.id)}
-            >
-              <div className="conversation-title">{conv.title}</div>
-              <div className="conversation-meta">
-                {conv.messageCount} msg{conv.messageCount !== 1 ? 's' : ''} · {formatTimestamp(conv.updatedAt)}
-              </div>
-              <button
-                className="conversation-delete"
-                onClick={(e) => handleDelete(e, conv.id)}
-                title="Delete"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+      <div className="council-history-content">
+        <div className="council-history-header">
+          <span className="sidebar-title">History</span>
+          <button
+            className="new-conversation-btn"
+            onClick={handleNewConversation}
+            title="New conversation"
+          >
+            +
+          </button>
         </div>
-      )}
+
+        {isHistoryLoading ? (
+          <div className="history-loading">Loading...</div>
+        ) : conversations.length === 0 ? (
+          <div className="history-empty">No conversations yet</div>
+        ) : (
+          <div className="conversation-list">
+            {conversations.map((conv) => (
+              <div
+                key={conv.id}
+                className={`conversation-item ${conv.id === currentConversationId ? 'active' : ''}`}
+                onClick={() => handleSelectConversation(conv.id)}
+              >
+                <div className="conversation-title">{conv.title}</div>
+                <div className="conversation-meta">
+                  {conv.messageCount} msg{conv.messageCount !== 1 ? 's' : ''} · {formatTimestamp(conv.updatedAt)}
+                </div>
+                <button
+                  className="conversation-delete"
+                  onClick={(e) => handleDelete(e, conv.id)}
+                  title="Delete"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
