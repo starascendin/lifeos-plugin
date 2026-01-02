@@ -22,7 +22,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  currentTab: 'chat',
+  currentTab: 'council',
   currentLayout: 2,
   currentTier: 'normal',
   authStatus: { chatgpt: false, claude: false, gemini: false, xai: false },

@@ -33,19 +33,19 @@ export function CouncilInputBar({ onSubmit, disabled }: CouncilInputBarProps) {
     <form className="council-input-bar" onSubmit={handleSubmit}>
       <textarea
         className="council-input"
-        placeholder="Ask the council a question... (Shift+Enter for new line)"
+        placeholder="Ask the council..."
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        rows={3}
+        rows={1}
       />
       <button
         type="submit"
         className="council-send-button"
         disabled={!input.trim() || disabled}
       >
-        {disabled ? 'Consulting...' : 'Ask Council'}
+        {disabled ? '...' : 'Ask'}
       </button>
     </form>
   );

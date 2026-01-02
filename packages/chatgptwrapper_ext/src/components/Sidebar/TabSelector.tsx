@@ -1,8 +1,8 @@
 import { useAppStore, type TabType } from '../../store/appStore';
 
 const TABS: { id: TabType; label: string }[] = [
-  { id: 'chat', label: 'Multi-Chat' },
-  { id: 'council', label: 'Council' }
+  { id: 'council', label: 'Council' },
+  { id: 'chat', label: 'Multi-Chat' }
 ];
 
 export function TabSelector() {
@@ -16,6 +16,8 @@ export function TabSelector() {
           key={tab.id}
           className={`tab-button ${currentTab === tab.id ? 'active' : ''}`}
           onClick={() => setTab(tab.id)}
+          data-tab={tab.id}
+          title={tab.label}
         >
           {tab.label}
         </button>
