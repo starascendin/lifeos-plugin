@@ -52,6 +52,7 @@ pub async fn generate_livekit_token(
     room_name: String,
     participant_identity: Option<String>,
     participant_name: Option<String>,
+    participant_metadata: Option<String>,
 ) -> Result<LiveKitTokenResponse, String> {
     // Get environment variables
     let api_key = env::var("LIVEKIT_API_KEY")
@@ -90,7 +91,7 @@ pub async fn generate_livekit_token(
             can_subscribe: true,
             can_update_own_metadata: true,
         },
-        metadata: None,
+        metadata: participant_metadata,
     };
 
     // Create JWT header

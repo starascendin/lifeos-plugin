@@ -22,10 +22,10 @@ use notes::{
     get_exported_notes, should_run_notes_sync,
 };
 use screentime::{
-    check_screentime_permission, get_device_id, get_screentime_daily_stats,
-    get_screentime_recent_summaries, get_screentime_sync_history, list_screentime_devices,
-    migrate_screentime_categories, read_screentime_sessions, sync_screentime_internal,
-    sync_screentime_to_local_db,
+    check_screentime_permission, debug_biome_raw_events, debug_screentime_devices, get_device_id,
+    get_screentime_daily_stats, get_screentime_recent_summaries, get_screentime_sync_history,
+    list_screentime_devices, migrate_screentime_categories, read_screentime_sessions,
+    sync_screentime_internal, sync_screentime_to_local_db, wipe_screentime_database,
 };
 use std::time::Duration;
 use tauri::{
@@ -68,9 +68,9 @@ pub fn run() {
         .setup(|app| {
             // Create menu items for tray context menu
             let sync_jobs =
-                MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs\t⌘1", true, None::<&str>)?;
+                MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs\t⌃1", true, None::<&str>)?;
             let lifeos_app =
-                MenuItem::with_id(app, "lifeos_app", "LifeOS App\t⌘2", true, None::<&str>)?;
+                MenuItem::with_id(app, "lifeos_app", "LifeOS App\t⌃2", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
             // Build context menu
@@ -107,10 +107,10 @@ pub fn run() {
                 .build(app)?;
 
             // Register global keyboard shortcuts
-            // Cmd+1 for Background Sync Jobs window
-            let shortcut_1 = Shortcut::new(Some(Modifiers::META), Code::Digit1);
-            // Cmd+2 for LifeOS App window
-            let shortcut_2 = Shortcut::new(Some(Modifiers::META), Code::Digit2);
+            // Ctrl+1 for Background Sync Jobs window
+            let shortcut_1 = Shortcut::new(Some(Modifiers::CONTROL), Code::Digit1);
+            // Ctrl+2 for LifeOS App window
+            let shortcut_2 = Shortcut::new(Some(Modifiers::CONTROL), Code::Digit2);
 
             let app_handle = app.handle().clone();
             app.handle().plugin(
@@ -241,6 +241,9 @@ pub fn run() {
             get_screentime_recent_summaries,
             get_screentime_sync_history,
             sync_screentime_to_local_db,
+            wipe_screentime_database,
+            debug_screentime_devices,
+            debug_biome_raw_events,
             migrate_screentime_categories,
             count_apple_notes,
             export_apple_notes,

@@ -29,7 +29,8 @@ const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 export async function generateToken(
   roomName: string,
   participantIdentity?: string,
-  participantName?: string
+  participantName?: string,
+  participantMetadata?: string
 ): Promise<LiveKitTokenResponse> {
   if (!isTauri) {
     throw new Error("Not running in Tauri");
@@ -39,6 +40,7 @@ export async function generateToken(
     roomName,
     participantIdentity,
     participantName,
+    participantMetadata,
   });
 }
 

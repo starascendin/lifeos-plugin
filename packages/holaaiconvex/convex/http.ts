@@ -1132,4 +1132,260 @@ http.route({
   }),
 });
 
+// ==================== TOOL CALL API ====================
+
+// API key for tool call endpoints (used by external agents)
+const TOOL_CALL_API_KEY = "tool-call-secret-key-2024";
+
+// Available tools and their internal query mappings
+const AVAILABLE_TOOLS = ["get_todays_tasks", "get_projects", "get_tasks"] as const;
+type ToolName = (typeof AVAILABLE_TOOLS)[number];
+
+/**
+ * Authenticate request via API key or Bearer token
+ * Returns userId if authenticated, null otherwise
+ */
+async function authenticateToolCall(
+  ctx: Parameters<Parameters<typeof httpAction>[0]>[0],
+  request: Request,
+  body: { userId?: string }
+): Promise<{ userId: string | null; error?: string }> {
+  // Try Bearer token auth first (Clerk)
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity) {
+      const user = await ctx.runQuery(internal.common.users.getUserByTokenIdentifier, {
+        tokenIdentifier: identity.tokenIdentifier,
+      }) as { _id: string } | null;
+      if (user) {
+        return { userId: user._id };
+      }
+    }
+    return { userId: null, error: "Invalid Bearer token" };
+  }
+
+  // Fall back to API key auth
+  const apiKey = request.headers.get("X-API-Key") || request.headers.get("x-api-key");
+  if (apiKey === TOOL_CALL_API_KEY) {
+    if (!body.userId) {
+      return { userId: null, error: "userId required when using API key auth" };
+    }
+    return { userId: body.userId };
+  }
+
+  return { userId: null, error: "Invalid or missing authentication" };
+}
+
+/**
+ * Unified tool call endpoint
+ * POST /tool-call
+ *
+ * Auth: X-API-Key header OR Authorization: Bearer token
+ * Body: { tool: string, userId?: string, params?: object }
+ *
+ * Note: userId required for API key auth, derived from token for Bearer auth
+ *
+ * Available tools:
+ * - get_todays_tasks: Get today's tasks (due today + top priority)
+ * - get_projects: Get user's projects with summary stats
+ * - get_tasks: Get tasks with optional filters
+ */
+http.route({
+  path: "/tool-call",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+    };
+
+    try {
+      // Parse request body
+      const body = await request.json() as {
+        tool: string;
+        userId?: string;
+        params?: Record<string, unknown>;
+      };
+      const { tool, params } = body;
+
+      // Validate tool name
+      if (!tool || !AVAILABLE_TOOLS.includes(tool as ToolName)) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Unknown tool: ${tool}`,
+            availableTools: AVAILABLE_TOOLS,
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Authenticate
+      const auth = await authenticateToolCall(ctx, request, body);
+      if (!auth.userId) {
+        return new Response(
+          JSON.stringify({ success: false, error: auth.error }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Route to appropriate tool handler
+      let result: unknown;
+
+      switch (tool as ToolName) {
+        case "get_todays_tasks":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getTodaysTasksInternal, {
+            userId: auth.userId,
+          });
+          break;
+
+        case "get_projects":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getProjectsInternal, {
+            userId: auth.userId,
+            status: params?.status as string | undefined,
+            includeArchived: params?.includeArchived as boolean | undefined,
+          });
+          break;
+
+        case "get_tasks":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getTasksInternal, {
+            userId: auth.userId,
+            projectId: params?.projectId as string | undefined,
+            status: params?.status as string | undefined,
+            priority: params?.priority as string | undefined,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          tool,
+          result,
+          executedAt: new Date().toISOString(),
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Internal server error";
+      return new Response(
+        JSON.stringify({ success: false, error: errorMessage }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+  }),
+});
+
+// Handle CORS preflight for tool-call
+http.route({
+  path: "/tool-call",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+      },
+    });
+  }),
+});
+
+// ==================== VOICE AGENT HTTP API (DEPRECATED) ====================
+// Use /tool-call with tool: "get_todays_tasks" instead
+
+// API key for voice agent endpoints (kept for backwards compatibility)
+const VOICE_AGENT_API_KEY = "voice-agent-secret-key-2024";
+
+/**
+ * @deprecated Use /tool-call with tool: "get_todays_tasks" instead
+ * Get today's tasks for voice agent
+ * Used by LiveKit voice agent to retrieve user's tasks
+ *
+ * Request body: { userId: string }
+ * Response: { tasks: [...], summary: {...} } or { error: string }
+ */
+http.route({
+  path: "/voice-agent/todays-tasks",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
+      "X-Deprecated": "Use /tool-call with tool: get_todays_tasks instead",
+    };
+
+    // Validate API key
+    const apiKey = request.headers.get("X-API-Key") || request.headers.get("x-api-key");
+    if (apiKey !== VOICE_AGENT_API_KEY) {
+      return new Response(JSON.stringify({ error: "Invalid or missing API key" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      // Parse request body
+      const body = await request.json();
+      const { userId } = body as { userId: string };
+
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "Missing required field: userId" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Forward to new tool_call module
+      const result = await ctx.runQuery(internal.lifeos.tool_call.getTodaysTasksInternal, {
+        userId,
+      });
+
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Internal server error";
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+// Handle CORS preflight for voice-agent/todays-tasks
+http.route({
+  path: "/voice-agent/todays-tasks",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
+      },
+    });
+  }),
+});
+
 export default http;

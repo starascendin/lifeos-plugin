@@ -1,4 +1,5 @@
 import { useScreenTimeSync } from "../../lib/contexts/SyncContext";
+import { wipeScreenTimeDatabase } from "../../lib/services/screentime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +20,9 @@ import {
   Monitor,
   Settings,
   Clock,
+  Trash2,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -32,6 +34,22 @@ interface ScreenTimeSyncButtonProps {
 export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonProps) {
   const { progress, hasPermission, startSync, isSyncing, refreshPermission, syncHistory } =
     useScreenTimeSync();
+  const [isWiping, setIsWiping] = useState(false);
+  const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+
+  const handleWipeDatabase = async () => {
+    setIsWiping(true);
+    try {
+      await wipeScreenTimeDatabase();
+      setShowWipeConfirm(false);
+      // Auto-start sync after wipe
+      startSync();
+    } catch (error) {
+      console.error("Failed to wipe database:", error);
+    } finally {
+      setIsWiping(false);
+    }
+  };
 
   // Format sync history timestamp (SQLite datetime string)
   const formatSyncTime = (timestamp: string) => {
@@ -183,6 +201,41 @@ export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonPro
               <RefreshCw className="h-4 w-4 mr-2" />
               Sync Again
             </Button>
+            {showWipeConfirm ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleWipeDatabase}
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isWiping}
+                >
+                  {isWiping ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Confirm Wipe
+                </Button>
+                <Button
+                  onClick={() => setShowWipeConfirm(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => setShowWipeConfirm(true)}
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Wipe DB & Resync
+              </Button>
+            )}
           </div>
         ) : progress.status === "error" ? (
           <div className="space-y-3">
@@ -200,6 +253,41 @@ export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonPro
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry Sync
             </Button>
+            {showWipeConfirm ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleWipeDatabase}
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isWiping}
+                >
+                  {isWiping ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Confirm Wipe
+                </Button>
+                <Button
+                  onClick={() => setShowWipeConfirm(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => setShowWipeConfirm(true)}
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Wipe DB & Resync
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -217,6 +305,41 @@ export function ScreenTimeSyncButton({ onSyncComplete }: ScreenTimeSyncButtonPro
               <Monitor className="h-4 w-4 mr-2" />
               Sync Screen Time Data
             </Button>
+            {showWipeConfirm ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleWipeDatabase}
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  disabled={isWiping}
+                >
+                  {isWiping ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Confirm Wipe
+                </Button>
+                <Button
+                  onClick={() => setShowWipeConfirm(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => setShowWipeConfirm(true)}
+                variant="ghost"
+                size="sm"
+                className="w-full text-muted-foreground"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Wipe DB & Resync
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

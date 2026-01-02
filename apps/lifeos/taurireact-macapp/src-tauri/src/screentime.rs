@@ -202,6 +202,12 @@ fn init_screentime_database(db_path: &PathBuf) -> SqliteResult<()> {
         [],
     )?;
 
+    // Add unique constraint to prevent duplicate sessions (same app at same time = same session)
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_unique ON sessions(bundle_id, start_time)",
+        [],
+    )?;
+
     // Create daily_summary table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS daily_summary (
@@ -379,70 +385,38 @@ fn get_device_bundle_ids_from_biome(device_id: &str) -> Vec<String> {
     bundle_ids.into_iter().collect()
 }
 
-/// Infer device type using both UDID patterns and app analysis
-fn infer_device_type_with_apps(device_id: &str, bundle_ids: &[String]) -> &'static str {
-    // First try UDID pattern matching (if definitive)
-    if device_id.is_empty() || device_id == "local" {
-        return "mac";
-    }
-    if device_id.starts_with("00008020") {
+/// Infer device type: iPhone (has mobilesafari) vs Mac (everything else)
+fn infer_device_type_with_apps(_device_id: &str, bundle_ids: &[String]) -> &'static str {
+    // Simple grouping: if device has mobilesafari, it's an iPhone; otherwise it's a Mac
+    if detect_device_type_from_apps(bundle_ids).is_some() {
         return "iphone";
     }
-    if device_id.starts_with("00008030") {
-        return "ipad";
-    }
-
-    // For ambiguous hex UUIDs, check apps to determine if iOS
-    let clean_id: String = device_id.chars().filter(|c| *c != '-').collect();
-    if clean_id.len() >= 32 && clean_id.chars().all(|c| c.is_ascii_hexdigit()) {
-        // Check if it has iOS-specific apps
-        if let Some(detected_type) = detect_device_type_from_apps(bundle_ids) {
-            return detected_type;
-        }
-        // Default to "ios" for unidentified hex UUIDs
-        return "ios";
-    }
-
     "mac"
 }
 
-/// Infer device type from device ID pattern only (legacy, used where we don't have app data)
-/// Based on Apple UDID patterns:
-/// - 00008020* = iPhone
-/// - 00008030* = iPad
-/// - 32+ hex chars = iOS/tvOS device
-/// - Otherwise = Mac
+/// Infer device type from device ID pattern only (fallback when no app data available)
+/// Simplified: returns "mac" for all devices (iPhone detection requires mobilesafari check)
 #[allow(dead_code)]
-fn infer_device_type(device_id: &str) -> &'static str {
-    if device_id.is_empty() || device_id == "local" {
-        return "mac";
-    }
-    if device_id.starts_with("00008020") {
-        return "iphone";
-    }
-    if device_id.starts_with("00008030") {
-        return "ipad";
-    }
-    // Hex UUIDs (with or without hyphens) are typically iOS/tvOS devices
-    let clean_id: String = device_id.chars().filter(|c| *c != '-').collect();
-    if clean_id.len() >= 32 && clean_id.chars().all(|c| c.is_ascii_hexdigit()) {
-        return "ios";
-    }
+fn infer_device_type(_device_id: &str) -> &'static str {
+    // Without app data, default to "mac" - iPhone detection requires mobilesafari
     "mac"
 }
 
-/// Get known device name by UUID (hard-coded mappings)
-fn get_known_device_name(device_id: &str) -> Option<&'static str> {
-    // Known devices - add your device mappings here
-    const KNOWN_DEVICES: &[(&str, &str)] = &[
-        ("local", "This Mac"),
-        // iPhone - MisfitRebel 17Pro (detected by mobilesafari in Biome)
-        ("0E97FD75-40EA-4726-A65C-57545C0B778D", "MisfitRebel 17Pro"),
-        // iPhone - same device but different UUID in knowledgeC.db
-        ("42255668-8D14-5FA1-883A-854797FDB7D3", "MisfitRebel 17Pro"),
-    ];
+/// Known device mappings: (device_id, display_name, device_type)
+/// Note: iPhone data comes from Biome only (knowledgeC.db doesn't have remote device data)
+const KNOWN_DEVICES: &[(&str, &str, &str)] = &[
+    ("local", "This Mac", "mac"),
+    // iPhone 17 - Biome UUID (from ~/Library/Biome/streams/restricted/App.InFocus/remote/)
+    (
+        "0E97FD75-40EA-4726-A65C-57545C0B778D",
+        "iPhone 17",
+        "iphone",
+    ),
+];
 
-    for (id, name) in KNOWN_DEVICES {
+/// Get known device name by UUID
+fn get_known_device_name(device_id: &str) -> Option<&'static str> {
+    for (id, name, _) in KNOWN_DEVICES {
         if device_id == *id {
             return Some(name);
         }
@@ -450,25 +424,32 @@ fn get_known_device_name(device_id: &str) -> Option<&'static str> {
     None
 }
 
+/// Get known device type by UUID
+fn get_known_device_type(device_id: &str) -> Option<&'static str> {
+    for (id, _, device_type) in KNOWN_DEVICES {
+        if device_id == *id {
+            return Some(device_type);
+        }
+    }
+    None
+}
+
 /// Generate display name for device based on type and ID
+/// Simplified: only "iPhone" and "Mac" device types
 fn get_device_display_name(device_id: &str, device_type: &str) -> String {
     // Check for known device first
     if let Some(name) = get_known_device_name(device_id) {
         return name.to_string();
     }
 
-    if device_id.is_empty() {
+    if device_id.is_empty() || device_id == "local" {
         return "This Mac".to_string();
     }
 
-    // Fall back to type-based name (no UUID snippets)
+    // Fall back to type-based name: iPhone or Mac
     match device_type {
         "iphone" => "iPhone".to_string(),
-        "ipad" => "iPad".to_string(),
-        "ios" => "iOS Device".to_string(),
-        "mac" => "Mac".to_string(),
-        "misc" => "Other Device".to_string(),
-        _ => "Unknown Device".to_string(),
+        _ => "Mac".to_string(), // Everything else is grouped as Mac
     }
 }
 
@@ -818,8 +799,8 @@ fn export_knowledge_db_sessions(
         let end_datetime = mac_timestamp_to_datetime(end_mac);
         let created_datetime = created_mac.map(mac_timestamp_to_datetime);
 
-        our_conn.execute(
-            "INSERT INTO sessions (device_id, bundle_id, app_name, category, start_time, end_time, duration_seconds, timezone_offset, created_at)
+        let result = our_conn.execute(
+            "INSERT OR IGNORE INTO sessions (device_id, bundle_id, app_name, category, start_time, end_time, duration_seconds, timezone_offset, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 device_id,
@@ -832,9 +813,11 @@ fn export_knowledge_db_sessions(
                 tz_offset,
                 created_datetime,
             ],
-        ).ok();
+        );
 
-        inserted += 1;
+        if result.map(|n| n > 0).unwrap_or(false) {
+            inserted += 1;
+        }
         new_last_timestamp = new_last_timestamp.max(end_mac);
     }
 
@@ -867,11 +850,15 @@ fn export_biome_records(our_conn: &Connection, since_timestamp: f64) -> Result<i
             continue;
         }
 
-        let device_type = if record.device_id == "local" {
-            "current_mac"
-        } else {
-            infer_device_type(&record.device_id)
-        };
+        // Skip local device - use knowledgeC.db for Mac data (has accurate durations)
+        // Biome is only used for remote devices (iPhone/iPad)
+        if record.device_id == "local" {
+            continue;
+        }
+
+        // For remote devices, check if it's a known device or default to "iphone"
+        // (Remote devices in Biome are typically iPhones/iPads)
+        let device_type = get_known_device_type(&record.device_id).unwrap_or("iphone");
 
         register_device(our_conn, &record.device_id, device_type).ok();
 
@@ -879,8 +866,8 @@ fn export_biome_records(our_conn: &Connection, since_timestamp: f64) -> Result<i
 
         let datetime = mac_timestamp_to_datetime(record.timestamp);
 
-        our_conn.execute(
-            "INSERT INTO sessions (device_id, bundle_id, app_name, category, start_time, end_time, duration_seconds, timezone_offset, created_at)
+        let result = our_conn.execute(
+            "INSERT OR IGNORE INTO sessions (device_id, bundle_id, app_name, category, start_time, end_time, duration_seconds, timezone_offset, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
                 record.device_id,
@@ -893,9 +880,11 @@ fn export_biome_records(our_conn: &Connection, since_timestamp: f64) -> Result<i
                 local_tz_offset,
                 &datetime,
             ],
-        ).ok();
+        );
 
-        inserted += 1;
+        if result.map(|n| n > 0).unwrap_or(false) {
+            inserted += 1;
+        }
     }
 
     Ok(inserted)
@@ -974,10 +963,11 @@ pub fn sync_screentime_internal_with_source(source: &str) -> Result<SyncResult, 
         thirty_days_ago - MAC_EPOCH_OFFSET as f64
     };
 
-    // Export from knowledgeC.db
+    // Export from knowledgeC.db - LOCAL Mac data only (has accurate durations)
     let (knowledge_count, new_timestamp) = export_knowledge_db_sessions(&conn, cutoff)?;
 
-    // Export from Biome SEGB files
+    // Export from Biome - REMOTE devices only (iPhone/iPad)
+    // knowledgeC.db doesn't have remote device data, only Biome has it
     let biome_count = export_biome_records(&conn, cutoff)?;
 
     // Generate daily summary
@@ -1082,6 +1072,147 @@ pub async fn get_screentime_sync_history() -> Result<Vec<SyncHistoryEntry>, Stri
         .collect();
 
     Ok(history)
+}
+
+/// Debug: show raw Biome events for a device to understand duration calculation
+#[command]
+pub async fn debug_biome_raw_events(device_id: String) -> Result<String, String> {
+    // Get today's date range in Mac absolute time
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs_f64();
+    let today_start = now - (now % 86400.0); // Start of today UTC
+    let today_start_mac = today_start - MAC_EPOCH_OFFSET as f64;
+
+    // Parse all Biome data
+    let mut records = parse_all_biome_data(today_start_mac - 86400.0); // Include yesterday
+
+    // Filter for the specific device
+    records.retain(|r| r.device_id == device_id);
+
+    if records.is_empty() {
+        return Ok(format!("No Biome records found for device: {}", device_id));
+    }
+
+    // Calculate durations
+    let records_with_duration = calculate_segb_durations(&mut records);
+
+    let mut result = format!(
+        "Raw Biome events for {} ({} records):\n\n",
+        get_known_device_name(&device_id).unwrap_or(&device_id),
+        records_with_duration.len()
+    );
+
+    // Group by bundle_id and show events
+    let mut by_app: std::collections::HashMap<String, Vec<(String, f64)>> =
+        std::collections::HashMap::new();
+
+    for (record, duration) in &records_with_duration {
+        let datetime = mac_timestamp_to_datetime(record.timestamp);
+        by_app
+            .entry(record.bundle_id.clone())
+            .or_default()
+            .push((datetime, *duration));
+    }
+
+    // Show mobilesafari events first
+    if let Some(events) = by_app.get("com.apple.mobilesafari") {
+        result.push_str("=== com.apple.mobilesafari ===\n");
+        let mut total = 0.0;
+        for (time, dur) in events {
+            result.push_str(&format!(
+                "  {} → {:.0}s ({:.1}min)\n",
+                time,
+                dur,
+                dur / 60.0
+            ));
+            total += dur;
+        }
+        result.push_str(&format!(
+            "  TOTAL: {:.0}s ({:.1}min, {:.1}h)\n\n",
+            total,
+            total / 60.0,
+            total / 3600.0
+        ));
+    }
+
+    // Summary of all apps
+    result.push_str("=== All apps summary ===\n");
+    let mut app_totals: Vec<(String, f64)> = by_app
+        .iter()
+        .map(|(app, events)| (app.clone(), events.iter().map(|(_, d)| d).sum()))
+        .collect();
+    app_totals.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+    for (app, total) in app_totals.iter().take(10) {
+        let app_name = get_app_name(app).unwrap_or_else(|| app.clone());
+        result.push_str(&format!("  {}: {:.1}min\n", app_name, total / 60.0));
+    }
+
+    Ok(result)
+}
+
+/// Debug: list all device_ids and their session counts from the database
+#[command]
+pub async fn debug_screentime_devices() -> Result<String, String> {
+    let db_path = get_app_screentime_db_path()
+        .ok_or_else(|| "Could not determine app data directory".to_string())?;
+
+    if !db_path.exists() {
+        return Ok("No database found".to_string());
+    }
+
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Get all unique device_ids with counts
+    let mut result = String::from("Device IDs in sessions table:\n");
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT device_id, COUNT(*) as count, GROUP_CONCAT(DISTINCT bundle_id) as bundles
+         FROM sessions
+         GROUP BY device_id
+         ORDER BY count DESC",
+        )
+        .map_err(|e| format!("Query error: {}", e))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let device_id: String = row.get(0)?;
+            let count: i32 = row.get(1)?;
+            let bundles: String = row.get::<_, Option<String>>(2)?.unwrap_or_default();
+            Ok((device_id, count, bundles))
+        })
+        .map_err(|e| format!("Query error: {}", e))?;
+
+    for row in rows.filter_map(|r| r.ok()) {
+        let (device_id, count, bundles) = row;
+        let has_mobilesafari = bundles.contains("com.apple.mobilesafari");
+        result.push_str(&format!(
+            "\n- {} ({}): {} sessions, mobilesafari: {}",
+            device_id,
+            get_known_device_name(&device_id).unwrap_or("unknown"),
+            count,
+            has_mobilesafari
+        ));
+    }
+
+    Ok(result)
+}
+
+/// Wipe the local screentime database to allow a fresh resync
+#[command]
+pub async fn wipe_screentime_database() -> Result<String, String> {
+    let db_path = get_app_screentime_db_path()
+        .ok_or_else(|| "Could not determine app data directory".to_string())?;
+
+    if db_path.exists() {
+        std::fs::remove_file(&db_path).map_err(|e| format!("Failed to delete database: {}", e))?;
+        Ok("Database wiped successfully. Run sync to rebuild.".to_string())
+    } else {
+        Ok("No database found to wipe.".to_string())
+    }
 }
 
 /// Read Screen Time sessions from knowledgeC.db
@@ -1348,29 +1479,29 @@ pub async fn list_screentime_devices() -> Result<Vec<DeviceInfo>, String> {
                             .map(|s| s.to_string())
                             .collect();
 
-                        // Infer type using bundle IDs (more accurate than UDID patterns)
-                        // But only for devices with enough sessions to be "real"
-                        let device_type = if session_count < REAL_DEVICE_SESSION_THRESHOLD
-                            && device_id != "local"
-                            && raw_type != "current_mac"
-                        {
-                            // Low session count = misc device (old phone, temp device, etc.)
-                            "misc"
-                        } else if raw_type == "current_mac" || device_id == "local" {
-                            "mac"
-                        } else if let Some(detected) = detect_device_type_from_apps(&bundle_ids) {
-                            detected
-                        } else {
-                            infer_device_type(&device_id)
-                        };
+                        // Device type: check known devices first, then bundle_ids, then default to mac
+                        let device_type =
+                            if let Some(known_type) = get_known_device_type(&device_id) {
+                                known_type
+                            } else if raw_type == "current_mac" || device_id == "local" {
+                                "mac"
+                            } else if detect_device_type_from_apps(&bundle_ids).is_some() {
+                                "iphone"
+                            } else {
+                                "mac" // Default everything else to Mac
+                            };
 
                         // Skip "unknown" device - it's merged with "local" (This Mac)
                         if device_id == "unknown" {
                             continue;
                         }
 
-                        // Skip "misc" devices unless they have a known name
-                        if device_type == "misc" && get_known_device_name(&device_id).is_none() {
+                        // Skip devices with very low session counts unless they have a known name
+                        if session_count < REAL_DEVICE_SESSION_THRESHOLD
+                            && device_id != "local"
+                            && raw_type != "current_mac"
+                            && get_known_device_name(&device_id).is_none()
+                        {
                             continue;
                         }
 

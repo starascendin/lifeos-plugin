@@ -55,7 +55,9 @@ import type * as lifeos_pm_pomodoro from "../lifeos/pm_pomodoro.js";
 import type * as lifeos_pm_projects from "../lifeos/pm_projects.js";
 import type * as lifeos_pm_schema from "../lifeos/pm_schema.js";
 import type * as lifeos_pm_user_settings from "../lifeos/pm_user_settings.js";
+import type * as lifeos_pm_voice_agent from "../lifeos/pm_voice_agent.js";
 import type * as lifeos_screentime from "../lifeos/screentime.js";
+import type * as lifeos_tool_call from "../lifeos/tool_call.js";
 import type * as lifeos_voicememo from "../lifeos/voicememo.js";
 import type * as lifeos_youtube from "../lifeos/youtube.js";
 
@@ -113,7 +115,9 @@ declare const fullApi: ApiFromModules<{
   "lifeos/pm_projects": typeof lifeos_pm_projects;
   "lifeos/pm_schema": typeof lifeos_pm_schema;
   "lifeos/pm_user_settings": typeof lifeos_pm_user_settings;
+  "lifeos/pm_voice_agent": typeof lifeos_pm_voice_agent;
   "lifeos/screentime": typeof lifeos_screentime;
+  "lifeos/tool_call": typeof lifeos_tool_call;
   "lifeos/voicememo": typeof lifeos_voicememo;
   "lifeos/youtube": typeof lifeos_youtube;
 }>;

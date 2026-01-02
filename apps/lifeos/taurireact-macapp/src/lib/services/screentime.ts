@@ -183,6 +183,24 @@ export async function getScreenTimeSyncHistory(): Promise<SyncHistoryEntry[]> {
   }
 }
 
+// Wipe the local screentime database
+export async function wipeScreenTimeDatabase(): Promise<string> {
+  if (!isTauri) return "Not running in Tauri";
+  return await invoke<string>("wipe_screentime_database");
+}
+
+// Debug: list all device_ids in the database
+export async function debugScreenTimeDevices(): Promise<string> {
+  if (!isTauri) return "Not running in Tauri";
+  return await invoke<string>("debug_screentime_devices");
+}
+
+// Debug: show raw Biome events for a device
+export async function debugBiomeRawEvents(deviceId: string): Promise<string> {
+  if (!isTauri) return "Not running in Tauri";
+  return await invoke<string>("debug_biome_raw_events", { deviceId });
+}
+
 // Generate session key for deduplication
 function generateSessionKey(session: ScreenTimeSession): string {
   return `${session.bundle_id}_${session.start_time}`;

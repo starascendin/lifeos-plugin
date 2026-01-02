@@ -24,6 +24,8 @@ import {
   ChatMessage,
   generateMessageId,
 } from "../services/livekit";
+import { useQuery } from "convex/react";
+import { api } from "@holaai/convex";
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -38,6 +40,19 @@ export type VoiceAgentConnectionState =
 
 export type AgentState = "idle" | "listening" | "speaking" | "thinking";
 
+// ==================== MODEL CONFIGURATION ====================
+
+export const VOICE_AGENT_MODELS = [
+  { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Fast & affordable" },
+  { id: "gpt-4o", name: "GPT-4o", description: "High quality" },
+  { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Latest mini model" },
+  { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", description: "Enhanced mini" },
+  { id: "gpt-5.1-codex-mini", name: "GPT-5.1 Codex Mini", description: "Optimized for code" },
+] as const;
+
+export type VoiceAgentModelId = (typeof VOICE_AGENT_MODELS)[number]["id"];
+export const DEFAULT_VOICE_AGENT_MODEL: VoiceAgentModelId = "gpt-4o-mini";
+
 interface VoiceAgentState {
   connectionState: VoiceAgentConnectionState;
   agentState: AgentState;
@@ -47,6 +62,7 @@ interface VoiceAgentState {
   roomName: string | null;
   participantIdentity: string | null;
   agentParticipant: RemoteParticipant | null;
+  selectedModelId: VoiceAgentModelId;
 }
 
 interface VoiceAgentContextValue extends VoiceAgentState {
@@ -57,7 +73,9 @@ interface VoiceAgentContextValue extends VoiceAgentState {
   sendMessage: (text: string) => Promise<void>;
   clearError: () => void;
   clearMessages: () => void;
+  setSelectedModelId: (modelId: VoiceAgentModelId) => void;
   isConfigured: boolean;
+  isUserLoaded: boolean;
 }
 
 const defaultState: VoiceAgentState = {
@@ -69,6 +87,7 @@ const defaultState: VoiceAgentState = {
   roomName: null,
   participantIdentity: null,
   agentParticipant: null,
+  selectedModelId: DEFAULT_VOICE_AGENT_MODEL,
 };
 
 // ==================== CONTEXT ====================
@@ -85,6 +104,9 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
   const [state, setState] = useState<VoiceAgentState>(defaultState);
   const [isConfigured, setIsConfigured] = useState(false);
   const roomRef = useRef<Room | null>(null);
+
+  // Get current user for userId in metadata
+  const currentUser = useQuery(api.common.users.currentUser);
 
   // Check configuration on mount
   useEffect(() => {
@@ -168,9 +190,23 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
         throw mediaError;
       }
 
-      // Generate token
+      // Generate token with model and user metadata
       const targetRoom = roomName || `voice-agent-${Date.now()}`;
-      const tokenResponse = await generateToken(targetRoom);
+
+      // Validate userId is available
+      const userId = currentUser?._id;
+      if (!userId) {
+        console.warn("[VoiceAgent] Warning: No userId available. Tools requiring user context will fail.");
+      }
+
+      const metadata = JSON.stringify({
+        model: state.selectedModelId,
+        userId: userId,
+      });
+
+      console.log("[VoiceAgent] Connecting with metadata:", { model: state.selectedModelId, userId: userId || 'undefined' });
+
+      const tokenResponse = await generateToken(targetRoom, undefined, undefined, metadata);
 
       // Create room
       const room = new Room({
@@ -329,7 +365,7 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
         error: errorMessage,
       }));
     }
-  }, [updateAgentState]);
+  }, [updateAgentState, currentUser, state.selectedModelId]);
 
   // Disconnect from room
   const disconnect = useCallback(() => {
@@ -391,6 +427,13 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
     setState((prev) => ({ ...prev, messages: [] }));
   }, []);
 
+  // Set selected model (only when disconnected)
+  const setSelectedModelId = useCallback((modelId: VoiceAgentModelId) => {
+    if (state.connectionState === "disconnected") {
+      setState((prev) => ({ ...prev, selectedModelId: modelId }));
+    }
+  }, [state.connectionState]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -409,7 +452,9 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
     sendMessage,
     clearError,
     clearMessages,
+    setSelectedModelId,
     isConfigured,
+    isUserLoaded: !!currentUser?._id,
   };
 
   return (

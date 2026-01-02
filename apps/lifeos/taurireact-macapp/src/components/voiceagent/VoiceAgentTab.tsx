@@ -5,7 +5,9 @@ import { AudioVisualizer } from "./AudioVisualizer";
 import { ChatPanel } from "./ChatPanel";
 import { ChatInput } from "./ChatInput";
 import { AgentControls } from "./AgentControls";
-import { AlertCircle, Settings } from "lucide-react";
+import { VoiceAgentModelSelector } from "./VoiceAgentModelSelector";
+import { ToolTestPanel } from "./ToolTestPanel";
+import { AlertCircle, Settings, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -14,6 +16,7 @@ function VoiceAgentContent() {
     connectionState,
     error,
     isConfigured,
+    isUserLoaded,
     clearError,
   } = useVoiceAgent();
 
@@ -27,7 +30,11 @@ function VoiceAgentContent() {
             Real-time voice chat with AI
           </p>
         </div>
-        <ConnectionStatus />
+        <div className="flex items-center gap-3 relative">
+          <ToolTestPanel />
+          <VoiceAgentModelSelector />
+          <ConnectionStatus />
+        </div>
       </div>
 
       {/* Configuration warning */}
@@ -45,6 +52,16 @@ function VoiceAgentContent() {
                 Settings
               </Link>
             </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* User not loaded warning */}
+      {isConfigured && !isUserLoaded && (
+        <Alert className="m-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+            User not loaded yet. Tools like "get my tasks" won't work until you're authenticated.
           </AlertDescription>
         </Alert>
       )}
