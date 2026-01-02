@@ -51,11 +51,17 @@ export function CycleSettingsModal({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Auto-detect user's timezone offset
+      // getTimezoneOffset() returns minutes WEST of UTC (opposite of standard)
+      // So we negate it to get standard UTC offset (e.g., -420 for UTC-7/Denver)
+      const timezoneOffsetMinutes = -new Date().getTimezoneOffset();
+
       await updateUserSettings({
         cycleSettings: {
           duration,
           startDay,
           defaultCyclesToCreate,
+          timezoneOffsetMinutes,
         },
       });
     } catch (error) {
@@ -68,12 +74,16 @@ export function CycleSettingsModal({
   const handleGenerateCycles = async () => {
     setIsGenerating(true);
     try {
-      // First save settings if they've changed
+      // Auto-detect user's timezone offset
+      const timezoneOffsetMinutes = -new Date().getTimezoneOffset();
+
+      // First save settings if they've changed (including timezone)
       await updateUserSettings({
         cycleSettings: {
           duration,
           startDay,
           defaultCyclesToCreate,
+          timezoneOffsetMinutes,
         },
       });
       // Then generate cycles

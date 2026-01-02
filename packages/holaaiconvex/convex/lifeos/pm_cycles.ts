@@ -570,6 +570,12 @@ export const generateCycles = mutation({
     const startDay = userSettings?.cycleSettings?.startDay ?? "monday";
     const count =
       args.count ?? userSettings?.cycleSettings?.defaultCyclesToCreate ?? 4;
+    // Timezone offset in minutes (e.g., -420 for UTC-7/Denver)
+    // Note: JavaScript's getTimezoneOffset() returns minutes WEST of UTC (opposite sign)
+    // So we store the negated value to get standard UTC offset
+    const tzOffsetMinutes =
+      userSettings?.cycleSettings?.timezoneOffsetMinutes ?? 0;
+    const tzOffsetMs = tzOffsetMinutes * 60 * 1000;
 
     // Calculate duration in milliseconds
     const durationMs =
@@ -578,10 +584,16 @@ export const generateCycles = mutation({
         : 14 * 24 * 60 * 60 * 1000;
 
     // Find next start date based on startDay
+    // We need to calculate the day-of-week in the USER's timezone
     let startDate = args.startFrom ?? now;
     const targetDayNum = startDay === "sunday" ? 0 : 1;
-    const currentDate = new Date(startDate);
-    const currentDay = currentDate.getDay();
+
+    // Convert to user's local time to determine day-of-week
+    // tzOffsetMs is positive for UTC+ timezones, negative for UTC- timezones
+    // To get local time: UTC + offset
+    const localTimeMs = startDate + tzOffsetMs;
+    const currentDate = new Date(localTimeMs);
+    const currentDay = currentDate.getUTCDay(); // Day in user's timezone
     const daysUntilTarget = (targetDayNum - currentDay + 7) % 7;
 
     // If today is the target day and no startFrom provided, use next week's target day
@@ -591,10 +603,12 @@ export const generateCycles = mutation({
       startDate += daysUntilTarget * 24 * 60 * 60 * 1000;
     }
 
-    // Normalize to start of day (midnight)
-    const startDateObj = new Date(startDate);
-    startDateObj.setHours(0, 0, 0, 0);
-    startDate = startDateObj.getTime();
+    // Normalize to midnight in USER's timezone
+    // First convert to local time, then truncate to midnight, then convert back to UTC
+    const localStartMs = startDate + tzOffsetMs;
+    const startDateObj = new Date(localStartMs);
+    startDateObj.setUTCHours(0, 0, 0, 0);
+    startDate = startDateObj.getTime() - tzOffsetMs;
 
     // Get existing max cycle number globally for this user
     const existingCycles = await ctx.db
@@ -693,6 +707,9 @@ export const ensureUpcomingCycles = mutation({
     // Use settings
     const duration = userSettings.cycleSettings.duration;
     const startDay = userSettings.cycleSettings.startDay;
+    const tzOffsetMinutes =
+      userSettings.cycleSettings.timezoneOffsetMinutes ?? 0;
+    const tzOffsetMs = tzOffsetMinutes * 60 * 1000;
 
     // Calculate duration in milliseconds
     const durationMs =
@@ -700,11 +717,14 @@ export const ensureUpcomingCycles = mutation({
         ? 7 * 24 * 60 * 60 * 1000
         : 14 * 24 * 60 * 60 * 1000;
 
-    // Find next start date based on startDay
+    // Find next start date based on startDay (in user's timezone)
     let startDate = startFrom ?? now;
     const targetDayNum = startDay === "sunday" ? 0 : 1;
-    const currentDate = new Date(startDate);
-    const currentDay = currentDate.getDay();
+
+    // Convert to user's local time to determine day-of-week
+    const localTimeMs = startDate + tzOffsetMs;
+    const currentDate = new Date(localTimeMs);
+    const currentDay = currentDate.getUTCDay(); // Day in user's timezone
     const daysUntilTarget = (targetDayNum - currentDay + 7) % 7;
 
     // If today is the target day and no startFrom provided, use next week
@@ -714,10 +734,11 @@ export const ensureUpcomingCycles = mutation({
       startDate += daysUntilTarget * 24 * 60 * 60 * 1000;
     }
 
-    // Normalize to start of day (midnight)
-    const startDateObj = new Date(startDate);
-    startDateObj.setHours(0, 0, 0, 0);
-    startDate = startDateObj.getTime();
+    // Normalize to midnight in USER's timezone
+    const localStartMs = startDate + tzOffsetMs;
+    const startDateObj = new Date(localStartMs);
+    startDateObj.setUTCHours(0, 0, 0, 0);
+    startDate = startDateObj.getTime() - tzOffsetMs;
 
     // Get existing max cycle number
     let nextNumber =
@@ -829,6 +850,9 @@ export const _autoGenerateCyclesForUser = internalMutation({
     // Use settings
     const duration = userSettings.cycleSettings.duration;
     const startDay = userSettings.cycleSettings.startDay;
+    const tzOffsetMinutes =
+      userSettings.cycleSettings.timezoneOffsetMinutes ?? 0;
+    const tzOffsetMs = tzOffsetMinutes * 60 * 1000;
 
     // Calculate duration in milliseconds
     const durationMs =
@@ -836,11 +860,14 @@ export const _autoGenerateCyclesForUser = internalMutation({
         ? 7 * 24 * 60 * 60 * 1000
         : 14 * 24 * 60 * 60 * 1000;
 
-    // Find next start date based on startDay
+    // Find next start date based on startDay (in user's timezone)
     let startDate = startFrom ?? now;
     const targetDayNum = startDay === "sunday" ? 0 : 1;
-    const currentDate = new Date(startDate);
-    const currentDay = currentDate.getDay();
+
+    // Convert to user's local time to determine day-of-week
+    const localTimeMs = startDate + tzOffsetMs;
+    const currentDate = new Date(localTimeMs);
+    const currentDay = currentDate.getUTCDay(); // Day in user's timezone
     const daysUntilTarget = (targetDayNum - currentDay + 7) % 7;
 
     if (daysUntilTarget === 0 && !startFrom) {
@@ -849,10 +876,11 @@ export const _autoGenerateCyclesForUser = internalMutation({
       startDate += daysUntilTarget * 24 * 60 * 60 * 1000;
     }
 
-    // Normalize to start of day (midnight)
-    const startDateObj = new Date(startDate);
-    startDateObj.setHours(0, 0, 0, 0);
-    startDate = startDateObj.getTime();
+    // Normalize to midnight in USER's timezone
+    const localStartMs = startDate + tzOffsetMs;
+    const startDateObj = new Date(localStartMs);
+    startDateObj.setUTCHours(0, 0, 0, 0);
+    startDate = startDateObj.getTime() - tzOffsetMs;
 
     // Get existing max cycle number
     let nextNumber =

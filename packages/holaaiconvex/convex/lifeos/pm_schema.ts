@@ -61,6 +61,9 @@ export const cycleSettingsValidator = v.object({
   duration: cycleDurationValidator,
   startDay: cycleStartDayValidator,
   defaultCyclesToCreate: v.number(),
+  // Timezone offset in minutes from UTC (e.g., -420 for UTC-7/Denver)
+  // Used to calculate cycle start dates in user's local timezone
+  timezoneOffsetMinutes: v.optional(v.number()),
 });
 
 export const cycleRetrospectiveValidator = v.object({
