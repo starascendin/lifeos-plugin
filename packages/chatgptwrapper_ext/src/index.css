@@ -2166,8 +2166,21 @@ body {
   }
 
   .council-history.mobile-open .conversation-item.active {
-    background: #eff6ff;
-    border-left: 3px solid #2563eb;
+    background: #2563eb;
+    border-left: 3px solid #1d4ed8;
+  }
+
+  .council-history.mobile-open .conversation-item.active .conversation-title {
+    color: #fff;
+  }
+
+  .council-history.mobile-open .conversation-item.active .conversation-meta {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .council-history.mobile-open .conversation-item.active .conversation-delete {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
   }
 
   .council-history.mobile-open .conversation-title {
