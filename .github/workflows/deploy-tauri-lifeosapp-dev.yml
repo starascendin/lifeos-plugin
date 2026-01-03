@@ -14,7 +14,7 @@ env:
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_TAURI_LIFEOSAPP_PROJECT_ID }}
 
 jobs:
-  deploy-preview:
+  deploy-dev:
     runs-on: ubuntu-latest
 
     steps:
