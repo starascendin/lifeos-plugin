@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { usePM } from "@/lib/contexts/PMContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ListTodo, Star, CheckCircle2 } from "lucide-react";
+import { ListTodo, Star, CheckCircle2, AlertTriangle, ChevronDown } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { Doc, Id } from "@holaai/convex";
 
 interface TaskItemProps {
@@ -14,6 +20,7 @@ interface TaskItemProps {
   onToggleStar: () => void;
   onClick: () => void;
   showStar?: boolean;
+  overdueDays?: number;
 }
 
 const priorityColors: Record<string, string> = {
@@ -24,12 +31,29 @@ const priorityColors: Record<string, string> = {
   none: "bg-gray-500/10 text-gray-500 border-gray-500/20",
 };
 
+function getDaysOverdue(dueDate: number): number {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  return Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function formatOverdueDays(days: number): string {
+  if (days === 1) return "1 day overdue";
+  if (days < 7) return `${days} days overdue`;
+  if (days < 14) return "1 week overdue";
+  if (days < 30) return `${Math.floor(days / 7)} weeks overdue`;
+  return `${Math.floor(days / 30)} month(s) overdue`;
+}
+
 function TaskItem({
   task,
   onToggleStatus,
   onToggleStar,
   onClick,
   showStar = true,
+  overdueDays,
 }: TaskItemProps) {
   const isDone = task.status === "done";
   const isStarred = task.isTopPriority;
@@ -67,6 +91,14 @@ function TaskItem({
           <span className="text-xs text-muted-foreground">
             {task.identifier}
           </span>
+          {overdueDays !== undefined && overdueDays > 0 && (
+            <Badge
+              variant="destructive"
+              className="text-xs bg-red-500/10 text-red-500 border-red-500/20"
+            >
+              {formatOverdueDays(overdueDays)}
+            </Badge>
+          )}
         </div>
       </div>
       {showStar && (
@@ -92,12 +124,18 @@ export function TasksSection() {
   const {
     todaysTasks,
     topPriorityTasks,
+    overdueTasks,
     isLoadingTasks,
     updateIssueStatus,
     toggleTopPriority,
   } = useAgenda();
 
   const { setSelectedIssueId } = usePM();
+
+  // Collapsible state for each section
+  const [isTop3Open, setIsTop3Open] = useState(true);
+  const [isOverdueOpen, setIsOverdueOpen] = useState(true);
+  const [isOtherTasksOpen, setIsOtherTasksOpen] = useState(true);
 
   const handleToggleStatus = async (task: Doc<"lifeos_pmIssues">) => {
     const newStatus = task.status === "done" ? "todo" : "done";
@@ -131,7 +169,7 @@ export function TasksSection() {
   ];
 
   // Count active (non-completed) tasks
-  const activeTaskCount = top3Tasks.length + otherTasks.length;
+  const activeTaskCount = top3Tasks.length + otherTasks.length + (overdueTasks?.length ?? 0);
 
   return (
     <Card>
@@ -151,51 +189,100 @@ export function TasksSection() {
         ) : (
           <>
             {/* Top 3 Priorities Section */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
+            <Collapsible open={isTop3Open} onOpenChange={setIsTop3Open}>
+              <CollapsibleTrigger className="flex items-center gap-2 mb-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
+                <ChevronDown
+                  className={`h-4 w-4 text-muted-foreground transition-transform ${
+                    isTop3Open ? "" : "-rotate-90"
+                  }`}
+                />
                 <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
                 <h4 className="text-sm font-medium">Top 3 Priorities</h4>
-              </div>
-              {top3Tasks.length > 0 ? (
-                <div className="space-y-1 bg-yellow-500/5 rounded-lg p-2">
-                  {top3Tasks.map((task) => (
-                    <TaskItem
-                      key={task._id}
-                      task={task}
-                      onToggleStatus={() => handleToggleStatus(task)}
-                      onToggleStar={() => handleToggleStar(task._id)}
-                      onClick={() => setSelectedIssueId(task._id)}
-                      showStar={true}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground text-sm bg-muted/30 rounded-lg">
-                  <Star className="h-5 w-5 mx-auto mb-1 opacity-50" />
-                  <p>Star up to 3 tasks to set priorities</p>
-                </div>
-              )}
-            </div>
+                <span className="text-xs text-muted-foreground">({top3Tasks.length})</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                {top3Tasks.length > 0 ? (
+                  <div className="space-y-1 bg-yellow-500/5 rounded-lg p-2">
+                    {top3Tasks.map((task) => (
+                      <TaskItem
+                        key={task._id}
+                        task={task}
+                        onToggleStatus={() => handleToggleStatus(task)}
+                        onToggleStar={() => handleToggleStar(task._id)}
+                        onClick={() => setSelectedIssueId(task._id)}
+                        showStar={true}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground text-sm bg-muted/30 rounded-lg">
+                    <Star className="h-5 w-5 mx-auto mb-1 opacity-50" />
+                    <p>Star up to 3 tasks to set priorities</p>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Overdue Tasks Section */}
+            {overdueTasks && overdueTasks.length > 0 && (
+              <Collapsible open={isOverdueOpen} onOpenChange={setIsOverdueOpen}>
+                <CollapsibleTrigger className="flex items-center gap-2 mb-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground transition-transform ${
+                      isOverdueOpen ? "" : "-rotate-90"
+                    }`}
+                  />
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <h4 className="text-sm font-medium text-red-500">Overdue</h4>
+                  <span className="text-xs text-red-500">({overdueTasks.length})</span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-1 bg-red-500/5 rounded-lg p-2 border border-red-500/10">
+                    {overdueTasks.map((task) => (
+                      <TaskItem
+                        key={task._id}
+                        task={task}
+                        onToggleStatus={() => handleToggleStatus(task)}
+                        onToggleStar={() => handleToggleStar(task._id)}
+                        onClick={() => setSelectedIssueId(task._id)}
+                        showStar={top3Tasks.length < 3}
+                        overdueDays={getDaysOverdue(task.dueDate!)}
+                      />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             {/* Other Tasks Due Today */}
             {otherTasks.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2 text-muted-foreground">
-                  Other Tasks Due Today
-                </h4>
-                <div className="space-y-1">
-                  {otherTasks.map((task) => (
-                    <TaskItem
-                      key={task._id}
-                      task={task}
-                      onToggleStatus={() => handleToggleStatus(task)}
-                      onToggleStar={() => handleToggleStar(task._id)}
-                      onClick={() => setSelectedIssueId(task._id)}
-                      showStar={top3Tasks.length < 3}
-                    />
-                  ))}
-                </div>
-              </div>
+              <Collapsible open={isOtherTasksOpen} onOpenChange={setIsOtherTasksOpen}>
+                <CollapsibleTrigger className="flex items-center gap-2 mb-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground transition-transform ${
+                      isOtherTasksOpen ? "" : "-rotate-90"
+                    }`}
+                  />
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Other Tasks Due Today
+                  </h4>
+                  <span className="text-xs text-muted-foreground">({otherTasks.length})</span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-1">
+                    {otherTasks.map((task) => (
+                      <TaskItem
+                        key={task._id}
+                        task={task}
+                        onToggleStatus={() => handleToggleStatus(task)}
+                        onToggleStar={() => handleToggleStar(task._id)}
+                        onClick={() => setSelectedIssueId(task._id)}
+                        showStar={top3Tasks.length < 3}
+                      />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             {/* Empty state for active tasks */}

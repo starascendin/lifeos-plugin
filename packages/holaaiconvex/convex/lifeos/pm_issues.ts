@@ -759,6 +759,43 @@ export const getTasksForDate = query({
 });
 
 /**
+ * Get overdue tasks (past due date, not completed/cancelled)
+ * Returns tasks with dueDate before the start of the given date
+ */
+export const getOverdueTasks = query({
+  args: {
+    date: v.string(), // YYYY-MM-DD format
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Get start of the given date (anything before this is overdue)
+    const startOfDay = new Date(args.date).setHours(0, 0, 0, 0);
+
+    // Get all issues for the user
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Filter: dueDate < startOfDay AND not done/cancelled
+    const overdueTasks = allIssues.filter((issue) => {
+      if (!issue.dueDate) return false;
+      if (issue.status === "done" || issue.status === "cancelled") return false;
+      return issue.dueDate < startOfDay;
+    });
+
+    // Sort by due date (oldest first) then priority
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+    return overdueTasks.sort((a, b) => {
+      const dateDiff = (a.dueDate ?? 0) - (b.dueDate ?? 0);
+      if (dateDiff !== 0) return dateDiff;
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+  },
+});
+
+/**
  * Get top priority tasks (marked for "Top 3" in Daily Agenda)
  * Returns active tasks with isTopPriority=true
  */

@@ -34,6 +34,7 @@ interface AgendaContextValue {
   // Tasks data
   todaysTasks: Doc<"lifeos_pmIssues">[] | undefined;
   topPriorityTasks: Doc<"lifeos_pmIssues">[] | undefined;
+  overdueTasks: Doc<"lifeos_pmIssues">[] | undefined;
   isLoadingTasks: boolean;
 
   // Daily summary
@@ -103,6 +104,11 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   });
 
   const topPriorityTasks = useQuery(api.lifeos.pm_issues.getTopPriorityTasks, {});
+
+  // Overdue tasks query (tasks with past due dates that are not completed)
+  const overdueTasks = useQuery(api.lifeos.pm_issues.getOverdueTasks, {
+    date: dateString,
+  });
 
   // Daily summary query
   const dailySummary = useQuery(api.lifeos.agenda.getDailySummary, {
@@ -191,7 +197,8 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     // Tasks data
     todaysTasks,
     topPriorityTasks,
-    isLoadingTasks: todaysTasks === undefined,
+    overdueTasks,
+    isLoadingTasks: todaysTasks === undefined || overdueTasks === undefined,
 
     // Daily summary
     dailySummary,
