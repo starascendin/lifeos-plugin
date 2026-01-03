@@ -57,7 +57,7 @@ function DashboardContent() {
       <div>
         <h1 className="font-bold text-3xl">LifeOS Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome back! Here is your account overview.
+          Welcome back! Here is your account overview!.
         </p>
       </div>
 
