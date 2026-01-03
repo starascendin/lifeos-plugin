@@ -63,7 +63,7 @@ export function Sidebar() {
             isCollapsed ? "justify-center p-4" : "justify-between p-6",
           )}
         >
-          {!isCollapsed && <h1 className="font-bold text-xl">TanStack Demo</h1>}
+          {!isCollapsed && <h1 className="font-bold text-xl">TanStack Demo Test</h1>}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
