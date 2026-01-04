@@ -16,11 +16,11 @@ export function AgendaTab() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-semibold">Agenda</h1>
-            <div className="flex items-center gap-2">
+      <div className="border-b px-4 py-3 md:px-6 md:py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between sm:justify-start gap-3 md:gap-4">
+            <h1 className="text-xl md:text-2xl font-semibold">Agenda</h1>
+            <div className="flex items-center gap-1 md:gap-2">
               <Button
                 variant="outline"
                 size="icon"
@@ -34,10 +34,10 @@ export function AgendaTab() {
                 size="sm"
                 onClick={goToToday}
                 disabled={isToday(currentDate)}
-                className="h-8"
+                className="h-8 px-2 md:px-3"
               >
-                <CalendarDays className="mr-2 h-4 w-4" />
-                Today
+                <CalendarDays className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Today</span>
               </Button>
               <Button
                 variant="outline"
@@ -49,7 +49,7 @@ export function AgendaTab() {
               </Button>
             </div>
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs md:text-sm text-muted-foreground text-center sm:text-right">
             {formatDisplayDate(currentDate)}
           </div>
         </div>

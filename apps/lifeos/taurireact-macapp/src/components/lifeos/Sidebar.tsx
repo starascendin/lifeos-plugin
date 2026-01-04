@@ -38,6 +38,7 @@ import {
   Target,
   User,
   Users,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -48,19 +49,33 @@ interface NavItem {
   children?: { name: string; href: string; icon?: React.ComponentType<{ className?: string }> }[];
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  isMobile?: boolean;
+}
+
+export function Sidebar({ isMobile = false }: SidebarProps) {
   const location = useLocation();
   const pathname = location.pathname;
   const { signOut } = useClerk();
   const { user } = useUser();
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { isCollapsed, toggleSidebar, closeMobileSidebar } = useSidebar();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(["Projects"]);
 
+  // For mobile, always show expanded sidebar
+  const effectiveCollapsed = isMobile ? false : isCollapsed;
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    if (isMobile) {
+      closeMobileSidebar();
+    }
+  }, [pathname, isMobile, closeMobileSidebar]);
 
   const toggleSection = (name: string) => {
     setExpandedSections((prev) =>
@@ -94,7 +109,7 @@ export function Sidebar() {
     <aside
       className={cn(
         "h-full rounded-lg border border-sidebar-border bg-sidebar text-sidebar-foreground shadow transition-all duration-300",
-        isCollapsed ? "w-16" : "w-64",
+        effectiveCollapsed ? "w-16" : "w-64",
       )}
     >
       <div className="flex h-full flex-col">
@@ -102,36 +117,47 @@ export function Sidebar() {
         <div
           className={cn(
             "flex items-center border-sidebar-border border-b",
-            isCollapsed ? "justify-center p-4" : "justify-between p-6",
+            effectiveCollapsed ? "justify-center p-4" : "justify-between p-6",
           )}
         >
-          {!isCollapsed && <h1 className="font-bold text-xl">LifeOS</h1>}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className={cn("h-8 w-8", isCollapsed && "mx-auto")}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              {isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            </TooltipContent>
-          </Tooltip>
+          {!effectiveCollapsed && <h1 className="font-bold text-xl">LifeOS</h1>}
+          {isMobile ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={closeMobileSidebar}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleSidebar}
+                  className={cn("h-8 w-8", effectiveCollapsed && "mx-auto")}
+                >
+                  {effectiveCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         {/* Navigation */}
         <nav
           className={cn(
             "flex-1 space-y-1",
-            isCollapsed ? "px-2 py-4" : "px-4 py-4",
+            effectiveCollapsed ? "px-2 py-4" : "px-4 py-4",
           )}
         >
           {navigation.map((item) => {
@@ -142,7 +168,7 @@ export function Sidebar() {
             const isExpanded = expandedSections.includes(item.name);
 
             // For items with children, render expandable section
-            if (hasChildren && !isCollapsed) {
+            if (hasChildren && !effectiveCollapsed) {
               return (
                 <div key={item.name} className="space-y-1">
                   <button
@@ -200,18 +226,18 @@ export function Sidebar() {
                 to={item.href}
                 className={cn(
                   "flex items-center rounded-md font-medium text-sm transition-colors",
-                  isCollapsed ? "justify-center p-3" : "gap-3 px-3 py-2",
+                  effectiveCollapsed ? "justify-center p-3" : "gap-3 px-3 py-2",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!isCollapsed && <span>{item.name}</span>}
+                {!effectiveCollapsed && <span>{item.name}</span>}
               </Link>
             );
 
-            return isCollapsed ? (
+            return effectiveCollapsed ? (
               <Tooltip key={item.name}>
                 <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
                 <TooltipContent side="right">{item.name}</TooltipContent>
@@ -226,40 +252,40 @@ export function Sidebar() {
         <div
           className={cn(
             "border-sidebar-border border-t",
-            isCollapsed ? "p-2" : "px-4 py-3",
+            effectiveCollapsed ? "p-2" : "px-4 py-3",
           )}
         >
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size={isCollapsed ? "icon" : "default"}
+                size={effectiveCollapsed ? "icon" : "default"}
                 onClick={() =>
                   setTheme(resolvedTheme === "dark" ? "light" : "dark")
                 }
-                className={cn("w-full", !isCollapsed && "justify-start")}
+                className={cn("w-full", !effectiveCollapsed && "justify-start")}
               >
                 {mounted ? (
                   resolvedTheme === "dark" ? (
                     <>
                       <Sun className="h-5 w-5" />
-                      {!isCollapsed && <span className="ml-3">Light Mode</span>}
+                      {!effectiveCollapsed && <span className="ml-3">Light Mode</span>}
                     </>
                   ) : (
                     <>
                       <Moon className="h-5 w-5" />
-                      {!isCollapsed && <span className="ml-3">Dark Mode</span>}
+                      {!effectiveCollapsed && <span className="ml-3">Dark Mode</span>}
                     </>
                   )
                 ) : (
                   <>
                     <Sun className="h-5 w-5" />
-                    {!isCollapsed && <span className="ml-3">Toggle Theme</span>}
+                    {!effectiveCollapsed && <span className="ml-3">Toggle Theme</span>}
                   </>
                 )}
               </Button>
             </TooltipTrigger>
-            {isCollapsed && mounted && (
+            {effectiveCollapsed && mounted && (
               <TooltipContent side="right">
                 {resolvedTheme === "dark"
                   ? "Switch to light mode"
@@ -274,7 +300,7 @@ export function Sidebar() {
           <div
             className={cn(
               "border-sidebar-border border-t",
-              isCollapsed ? "p-2" : "p-4",
+              effectiveCollapsed ? "p-2" : "p-4",
             )}
           >
             <DropdownMenu>
@@ -283,10 +309,10 @@ export function Sidebar() {
                   variant="ghost"
                   className={cn(
                     "w-full",
-                    isCollapsed ? "px-2" : "justify-start",
+                    effectiveCollapsed ? "px-2" : "justify-start",
                   )}
                 >
-                  {isCollapsed ? (
+                  {effectiveCollapsed ? (
                     <User className="h-4 w-4" />
                   ) : (
                     <div className="flex w-full items-center gap-3">

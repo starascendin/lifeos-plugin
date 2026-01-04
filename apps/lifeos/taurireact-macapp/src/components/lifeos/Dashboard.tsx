@@ -100,11 +100,11 @@ function DashboardContent() {
   const isLoading = issuesByStatus === undefined || projects === undefined;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 p-4 md:space-y-6 md:p-6">
       {/* Page Header */}
       <div>
-        <h1 className="font-bold text-3xl">LifeOS Dashboard</h1>
-        <p className="text-muted-foreground">
+        <h1 className="font-bold text-2xl md:text-3xl">LifeOS Dashboard</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
           Command Center - Your productivity at a glance
         </p>
       </div>
@@ -116,7 +116,7 @@ function DashboardContent() {
       ) : (
         <>
           {/* Task Overview Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
@@ -170,12 +170,12 @@ function DashboardContent() {
 
           {/* Task Status Breakdown */}
           <Card>
-            <CardHeader>
-              <CardTitle>Task Status Breakdown</CardTitle>
-              <CardDescription>Distribution of tasks across all statuses</CardDescription>
+            <CardHeader className="pb-3 md:pb-6">
+              <CardTitle className="text-base md:text-lg">Task Status Breakdown</CardTitle>
+              <CardDescription className="text-xs md:text-sm">Distribution of tasks across all statuses</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4 lg:grid-cols-6">
                 <StatusCard
                   icon={<Circle className="h-4 w-4 text-gray-500" />}
                   label="Backlog"
@@ -216,7 +216,7 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:gap-6 md:grid-cols-2">
             {/* Projects Overview */}
             <Card>
               <CardHeader>
