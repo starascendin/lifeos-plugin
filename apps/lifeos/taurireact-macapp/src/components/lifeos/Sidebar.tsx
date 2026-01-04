@@ -40,7 +40,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface NavItem {
   name: string;
@@ -66,15 +66,19 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   // For mobile, always show expanded sidebar
   const effectiveCollapsed = isMobile ? false : isCollapsed;
 
+  // Track previous pathname to detect actual route changes
+  const prevPathnameRef = useRef(pathname);
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Close mobile sidebar on route change
+  // Close mobile sidebar on route change (not on initial mount)
   useEffect(() => {
-    if (isMobile) {
+    if (isMobile && prevPathnameRef.current !== pathname) {
       closeMobileSidebar();
     }
+    prevPathnameRef.current = pathname;
   }, [pathname, isMobile, closeMobileSidebar]);
 
   const toggleSection = (name: string) => {
