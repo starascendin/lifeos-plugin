@@ -13,7 +13,9 @@ import { Label } from "@/components/ui/label";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { useApiKeys } from "@/lib/hooks/useApiKeys";
 import { useUser } from "@clerk/clerk-react";
-import { Check, Eye, EyeOff, ExternalLink, Key, Loader2, Monitor, Moon, Sun, Trash2 } from "lucide-react";
+import { api } from "@holaai/convex";
+import { useAction, useQuery } from "convex/react";
+import { Check, CheckCircle, Eye, EyeOff, ExternalLink, Key, Loader2, Monitor, Moon, Sun, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function LifeOSSettings() {
@@ -27,6 +29,32 @@ export function LifeOSSettings() {
 function SettingsContent() {
   const { user } = useUser();
   const { theme, setTheme } = useTheme();
+  const currentUser = useQuery(api.common.users.currentUser);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    loading: boolean;
+    success?: boolean;
+    message?: string;
+  }>({ loading: false });
+
+  const testConnection = useAction(api.common.dev.testConvexConnection);
+
+  const handleTestConnection = async () => {
+    setConnectionStatus({ loading: true });
+    try {
+      const result = await testConnection();
+      setConnectionStatus({
+        loading: false,
+        success: result.success,
+        message: result.message,
+      });
+    } catch (error) {
+      setConnectionStatus({
+        loading: false,
+        success: false,
+        message: error instanceof Error ? error.message : "Connection failed",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -38,15 +66,32 @@ function SettingsContent() {
         </p>
       </div>
 
-      {/* Profile Settings */}
+      {/* Profile Settings - Clerk User */}
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
           <CardDescription>
-            Your profile information from Clerk (read-only)
+            Your authentication profile from Clerk
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {user && (
+            <div className="flex items-center gap-4 mb-4">
+              {user.imageUrl && (
+                <img
+                  src={user.imageUrl}
+                  alt="Profile"
+                  className="h-16 w-16 rounded-full"
+                />
+              )}
+              <div className="space-y-1">
+                <p className="font-medium text-lg">{user.fullName || "Not set"}</p>
+                <p className="text-muted-foreground text-sm">
+                  {user.primaryEmailAddress?.emailAddress || "No email"}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
@@ -67,6 +112,52 @@ function SettingsContent() {
               />
             </div>
           </div>
+          {user && (
+            <div className="pt-2">
+              <Badge variant="secondary">Clerk ID: {user.id}</Badge>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Convex User Record */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Convex User Record</CardTitle>
+          <CardDescription>
+            Your synced user data in Convex backend
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {currentUser === undefined ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading Convex user...
+            </div>
+          ) : currentUser === null ? (
+            <p className="text-muted-foreground">
+              No Convex user found (EnsureUser should create one)
+            </p>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <p>
+                <span className="font-medium">Convex ID:</span>{" "}
+                <code className="rounded bg-muted px-2 py-1">{currentUser._id}</code>
+              </p>
+              <p>
+                <span className="font-medium">Token Identifier:</span>{" "}
+                <code className="rounded bg-muted px-2 py-1 text-xs">{currentUser.tokenIdentifier}</code>
+              </p>
+              <p>
+                <span className="font-medium">Email:</span>{" "}
+                {currentUser.email || "Not set"}
+              </p>
+              <p>
+                <span className="font-medium">Name:</span>{" "}
+                {currentUser.name || "Not set"}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -143,6 +234,43 @@ function SettingsContent() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Package:</span>
             <Badge variant="secondary">@holaai/convex (workspace)</Badge>
+          </div>
+
+          {/* Connection Test */}
+          <div className="pt-4 border-t">
+            <Label className="mb-2 block">Connection Test</Label>
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={handleTestConnection}
+                disabled={connectionStatus.loading}
+                variant="outline"
+                size="sm"
+              >
+                {connectionStatus.loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  "Test Connection"
+                )}
+              </Button>
+
+              {connectionStatus.success !== undefined && (
+                <div
+                  className={`flex items-center gap-2 text-sm ${
+                    connectionStatus.success ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {connectionStatus.success ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  <span>{connectionStatus.message}</span>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
