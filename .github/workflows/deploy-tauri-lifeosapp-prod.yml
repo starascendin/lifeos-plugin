@@ -45,5 +45,11 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }} --build-env SKIP_CONVEX_DEPLOY=1 --build-env VITE_CONVEX_URL=https://agreeable-ibex-949.convex.cloud
+
       - name: Deploy to Vercel Production
-        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
