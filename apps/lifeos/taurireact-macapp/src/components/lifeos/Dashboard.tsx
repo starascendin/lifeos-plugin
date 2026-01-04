@@ -23,7 +23,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 
 export function LifeOSDashboard() {
   return (
@@ -72,13 +72,13 @@ function DashboardContent() {
     if (!projects) return null;
 
     const activeProjects = projects.filter(
-      (p) => p.status === "in_progress" && !p.isArchived
+      (p) => p.status === "in_progress" && !p.archivedAt
     );
     const plannedProjects = projects.filter(
-      (p) => p.status === "planned" && !p.isArchived
+      (p) => p.status === "planned" && !p.archivedAt
     );
     const completedProjects = projects.filter(
-      (p) => p.status === "completed" && !p.isArchived
+      (p) => p.status === "completed" && !p.archivedAt
     );
 
     const healthCounts = {
@@ -88,7 +88,7 @@ function DashboardContent() {
     };
 
     return {
-      total: projects.filter((p) => !p.isArchived).length,
+      total: projects.filter((p) => !p.archivedAt).length,
       active: activeProjects.length,
       planned: plannedProjects.length,
       completed: completedProjects.length,
