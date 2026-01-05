@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useConvex } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
+import { api } from "@holaai/convex";
 import {
   type VoiceMemo,
   type VoiceMemosSyncProgress,
@@ -126,6 +127,10 @@ export function VoiceMemosTab() {
   const [pageSize, setPageSize] = useState<number>(10);
   const convex = useConvex();
 
+  // Query synced local IDs from Convex to show cloud sync status
+  const syncedLocalIds = useQuery(api.lifeos.voicememo.getSyncedLocalIds, {});
+  const syncedUuidSet = new Set(syncedLocalIds ?? []);
+
   // Load memos on mount
   const loadMemos = useCallback(async () => {
     setIsLoading(true);
@@ -168,7 +173,7 @@ export function VoiceMemosTab() {
     await syncTranscriptsToConvex(convex, setConvexSyncProgress);
   };
 
-  // Handle transcription
+  // Handle transcription with auto-sync to cloud
   const handleTranscribe = async () => {
     if (selectedIds.size === 0) return;
 
@@ -187,8 +192,19 @@ export function VoiceMemosTab() {
         console.error("Transcription errors:", failed);
       }
 
+      // Count successful transcriptions
+      const successful = results.filter(r => r.success);
+
       await loadMemos();
       setSelectedIds(new Set());
+
+      // Auto-sync to Convex cloud if any transcriptions succeeded
+      if (successful.length > 0) {
+        // Small delay to ensure local DB is updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setConvexSyncProgress({ ...initialConvexSyncProgress, status: "preparing" });
+        await syncTranscriptsToConvex(convex, setConvexSyncProgress);
+      }
     } catch (error) {
       console.error("Transcription error:", error);
       setTranscriptionErrors([{
@@ -681,6 +697,7 @@ export function VoiceMemosTab() {
                   onToggleSelect={() => toggleSelection(memo.id)}
                   isTranscribing={isTranscribing}
                   isTauri={isTauri}
+                  isSyncedToCloud={syncedUuidSet.has(memo.uuid)}
                 />
               ))}
             </TableBody>
@@ -747,9 +764,10 @@ interface VoiceMemoRowProps {
   onToggleSelect: () => void;
   isTranscribing: boolean;
   isTauri: boolean;
+  isSyncedToCloud: boolean;
 }
 
-function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTauri }: VoiceMemoRowProps) {
+function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTauri, isSyncedToCloud }: VoiceMemoRowProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
