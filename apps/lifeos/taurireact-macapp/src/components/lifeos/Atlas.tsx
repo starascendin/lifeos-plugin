@@ -21,9 +21,10 @@ import type { GlobeMethods } from "react-globe.gl";
 interface CountryFeature {
   type: string;
   properties: {
-    NAME: string;
-    ISO_A2: string;
-    POP_EST: number;
+    NAME?: string;
+    ADMIN?: string; // Natural Earth uses ADMIN
+    ISO_A2?: string;
+    POP_EST?: number;
     [key: string]: unknown;
   };
   geometry: {
@@ -163,10 +164,11 @@ export function LifeOSAtlas() {
   });
 
   // Fetch country GeoJSON data (only when countries layer is enabled)
+  // Using simplified 110m resolution (~200KB vs 10MB)
   useEffect(() => {
     if (!layers.countries || countries.features.length > 0) return;
 
-    fetch("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
+    fetch("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson")
       .then((res) => res.json())
       .then((data: GeoJsonData) => setCountries(data))
       .catch(console.error);
@@ -225,7 +227,7 @@ export function LifeOSAtlas() {
                 Interactive 3D Earth visualization
                 {hoverCountry && (
                   <span className="ml-2 text-foreground font-medium">
-                    — {hoverCountry.properties.NAME}
+                    — {hoverCountry.properties.NAME || hoverCountry.properties.ADMIN}
                   </span>
                 )}
                 {hoverCity && (
@@ -335,9 +337,10 @@ export function LifeOSAtlas() {
             polygonStrokeColor={() => "rgba(255, 255, 255, 0.3)"}
             polygonLabel={(d) => {
               const country = d as CountryFeature;
+              const name = country.properties.NAME || country.properties.ADMIN || "Unknown";
               return `
                 <div style="padding: 8px; background: rgba(0,0,0,0.85); border-radius: 6px; color: white; font-size: 12px;">
-                  <b style="font-size: 14px;">${country.properties.NAME}</b>
+                  <b style="font-size: 14px;">${name}</b>
                   ${country.properties.POP_EST ? `<br/>Population: ${(country.properties.POP_EST / 1e6).toFixed(1)}M` : ""}
                 </div>
               `;

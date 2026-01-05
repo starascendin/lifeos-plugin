@@ -6,6 +6,7 @@ import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { Toaster } from "./components/ui/sonner";
 import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
@@ -14,6 +15,7 @@ import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
 import { LifeOSVoiceAgent } from "./components/lifeos/VoiceAgent";
+import { LifeOSVoiceNotes } from "./components/lifeos/VoiceNotes";
 import { LifeOSAIAgent } from "./components/lifeos/AIAgent";
 import { LifeOSAgenda } from "./components/lifeos/Agenda";
 import { LifeOSAtlas } from "./components/lifeos/Atlas";
@@ -65,6 +67,7 @@ export default function LifeOSApp() {
                 <Route path="pm-ai" element={<LifeOSPMAI />} />
                 <Route path="habits" element={<LifeOSHabits />} />
                 <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
+                <Route path="voicenotes" element={<LifeOSVoiceNotes />} />
                 <Route path="aiagent" element={<LifeOSAIAgent />} />
                 <Route path="settings" element={<LifeOSSettings />} />
                 <Route path="*" element={<Navigate to="/lifeos" replace />} />
@@ -73,6 +76,7 @@ export default function LifeOSApp() {
           </AuthGate>
         </SignedIn>
       </TooltipProvider>
+      <Toaster richColors position="top-right" />
     </ThemeProvider>
   );
 }

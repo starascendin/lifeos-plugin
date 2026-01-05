@@ -18,6 +18,10 @@ This is my Lifeos app
             - UX:
                 - ideally, i can just use voice (say some things) to AI agent, and it just gives me what i asked for, like do x tasks, update data, etc.
 
-use shadcn ui component has much as possible
+- the LifeOS Tauri app:
+    - the background jobs app IS ALWAYS tauri app.
+    - the Life OS app can be BOTH BOTH tauri app AND a web app (deployed on vercel)
+        - make sure whatever you do, it can handle both webapp + tauri
+- use shadcn ui component has much as possible
 
 
