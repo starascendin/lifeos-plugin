@@ -898,26 +898,42 @@ function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTaur
           )}
         </TableCell>
         <TableCell>
-          {isCloudOnly ? (
-            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
-              <Cloud className="h-3 w-3 mr-1" />
-              iCloud
-            </Badge>
-          ) : memo.transcription ? (
-            <Badge variant="secondary" className="text-xs">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Done
-            </Badge>
-          ) : isTooLarge ? (
-            <Badge variant="destructive" className="text-xs">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              Too Large
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-xs">
-              Pending
-            </Badge>
-          )}
+          <div className="flex items-center gap-1">
+            {isCloudOnly ? (
+              <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                <Cloud className="h-3 w-3 mr-1" />
+                iCloud
+              </Badge>
+            ) : memo.transcription ? (
+              <>
+                <Badge variant="secondary" className="text-xs">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Done
+                </Badge>
+                {isSyncedToCloud && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Cloud className="h-3.5 w-3.5 text-green-600" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Synced to cloud</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </>
+            ) : isTooLarge ? (
+              <Badge variant="destructive" className="text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Too Large
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs">
+                Pending
+              </Badge>
+            )}
+          </div>
         </TableCell>
         <TableCell>
           {memo.local_path && (
