@@ -235,6 +235,8 @@ export const lifeosTables = {
     ),
     // Language detected/specified
     language: v.optional(v.string()),
+    // Tags for categorization (voice agent journaling)
+    tags: v.optional(v.array(v.string())),
     // Original client timestamps
     clientCreatedAt: v.number(),
     clientUpdatedAt: v.number(),
@@ -244,5 +246,9 @@ export const lifeosTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_localId", ["userId", "localId"])
-    .index("by_user_created", ["userId", "clientCreatedAt"]),
+    .index("by_user_created", ["userId", "clientCreatedAt"])
+    .searchIndex("search_transcript", {
+      searchField: "transcript",
+      filterFields: ["userId"],
+    }),
 };

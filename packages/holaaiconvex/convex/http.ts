@@ -1138,7 +1138,17 @@ http.route({
 const TOOL_CALL_API_KEY = "tool-call-secret-key-2024";
 
 // Available tools and their internal query mappings
-const AVAILABLE_TOOLS = ["get_todays_tasks", "get_projects", "get_tasks"] as const;
+const AVAILABLE_TOOLS = [
+  // Task/Project tools
+  "get_todays_tasks",
+  "get_projects",
+  "get_tasks",
+  // Notes/Journal tools
+  "search_notes",
+  "get_recent_notes",
+  "create_quick_note",
+  "add_tags_to_note",
+] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
 /**
@@ -1190,6 +1200,10 @@ async function authenticateToolCall(
  * - get_todays_tasks: Get today's tasks (due today + top priority)
  * - get_projects: Get user's projects with summary stats
  * - get_tasks: Get tasks with optional filters
+ * - search_notes: Search voice notes by content
+ * - get_recent_notes: Get recent voice notes
+ * - create_quick_note: Create a text note via voice
+ * - add_tags_to_note: Add tags to an existing note
  */
 http.route({
   path: "/tool-call",
@@ -1262,6 +1276,38 @@ http.route({
             status: params?.status as string | undefined,
             priority: params?.priority as string | undefined,
             limit: params?.limit as number | undefined,
+          });
+          break;
+
+        // Notes/Journal tools
+        case "search_notes":
+          result = await ctx.runQuery(internal.lifeos.tool_call.searchNotesInternal, {
+            userId: auth.userId,
+            query: params?.query as string,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "get_recent_notes":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getRecentNotesInternal, {
+            userId: auth.userId,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "create_quick_note":
+          result = await ctx.runMutation(internal.lifeos.tool_call.createQuickNoteInternal, {
+            userId: auth.userId,
+            content: params?.content as string,
+            tags: params?.tags as string[] | undefined,
+          });
+          break;
+
+        case "add_tags_to_note":
+          result = await ctx.runMutation(internal.lifeos.tool_call.addTagsToNoteInternal, {
+            userId: auth.userId,
+            noteId: params?.noteId as string,
+            tags: params?.tags as string[],
           });
           break;
       }

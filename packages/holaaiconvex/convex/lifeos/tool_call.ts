@@ -9,7 +9,7 @@
  */
 
 import { v } from "convex/values";
-import { internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 
 // ==================== TOOL DEFINITIONS ====================
@@ -37,6 +37,34 @@ export const TOOL_DEFINITIONS = {
       status: "optional - filter by status (backlog, todo, in_progress, in_review, done, cancelled)",
       priority: "optional - filter by priority (urgent, high, medium, low, none)",
       limit: "optional - max results (default 50, max 100)",
+    },
+  },
+  // Notes/Journal tools
+  search_notes: {
+    description: "Search voice notes/memos by content",
+    params: {
+      query: "required - search terms to find in notes",
+      limit: "optional - max results (default 10, max 50)",
+    },
+  },
+  get_recent_notes: {
+    description: "Get recent voice notes with transcripts",
+    params: {
+      limit: "optional - number of notes to return (default 5, max 20)",
+    },
+  },
+  create_quick_note: {
+    description: "Create a quick text note (captured via voice)",
+    params: {
+      content: "required - the note content",
+      tags: "optional - array of tags for categorization",
+    },
+  },
+  add_tags_to_note: {
+    description: "Add tags to an existing note",
+    params: {
+      noteId: "required - the ID of the note",
+      tags: "required - array of tags to add",
     },
   },
 } as const;
@@ -305,6 +333,188 @@ export const getTasksInternal = internalQuery({
       tasks,
       total,
       hasMore,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 4: SEARCH NOTES ====================
+
+/**
+ * Search voice memos/notes by transcript content
+ * Uses Convex full-text search
+ */
+export const searchNotesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = Math.min(args.limit ?? 10, 50);
+
+    // Use full-text search on transcript field
+    const results = await ctx.db
+      .query("life_voiceMemos")
+      .withSearchIndex("search_transcript", (q) =>
+        q.search("transcript", args.query).eq("userId", userId)
+      )
+      .take(limit);
+
+    // Build response
+    const notes = results.map((memo) => ({
+      id: memo._id,
+      name: memo.name,
+      transcript: memo.transcript,
+      tags: memo.tags || [],
+      duration: memo.duration,
+      language: memo.language,
+      createdAt: new Date(memo.clientCreatedAt).toISOString(),
+    }));
+
+    return {
+      notes,
+      query: args.query,
+      count: notes.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 5: GET RECENT NOTES ====================
+
+/**
+ * Get recent voice memos/notes
+ * Returns memos with transcripts, sorted by creation date
+ */
+export const getRecentNotesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = Math.min(args.limit ?? 5, 20);
+
+    // Get recent memos with completed transcripts
+    const memos = await ctx.db
+      .query("life_voiceMemos")
+      .withIndex("by_user_created", (q) => q.eq("userId", userId))
+      .order("desc")
+      .filter((q) => q.eq(q.field("transcriptionStatus"), "completed"))
+      .take(limit);
+
+    // Build response
+    const notes = memos.map((memo) => ({
+      id: memo._id,
+      name: memo.name,
+      transcript: memo.transcript,
+      tags: memo.tags || [],
+      duration: memo.duration,
+      language: memo.language,
+      createdAt: new Date(memo.clientCreatedAt).toISOString(),
+    }));
+
+    return {
+      notes,
+      count: notes.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 6: CREATE QUICK NOTE ====================
+
+/**
+ * Create a text-only voice memo (no audio)
+ * Used by voice agent to capture spoken notes
+ */
+export const createQuickNoteInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    content: v.string(),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const now = Date.now();
+
+    // Generate a unique local ID
+    const localId = `voice-note-${now}-${Math.random().toString(36).slice(2, 9)}`;
+
+    // Create memo with transcript (no audio file)
+    const memoId = await ctx.db.insert("life_voiceMemos", {
+      userId,
+      localId,
+      name: `Voice Note ${new Date().toLocaleDateString()}`,
+      duration: 0, // No audio
+      transcriptionStatus: "completed",
+      transcript: args.content,
+      tags: args.tags,
+      clientCreatedAt: now,
+      clientUpdatedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      noteId: memoId,
+      message: "Note created successfully",
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 7: ADD TAGS TO NOTE ====================
+
+/**
+ * Add tags to an existing voice memo/note
+ */
+export const addTagsToNoteInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    noteId: v.string(),
+    tags: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const noteId = args.noteId as Id<"life_voiceMemos">;
+
+    // Get the memo
+    const memo = await ctx.db.get(noteId);
+    if (!memo) {
+      return {
+        success: false,
+        error: "Note not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Verify ownership
+    if (memo.userId !== userId) {
+      return {
+        success: false,
+        error: "Access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Merge existing tags with new ones (deduplicated)
+    const existingTags = memo.tags || [];
+    const mergedTags = Array.from(new Set([...existingTags, ...args.tags]));
+
+    // Update memo
+    await ctx.db.patch(noteId, {
+      tags: mergedTags,
+      updatedAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      noteId,
+      tags: mergedTags,
       generatedAt: new Date().toISOString(),
     };
   },
