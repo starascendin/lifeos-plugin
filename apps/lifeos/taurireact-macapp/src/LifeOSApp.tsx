@@ -16,6 +16,7 @@ import { LifeOSHabits } from "./components/lifeos/Habits";
 import { LifeOSVoiceAgent } from "./components/lifeos/VoiceAgent";
 import { LifeOSAIAgent } from "./components/lifeos/AIAgent";
 import { LifeOSAgenda } from "./components/lifeos/Agenda";
+import { LifeOSAtlas } from "./components/lifeos/Atlas";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -53,6 +54,7 @@ export default function LifeOSApp() {
             <PomodoroProvider>
               <Routes>
                 <Route index element={<LifeOSDashboard />} />
+                <Route path="atlas" element={<LifeOSAtlas />} />
                 <Route path="agenda" element={<LifeOSAgenda />} />
                 <Route path="agenda/:view" element={<LifeOSAgenda />} />
                 <Route path="chatnexus" element={<LifeOSChatNexus />} />

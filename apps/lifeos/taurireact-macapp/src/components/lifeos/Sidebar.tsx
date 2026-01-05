@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Circle,
   Cpu,
+  Globe,
   Headphones,
   Kanban,
   LayoutDashboard,
@@ -70,6 +71,7 @@ export function Sidebar() {
 
   const navigation: NavItem[] = [
     { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
+    { name: "Atlas", href: "/lifeos/atlas", icon: Globe },
     { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
     { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
     { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
