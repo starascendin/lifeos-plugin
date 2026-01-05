@@ -25,6 +25,28 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertCircle,
   CheckCircle,
   RefreshCw,
@@ -39,6 +61,11 @@ import {
   Info,
   Cloud,
   Upload,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronDown,
 } from "lucide-react";
 import {
   Tooltip,
@@ -46,13 +73,48 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { readFile } from "@tauri-apps/plugin-fs";
 
 type ViewFilter = "all" | "transcribed" | "not_transcribed" | "cloud_only";
+
+const PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
+
+// Check if running in Tauri (as a function to evaluate at runtime)
+const checkIsTauri = () => typeof window !== "undefined" && "__TAURI__" in window;
+
+// Detect if error is related to Full Disk Access permission
+const isPermissionError = (error: string | undefined | null): boolean => {
+  if (!error) return false;
+  const lowerError = error.toLowerCase();
+  return (
+    lowerError.includes("operation not permitted") ||
+    lowerError.includes("permission denied") ||
+    lowerError.includes("full disk access") ||
+    lowerError.includes("access denied") ||
+    lowerError.includes("unable to open database") ||
+    lowerError.includes("readonly database")
+  );
+};
+
+// Open macOS System Preferences for Full Disk Access
+const openFullDiskAccessSettings = async () => {
+  try {
+    const { open } = await import("@tauri-apps/plugin-shell");
+    await open("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles");
+  } catch (error) {
+    console.error("Failed to open settings:", error);
+  }
+};
 
 export function VoiceMemosTab() {
   const [memos, setMemos] = useState<VoiceMemo[]>([]);
   const [syncProgress, setSyncProgress] = useState<VoiceMemosSyncProgress>(initialSyncProgress);
+  const [hasPermissionError, setHasPermissionError] = useState(false);
+  const [isTauri, setIsTauri] = useState(false);
+
+  // Check if running in Tauri on mount
+  useEffect(() => {
+    setIsTauri(checkIsTauri());
+  }, []);
   const [convexSyncProgress, setConvexSyncProgress] = useState<ConvexSyncProgress>(initialConvexSyncProgress);
   const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress | null>(null);
   const [transcriptionErrors, setTranscriptionErrors] = useState<TranscriptionResult[]>([]);
@@ -60,6 +122,8 @@ export function VoiceMemosTab() {
   const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(10);
   const convex = useConvex();
 
   // Load memos on mount
@@ -79,10 +143,22 @@ export function VoiceMemosTab() {
     loadMemos();
   }, [loadMemos]);
 
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [viewFilter, pageSize]);
+
   // Handle sync from macOS Voice Memos
   const handleSync = async () => {
+    setHasPermissionError(false);
     setSyncProgress({ ...initialSyncProgress, status: "syncing" });
-    await syncVoiceMemos(setSyncProgress);
+    const result = await syncVoiceMemos(setSyncProgress);
+
+    // Check for permission error
+    if (result.error && isPermissionError(result.error)) {
+      setHasPermissionError(true);
+    }
+
     await loadMemos();
   };
 
@@ -139,19 +215,6 @@ export function VoiceMemosTab() {
     setSelectedIds(newSelected);
   };
 
-  // Select all eligible for transcription
-  const selectAllEligible = () => {
-    const eligible = filteredMemos
-      .filter((m) => !m.transcription && m.local_path && !exceedsGroqLimit(m.file_size))
-      .map((m) => m.id);
-    setSelectedIds(new Set(eligible));
-  };
-
-  // Clear selection
-  const clearSelection = () => {
-    setSelectedIds(new Set());
-  };
-
   // Filter memos
   const filteredMemos = memos.filter((memo) => {
     if (viewFilter === "transcribed") return memo.transcription;
@@ -159,6 +222,58 @@ export function VoiceMemosTab() {
     if (viewFilter === "cloud_only") return !memo.local_path;
     return true;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredMemos.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedMemos = filteredMemos.slice(startIndex, endIndex);
+
+  // Selection helpers
+  const eligibleForTranscription = (memo: VoiceMemo) =>
+    memo.local_path && !memo.transcription && !exceedsGroqLimit(memo.file_size);
+
+  const eligibleOnPage = paginatedMemos.filter(eligibleForTranscription);
+  const eligibleOnPageIds = new Set(eligibleOnPage.map(m => m.id));
+  const allEligible = filteredMemos.filter(eligibleForTranscription);
+  const allEligibleIds = new Set(allEligible.map(m => m.id));
+
+  const selectedOnPage = paginatedMemos.filter(m => selectedIds.has(m.id) && eligibleForTranscription(m));
+  const isAllPageSelected = eligibleOnPage.length > 0 && eligibleOnPage.every(m => selectedIds.has(m.id));
+  const isSomePageSelected = selectedOnPage.length > 0 && !isAllPageSelected;
+
+  // Select all eligible on current page
+  const selectAllOnPage = () => {
+    const newSelected = new Set(selectedIds);
+    eligibleOnPage.forEach(m => newSelected.add(m.id));
+    setSelectedIds(newSelected);
+  };
+
+  // Select all eligible across all pages
+  const selectAllEligible = () => {
+    setSelectedIds(new Set(allEligibleIds));
+  };
+
+  // Deselect all on current page
+  const deselectAllOnPage = () => {
+    const newSelected = new Set(selectedIds);
+    paginatedMemos.forEach(m => newSelected.delete(m.id));
+    setSelectedIds(newSelected);
+  };
+
+  // Clear all selection
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  // Toggle header checkbox
+  const toggleHeaderCheckbox = () => {
+    if (isAllPageSelected) {
+      deselectAllOnPage();
+    } else {
+      selectAllOnPage();
+    }
+  };
 
   const isSyncing = syncProgress.status === "syncing";
 
@@ -173,88 +288,218 @@ export function VoiceMemosTab() {
     return Math.round((syncProgress.current / syncProgress.total) * 100);
   };
 
+  // Check if any operation is in progress
+  const isAnyOperationInProgress = isSyncing || isTranscribing ||
+    convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing";
+
   return (
     <div className="space-y-4 overflow-y-auto h-full">
-      {/* Sync Controls */}
+      {/* Unified Action Bar */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Mic className="h-5 w-5 text-muted-foreground" />
-              <span className="font-medium">Voice Memos</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs text-xs">
-                    <div className="space-y-2">
-                      <p>
-                        <strong>How it works:</strong> Syncs voice memos from macOS Voice Memos app
-                        and allows transcription using AI.
-                      </p>
-                      <p>
-                        <strong>Storage:</strong> Audio files are copied locally to app data
-                        directory. Metadata stored in local SQLite database. No cloud sync.
-                      </p>
-                      <p>
-                        <strong>Transcription:</strong> Uses Groq&apos;s{" "}
-                        <code className="bg-muted px-1 rounded">whisper-large-v3-turbo</code> model.
-                        Max file size: 100 MB.
-                      </p>
-                      <p>
-                        <strong>API Key:</strong> Configure your Groq API key in{" "}
-                        <strong>Settings &gt; API Keys</strong>.
-                      </p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <Badge variant="secondary">{memos.length} synced</Badge>
+            {/* Left side - Title and stats */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Mic className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">Voice Memos</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-xs">
+                      <div className="space-y-2">
+                        <p>
+                          <strong>Sync:</strong> Import voice memos from macOS Voice Memos app.
+                        </p>
+                        <p>
+                          <strong>Transcribe:</strong> Uses Groq Whisper AI. Max 100 MB per file.
+                        </p>
+                        <p>
+                          <strong>Cloud:</strong> Upload transcripts to Convex (no audio).
+                        </p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{memos.length} total</Badge>
+                <Badge variant="outline">{transcribedCount} transcribed</Badge>
+                {selectedIds.size > 0 && (
+                  <Badge variant="default">{selectedIds.size} selected</Badge>
+                )}
+              </div>
             </div>
 
-            <Button onClick={handleSync} disabled={isSyncing} size="sm">
-              {isSyncing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Sync from Mac
-                </>
+            {/* Right side - Action buttons */}
+            <div className="flex items-center gap-2">
+              {selectedIds.size > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearSelection}>
+                  Clear
+                </Button>
               )}
-            </Button>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleSync}
+                    disabled={!isTauri || isAnyOperationInProgress}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {isSyncing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Sync</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Sync voice memos from Mac</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleTranscribe}
+                    disabled={!isTauri || selectedIds.size === 0 || isAnyOperationInProgress}
+                    size="sm"
+                  >
+                    {isTranscribing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
+                    )}
+                    <span className="ml-2">Transcribe{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Transcribe selected memos using AI</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleSyncToConvex}
+                    disabled={transcribedCount === 0 || isAnyOperationInProgress}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Cloud className="h-4 w-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Cloud</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Sync transcriptions to cloud</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
-          {/* Progress indicator */}
-          {syncProgress.status !== "idle" && (
-            <div className="mt-3 pt-3 border-t">
-              {syncProgress.status === "syncing" && syncProgress.total > 0 && (
-                <div className="mb-2 space-y-1">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>
-                      {syncProgress.current} / {syncProgress.total}
+          {/* Progress indicators */}
+          {(syncProgress.status !== "idle" || transcriptionProgress || convexSyncProgress.status !== "idle" || transcriptionErrors.length > 0) && (
+            <div className="mt-3 pt-3 border-t space-y-2">
+              {/* Sync progress */}
+              {syncProgress.status !== "idle" && (
+                <div className="space-y-1">
+                  {syncProgress.status === "syncing" && syncProgress.total > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-16">Sync:</span>
+                      <Progress value={getSyncProgressPercentage()} className="h-2 flex-1" />
+                      <span className="text-xs text-muted-foreground w-12 text-right">
+                        {syncProgress.current}/{syncProgress.total}
+                      </span>
+                    </div>
+                  )}
+                  {syncProgress.status === "complete" && (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="h-3 w-3" />
+                      <span className="text-xs">
+                        Sync complete: {syncProgress.exported} new, {syncProgress.skipped} existing
+                      </span>
+                    </div>
+                  )}
+                  {syncProgress.status === "error" && (
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      <span className="text-xs">Sync error: {syncProgress.error}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Transcription progress */}
+              {transcriptionProgress && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16">Transcribe:</span>
+                    <Progress
+                      value={transcriptionProgress.total > 0 ? (transcriptionProgress.current / transcriptionProgress.total) * 100 : 0}
+                      className="h-2 flex-1"
+                    />
+                    <span className="text-xs text-muted-foreground w-12 text-right">
+                      {transcriptionProgress.current}/{transcriptionProgress.total}
                     </span>
-                    <span>{getSyncProgressPercentage()}%</span>
                   </div>
-                  <Progress value={getSyncProgressPercentage()} className="h-2" />
+                  <p className="text-xs text-muted-foreground pl-[72px] truncate">
+                    {transcriptionProgress.status}: {transcriptionProgress.memo_name}
+                  </p>
                 </div>
               )}
-              <p className="text-sm truncate">{syncProgress.currentMemo}</p>
-              {syncProgress.status === "complete" && (
-                <div className="flex items-center gap-2 text-green-600 mt-1">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-xs">
-                    {syncProgress.exported} new, {syncProgress.skipped} existing
+
+              {/* Cloud sync progress */}
+              {convexSyncProgress.status !== "idle" && (
+                <div className="space-y-1">
+                  {(convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing") && convexSyncProgress.total > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-16">Cloud:</span>
+                      <Progress value={(convexSyncProgress.current / convexSyncProgress.total) * 100} className="h-2 flex-1" />
+                      <span className="text-xs text-muted-foreground w-12 text-right">
+                        {convexSyncProgress.current}/{convexSyncProgress.total}
+                      </span>
+                    </div>
+                  )}
+                  {convexSyncProgress.status === "complete" && (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="h-3 w-3" />
+                      <span className="text-xs">
+                        Cloud sync: {convexSyncProgress.synced} synced, {convexSyncProgress.skipped} existing
+                      </span>
+                    </div>
+                  )}
+                  {convexSyncProgress.status === "error" && (
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      <span className="text-xs">Cloud error: {convexSyncProgress.error}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Transcription errors */}
+              {transcriptionErrors.length > 0 && !isTranscribing && (
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-3 w-3 text-destructive" />
+                  <span className="text-xs text-destructive">
+                    {transcriptionErrors.length} transcription{transcriptionErrors.length > 1 ? "s" : ""} failed
                   </span>
-                </div>
-              )}
-              {syncProgress.status === "error" && (
-                <div className="flex items-center gap-2 text-destructive mt-1">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-xs">Error: {syncProgress.error}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-2 text-xs"
+                    onClick={() => setTranscriptionErrors([])}
+                  >
+                    Dismiss
+                  </Button>
                 </div>
               )}
             </div>
@@ -262,225 +507,81 @@ export function VoiceMemosTab() {
         </CardContent>
       </Card>
 
-      {/* Transcription Controls */}
-      {memos.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {selectedIds.size > 0
-                    ? `${selectedIds.size} selected for transcription`
-                    : "Select memos to transcribe"}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {selectedIds.size > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearSelection}>
-                    Clear
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={selectAllEligible}
-                  disabled={isTranscribing}
-                >
-                  Select All Untranscribed
-                </Button>
-                <Button
-                  onClick={handleTranscribe}
-                  disabled={selectedIds.size === 0 || isTranscribing}
-                  size="sm"
-                >
-                  {isTranscribing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Transcribing...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Transcribe ({selectedIds.size})
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Transcription progress */}
-            {transcriptionProgress && (
-              <div className="mt-3 pt-3 border-t">
-                <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                  <span>
-                    {transcriptionProgress.current} / {transcriptionProgress.total}
-                  </span>
-                  <span>{transcriptionProgress.memo_name}</span>
-                </div>
-                <Progress
-                  value={
-                    transcriptionProgress.total > 0
-                      ? (transcriptionProgress.current / transcriptionProgress.total) * 100
-                      : 0
-                  }
-                  className="h-2"
-                />
-                <p className="text-xs text-muted-foreground mt-1 capitalize">
-                  {transcriptionProgress.status}...
-                </p>
-                {transcriptionProgress.status === "error" && transcriptionProgress.error && (
-                  <div className="flex items-center gap-2 text-destructive mt-1">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="text-xs">{transcriptionProgress.error}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Transcription errors summary */}
-            {transcriptionErrors.length > 0 && !isTranscribing && (
-              <div className="mt-3 pt-3 border-t">
-                <div className="flex items-center gap-2 text-destructive mb-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">
-                    {transcriptionErrors.length} transcription{transcriptionErrors.length > 1 ? "s" : ""} failed
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto h-6 px-2 text-xs"
-                    onClick={() => setTranscriptionErrors([])}
-                  >
-                    Dismiss
-                  </Button>
-                </div>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {transcriptionErrors.map((err, idx) => (
-                    <p key={idx} className="text-xs text-destructive">
-                      {err.memo_id > 0 ? `Memo ${err.memo_id}: ` : ""}{err.error}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Sync to Cloud Controls */}
-      {transcribedCount > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Upload className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Sync transcripts to cloud</span>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs text-xs">
-                      <p>
-                        Syncs transcript text and metadata to Convex cloud.
-                        Audio files are NOT uploaded.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-
-              <Button
-                onClick={handleSyncToConvex}
-                disabled={convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing"}
-                size="sm"
-                variant="outline"
-              >
-                {convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Syncing...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Sync to Cloud ({transcribedCount})
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* Progress indicator */}
-            {convexSyncProgress.status !== "idle" && (
-              <div className="mt-3 pt-3 border-t">
-                {(convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing") && convexSyncProgress.total > 0 && (
-                  <div className="mb-2 space-y-1">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>
-                        {convexSyncProgress.current} / {convexSyncProgress.total}
-                      </span>
-                      <span>{Math.round((convexSyncProgress.current / convexSyncProgress.total) * 100)}%</span>
-                    </div>
-                    <Progress value={(convexSyncProgress.current / convexSyncProgress.total) * 100} className="h-2" />
-                  </div>
-                )}
-                <p className="text-sm truncate">{convexSyncProgress.currentMemo}</p>
-                {convexSyncProgress.status === "complete" && (
-                  <div className="flex items-center gap-2 text-green-600 mt-1">
-                    <CheckCircle className="h-4 w-4" />
-                    <span className="text-xs">
-                      {convexSyncProgress.synced} synced, {convexSyncProgress.skipped} already existed
-                    </span>
-                  </div>
-                )}
-                {convexSyncProgress.status === "error" && (
-                  <div className="flex items-center gap-2 text-destructive mt-1">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="text-xs">Error: {convexSyncProgress.error}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filter tabs */}
-      {memos.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-2">
-          <Badge
-            variant={viewFilter === "all" ? "default" : "outline"}
-            className="cursor-pointer flex-shrink-0"
-            onClick={() => setViewFilter("all")}
-          >
-            All ({memos.length})
-          </Badge>
-          <Badge
-            variant={viewFilter === "transcribed" ? "default" : "outline"}
-            className="cursor-pointer flex-shrink-0"
-            onClick={() => setViewFilter("transcribed")}
-          >
-            Transcribed ({transcribedCount})
-          </Badge>
-          <Badge
-            variant={viewFilter === "not_transcribed" ? "default" : "outline"}
-            className="cursor-pointer flex-shrink-0"
-            onClick={() => setViewFilter("not_transcribed")}
-          >
-            Not Transcribed ({notTranscribedCount})
-          </Badge>
-          {cloudOnlyCount > 0 && (
-            <Badge
-              variant={viewFilter === "cloud_only" ? "default" : "outline"}
-              className="cursor-pointer flex-shrink-0"
-              onClick={() => setViewFilter("cloud_only")}
+      {/* Full Disk Access Permission Error */}
+      {hasPermissionError && isTauri && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              Full Disk Access is required to sync Voice Memos from macOS.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openFullDiskAccessSettings}
+              className="ml-4 shrink-0"
             >
-              <Cloud className="h-3 w-3 mr-1" />
-              iCloud Only ({cloudOnlyCount})
+              Open System Settings
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Filter tabs and pagination controls */}
+      {memos.length > 0 && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <Badge
+              variant={viewFilter === "all" ? "default" : "outline"}
+              className="cursor-pointer flex-shrink-0"
+              onClick={() => setViewFilter("all")}
+            >
+              All ({memos.length})
             </Badge>
-          )}
+            <Badge
+              variant={viewFilter === "transcribed" ? "default" : "outline"}
+              className="cursor-pointer flex-shrink-0"
+              onClick={() => setViewFilter("transcribed")}
+            >
+              Transcribed ({transcribedCount})
+            </Badge>
+            <Badge
+              variant={viewFilter === "not_transcribed" ? "default" : "outline"}
+              className="cursor-pointer flex-shrink-0"
+              onClick={() => setViewFilter("not_transcribed")}
+            >
+              Not Transcribed ({notTranscribedCount})
+            </Badge>
+            {cloudOnlyCount > 0 && (
+              <Badge
+                variant={viewFilter === "cloud_only" ? "default" : "outline"}
+                className="cursor-pointer flex-shrink-0"
+                onClick={() => setViewFilter("cloud_only")}
+              >
+                <Cloud className="h-3 w-3 mr-1" />
+                iCloud Only ({cloudOnlyCount})
+              </Badge>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-sm text-muted-foreground">Show</span>
+            <Select
+              value={pageSize.toString()}
+              onValueChange={(value) => setPageSize(Number(value))}
+            >
+              <SelectTrigger className="w-[70px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={size.toString()}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       )}
 
@@ -501,37 +602,154 @@ export function VoiceMemosTab() {
         <Alert>
           <Mic className="h-4 w-4" />
           <AlertDescription>
-            No voice memos synced yet. Click "Sync from Mac" to import your Voice Memos.
+            {isTauri
+              ? 'No voice memos synced yet. Click "Sync from Mac" to import your Voice Memos.'
+              : "Voice Memos sync is only available in the desktop app. Download the macOS app to sync and transcribe your Voice Memos."}
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Memos list */}
+      {/* Memos table */}
       {!isLoading && filteredMemos.length > 0 && (
-        <div className="space-y-2">
-          {filteredMemos.map((memo) => (
-            <VoiceMemoCard
-              key={memo.id}
-              memo={memo}
-              isSelected={selectedIds.has(memo.id)}
-              onToggleSelect={() => toggleSelection(memo.id)}
-              isTranscribing={isTranscribing}
-            />
-          ))}
-        </div>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50px]">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 p-0 hover:bg-transparent">
+                        <div className="flex items-center gap-1">
+                          <Checkbox
+                            checked={isAllPageSelected}
+                            ref={(el) => {
+                              if (el) {
+                                (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = isSomePageSelected;
+                              }
+                            }}
+                            onCheckedChange={toggleHeaderCheckbox}
+                            disabled={isTranscribing || eligibleOnPage.length === 0}
+                            aria-label="Select all"
+                          />
+                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem
+                        onClick={selectAllOnPage}
+                        disabled={eligibleOnPage.length === 0}
+                      >
+                        Select page ({eligibleOnPage.length} eligible)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={selectAllEligible}
+                        disabled={allEligible.length === 0}
+                      >
+                        Select all untranscribed ({allEligible.length})
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={deselectAllOnPage}
+                        disabled={selectedOnPage.length === 0}
+                      >
+                        Deselect page
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={clearSelection}
+                        disabled={selectedIds.size === 0}
+                      >
+                        Clear all selection
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-[100px]">Duration</TableHead>
+                <TableHead className="w-[120px]">Date</TableHead>
+                <TableHead className="w-[80px]">Size</TableHead>
+                <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[80px]">Play</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedMemos.map((memo) => (
+                <VoiceMemoRow
+                  key={memo.id}
+                  memo={memo}
+                  isSelected={selectedIds.has(memo.id)}
+                  onToggleSelect={() => toggleSelection(memo.id)}
+                  isTranscribing={isTranscribing}
+                  isTauri={isTauri}
+                />
+              ))}
+            </TableBody>
+          </Table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredMemos.length)} of {filteredMemos.length}
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-3 text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       )}
     </div>
   );
 }
 
-interface VoiceMemoCardProps {
+interface VoiceMemoRowProps {
   memo: VoiceMemo;
   isSelected: boolean;
   onToggleSelect: () => void;
   isTranscribing: boolean;
+  isTauri: boolean;
 }
 
-function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: VoiceMemoCardProps) {
+function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTauri }: VoiceMemoRowProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -548,12 +766,12 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
 
   // Load audio file and create blob URL
   const loadAudio = async () => {
-    if (!memo.local_path || audioSrc || isLoadingAudio) return;
+    if (!memo.local_path || audioSrc || isLoadingAudio || !isTauri) return;
 
     setIsLoadingAudio(true);
     try {
+      const { readFile } = await import("@tauri-apps/plugin-fs");
       const data = await readFile(memo.local_path);
-      // Use audio/mp4 which is more broadly compatible, or let browser auto-detect
       const blob = new Blob([data], { type: "audio/mp4" });
       const url = URL.createObjectURL(blob);
       setAudioSrc(url);
@@ -574,10 +792,8 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
   }, [audioSrc]);
 
   const togglePlay = async () => {
-    // Load audio on first play
     if (!audioSrc) {
       await loadAudio();
-      // Audio will auto-play once loaded via useEffect
       return;
     }
 
@@ -602,139 +818,130 @@ function VoiceMemoCard({ memo, isSelected, onToggleSelect, isTranscribing }: Voi
   };
 
   return (
-    <Card className={`transition-colors ${isSelected ? "ring-2 ring-primary" : ""}`}>
-      <CardContent className="p-3">
-        <div className="flex items-start gap-3">
-          {/* Checkbox */}
-          {canTranscribe && (
+    <>
+      <TableRow data-state={isSelected ? "selected" : undefined}>
+        <TableCell>
+          {canTranscribe ? (
             <Checkbox
               checked={isSelected}
               onCheckedChange={onToggleSelect}
               disabled={isTranscribing}
-              className="mt-1"
+              aria-label={`Select ${displayName}`}
             />
+          ) : (
+            <div className="w-4" />
           )}
-
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-start gap-2">
-              <h4 className="font-medium text-sm truncate flex-1">{displayName}</h4>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {isCloudOnly && (
-                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
-                    <Cloud className="h-3 w-3 mr-1" />
-                    iCloud Only
-                  </Badge>
-                )}
-                {memo.transcription && (
-                  <Badge variant="secondary" className="text-xs">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Transcribed
-                  </Badge>
-                )}
-                {isTooLarge && !isCloudOnly && (
-                  <Badge variant="destructive" className="text-xs">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Too Large
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Metadata */}
-            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatMemoDuration(memo.duration)}
-              </span>
-              <span>{formatMemoDate(memo.date)}</span>
-              {memo.file_size && (
-                <span className="flex items-center gap-1">
-                  <HardDrive className="h-3 w-3" />
-                  {formatFileSize(memo.file_size)}
-                </span>
-              )}
-              <Badge variant="outline" className="text-xs font-mono">
-                {fileFormat}
-              </Badge>
-            </div>
-
-            {/* Audio player */}
-            {memo.local_path && (
-              <div className="mt-2 flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={togglePlay}
-                  className="h-8 w-8 p-0"
-                  disabled={isLoadingAudio}
-                >
-                  {isLoadingAudio ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : isPlaying ? (
-                    <Pause className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                </Button>
-                {audioSrc && (
-                  <audio
-                    ref={audioRef}
-                    src={audioSrc}
-                    onEnded={handleAudioEnded}
-                    onPause={() => setIsPlaying(false)}
-                    onPlay={() => setIsPlaying(true)}
-                    className="hidden"
-                  />
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {isLoadingAudio ? "Loading..." : isPlaying ? "Playing..." : "Click to play"}
-                </span>
-              </div>
-            )}
-
-            {/* Transcription */}
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-col gap-1">
+            <span className="font-medium truncate max-w-[300px]">{displayName}</span>
             {memo.transcription && (
-              <div className="mt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowTranscript(!showTranscript)}
-                  className="h-6 px-2 text-xs"
-                >
-                  {showTranscript ? "Hide" : "Show"} Transcript
-                  {memo.transcription_language && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {memo.transcription_language}
-                    </Badge>
-                  )}
-                </Button>
-                {showTranscript && (
-                  <div className="mt-2 p-2 bg-muted rounded-md">
-                    <p className="text-sm whitespace-pre-wrap">{memo.transcription}</p>
-                  </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTranscript(!showTranscript)}
+                className="h-6 px-2 text-xs justify-start w-fit"
+              >
+                {showTranscript ? "Hide" : "Show"} Transcript
+                {memo.transcription_language && (
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {memo.transcription_language}
+                  </Badge>
                 )}
-              </div>
+              </Button>
             )}
-
-            {/* Cloud-only message */}
             {isCloudOnly && (
-              <p className="mt-2 text-xs text-blue-600">
-                This recording is stored in iCloud. Open the Voice Memos app on your Mac to download
-                it locally, then sync again.
+              <p className="text-xs text-blue-600">
+                Stored in iCloud - download in Voice Memos app first
               </p>
             )}
-
-            {/* Too large warning */}
             {isTooLarge && !isCloudOnly && (
-              <p className="mt-2 text-xs text-destructive">
-                This file exceeds the 100 MB limit for transcription. Consider trimming it in the
-                Voice Memos app.
+              <p className="text-xs text-destructive">
+                Exceeds 100 MB limit
               </p>
             )}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span className="text-sm">{formatMemoDuration(memo.duration)}</span>
+          </div>
+        </TableCell>
+        <TableCell>
+          <span className="text-sm text-muted-foreground">{formatMemoDate(memo.date)}</span>
+        </TableCell>
+        <TableCell>
+          {memo.file_size && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <HardDrive className="h-3 w-3" />
+              <span className="text-sm">{formatFileSize(memo.file_size)}</span>
+            </div>
+          )}
+        </TableCell>
+        <TableCell>
+          {isCloudOnly ? (
+            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+              <Cloud className="h-3 w-3 mr-1" />
+              iCloud
+            </Badge>
+          ) : memo.transcription ? (
+            <Badge variant="secondary" className="text-xs">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Done
+            </Badge>
+          ) : isTooLarge ? (
+            <Badge variant="destructive" className="text-xs">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              Too Large
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              Pending
+            </Badge>
+          )}
+        </TableCell>
+        <TableCell>
+          {memo.local_path && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={togglePlay}
+                className="h-8 w-8 p-0"
+                disabled={isLoadingAudio}
+              >
+                {isLoadingAudio ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : isPlaying ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+              </Button>
+              {audioSrc && (
+                <audio
+                  ref={audioRef}
+                  src={audioSrc}
+                  onEnded={handleAudioEnded}
+                  onPause={() => setIsPlaying(false)}
+                  onPlay={() => setIsPlaying(true)}
+                  className="hidden"
+                />
+              )}
+            </>
+          )}
+        </TableCell>
+      </TableRow>
+      {showTranscript && memo.transcription && (
+        <TableRow>
+          <TableCell colSpan={7} className="bg-muted/50">
+            <div className="p-3">
+              <p className="text-sm whitespace-pre-wrap">{memo.transcription}</p>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }

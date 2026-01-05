@@ -6,16 +6,20 @@ import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { Toaster } from "./components/ui/sonner";
 import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
 import { LifeOSLLMCouncil } from "./components/lifeos/LLMCouncil";
+import { LifeOSProxyLLMCouncil } from "./components/lifeos/ProxyLLMCouncil";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
 import { LifeOSVoiceAgent } from "./components/lifeos/VoiceAgent";
+import { LifeOSVoiceNotes } from "./components/lifeos/VoiceNotes";
 import { LifeOSAIAgent } from "./components/lifeos/AIAgent";
 import { LifeOSAgenda } from "./components/lifeos/Agenda";
+import { LifeOSAtlas } from "./components/lifeos/Atlas";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -53,16 +57,20 @@ export default function LifeOSApp() {
             <PomodoroProvider>
               <Routes>
                 <Route index element={<LifeOSDashboard />} />
+                <Route path="atlas" element={<LifeOSAtlas />} />
                 <Route path="agenda" element={<LifeOSAgenda />} />
                 <Route path="agenda/:view" element={<LifeOSAgenda />} />
                 <Route path="chatnexus" element={<LifeOSChatNexus />} />
                 <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
+                {/* Tauri-only: Proxy LLM Council (uses HTTP iframe, blocked on HTTPS web) */}
+                {isTauri && <Route path="proxy-council" element={<LifeOSProxyLLMCouncil />} />}
                 <Route path="pm" element={<LifeOSPM />} />
                 <Route path="pm/:view" element={<LifeOSPM />} />
                 <Route path="pm/:view/:id" element={<LifeOSPM />} />
                 <Route path="pm-ai" element={<LifeOSPMAI />} />
                 <Route path="habits" element={<LifeOSHabits />} />
                 <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
+                <Route path="voicenotes" element={<LifeOSVoiceNotes />} />
                 <Route path="aiagent" element={<LifeOSAIAgent />} />
                 <Route path="settings" element={<LifeOSSettings />} />
                 <Route path="*" element={<Navigate to="/lifeos" replace />} />
@@ -71,6 +79,7 @@ export default function LifeOSApp() {
           </AuthGate>
         </SignedIn>
       </TooltipProvider>
+      <Toaster richColors position="top-right" />
     </ThemeProvider>
   );
 }

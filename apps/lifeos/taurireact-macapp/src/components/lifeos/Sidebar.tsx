@@ -24,8 +24,11 @@ import {
   ChevronRight,
   Circle,
   Cpu,
+  FileAudio,
+  Globe,
   Headphones,
   Kanban,
+  Network,
   LayoutDashboard,
   ListTodo,
   LogOut,
@@ -40,7 +43,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 
 interface NavItem {
   name: string;
@@ -62,6 +65,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(["Projects"]);
+  const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
   // For mobile, always show expanded sidebar
   const effectiveCollapsed = isMobile ? false : isCollapsed;
@@ -87,27 +91,34 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
     );
   };
 
-  const navigation: NavItem[] = [
-    { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
-    { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
-    { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
-    { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
-    {
-      name: "Projects",
-      href: "/lifeos/pm",
-      icon: Kanban,
-      children: [
-        { name: "All Issues", href: "/lifeos/pm", icon: ListTodo },
-        { name: "Projects", href: "/lifeos/pm/projects", icon: FolderKanban },
-        { name: "Cycles", href: "/lifeos/pm/cycles", icon: RefreshCw },
-      ],
-    },
-    { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
-    { name: "Habits", href: "/lifeos/habits", icon: Target },
-    { name: "Voice Agent", href: "/lifeos/voiceagent", icon: Headphones },
-    { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
-    { name: "Settings", href: "/lifeos/settings", icon: Settings },
-  ];
+  const navigation: NavItem[] = useMemo(() => {
+    const items: NavItem[] = [
+      { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
+      // Tauri-only: Proxy LLM Council (uses HTTP iframe, blocked on HTTPS web)
+      ...(isTauri ? [{ name: "Proxy LLM Council", href: "/lifeos/proxy-council", icon: Network }] : []),
+      { name: "Atlas", href: "/lifeos/atlas", icon: Globe },
+      { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
+      { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
+      { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
+      {
+        name: "Projects",
+        href: "/lifeos/pm",
+        icon: Kanban,
+        children: [
+          { name: "All Issues", href: "/lifeos/pm", icon: ListTodo },
+          { name: "Projects", href: "/lifeos/pm/projects", icon: FolderKanban },
+          { name: "Cycles", href: "/lifeos/pm/cycles", icon: RefreshCw },
+        ],
+      },
+      { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
+      { name: "Habits", href: "/lifeos/habits", icon: Target },
+      { name: "Voice Agent", href: "/lifeos/voiceagent", icon: Headphones },
+      { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
+      { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
+      { name: "Settings", href: "/lifeos/settings", icon: Settings },
+    ];
+    return items;
+  }, [isTauri]);
 
   return (
     <aside
