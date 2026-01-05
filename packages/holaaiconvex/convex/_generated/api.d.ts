@@ -42,6 +42,8 @@ import type * as lifeos_habits_checkins from "../lifeos/habits_checkins.js";
 import type * as lifeos_habits_schema from "../lifeos/habits_schema.js";
 import type * as lifeos_lib_demo_tools from "../lifeos/lib/demo_tools.js";
 import type * as lifeos_lib_pm_tools from "../lifeos/lib/pm_tools.js";
+import type * as lifeos_livekit from "../lifeos/livekit.js";
+import type * as lifeos_livekit_config from "../lifeos/livekit_config.js";
 import type * as lifeos_llmcouncil from "../lifeos/llmcouncil.js";
 import type * as lifeos_llmcouncil_schema from "../lifeos/llmcouncil_schema.js";
 import type * as lifeos_pm_ai from "../lifeos/pm_ai.js";
@@ -102,6 +104,8 @@ declare const fullApi: ApiFromModules<{
   "lifeos/habits_schema": typeof lifeos_habits_schema;
   "lifeos/lib/demo_tools": typeof lifeos_lib_demo_tools;
   "lifeos/lib/pm_tools": typeof lifeos_lib_pm_tools;
+  "lifeos/livekit": typeof lifeos_livekit;
+  "lifeos/livekit_config": typeof lifeos_livekit_config;
   "lifeos/llmcouncil": typeof lifeos_llmcouncil;
   "lifeos/llmcouncil_schema": typeof lifeos_llmcouncil_schema;
   "lifeos/pm_ai": typeof lifeos_pm_ai;

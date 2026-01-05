@@ -1,6 +1,14 @@
-import { invoke } from "@tauri-apps/api/core";
+/**
+ * LiveKit Service
+ *
+ * Provides token generation and config access via Convex.
+ * Works for both Tauri desktop and web deployments.
+ */
 
-// Types matching Rust structs
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@holaai/convex";
+
+// Types matching Convex response
 export interface LiveKitTokenResponse {
   server_url: string;
   token: string;
@@ -20,11 +28,12 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-// Check if running in Tauri
-const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+// Create HTTP client for actions (can't use reactive client for actions in some contexts)
+const convexUrl = import.meta.env.VITE_CONVEX_URL;
+const httpClient = convexUrl ? new ConvexHttpClient(convexUrl) : null;
 
 /**
- * Generate a LiveKit access token
+ * Generate a LiveKit access token via Convex action
  */
 export async function generateToken(
   roomName: string,
@@ -32,30 +41,33 @@ export async function generateToken(
   participantName?: string,
   participantMetadata?: string
 ): Promise<LiveKitTokenResponse> {
-  if (!isTauri) {
-    throw new Error("Not running in Tauri");
+  if (!httpClient) {
+    throw new Error("Convex URL not configured");
   }
 
-  return await invoke<LiveKitTokenResponse>("generate_livekit_token", {
+  const result = await httpClient.action(api.lifeos.livekit.generateToken, {
     roomName,
     participantIdentity,
     participantName,
     participantMetadata,
   });
+
+  return result;
 }
 
 /**
- * Get LiveKit configuration (server URL and status)
+ * Get LiveKit configuration via Convex query
  */
 export async function getLiveKitConfig(): Promise<LiveKitConfig> {
-  if (!isTauri) {
+  if (!httpClient) {
     return {
       server_url: "",
       is_configured: false,
     };
   }
 
-  return await invoke<LiveKitConfig>("get_livekit_config");
+  const result = await httpClient.query(api.lifeos.livekit_config.getConfig);
+  return result;
 }
 
 /**

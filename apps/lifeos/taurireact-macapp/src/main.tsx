@@ -6,6 +6,7 @@ import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
 import LifeOSApp from "./LifeOSApp";
+import { ConfigProvider } from "./lib/config";
 import "./App.css";
 
 // Check if running in Tauri
@@ -40,16 +41,18 @@ async function initializeApp() {
         allowedRedirectProtocols={isTauri ? ["tauri:"] : undefined}
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <HashRouter>
-            <Routes>
-              {/* On web, redirect / to /lifeos. On Tauri, show menu bar app */}
-              <Route
-                path="/"
-                element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
-              />
-              <Route path="/lifeos/*" element={<LifeOSApp />} />
-            </Routes>
-          </HashRouter>
+          <ConfigProvider>
+            <HashRouter>
+              <Routes>
+                {/* On web, redirect / to /lifeos. On Tauri, show menu bar app */}
+                <Route
+                  path="/"
+                  element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
+                />
+                <Route path="/lifeos/*" element={<LifeOSApp />} />
+              </Routes>
+            </HashRouter>
+          </ConfigProvider>
         </ConvexProviderWithClerk>
       </ClerkProvider>
     </React.StrictMode>

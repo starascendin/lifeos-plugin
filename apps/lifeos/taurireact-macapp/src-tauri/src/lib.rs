@@ -3,7 +3,6 @@
 mod api_keys;
 mod app_category;
 mod council_server;
-mod livekit;
 mod notes;
 mod screentime;
 mod voicememos;
@@ -16,7 +15,6 @@ use council_server::{
     get_council_server_status, start_council_server, start_server_internal, stop_council_server,
     COUNCIL_PORT,
 };
-use livekit::{generate_livekit_token, get_livekit_config};
 use notes::{
     count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders,
     get_exported_notes, should_run_notes_sync,
@@ -265,9 +263,6 @@ pub fn run() {
             get_groq_api_key,
             delete_groq_api_key,
             open_full_disk_access_settings,
-            // LiveKit
-            generate_livekit_token,
-            get_livekit_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

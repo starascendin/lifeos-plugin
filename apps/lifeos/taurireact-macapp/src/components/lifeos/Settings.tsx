@@ -15,8 +15,9 @@ import { useApiKeys } from "@/lib/hooks/useApiKeys";
 import { useUser } from "@clerk/clerk-react";
 import { api } from "@holaai/convex";
 import { useAction, useQuery } from "convex/react";
-import { Check, CheckCircle, Eye, EyeOff, ExternalLink, Key, Loader2, Monitor, Moon, Sun, Trash2, XCircle } from "lucide-react";
+import { Check, CheckCircle, Eye, EyeOff, ExternalLink, Key, Loader2, Mic, Monitor, Moon, Settings2, Sun, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useConfig } from "@/lib/config";
 
 export function LifeOSSettings() {
   return (
@@ -213,6 +214,22 @@ function SettingsContent() {
         </CardHeader>
         <CardContent>
           <ApiKeysSection />
+        </CardContent>
+      </Card>
+
+      {/* Environment Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5" />
+            Environment Configuration
+          </CardTitle>
+          <CardDescription>
+            Runtime configuration loaded from environment
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EnvironmentConfigSection />
         </CardContent>
       </Card>
 
@@ -437,6 +454,119 @@ function ApiKeysSection() {
           Open Full Disk Access Settings
         </Button>
       </div>
+    </div>
+  );
+}
+
+function EnvironmentConfigSection() {
+  const { config, isLoading, error } = useConfig();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>Loading configuration...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 text-destructive">
+        <XCircle className="h-4 w-4" />
+        <span>{error}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Runtime Badge */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium">Runtime:</span>
+        <Badge variant={config?.runtime === "tauri" ? "default" : "secondary"}>
+          {config?.runtime === "tauri" ? "Desktop (Tauri)" : "Web"}
+        </Badge>
+      </div>
+
+      {/* LiveKit Voice Agent */}
+      <div className="space-y-3 pt-2 border-t">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Mic className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">LiveKit Voice Agent</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {config?.livekit.is_configured ? (
+              <>
+                <CheckCircle className="h-3 w-3 text-green-600" />
+                <span className="text-xs text-green-600">Configured</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-3 w-3 text-amber-600" />
+                <span className="text-xs text-amber-600">Not Configured</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2 text-sm rounded-lg border bg-muted/30 p-3">
+          <EnvVarRow
+            name="LIVEKIT_URL"
+            value={config?.livekit.server_url}
+            isSensitive={false}
+          />
+          <EnvVarRow
+            name="LIVEKIT_API_KEY"
+            value={config?.livekit.is_configured ? "••••••••" : undefined}
+            isSensitive={true}
+            isSet={config?.livekit.is_configured}
+          />
+          <EnvVarRow
+            name="LIVEKIT_API_SECRET"
+            value={config?.livekit.is_configured ? "••••••••" : undefined}
+            isSensitive={true}
+            isSet={config?.livekit.is_configured}
+          />
+        </div>
+
+        {!config?.livekit.is_configured && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950 p-3 text-sm text-amber-800 dark:text-amber-200">
+            <p>
+              To enable voice agent, set these environment variables in your
+              Convex dashboard.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EnvVarRow({
+  name,
+  value,
+  isSensitive,
+  isSet,
+}: {
+  name: string;
+  value?: string;
+  isSensitive: boolean;
+  isSet?: boolean;
+}) {
+  const hasValue = isSensitive ? isSet : !!value;
+
+  return (
+    <div className="flex justify-between items-center gap-4">
+      <code className="text-xs font-mono text-muted-foreground">{name}</code>
+      {hasValue ? (
+        <code className="text-xs font-mono truncate max-w-[200px]">
+          {isSensitive ? "••••••••" : value}
+        </code>
+      ) : (
+        <span className="text-xs text-muted-foreground italic">Not set</span>
+      )}
     </div>
   );
 }
