@@ -24,8 +24,14 @@ import {
   ChatMessage,
   generateMessageId,
 } from "../services/livekit";
-import { useQuery } from "convex/react";
-import { api } from "@holaai/convex";
+import { useQuery, useMutation } from "convex/react";
+import { api, Id } from "@holaai/convex";
+
+// Re-export ChatMessage type for use in other components
+export type { ChatMessage };
+
+// Session ID type from Convex
+type VoiceAgentSessionId = Id<"lifeos_voiceAgentSessions">;
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -63,6 +69,7 @@ interface VoiceAgentState {
   participantIdentity: string | null;
   agentParticipant: RemoteParticipant | null;
   selectedModelId: VoiceAgentModelId;
+  sessionId: VoiceAgentSessionId | null;
 }
 
 interface VoiceAgentContextValue extends VoiceAgentState {
@@ -88,6 +95,7 @@ const defaultState: VoiceAgentState = {
   participantIdentity: null,
   agentParticipant: null,
   selectedModelId: DEFAULT_VOICE_AGENT_MODEL,
+  sessionId: null,
 };
 
 // ==================== CONTEXT ====================
@@ -104,9 +112,40 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
   const [state, setState] = useState<VoiceAgentState>(defaultState);
   const [isConfigured, setIsConfigured] = useState(false);
   const roomRef = useRef<Room | null>(null);
+  const sessionIdRef = useRef<VoiceAgentSessionId | null>(null);
 
   // Get current user for userId in metadata
   const currentUser = useQuery(api.common.users.currentUser);
+
+  // Convex mutations for persistence
+  const createSessionMutation = useMutation(api.lifeos.voiceagent.createSession);
+  const endSessionMutation = useMutation(api.lifeos.voiceagent.endSession);
+  const addMessageMutation = useMutation(api.lifeos.voiceagent.addMessage);
+
+  // Query for recent messages (load history on mount)
+  const recentMessages = useQuery(api.lifeos.voiceagent.getRecentMessages, { limit: 50 });
+
+  // Load history on initial mount
+  useEffect(() => {
+    if (recentMessages && state.connectionState === "disconnected" && state.messages.length === 0) {
+      // Convert Convex messages to ChatMessage format
+      const historyMessages: ChatMessage[] = recentMessages
+        .map((m) => ({
+          id: m._id,
+          sender: m.sender as "user" | "agent",
+          text: m.text,
+          timestamp: new Date(m.timestamp),
+        }))
+        .reverse(); // Most recent first, so reverse for chronological order
+
+      if (historyMessages.length > 0) {
+        setState((prev) => ({
+          ...prev,
+          messages: historyMessages,
+        }));
+      }
+    }
+  }, [recentMessages, state.connectionState, state.messages.length]);
 
   // Check configuration on mount
   useEffect(() => {
@@ -279,12 +318,15 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
           // Only process final segments (complete utterances)
           if (segment.final && segment.text.trim()) {
             const isAgent = participant instanceof RemoteParticipant;
+            const sender = isAgent ? "agent" : "user";
+            const messageId = segment.id || generateMessageId();
+            const timestamp = segment.firstReceivedTime || Date.now();
 
             const chatMessage: ChatMessage = {
-              id: segment.id || generateMessageId(),
-              sender: isAgent ? "agent" : "user",
+              id: messageId,
+              sender,
               text: segment.text.trim(),
-              timestamp: new Date(segment.firstReceivedTime || Date.now()),
+              timestamp: new Date(timestamp),
             };
 
             setState((prev) => {
@@ -305,6 +347,19 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
               };
             });
             console.log("[VoiceAgent] Added transcription:", segment.text);
+
+            // Save to Convex for persistence (non-blocking)
+            if (sessionIdRef.current) {
+              addMessageMutation({
+                sessionId: sessionIdRef.current,
+                sender,
+                text: segment.text.trim(),
+                livekitMessageId: segment.id,
+                timestamp,
+              }).catch((error) => {
+                console.error("[VoiceAgent] Failed to save message:", error);
+              });
+            }
           }
         });
       });
@@ -349,13 +404,32 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
         }
       });
 
-      setState((prev) => ({
-        ...prev,
-        connectionState: "connected",
-        roomName: tokenResponse.room_name,
-        participantIdentity: tokenResponse.participant_identity,
-        isMicEnabled: true,
-      }));
+      // Create session in Convex for persistence
+      try {
+        const sessionId = await createSessionMutation({
+          roomName: tokenResponse.room_name,
+          modelId: state.selectedModelId,
+        });
+        sessionIdRef.current = sessionId;
+        setState((prev) => ({
+          ...prev,
+          connectionState: "connected",
+          roomName: tokenResponse.room_name,
+          participantIdentity: tokenResponse.participant_identity,
+          isMicEnabled: true,
+          sessionId,
+        }));
+      } catch (sessionError) {
+        console.error("[VoiceAgent] Failed to create session:", sessionError);
+        // Still mark as connected even if session creation fails
+        setState((prev) => ({
+          ...prev,
+          connectionState: "connected",
+          roomName: tokenResponse.room_name,
+          participantIdentity: tokenResponse.participant_identity,
+          isMicEnabled: true,
+        }));
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to connect";
@@ -365,10 +439,20 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
         error: errorMessage,
       }));
     }
-  }, [updateAgentState, currentUser, state.selectedModelId]);
+  }, [updateAgentState, currentUser, state.selectedModelId, createSessionMutation, addMessageMutation]);
 
   // Disconnect from room
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback(async () => {
+    // End session in Convex
+    if (sessionIdRef.current) {
+      try {
+        await endSessionMutation({ sessionId: sessionIdRef.current });
+      } catch (error) {
+        console.error("[VoiceAgent] Failed to end session:", error);
+      }
+      sessionIdRef.current = null;
+    }
+
     if (roomRef.current) {
       roomRef.current.disconnect();
       roomRef.current = null;
@@ -376,8 +460,9 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
     setState((prev) => ({
       ...defaultState,
       messages: prev.messages, // Keep messages
+      selectedModelId: prev.selectedModelId, // Keep model selection
     }));
-  }, []);
+  }, [endSessionMutation]);
 
   // Toggle microphone
   const toggleMic = useCallback(async () => {
@@ -392,17 +477,32 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
   const sendMessage = useCallback(async (text: string) => {
     if (!roomRef.current || !text.trim()) return;
 
+    const messageId = generateMessageId();
+    const timestamp = Date.now();
+
     // Add user message to list
     const userMessage: ChatMessage = {
-      id: generateMessageId(),
+      id: messageId,
       sender: "user",
       text: text.trim(),
-      timestamp: new Date(),
+      timestamp: new Date(timestamp),
     };
     setState((prev) => ({
       ...prev,
       messages: [...prev.messages, userMessage],
     }));
+
+    // Save to Convex for persistence
+    if (sessionIdRef.current) {
+      addMessageMutation({
+        sessionId: sessionIdRef.current,
+        sender: "user",
+        text: text.trim(),
+        timestamp,
+      }).catch((error) => {
+        console.error("[VoiceAgent] Failed to save sent message:", error);
+      });
+    }
 
     // Send via data channel
     const encoder = new TextEncoder();
@@ -415,7 +515,7 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
     await roomRef.current.localParticipant.publishData(data, {
       reliable: true,
     });
-  }, []);
+  }, [addMessageMutation]);
 
   // Clear error
   const clearError = useCallback(() => {

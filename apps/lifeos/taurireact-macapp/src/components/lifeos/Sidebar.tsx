@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useSidebar } from "@/lib/contexts/SidebarContext";
 import { useTheme } from "@/lib/contexts/ThemeContext";
+import { useVoiceAgent } from "@/lib/contexts/VoiceAgentContext";
 import { cn } from "@/lib/utils";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { Link, useLocation } from "react-router-dom";
@@ -37,6 +38,7 @@ import {
   FolderKanban,
   RefreshCw,
   Settings,
+  Sparkles,
   Sun,
   Target,
   User,
@@ -63,6 +65,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const { user } = useUser();
   const { isCollapsed, toggleSidebar, closeMobileSidebar } = useSidebar();
   const { resolvedTheme, setTheme } = useTheme();
+  const { connectionState, connect, disconnect, isConfigured } = useVoiceAgent();
   const [mounted, setMounted] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(["Projects"]);
   const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -166,6 +169,63 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
               </TooltipContent>
             </Tooltip>
           )}
+        </div>
+
+        {/* Butler AI Button */}
+        <div
+          className={cn(
+            "border-b border-sidebar-border",
+            effectiveCollapsed ? "px-2 py-2" : "px-4 py-3",
+          )}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={connectionState === "connected" ? "default" : "outline"}
+                className={cn(
+                  "w-full transition-all",
+                  effectiveCollapsed ? "justify-center p-3" : "justify-start gap-3",
+                  connectionState === "connected" && "bg-primary hover:bg-primary/90",
+                )}
+                onClick={() => {
+                  if (connectionState === "connected") {
+                    disconnect();
+                  } else if (connectionState === "disconnected") {
+                    connect();
+                  }
+                }}
+                disabled={!isConfigured || connectionState === "connecting"}
+              >
+                <div className="relative">
+                  <Sparkles className={cn(
+                    "h-5 w-5",
+                    connectionState === "connecting" && "animate-pulse"
+                  )} />
+                  {connectionState === "connected" && (
+                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
+                  )}
+                </div>
+                {!effectiveCollapsed && (
+                  <span className="font-medium">
+                    {connectionState === "connecting"
+                      ? "Connecting..."
+                      : connectionState === "connected"
+                        ? "Butler AI Active"
+                        : "Butler AI"}
+                  </span>
+                )}
+              </Button>
+            </TooltipTrigger>
+            {effectiveCollapsed && (
+              <TooltipContent side="right">
+                {connectionState === "connected"
+                  ? "Disconnect Butler AI"
+                  : connectionState === "connecting"
+                    ? "Connecting..."
+                    : "Connect Butler AI"}
+              </TooltipContent>
+            )}
+          </Tooltip>
         </div>
 
         {/* Navigation */}

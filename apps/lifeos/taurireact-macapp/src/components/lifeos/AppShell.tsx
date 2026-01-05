@@ -1,6 +1,7 @@
 import { SidebarProvider, useSidebar } from "@/lib/contexts/SidebarContext";
 import { CommandMenu } from "./CommandMenu";
 import { Sidebar } from "./Sidebar";
+import { FloatingVoiceWidget } from "../voiceagent/FloatingVoiceWidget";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ function AppShellContent({ children }: AppShellProps) {
   return (
     <>
       <CommandMenu />
+      <FloatingVoiceWidget />
       <div className="flex h-screen overflow-hidden bg-sidebar/30">
         {/* Desktop Sidebar - hidden on mobile */}
         <div className="hidden md:block p-2">

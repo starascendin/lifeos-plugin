@@ -5,6 +5,7 @@ import { SignIn } from "./components/auth/SignIn";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
+import { VoiceAgentProvider } from "./lib/contexts/VoiceAgentContext";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "./components/ui/sonner";
 import { LifeOSDashboard } from "./components/lifeos/Dashboard";
@@ -54,8 +55,9 @@ export default function LifeOSApp() {
         </SignedOut>
         <SignedIn>
           <AuthGate>
-            <PomodoroProvider>
-              <Routes>
+            <VoiceAgentProvider>
+              <PomodoroProvider>
+                <Routes>
                 <Route index element={<LifeOSDashboard />} />
                 <Route path="atlas" element={<LifeOSAtlas />} />
                 <Route path="agenda" element={<LifeOSAgenda />} />
@@ -74,8 +76,9 @@ export default function LifeOSApp() {
                 <Route path="aiagent" element={<LifeOSAIAgent />} />
                 <Route path="settings" element={<LifeOSSettings />} />
                 <Route path="*" element={<Navigate to="/lifeos" replace />} />
-              </Routes>
-            </PomodoroProvider>
+                </Routes>
+              </PomodoroProvider>
+            </VoiceAgentProvider>
           </AuthGate>
         </SignedIn>
       </TooltipProvider>

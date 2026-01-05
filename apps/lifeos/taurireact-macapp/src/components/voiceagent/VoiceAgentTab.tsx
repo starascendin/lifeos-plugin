@@ -1,5 +1,5 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { VoiceAgentProvider, useVoiceAgent } from "@/lib/contexts/VoiceAgentContext";
+import { useVoiceAgent } from "@/lib/contexts/VoiceAgentContext";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { AudioVisualizer } from "./AudioVisualizer";
 import { ChatPanel } from "./ChatPanel";
@@ -100,9 +100,6 @@ function VoiceAgentContent() {
 }
 
 export function VoiceAgentTab() {
-  return (
-    <VoiceAgentProvider>
-      <VoiceAgentContent />
-    </VoiceAgentProvider>
-  );
+  // VoiceAgentProvider is now global in LifeOSApp.tsx
+  return <VoiceAgentContent />;
 }

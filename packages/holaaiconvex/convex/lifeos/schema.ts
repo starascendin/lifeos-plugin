@@ -5,6 +5,7 @@ import { demoAgentTables } from "./demo_agent_schema";
 import { habitsTables } from "./habits_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
 import { pmTables } from "./pm_schema";
+import { voiceAgentTables } from "./voiceagent_schema";
 
 /**
  * LifeOS Tables
@@ -23,6 +24,8 @@ export const lifeosTables = {
   ...pmTables,
   // Habit Tracker tables
   ...habitsTables,
+  // Voice Agent tables
+  ...voiceAgentTables,
   // ==================== YOUTUBE PLAYLISTS ====================
   life_youtubePlaylists: defineTable({
     // User who owns this playlist sync
