@@ -11,6 +11,7 @@ import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
 import { LifeOSLLMCouncil } from "./components/lifeos/LLMCouncil";
+import { LifeOSProxyLLMCouncil } from "./components/lifeos/ProxyLLMCouncil";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
@@ -61,6 +62,8 @@ export default function LifeOSApp() {
                 <Route path="agenda/:view" element={<LifeOSAgenda />} />
                 <Route path="chatnexus" element={<LifeOSChatNexus />} />
                 <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
+                {/* Tauri-only: Proxy LLM Council (uses HTTP iframe, blocked on HTTPS web) */}
+                {isTauri && <Route path="proxy-council" element={<LifeOSProxyLLMCouncil />} />}
                 <Route path="pm" element={<LifeOSPM />} />
                 <Route path="pm/:view" element={<LifeOSPM />} />
                 <Route path="pm/:view/:id" element={<LifeOSPM />} />

@@ -73,14 +73,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { toast } from "sonner";
 
 type ViewFilter = "all" | "transcribed" | "not_transcribed" | "cloud_only";
 
 const PAGE_SIZE_OPTIONS = [10, 50, 100] as const;
 
-// Check if running in Tauri
-const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+// Check if running in Tauri (as a function to evaluate at runtime)
+const checkIsTauri = () => typeof window !== "undefined" && "__TAURI__" in window;
 
 // Detect if error is related to Full Disk Access permission
 const isPermissionError = (error: string | undefined | null): boolean => {
@@ -106,21 +105,16 @@ const openFullDiskAccessSettings = async () => {
   }
 };
 
-// Show toast for Full Disk Access permission error
-const showPermissionErrorToast = () => {
-  toast.error("Full Disk Access Required", {
-    description: "Grant Full Disk Access to sync Voice Memos from macOS.",
-    duration: 10000,
-    action: {
-      label: "Open Settings",
-      onClick: openFullDiskAccessSettings,
-    },
-  });
-};
-
 export function VoiceMemosTab() {
   const [memos, setMemos] = useState<VoiceMemo[]>([]);
   const [syncProgress, setSyncProgress] = useState<VoiceMemosSyncProgress>(initialSyncProgress);
+  const [hasPermissionError, setHasPermissionError] = useState(false);
+  const [isTauri, setIsTauri] = useState(false);
+
+  // Check if running in Tauri on mount
+  useEffect(() => {
+    setIsTauri(checkIsTauri());
+  }, []);
   const [convexSyncProgress, setConvexSyncProgress] = useState<ConvexSyncProgress>(initialConvexSyncProgress);
   const [transcriptionProgress, setTranscriptionProgress] = useState<TranscriptionProgress | null>(null);
   const [transcriptionErrors, setTranscriptionErrors] = useState<TranscriptionResult[]>([]);
@@ -156,12 +150,13 @@ export function VoiceMemosTab() {
 
   // Handle sync from macOS Voice Memos
   const handleSync = async () => {
+    setHasPermissionError(false);
     setSyncProgress({ ...initialSyncProgress, status: "syncing" });
     const result = await syncVoiceMemos(setSyncProgress);
 
-    // Check for permission error and show toast
+    // Check for permission error
     if (result.error && isPermissionError(result.error)) {
-      showPermissionErrorToast();
+      setHasPermissionError(true);
     }
 
     await loadMemos();
@@ -346,46 +341,67 @@ export function VoiceMemosTab() {
                 </Button>
               )}
 
-              <Button
-                onClick={handleSync}
-                disabled={!isTauri || isAnyOperationInProgress}
-                size="sm"
-                variant="outline"
-              >
-                {isSyncing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                <span className="ml-2 hidden sm:inline">Sync</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleSync}
+                    disabled={!isTauri || isAnyOperationInProgress}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {isSyncing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Sync</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Sync voice memos from Mac</p>
+                </TooltipContent>
+              </Tooltip>
 
-              <Button
-                onClick={handleTranscribe}
-                disabled={!isTauri || selectedIds.size === 0 || isAnyOperationInProgress}
-                size="sm"
-              >
-                {isTranscribing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4" />
-                )}
-                <span className="ml-2">Transcribe{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleTranscribe}
+                    disabled={!isTauri || selectedIds.size === 0 || isAnyOperationInProgress}
+                    size="sm"
+                  >
+                    {isTranscribing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
+                    )}
+                    <span className="ml-2">Transcribe{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Transcribe selected memos using AI</p>
+                </TooltipContent>
+              </Tooltip>
 
-              <Button
-                onClick={handleSyncToConvex}
-                disabled={transcribedCount === 0 || isAnyOperationInProgress}
-                size="sm"
-                variant="outline"
-              >
-                {convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Cloud className="h-4 w-4" />
-                )}
-                <span className="ml-2 hidden sm:inline">Cloud</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleSyncToConvex}
+                    disabled={transcribedCount === 0 || isAnyOperationInProgress}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Cloud className="h-4 w-4" />
+                    )}
+                    <span className="ml-2 hidden sm:inline">Cloud</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Sync transcriptions to cloud</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
@@ -490,6 +506,26 @@ export function VoiceMemosTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Full Disk Access Permission Error */}
+      {hasPermissionError && isTauri && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              Full Disk Access is required to sync Voice Memos from macOS.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openFullDiskAccessSettings}
+              className="ml-4 shrink-0"
+            >
+              Open System Settings
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Filter tabs and pagination controls */}
       {memos.length > 0 && (
@@ -644,6 +680,7 @@ export function VoiceMemosTab() {
                   isSelected={selectedIds.has(memo.id)}
                   onToggleSelect={() => toggleSelection(memo.id)}
                   isTranscribing={isTranscribing}
+                  isTauri={isTauri}
                 />
               ))}
             </TableBody>
@@ -709,9 +746,10 @@ interface VoiceMemoRowProps {
   isSelected: boolean;
   onToggleSelect: () => void;
   isTranscribing: boolean;
+  isTauri: boolean;
 }
 
-function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing }: VoiceMemoRowProps) {
+function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTauri }: VoiceMemoRowProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
