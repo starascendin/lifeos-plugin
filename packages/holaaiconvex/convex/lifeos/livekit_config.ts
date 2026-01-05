@@ -10,15 +10,24 @@ import { query } from "../_generated/server";
  */
 export const getConfig = query({
   handler: async () => {
-    const serverUrl = process.env.LIVEKIT_URL || "";
-    const hasApiKey = !!process.env.LIVEKIT_API_KEY;
-    const hasApiSecret = !!process.env.LIVEKIT_API_SECRET;
+    try {
+      const serverUrl = process.env.LIVEKIT_URL ?? "";
+      const hasApiKey = !!process.env.LIVEKIT_API_KEY;
+      const hasApiSecret = !!process.env.LIVEKIT_API_SECRET;
 
-    const isConfigured = !!serverUrl && hasApiKey && hasApiSecret;
+      const isConfigured = !!serverUrl && hasApiKey && hasApiSecret;
 
-    return {
-      server_url: isConfigured ? serverUrl : "",
-      is_configured: isConfigured,
-    };
+      return {
+        server_url: isConfigured ? serverUrl : "",
+        is_configured: isConfigured,
+      };
+    } catch (error) {
+      console.error("Error in getConfig:", error);
+      // Return safe defaults on error
+      return {
+        server_url: "",
+        is_configured: false,
+      };
+    }
   },
 });

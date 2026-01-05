@@ -7,8 +7,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, FlaskConical, Loader2, Copy, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, FlaskConical, Loader2, Copy, Check, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useConfig } from "@/lib/config";
 
 // Use the Convex site URL from environment (same as app uses)
 const CONVEX_SITE_URL = import.meta.env.VITE_CONVEX_URL?.replace('.cloud', '.site') || "https://beaming-giraffe-300.convex.site";
@@ -28,6 +29,7 @@ export function ToolTestPanel() {
   const [copied, setCopied] = useState(false);
 
   const currentUser = useQuery(api.common.users.currentUser);
+  const { config } = useConfig();
 
   const userId = currentUser?._id;
 
@@ -115,6 +117,48 @@ export function ToolTestPanel() {
       </CollapsibleTrigger>
       <CollapsibleContent className="absolute right-0 top-full mt-2 z-50 w-[500px] bg-background border rounded-lg shadow-lg p-4">
         <div className="space-y-4">
+          {/* LiveKit Environment Variables */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">
+                LiveKit Configuration
+              </label>
+              <div className="flex items-center gap-1">
+                {config?.livekit.is_configured ? (
+                  <>
+                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <span className="text-xs text-green-600">OK</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3 w-3 text-amber-600" />
+                    <span className="text-xs text-amber-600">Not Set</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="bg-muted rounded p-2 space-y-1">
+              <div className="flex justify-between items-center">
+                <code className="text-xs font-mono text-muted-foreground">LIVEKIT_URL</code>
+                <code className="text-xs font-mono truncate max-w-[250px]">
+                  {config?.livekit.server_url || <span className="text-muted-foreground italic">Not set</span>}
+                </code>
+              </div>
+              <div className="flex justify-between items-center">
+                <code className="text-xs font-mono text-muted-foreground">LIVEKIT_API_KEY</code>
+                <code className="text-xs font-mono">
+                  {config?.livekit.is_configured ? "••••••••" : <span className="text-muted-foreground italic">Not set</span>}
+                </code>
+              </div>
+              <div className="flex justify-between items-center">
+                <code className="text-xs font-mono text-muted-foreground">LIVEKIT_API_SECRET</code>
+                <code className="text-xs font-mono">
+                  {config?.livekit.is_configured ? "••••••••" : <span className="text-muted-foreground italic">Not set</span>}
+                </code>
+              </div>
+            </div>
+          </div>
+
           {/* User ID Info */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
