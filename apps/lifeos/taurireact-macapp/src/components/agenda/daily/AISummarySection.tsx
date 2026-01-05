@@ -30,36 +30,48 @@ export function AISummarySection() {
   };
 
   return (
-    <Card className="bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10">
+    <Card className="bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 overflow-hidden">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="h-5 w-5 text-violet-500" />
-            {isTodayView ? "Today's Summary" : "Daily Summary"}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <Sparkles className="h-5 w-5 text-violet-500 flex-shrink-0" />
+            <span className="truncate">{isTodayView ? "Today's Summary" : "Daily Summary"}</span>
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <ModelSelector
-              value={selectedModel}
-              onChange={setSelectedModel}
-              disabled={isGeneratingSummary}
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden sm:block">
+              <ModelSelector
+                value={selectedModel}
+                onChange={setSelectedModel}
+                disabled={isGeneratingSummary}
+              />
+            </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={generateSummary}
               disabled={isGeneratingSummary}
-              className="gap-2"
+              className="gap-2 flex-shrink-0"
             >
               <RefreshCw
                 className={`h-4 w-4 ${isGeneratingSummary ? "animate-spin" : ""}`}
               />
-              {isGeneratingSummary
-                ? "Generating..."
-                : hasSummary
-                  ? "Regenerate"
-                  : "Generate"}
+              <span className="hidden xs:inline">
+                {isGeneratingSummary
+                  ? "Generating..."
+                  : hasSummary
+                    ? "Regenerate"
+                    : "Generate"}
+              </span>
             </Button>
           </div>
+        </div>
+        {/* Mobile model selector */}
+        <div className="sm:hidden mt-2">
+          <ModelSelector
+            value={selectedModel}
+            onChange={setSelectedModel}
+            disabled={isGeneratingSummary}
+          />
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -78,7 +90,7 @@ export function AISummarySection() {
         ) : hasSummary ? (
           <div>
             <p className="text-sm leading-relaxed">{dailySummary.aiSummary}</p>
-            <div className="flex items-center justify-between mt-3">
+            <div className="flex flex-col gap-2 mt-3 sm:flex-row sm:items-center sm:justify-between">
               <UsageDisplay
                 usage={dailySummary.usage ?? null}
                 model={dailySummary.model}

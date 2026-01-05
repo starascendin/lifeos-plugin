@@ -46,14 +46,14 @@ export function ModelSelector({
       onValueChange={(v) => onChange(v as SupportedModelId)}
       disabled={disabled}
     >
-      <SelectTrigger className="w-[200px] h-8 text-xs">
+      <SelectTrigger className="w-full sm:w-[200px] h-8 text-xs">
         <SelectValue placeholder="Select model">
           {selectedModel && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 truncate">
               <span className="text-muted-foreground">
                 {selectedModel.provider}:
               </span>
-              <span>{selectedModel.name}</span>
+              <span className="truncate">{selectedModel.name}</span>
             </span>
           )}
         </SelectValue>
@@ -90,9 +90,9 @@ export function UsageDisplay({ usage, model }: UsageDisplayProps) {
     : null;
 
   return (
-    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
       {modelDisplay && (
-        <span className="bg-muted px-2 py-0.5 rounded">{modelDisplay}</span>
+        <span className="bg-muted px-2 py-0.5 rounded truncate max-w-[150px]">{modelDisplay}</span>
       )}
       <span title="Prompt tokens">↑ {usage.promptTokens}</span>
       <span title="Completion tokens">↓ {usage.completionTokens}</span>
