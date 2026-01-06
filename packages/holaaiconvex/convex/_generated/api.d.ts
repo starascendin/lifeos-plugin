@@ -32,6 +32,8 @@ import type * as holaai_vocab from "../holaai/vocab.js";
 import type * as holaai_voice from "../holaai/voice.js";
 import type * as http from "../http.js";
 import type * as lifeos_agenda from "../lifeos/agenda.js";
+import type * as lifeos_avatar_schema from "../lifeos/avatar_schema.js";
+import type * as lifeos_avatar_stats from "../lifeos/avatar_stats.js";
 import type * as lifeos_chatnexus from "../lifeos/chatnexus.js";
 import type * as lifeos_chatnexus_schema from "../lifeos/chatnexus_schema.js";
 import type * as lifeos_demo_agent from "../lifeos/demo_agent.js";
@@ -96,6 +98,8 @@ declare const fullApi: ApiFromModules<{
   "holaai/voice": typeof holaai_voice;
   http: typeof http;
   "lifeos/agenda": typeof lifeos_agenda;
+  "lifeos/avatar_schema": typeof lifeos_avatar_schema;
+  "lifeos/avatar_stats": typeof lifeos_avatar_stats;
   "lifeos/chatnexus": typeof lifeos_chatnexus;
   "lifeos/chatnexus_schema": typeof lifeos_chatnexus_schema;
   "lifeos/demo_agent": typeof lifeos_demo_agent;

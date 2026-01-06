@@ -1,5 +1,6 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
+import { avatarTables } from "./avatar_schema";
 import { chatnexusTables } from "./chatnexus_schema";
 import { demoAgentTables } from "./demo_agent_schema";
 import { habitsTables } from "./habits_schema";
@@ -14,6 +15,8 @@ import { voiceAgentTables } from "./voiceagent_schema";
  * All table names are prefixed with `life_` or `lifeos_chatnexus` or `lifeos_pm` to avoid conflicts.
  */
 export const lifeosTables = {
+  // Avatar Stats tables
+  ...avatarTables,
   // Chat Nexus tables
   ...chatnexusTables,
   // Demo Agent tables

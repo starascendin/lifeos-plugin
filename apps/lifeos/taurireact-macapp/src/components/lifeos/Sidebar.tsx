@@ -42,6 +42,7 @@ import {
   Sun,
   Target,
   User,
+  UserCircle,
   Users,
   X,
 } from "lucide-react";
@@ -115,6 +116,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
       },
       { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
       { name: "Habits", href: "/lifeos/habits", icon: Target },
+      { name: "Avatar", href: "/lifeos/avatar", icon: UserCircle },
       { name: "Voice Agent", href: "/lifeos/voiceagent", icon: Headphones },
       { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
       { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },

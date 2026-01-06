@@ -16,6 +16,7 @@ import { LifeOSProxyLLMCouncil } from "./components/lifeos/ProxyLLMCouncil";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
+import { LifeOSAvatar } from "./components/lifeos/Avatar";
 import { LifeOSVoiceAgent } from "./components/lifeos/VoiceAgent";
 import { LifeOSVoiceNotes } from "./components/lifeos/VoiceNotes";
 import { LifeOSAIAgent } from "./components/lifeos/AIAgent";
@@ -71,6 +72,7 @@ export default function LifeOSApp() {
                 <Route path="pm/:view/:id" element={<LifeOSPM />} />
                 <Route path="pm-ai" element={<LifeOSPMAI />} />
                 <Route path="habits" element={<LifeOSHabits />} />
+                <Route path="avatar" element={<LifeOSAvatar />} />
                 <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
                 <Route path="voicenotes" element={<LifeOSVoiceNotes />} />
                 <Route path="aiagent" element={<LifeOSAIAgent />} />
