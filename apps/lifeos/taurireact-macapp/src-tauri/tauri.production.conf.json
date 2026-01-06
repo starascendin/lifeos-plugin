@@ -38,7 +38,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://clerk.rjlabs.dev https://*.clerk.accounts.dev https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com https://www.youtube.com https://api.groq.com wss://*.rocketjump.tech wss://livekit.rocketjump.tech ipc://localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.rjlabs.dev https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob: asset: https://asset.localhost; font-src 'self' data:; frame-src https://clerk.rjlabs.dev https://*.clerk.accounts.dev https://accounts.google.com; worker-src 'self' blob:; media-src 'self' asset: https://asset.localhost blob:"
+      "csp": "default-src 'self'; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://clerk.rjlabs.dev https://*.clerk.accounts.dev https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com https://www.youtube.com https://api.groq.com wss://*.rocketjump.tech wss://livekit.rocketjump.tech ipc://localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.rjlabs.dev https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob: asset: https://asset.localhost; font-src 'self' data:; frame-src https://clerk.rjlabs.dev https://*.clerk.accounts.dev https://accounts.google.com https://*.ts.net; worker-src 'self' blob:; media-src 'self' asset: https://asset.localhost blob:"
     }
   },
   "bundle": {

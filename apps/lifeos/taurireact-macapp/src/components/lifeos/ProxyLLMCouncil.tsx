@@ -112,8 +112,21 @@ function ProxyCouncilContent() {
     );
   }
 
+  // Debug: log the constructed URL (without password)
+  useEffect(() => {
+    if (iframeUrl) {
+      try {
+        const debugUrl = new URL(iframeUrl);
+        debugUrl.password = "***";
+        console.log("[ProxyCouncil] iframe URL:", debugUrl.toString());
+      } catch {
+        console.log("[ProxyCouncil] iframe URL (raw):", iframeUrl);
+      }
+    }
+  }, [iframeUrl]);
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Settings Panel */}
       <Collapsible open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <div className="border-b bg-muted/30">
