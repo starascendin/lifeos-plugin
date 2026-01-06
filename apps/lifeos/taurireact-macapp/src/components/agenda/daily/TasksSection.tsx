@@ -125,6 +125,7 @@ export function TasksSection() {
     todaysTasks,
     topPriorityTasks,
     overdueTasks,
+    completedTodayTasks,
     isLoadingTasks,
     updateIssueStatus,
     toggleTopPriority,
@@ -160,13 +161,14 @@ export function TasksSection() {
         t.status !== "done" && !top3Tasks.find((top) => top._id === t._id)
     ) ?? [];
 
-  // Get completed tasks (from both today's tasks and top priority, deduplicated)
-  const completedTasks = [
-    ...(todaysTasks?.filter((t) => t.status === "done") ?? []),
-    ...(topPriorityTasks?.filter(
-      (t) => t.status === "done" && !todaysTasks?.find((td) => td._id === t._id)
-    ) ?? []),
-  ];
+  // Completed tasks for today (by completedAt, not dueDate)
+  const completedTasks = completedTodayTasks ?? [];
+
+  // Calculate total points from completed tasks
+  const totalCompletedPoints = completedTasks.reduce(
+    (sum, task) => sum + (task.estimate ?? 0),
+    0
+  );
 
   // Count active (non-completed) tasks
   const activeTaskCount = top3Tasks.length + otherTasks.length + (overdueTasks?.length ?? 0);
@@ -299,11 +301,18 @@ export function TasksSection() {
             {/* Completed Tasks Section */}
             {completedTasks.length > 0 && (
               <div className="pt-2 border-t">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Completed ({completedTasks.length})
-                  </h4>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <h4 className="text-sm font-medium text-muted-foreground">
+                      Completed Today ({completedTasks.length})
+                    </h4>
+                  </div>
+                  {totalCompletedPoints > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {totalCompletedPoints} pts
+                    </Badge>
+                  )}
                 </div>
                 <div className="space-y-1 opacity-75">
                   {completedTasks.map((task) => (

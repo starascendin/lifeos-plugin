@@ -58,6 +58,7 @@ interface AgendaContextValue {
   todaysTasks: Doc<"lifeos_pmIssues">[] | undefined;
   topPriorityTasks: Doc<"lifeos_pmIssues">[] | undefined;
   overdueTasks: Doc<"lifeos_pmIssues">[] | undefined;
+  completedTodayTasks: Doc<"lifeos_pmIssues">[] | undefined;
   isLoadingTasks: boolean;
 
   // Daily summary
@@ -68,6 +69,7 @@ interface AgendaContextValue {
 
   // Weekly data (only fetched when viewMode === "weekly")
   weeklyTasks: WeeklyTasksByDay | undefined;
+  weeklyCompletedTasks: Doc<"lifeos_pmIssues">[] | undefined;
   weeklyFieldValues: WeeklyFieldValues | undefined;
   weeklyMemos: WeeklyMemo[] | undefined;
   isLoadingWeeklyData: boolean;
@@ -202,6 +204,12 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     date: dateString,
   });
 
+  // Completed tasks for today (by completedAt timestamp)
+  const completedTodayTasks = useQuery(
+    api.lifeos.pm_issues.getCompletedTasksForDate,
+    { date: dateString }
+  );
+
   // Daily summary query
   const dailySummary = useQuery(api.lifeos.agenda.getDailySummary, {
     date: dateString,
@@ -216,7 +224,15 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const weeklyTasks = useQuery(
     api.lifeos.pm_issues.getTasksForDateRange,
     viewMode === "weekly"
-      ? { startDate: weekStartDate, endDate: weekEndDate, includeCompleted: true }
+      ? { startDate: weekStartDate, endDate: weekEndDate, includeCompleted: false }
+      : "skip"
+  );
+
+  // Weekly completed tasks (by completedAt)
+  const weeklyCompletedTasks = useQuery(
+    api.lifeos.pm_issues.getCompletedTasksForDateRange,
+    viewMode === "weekly"
+      ? { startDate: weekStartDate, endDate: weekEndDate }
       : "skip"
   );
 
@@ -408,6 +424,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     todaysTasks,
     topPriorityTasks,
     overdueTasks,
+    completedTodayTasks,
     isLoadingTasks: todaysTasks === undefined || overdueTasks === undefined,
 
     // Daily summary
@@ -418,11 +435,13 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
 
     // Weekly data
     weeklyTasks,
+    weeklyCompletedTasks,
     weeklyFieldValues,
     weeklyMemos,
     isLoadingWeeklyData:
       viewMode === "weekly" &&
       (weeklyTasks === undefined ||
+        weeklyCompletedTasks === undefined ||
         weeklyFieldValues === undefined ||
         weeklyMemos === undefined),
 

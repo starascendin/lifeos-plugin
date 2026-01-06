@@ -1,8 +1,21 @@
+import { useState } from "react";
 import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { CheckSquare, Circle, CheckCircle2, Clock } from "lucide-react";
+import {
+  CheckSquare,
+  Circle,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
+  Trophy,
+} from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { Doc } from "@holaai/convex";
 
@@ -15,8 +28,6 @@ const DAY_NAMES = [
   "Saturday",
   "Sunday",
 ];
-
-const SHORT_DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function getPriorityColor(priority: string): string {
   switch (priority) {
@@ -33,15 +44,18 @@ function getPriorityColor(priority: string): string {
   }
 }
 
-function TaskItem({ task }: { task: Doc<"lifeos_pmIssues"> }) {
+function TaskItem({
+  task,
+  showPoints = false,
+}: {
+  task: Doc<"lifeos_pmIssues">;
+  showPoints?: boolean;
+}) {
   const isDone = task.status === "done";
 
   return (
     <div
-      className={cn(
-        "flex items-start gap-2 py-1.5",
-        isDone && "opacity-60"
-      )}
+      className={cn("flex items-start gap-2 py-1.5", isDone && "opacity-75")}
     >
       {isDone ? (
         <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -55,12 +69,17 @@ function TaskItem({ task }: { task: Doc<"lifeos_pmIssues"> }) {
       )}
       <span
         className={cn(
-          "text-sm leading-tight",
+          "text-sm leading-tight flex-1",
           isDone && "line-through text-muted-foreground"
         )}
       >
         {task.title}
       </span>
+      {showPoints && task.estimate && task.estimate > 0 && (
+        <Badge variant="outline" className="text-xs ml-2">
+          {task.estimate} pts
+        </Badge>
+      )}
     </div>
   );
 }
@@ -78,9 +97,6 @@ function DayTaskGroup({
   const dayNum = dayDate.getDate();
   const monthName = dayDate.toLocaleDateString("en-US", { month: "short" });
 
-  const completedCount = tasks.filter((t) => t.status === "done").length;
-  const totalCount = tasks.length;
-
   if (tasks.length === 0) {
     return null;
   }
@@ -95,7 +111,7 @@ function DayTaskGroup({
           </span>
         </div>
         <Badge variant="outline" className="text-xs">
-          {completedCount}/{totalCount}
+          {tasks.length} task{tasks.length !== 1 ? "s" : ""}
         </Badge>
       </div>
       <div className="pl-2 border-l-2 border-muted space-y-0.5">
@@ -108,7 +124,15 @@ function DayTaskGroup({
 }
 
 export function WeeklyTasksSection() {
-  const { weeklyTasks, isLoadingWeeklyData, weekStartDate } = useAgenda();
+  const {
+    weeklyTasks,
+    weeklyCompletedTasks,
+    isLoadingWeeklyData,
+    weekStartDate,
+  } = useAgenda();
+
+  const [isPendingOpen, setIsPendingOpen] = useState(true);
+  const [isCompletedOpen, setIsCompletedOpen] = useState(true);
 
   // Generate array of dates for the week
   const getDatesForWeek = () => {
@@ -152,64 +176,136 @@ export function WeeklyTasksSection() {
   }
 
   const tasksByDay = weeklyTasks ?? {};
+  const completedTasks = weeklyCompletedTasks ?? [];
 
-  // Calculate totals
-  const allTasks = Object.values(tasksByDay).flat();
-  const totalTasks = allTasks.length;
-  const completedTasks = allTasks.filter((t) => t.status === "done").length;
+  // Calculate totals for pending tasks (due this week)
+  const pendingTasks = Object.values(tasksByDay).flat();
+  const pendingCount = pendingTasks.length;
 
-  // Get days that have tasks
-  const daysWithTasks = dates.filter((date) => {
-    const tasks = tasksByDay[date] ?? [];
-    return tasks.length > 0;
-  });
+  // Calculate completed tasks stats
+  const completedCount = completedTasks.length;
+  const totalCompletedPoints = completedTasks.reduce(
+    (sum, task) => sum + (task.estimate ?? 0),
+    0
+  );
+
+  // Check if there's any data
+  const hasNoData = pendingCount === 0 && completedCount === 0;
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             <CheckSquare className="h-5 w-5 text-blue-500" />
             Tasks This Week
           </CardTitle>
-          {totalTasks > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <span>
-                {completedTasks}/{totalTasks} completed
+          <div className="flex items-center gap-3 text-sm">
+            {pendingCount > 0 && (
+              <span className="text-muted-foreground">
+                {pendingCount} pending
               </span>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {totalTasks === 0 ? (
-          <div className="text-center py-8">
-            <Clock className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-            <p className="text-muted-foreground">
-              No tasks with due dates this week
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {dates.map((date, i) => {
-              const tasks = tasksByDay[date] ?? [];
-              return (
-                <DayTaskGroup
-                  key={date}
-                  date={date}
-                  dayIndex={i}
-                  tasks={tasks}
-                />
-              );
-            })}
-
-            {daysWithTasks.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No tasks scheduled for this week
-              </p>
+            )}
+            {completedCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-green-600">
+                  {completedCount} completed
+                </span>
+                {totalCompletedPoints > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 bg-green-500/10 text-green-600"
+                  >
+                    {totalCompletedPoints} pts
+                  </Badge>
+                )}
+              </div>
             )}
           </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {hasNoData ? (
+          <div className="text-center py-8">
+            <Clock className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+            <p className="text-muted-foreground">No tasks this week</p>
+          </div>
+        ) : (
+          <>
+            {/* Pending Tasks Section */}
+            {pendingCount > 0 && (
+              <Collapsible open={isPendingOpen} onOpenChange={setIsPendingOpen}>
+                <CollapsibleTrigger className="flex items-center gap-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      !isPendingOpen && "-rotate-90"
+                    )}
+                  />
+                  <Clock className="h-4 w-4 text-blue-500" />
+                  <h4 className="text-sm font-medium">Due This Week</h4>
+                  <span className="text-xs text-muted-foreground">
+                    ({pendingCount})
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <div className="space-y-4 pl-1">
+                    {dates.map((date, i) => {
+                      const tasks = tasksByDay[date] ?? [];
+                      return (
+                        <DayTaskGroup
+                          key={date}
+                          date={date}
+                          dayIndex={i}
+                          tasks={tasks}
+                        />
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
+            {/* Completed Tasks Section */}
+            {completedCount > 0 && (
+              <Collapsible
+                open={isCompletedOpen}
+                onOpenChange={setIsCompletedOpen}
+              >
+                <CollapsibleTrigger className="flex items-center gap-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform",
+                      !isCompletedOpen && "-rotate-90"
+                    )}
+                  />
+                  <Trophy className="h-4 w-4 text-green-500" />
+                  <h4 className="text-sm font-medium text-green-600">
+                    Completed This Week
+                  </h4>
+                  <span className="text-xs text-green-600">
+                    ({completedCount})
+                  </span>
+                  {totalCompletedPoints > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto bg-green-500/10 text-green-600 text-xs"
+                    >
+                      {totalCompletedPoints} pts total
+                    </Badge>
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <div className="bg-green-500/5 rounded-lg p-3 space-y-0.5">
+                    {completedTasks.map((task) => (
+                      <TaskItem key={task._id} task={task} showPoints={true} />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

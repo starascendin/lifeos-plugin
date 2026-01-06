@@ -891,6 +891,77 @@ export const getTasksForDateRange = query({
 });
 
 /**
+ * Get tasks completed on a specific date (by completedAt timestamp)
+ * Used by Daily Agenda to show tasks completed that day
+ */
+export const getCompletedTasksForDate = query({
+  args: {
+    date: v.string(), // YYYY-MM-DD format
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Parse the date to get start and end timestamps for the day
+    const startOfDay = new Date(args.date).setHours(0, 0, 0, 0);
+    const endOfDay = new Date(args.date).setHours(23, 59, 59, 999);
+
+    // Get all issues for the user
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Filter by completedAt date
+    const completedTasks = allIssues.filter((issue) => {
+      if (issue.status !== "done") return false;
+      if (!issue.completedAt) return false;
+      return issue.completedAt >= startOfDay && issue.completedAt <= endOfDay;
+    });
+
+    // Sort by completedAt (most recent first)
+    return completedTasks.sort(
+      (a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)
+    );
+  },
+});
+
+/**
+ * Get tasks completed in a date range (by completedAt timestamp)
+ * Used by Weekly View to show completed tasks rollup
+ */
+export const getCompletedTasksForDateRange = query({
+  args: {
+    startDate: v.string(), // YYYY-MM-DD
+    endDate: v.string(), // YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Parse dates to timestamps
+    const startOfRange = new Date(args.startDate).setHours(0, 0, 0, 0);
+    const endOfRange = new Date(args.endDate).setHours(23, 59, 59, 999);
+
+    // Get all issues for the user
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Filter by completedAt in date range
+    const completedTasks = allIssues.filter((issue) => {
+      if (issue.status !== "done") return false;
+      if (!issue.completedAt) return false;
+      return issue.completedAt >= startOfRange && issue.completedAt <= endOfRange;
+    });
+
+    // Sort by completedAt (most recent first)
+    return completedTasks.sort(
+      (a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)
+    );
+  },
+});
+
+/**
  * Toggle top priority status for an issue (for Daily Agenda "Top 3" selection)
  */
 export const toggleTopPriority = mutation({
