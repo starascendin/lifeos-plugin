@@ -20,14 +20,14 @@ export function UserButton() {
 
   const handleSwitchAccount = async () => {
     setIsOpen(false);
-    await signOut();
+    await (signOut as any)({ redirectUrl: "/#/lifeos" });
     // Don't call openSignIn - let the app naturally render SignIn.tsx
     // which has the correct oidcPrompt parameter
   };
 
   const handleSignOut = async () => {
     setIsOpen(false);
-    await signOut();
+    await (signOut as any)({ redirectUrl: "/#/lifeos" });
   };
 
   if (!user) return null;

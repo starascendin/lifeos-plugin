@@ -50,9 +50,10 @@ import { useEffect, useRef, useMemo, useState } from "react";
 
 interface NavItem {
   name: string;
-  href: string;
+  href?: string;
   icon: React.ComponentType<{ className?: string }>;
   children?: { name: string; href: string; icon?: React.ComponentType<{ className?: string }> }[];
+  onClick?: () => void | Promise<void>;
 }
 
 interface SidebarProps {
@@ -69,7 +70,11 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const { connectionState, connect, disconnect, isConfigured } = useVoiceAgent();
   const [mounted, setMounted] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(["Projects"]);
-  const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+
+  const signOutToLifeOS = async () => {
+    // Keep user in the LifeOS route after logout so re-login doesn't land on the background app.
+    await (signOut as any)({ redirectUrl: "/#/lifeos" });
+  };
 
   // For mobile, always show expanded sidebar
   const effectiveCollapsed = isMobile ? false : isCollapsed;
@@ -120,9 +125,17 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
       { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
       { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
       { name: "Settings", href: "/lifeos/settings", icon: Settings },
+      {
+        name: "Logout",
+        icon: LogOut,
+        onClick: async () => {
+          if (isMobile) closeMobileSidebar();
+          await signOutToLifeOS();
+        },
+      },
     ];
     return items;
-  }, []);
+  }, [closeMobileSidebar, isMobile, signOutToLifeOS]);
 
   return (
     <aside
@@ -131,7 +144,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
         effectiveCollapsed ? "w-16" : "w-64",
       )}
     >
-      <div className="flex h-full flex-col">
+      <div className="flex h-full min-h-0 flex-col">
         {/* Header with branding */}
         <div
           className={cn(
@@ -232,14 +245,16 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
         {/* Navigation */}
         <nav
           className={cn(
-            "flex-1 space-y-1",
+            "flex-1 min-h-0 overflow-y-auto space-y-1",
             effectiveCollapsed ? "px-2 py-4" : "px-4 py-4",
           )}
         >
           {navigation.map((item) => {
             const isActive =
-              pathname === item.href ||
-              (item.href !== "/lifeos" && pathname?.startsWith(`${item.href}/`));
+              item.href
+                ? pathname === item.href ||
+                  (item.href !== "/lifeos" && pathname?.startsWith(`${item.href}/`))
+                : false;
             const hasChildren = item.children && item.children.length > 0;
             const isExpanded = expandedSections.includes(item.name);
 
@@ -296,17 +311,29 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
             }
 
             // Regular nav item or collapsed mode
-            const linkContent = (
+            const commonClassName = cn(
+              "flex items-center rounded-md font-medium text-sm transition-colors",
+              effectiveCollapsed ? "justify-center p-3" : "gap-3 px-3 py-2",
+              isActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            );
+
+            const itemContent = item.onClick ? (
+              <button
+                key={item.name}
+                type="button"
+                onClick={item.onClick}
+                className={commonClassName}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {!effectiveCollapsed && <span>{item.name}</span>}
+              </button>
+            ) : (
               <Link
                 key={item.name}
-                to={item.href}
-                className={cn(
-                  "flex items-center rounded-md font-medium text-sm transition-colors",
-                  effectiveCollapsed ? "justify-center p-3" : "gap-3 px-3 py-2",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                )}
+                to={item.href!}
+                className={commonClassName}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
                 {!effectiveCollapsed && <span>{item.name}</span>}
@@ -315,11 +342,11 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
 
             return effectiveCollapsed ? (
               <Tooltip key={item.name}>
-                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                <TooltipTrigger asChild>{itemContent}</TooltipTrigger>
                 <TooltipContent side="right">{item.name}</TooltipContent>
               </Tooltip>
             ) : (
-              <div key={item.name}>{linkContent}</div>
+              <div key={item.name}>{itemContent}</div>
             );
           })}
         </nav>
@@ -410,7 +437,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => signOut()}
+                  onClick={() => signOutToLifeOS()}
                   className="cursor-pointer text-red-600"
                 >
                   <LogOut className="mr-2 h-4 w-4" />

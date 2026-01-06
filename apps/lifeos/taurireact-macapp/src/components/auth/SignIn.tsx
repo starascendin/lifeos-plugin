@@ -27,6 +27,20 @@ export function SignIn() {
   const [signUpPasswordConfirm, setSignUpPasswordConfirm] = useState("");
   const [signUpEmailCode, setSignUpEmailCode] = useState("");
 
+  const isDevOrStaging = import.meta.env.MODE === "development" || import.meta.env.MODE === "staging";
+  const testUserLoginEnabled =
+    isDevOrStaging &&
+    import.meta.env.VITE_ENABLE_TEST_USER_LOGIN === "true" &&
+    !!import.meta.env.E2E_TEST_USER_EMAIL &&
+    !!import.meta.env.E2E_TEST_USER_PASSWORD;
+
+  const goToLifeOS = () => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash || "";
+    if (hash === "#/lifeos" || hash.startsWith("#/lifeos/")) return;
+    window.location.hash = "#/lifeos";
+  };
+
   const handleGoogleSignIn = async () => {
     console.log("[SignIn] handleGoogleSignIn called, isLoaded:", isSignInLoaded, "signIn:", !!signIn);
     if (!isSignInLoaded || !signIn) {
@@ -114,6 +128,7 @@ export function SignIn() {
                 if (reloadedSignUp.createdSessionId) {
                   await clerk.setActive({ session: reloadedSignUp.createdSessionId });
                   console.log("[SignIn] Session activated from signUp");
+                  goToLifeOS();
                 } else {
                   throw new Error("No session ID after signUp reload");
                 }
@@ -124,6 +139,7 @@ export function SignIn() {
                 if (reloadedSignIn.createdSessionId) {
                   await clerk.setActive({ session: reloadedSignIn.createdSessionId });
                   console.log("[SignIn] Session activated from signIn");
+                  goToLifeOS();
                 } else {
                   throw new Error("No session ID after signIn reload");
                 }
@@ -148,6 +164,7 @@ export function SignIn() {
                 if (reloadedSignIn.status === "complete" && reloadedSignIn.createdSessionId) {
                   await clerk.setActive({ session: reloadedSignIn.createdSessionId });
                   console.log("[SignIn] Session activated via polling");
+                  goToLifeOS();
                   return;
                 }
 
@@ -161,6 +178,7 @@ export function SignIn() {
                   if (reloadedSignUp.createdSessionId) {
                     await clerk.setActive({ session: reloadedSignUp.createdSessionId });
                     console.log("[SignIn] Session activated from signUp via polling");
+                    goToLifeOS();
                     return;
                   }
                 }
@@ -192,8 +210,9 @@ export function SignIn() {
         console.log("[SignIn] Using web redirect OAuth flow...");
         await signIn.authenticateWithRedirect({
           strategy: "oauth_google",
-          redirectUrl: "/sso-callback",
-          redirectUrlComplete: "/",
+          // HashRouter: the callback route must live in the hash.
+          redirectUrl: "/#/sso-callback",
+          redirectUrlComplete: "/#/lifeos",
           // @ts-expect-error - Clerk types may not include additionalScopes but it works
           additionalScopes: ["https://www.googleapis.com/auth/youtube.readonly"],
           oidcPrompt: "consent",
@@ -212,12 +231,17 @@ export function SignIn() {
     }
   };
 
-  const handlePasswordSignIn = async () => {
+  const handlePasswordSignIn = async (opts?: {
+    identifier?: string;
+    password?: string;
+    autoSecondFactorCode?: string;
+  }) => {
     console.log("[SignIn] handlePasswordSignIn called, isLoaded:", isSignInLoaded, "signIn:", !!signIn);
     if (!isSignInLoaded || !signIn) return;
 
-    const emailOrUsername = identifier.trim();
-    if (!emailOrUsername || !password) {
+    const emailOrUsername = (opts?.identifier ?? identifier).trim();
+    const passwordToUse = opts?.password ?? password;
+    if (!emailOrUsername || !passwordToUse) {
       setError("Please enter your email and password.");
       return;
     }
@@ -235,17 +259,25 @@ export function SignIn() {
       await signInResource.create({ identifier: emailOrUsername });
       const firstFactorResult = await signInResource.attemptFirstFactor({
         strategy: "password",
-        password,
+        password: passwordToUse,
       });
 
       if (firstFactorResult?.status === "complete" && firstFactorResult.createdSessionId) {
         await clerk.setActive({ session: firstFactorResult.createdSessionId });
+        goToLifeOS();
         setLoadingMode(null);
         return;
       }
 
       if (firstFactorResult?.status === "needs_second_factor") {
+        const autoCode = opts?.autoSecondFactorCode?.trim();
         setNeedsSecondFactor(true);
+        if (autoCode) {
+          setTwoFactorCode(autoCode);
+          setLoadingMode(null);
+          await handleSecondFactor({ code: autoCode });
+          return;
+        }
         setLoadingMode(null);
         return;
       }
@@ -258,11 +290,11 @@ export function SignIn() {
     }
   };
 
-  const handleSecondFactor = async () => {
+  const handleSecondFactor = async (opts?: { code?: string }) => {
     console.log("[SignIn] handleSecondFactor called, isLoaded:", isSignInLoaded, "signIn:", !!signIn);
     if (!isSignInLoaded || !signIn) return;
 
-    const code = twoFactorCode.trim();
+    const code = (opts?.code ?? twoFactorCode).trim();
     if (!code) {
       setError("Enter your 2FA code.");
       return;
@@ -280,6 +312,7 @@ export function SignIn() {
 
       if (result?.status === "complete" && result.createdSessionId) {
         await clerk.setActive({ session: result.createdSessionId });
+        goToLifeOS();
         setLoadingMode(null);
         return;
       }
@@ -319,6 +352,7 @@ export function SignIn() {
 
       if (signUpResource.status === "complete" && signUpResource.createdSessionId) {
         await clerk.setActive({ session: signUpResource.createdSessionId });
+        goToLifeOS();
         setLoadingMode(null);
         return;
       }
@@ -352,6 +386,7 @@ export function SignIn() {
 
       if (result?.status === "complete" && result.createdSessionId) {
         await clerk.setActive({ session: result.createdSessionId });
+        goToLifeOS();
         setLoadingMode(null);
         return;
       }
@@ -460,6 +495,29 @@ export function SignIn() {
               <span className="text-xs text-[var(--text-secondary)]">or</span>
               <div className="h-px flex-1 bg-gray-200" />
             </div>
+
+            {testUserLoginEnabled && (
+              <button
+                onClick={() => {
+                  const email = import.meta.env.E2E_TEST_USER_EMAIL as string | undefined;
+                  const pw = import.meta.env.E2E_TEST_USER_PASSWORD as string | undefined;
+                  const code = import.meta.env.E2E_TEST_USER_2FA_CODE as string | undefined;
+                  setError(null);
+                  setShowEmailPassword(true);
+                  setIdentifier(email ?? "");
+                  setPassword(pw ?? "");
+                  void handlePasswordSignIn({
+                    identifier: email,
+                    password: pw,
+                    autoSecondFactorCode: code,
+                  });
+                }}
+                disabled={!isSignInLoaded || isLoading}
+                className="mt-4 w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+              >
+                Sign in with Test User
+              </button>
+            )}
 
             {!showEmailPassword ? (
               <button

@@ -1,6 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { ClerkProvider, useAuth } from "@clerk/clerk-react";
+import {
+  AuthenticateWithRedirectCallback,
+  ClerkProvider,
+  useAuth,
+} from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -48,6 +52,16 @@ async function initializeApp() {
                 <Route
                   path="/"
                   element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
+                />
+                <Route
+                  path="/sso-callback"
+                  element={
+                    <AuthenticateWithRedirectCallback
+                      // HashRouter: these should include the hash.
+                      signInFallbackRedirectUrl="/#/lifeos"
+                      signUpFallbackRedirectUrl="/#/lifeos"
+                    />
+                  }
                 />
                 <Route path="/lifeos/*" element={<LifeOSApp />} />
               </Routes>

@@ -8,6 +8,9 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
+  // Expose additional env vars (e.g. E2E_TEST_USER_EMAIL) to the client.
+  // Only enable test-user login UI in non-production modes.
+  envPrefix: ["VITE_", "E2E_"],
 
   resolve: {
     alias: {
