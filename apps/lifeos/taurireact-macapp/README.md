@@ -11,6 +11,7 @@ This template should help get you started developing with Tauri, React and Types
    - `pnpm -C apps/lifeos/taurireact-macapp exec playwright install chromium`
 4. Run:
    - `pnpm -C apps/lifeos/taurireact-macapp test:e2e`
+   - `pnpm -C apps/lifeos/taurireact-macapp test:e2e:preview` (deploys Convex to a new preview using `CONVEX_DEPLOY_KEY`, then runs E2E)
 
 ## Recommended IDE Setup
 
