@@ -44,33 +44,31 @@ function ProxyCouncilContent() {
   // Local form state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [url, setUrl] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
   // Sync form state with loaded settings
+  // Using password field as token for backwards compatibility
   useEffect(() => {
     if (settings) {
       setUrl(settings.url);
-      setUsername(settings.username);
-      setPassword(settings.password);
+      setToken(settings.password); // password field stores the token
     }
   }, [settings]);
 
-  // Construct iframe URL with embedded credentials
+  // Construct iframe URL with token query param
   const iframeUrl = useMemo(() => {
     if (!settings) return "";
 
     try {
       const urlObj = new URL(settings.url);
-      // Embed credentials in URL: https://user:pass@domain/
-      urlObj.username = settings.username;
-      urlObj.password = settings.password;
+      if (settings.password) {
+        urlObj.searchParams.set("token", settings.password);
+      }
       return urlObj.toString();
     } catch {
-      // Return plain URL if parsing fails
       return settings.url;
     }
   }, [settings]);
@@ -78,7 +76,8 @@ function ProxyCouncilContent() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await updateSettings({ url, username, password });
+      // Store token in password field, username empty
+      await updateSettings({ url, username: "", password: token });
     } catch (error) {
       console.error("Failed to save settings:", error);
     } finally {
@@ -100,9 +99,7 @@ function ProxyCouncilContent() {
   // Check if form has unsaved changes
   const hasChanges =
     settings &&
-    (url !== settings.url ||
-      username !== settings.username ||
-      password !== settings.password);
+    (url !== settings.url || token !== settings.password);
 
   if (settings === undefined) {
     return (
@@ -111,19 +108,6 @@ function ProxyCouncilContent() {
       </div>
     );
   }
-
-  // Debug: log the constructed URL (without password)
-  useEffect(() => {
-    if (iframeUrl) {
-      try {
-        const debugUrl = new URL(iframeUrl);
-        debugUrl.password = "***";
-        console.log("[ProxyCouncil] iframe URL:", debugUrl.toString());
-      } catch {
-        console.log("[ProxyCouncil] iframe URL (raw):", iframeUrl);
-      }
-    }
-  }, [iframeUrl]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -166,28 +150,16 @@ function ProxyCouncilContent() {
                 />
               </div>
 
-              {/* Username */}
+              {/* Token */}
               <div className="space-y-2">
-                <Label htmlFor="proxy-username">Username</Label>
-                <Input
-                  id="proxy-username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="username"
-                />
-              </div>
-
-              {/* Password */}
-              <div className="space-y-2">
-                <Label htmlFor="proxy-password">Password</Label>
+                <Label htmlFor="proxy-token">Auth Token</Label>
                 <div className="relative">
                   <Input
-                    id="proxy-password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="password"
+                    id="proxy-token"
+                    type={showToken ? "text" : "password"}
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    placeholder="secret123"
                     className="pr-10"
                   />
                   <Button
@@ -195,15 +167,18 @@ function ProxyCouncilContent() {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowToken(!showToken)}
                   >
-                    {showPassword ? (
+                    {showToken ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <Eye className="h-4 w-4 text-muted-foreground" />
                     )}
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Token is passed as ?token=xxx in the URL
+                </p>
               </div>
 
               {/* Actions */}
@@ -240,7 +215,7 @@ function ProxyCouncilContent() {
       </Collapsible>
 
       {/* Iframe */}
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         {iframeUrl ? (
           <iframe
             src={iframeUrl}

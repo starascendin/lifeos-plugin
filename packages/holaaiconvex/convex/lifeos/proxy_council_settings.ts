@@ -3,10 +3,11 @@ import { mutation, query } from "../_generated/server";
 import { requireUser } from "../_lib/auth";
 
 // Default values
+// Note: password field is used to store the auth token
 const DEFAULT_SETTINGS = {
   url: "https://council-proxy.tail05d28.ts.net/",
-  username: "council",
-  password: "secret123",
+  username: "",
+  password: "secret123", // This is the token for ?token=xxx
 };
 
 // ==================== QUERIES ====================
