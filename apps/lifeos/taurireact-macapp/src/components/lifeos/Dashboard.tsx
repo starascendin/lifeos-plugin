@@ -105,7 +105,7 @@ function DashboardContent() {
       <div>
         <h1 className="font-bold text-2xl md:text-3xl">LifeOS Dashboard</h1>
         <p className="text-sm md:text-base text-muted-foreground">
-          Command Center - Your productivity at a glance
+          Command Center - Your productivity at a glance!
         </p>
       </div>
 
