@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id } from "@holaai/convex";
@@ -41,10 +42,13 @@ const CYCLE_STATUS_CONFIG: Record<
   },
 };
 
-export function CycleDetailView() {
+interface CycleDetailViewProps {
+  cycleId: Id<"lifeos_pmCycles">;
+}
+
+export function CycleDetailView({ cycleId }: CycleDetailViewProps) {
+  const navigate = useNavigate();
   const {
-    viewingCycleId,
-    closeCycleDetailView,
     updateIssueStatus,
     setFilters,
     filters,
@@ -53,7 +57,7 @@ export function CycleDetailView() {
 
   const cycleData = useQuery(
     api.lifeos.pm_cycles.getCycleWithBreakdowns,
-    viewingCycleId ? { cycleId: viewingCycleId } : "skip"
+    { cycleId }
   );
 
   const recordSnapshot = useMutation(
@@ -67,32 +71,35 @@ export function CycleDetailView() {
     [updateIssueStatus]
   );
 
+  const handleClose = useCallback(() => {
+    navigate("/lifeos/pm/cycles");
+  }, [navigate]);
+
   // Set cycle filter when entering view
   useEffect(() => {
-    if (viewingCycleId) {
-      // Record snapshot
-      recordSnapshot({ cycleId: viewingCycleId }).catch(console.error);
-      // Set filter so QuickAddIssue creates issues in this cycle
-      setFilters({ ...filters, cycleId: viewingCycleId });
-    }
+    // Record snapshot
+    recordSnapshot({ cycleId }).catch(console.error);
+    // Set filter so QuickAddIssue creates issues in this cycle
+    setFilters({ ...filters, cycleId });
+
     return () => {
       // Clear cycle filter when leaving
       setFilters({ ...filters, cycleId: undefined });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewingCycleId]);
+  }, [cycleId]);
 
   // Handle Escape key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        closeCycleDetailView();
+        handleClose();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closeCycleDetailView]);
+  }, [handleClose]);
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString("en-US", {
@@ -104,10 +111,6 @@ export function CycleDetailView() {
   const formatDateRange = (start: number, end: number) => {
     return `${formatDate(start)} - ${formatDate(end)}`;
   };
-
-  if (!viewingCycleId) {
-    return null;
-  }
 
   if (cycleData === undefined) {
     return (
@@ -138,7 +141,7 @@ export function CycleDetailView() {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={closeCycleDetailView}
+            onClick={handleClose}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -177,7 +180,7 @@ export function CycleDetailView() {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => viewingCycleId && setSelectedCycleForDetail(viewingCycleId)}
+            onClick={() => setSelectedCycleForDetail(cycleId)}
             title="Cycle settings"
           >
             <MoreHorizontal className="h-4 w-4" />
@@ -198,7 +201,7 @@ export function CycleDetailView() {
 
         {/* Breakdown Panel */}
         <CycleBreakdownPanel
-          cycleId={viewingCycleId}
+          cycleId={cycleId}
           cycle={cycle}
           stats={stats}
           breakdowns={breakdowns}

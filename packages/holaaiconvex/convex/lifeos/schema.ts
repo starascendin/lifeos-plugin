@@ -2,6 +2,7 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { avatarTables } from "./avatar_schema";
 import { chatnexusTables } from "./chatnexus_schema";
+import { dailyFieldsTables } from "./daily_fields_schema";
 import { demoAgentTables } from "./demo_agent_schema";
 import { habitsTables } from "./habits_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
@@ -19,6 +20,8 @@ export const lifeosTables = {
   ...avatarTables,
   // Chat Nexus tables
   ...chatnexusTables,
+  // Daily Fields tables
+  ...dailyFieldsTables,
   // Demo Agent tables
   ...demoAgentTables,
   // LLM Council tables

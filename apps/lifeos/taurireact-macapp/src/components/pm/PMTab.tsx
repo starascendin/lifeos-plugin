@@ -29,7 +29,7 @@ type ViewType = "board" | "projects" | "cycles";
 export function PMTab() {
   const { view, id } = useParams<{ view?: string; id?: string }>();
   const navigate = useNavigate();
-  const { projects, filters, setFilters, clearFilters, viewingCycleId } = usePM();
+  const { projects, filters, setFilters, clearFilters } = usePM();
 
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateIssue, setShowCreateIssue] = useState(false);
@@ -40,9 +40,11 @@ export function PMTab() {
   const currentView: ViewType =
     view === "projects" ? "projects" : view === "cycles" ? "cycles" : "board";
 
-  // Check if we're viewing a specific project
+  // Check if we're viewing a specific project or cycle
   const isProjectDetail = view === "projects" && id;
-  const projectId = id as Id<"lifeos_pmProjects"> | undefined;
+  const isCycleDetail = view === "cycles" && id;
+  const projectId = isProjectDetail ? (id as Id<"lifeos_pmProjects">) : undefined;
+  const cycleId = isCycleDetail ? (id as Id<"lifeos_pmCycles">) : undefined;
 
   const handleViewChange = (newView: ViewType) => {
     if (newView === "board") {
@@ -55,7 +57,7 @@ export function PMTab() {
   return (
     <div className="flex h-full flex-col">
       {/* Header - hide when viewing project or cycle details */}
-      {!isProjectDetail && !viewingCycleId && (
+      {!isProjectDetail && !isCycleDetail && (
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-semibold">Project Management</h1>
@@ -160,8 +162,8 @@ export function PMTab() {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {viewingCycleId ? (
-          <CycleDetailView />
+        {isCycleDetail && cycleId ? (
+          <CycleDetailView cycleId={cycleId} />
         ) : isProjectDetail && projectId ? (
           <ProjectDetailView projectId={projectId} />
         ) : (

@@ -62,10 +62,6 @@ interface PMContextValue {
   setSelectedIssueId: (id: Id<"lifeos_pmIssues"> | null) => void;
   selectedCycleForDetail: Id<"lifeos_pmCycles"> | null;
   setSelectedCycleForDetail: (id: Id<"lifeos_pmCycles"> | null) => void;
-  viewingCycleId: Id<"lifeos_pmCycles"> | null;
-  setViewingCycleId: (id: Id<"lifeos_pmCycles"> | null) => void;
-  openCycleDetailView: (id: Id<"lifeos_pmCycles">) => void;
-  closeCycleDetailView: () => void;
 
   // Filters
   filters: FilterState;
@@ -119,7 +115,6 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
   const [selectedCycleId, setSelectedCycleId] = useState<Id<"lifeos_pmCycles"> | null>(null);
   const [selectedIssueId, setSelectedIssueId] = useState<Id<"lifeos_pmIssues"> | null>(null);
   const [selectedCycleForDetail, setSelectedCycleForDetail] = useState<Id<"lifeos_pmCycles"> | null>(null);
-  const [viewingCycleId, setViewingCycleId] = useState<Id<"lifeos_pmCycles"> | null>(null);
   const [filters, setFiltersState] = useState<FilterState>({});
 
   // Queries
@@ -168,16 +163,6 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
     setFiltersState({});
   }, []);
 
-  const openCycleDetailView = useCallback((id: Id<"lifeos_pmCycles">) => {
-    setViewingCycleId(id);
-    setCurrentView("cycle_detail");
-  }, []);
-
-  const closeCycleDetailView = useCallback(() => {
-    setViewingCycleId(null);
-    setCurrentView("cycles");
-  }, []);
-
   const value: PMContextValue = {
     currentView,
     setCurrentView,
@@ -189,10 +174,6 @@ export function PMProvider({ children }: { children: React.ReactNode }) {
     setSelectedIssueId,
     selectedCycleForDetail,
     setSelectedCycleForDetail,
-    viewingCycleId,
-    setViewingCycleId,
-    openCycleDetailView,
-    closeCycleDetailView,
     filters,
     setFilters,
     clearFilters,

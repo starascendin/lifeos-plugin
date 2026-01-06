@@ -36,6 +36,8 @@ import type * as lifeos_avatar_schema from "../lifeos/avatar_schema.js";
 import type * as lifeos_avatar_stats from "../lifeos/avatar_stats.js";
 import type * as lifeos_chatnexus from "../lifeos/chatnexus.js";
 import type * as lifeos_chatnexus_schema from "../lifeos/chatnexus_schema.js";
+import type * as lifeos_daily_fields from "../lifeos/daily_fields.js";
+import type * as lifeos_daily_fields_schema from "../lifeos/daily_fields_schema.js";
 import type * as lifeos_demo_agent from "../lifeos/demo_agent.js";
 import type * as lifeos_demo_agent_schema from "../lifeos/demo_agent_schema.js";
 import type * as lifeos_habits from "../lifeos/habits.js";
@@ -102,6 +104,8 @@ declare const fullApi: ApiFromModules<{
   "lifeos/avatar_stats": typeof lifeos_avatar_stats;
   "lifeos/chatnexus": typeof lifeos_chatnexus;
   "lifeos/chatnexus_schema": typeof lifeos_chatnexus_schema;
+  "lifeos/daily_fields": typeof lifeos_daily_fields;
+  "lifeos/daily_fields_schema": typeof lifeos_daily_fields_schema;
   "lifeos/demo_agent": typeof lifeos_demo_agent;
   "lifeos/demo_agent_schema": typeof lifeos_demo_agent_schema;
   "lifeos/habits": typeof lifeos_habits;

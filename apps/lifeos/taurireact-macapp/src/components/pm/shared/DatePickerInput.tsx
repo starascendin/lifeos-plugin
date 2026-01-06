@@ -1,5 +1,13 @@
-import { Calendar } from "lucide-react";
+import { useState } from "react";
+import { Calendar as CalendarIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface DatePickerInputProps {
   value?: number; // timestamp
@@ -16,11 +24,7 @@ export function DatePickerInput({
   disabled = false,
   className,
 }: DatePickerInputProps) {
-  const formatDateForInput = (timestamp?: number): string => {
-    if (!timestamp) return "";
-    const date = new Date(timestamp);
-    return date.toISOString().split("T")[0];
-  };
+  const [open, setOpen] = useState(false);
 
   const formatDateForDisplay = (timestamp?: number): string => {
     if (!timestamp) return placeholder;
@@ -32,29 +36,57 @@ export function DatePickerInput({
     });
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const dateStr = e.target.value;
-    if (!dateStr) {
+  const handleSelect = (date: Date | undefined) => {
+    if (!date) {
       onChange(undefined);
-      return;
+    } else {
+      // Set to start of day in local timezone
+      const localDate = new Date(date);
+      localDate.setHours(0, 0, 0, 0);
+      onChange(localDate.getTime());
     }
-    const date = new Date(dateStr + "T00:00:00");
-    onChange(date.getTime());
+    setOpen(false);
   };
 
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(undefined);
+  };
+
+  // Convert timestamp to Date for the calendar
+  const selectedDate = value ? new Date(value) : undefined;
+
   return (
-    <div className={cn("relative inline-flex items-center", className)}>
-      <div className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-        <Calendar className="h-4 w-4" />
-        <span className={cn(!value && "italic")}>{formatDateForDisplay(value)}</span>
-      </div>
-      <input
-        type="date"
-        value={formatDateForInput(value)}
-        onChange={handleChange}
-        disabled={disabled}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-      />
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={disabled}
+          className={cn(
+            "h-8 justify-start gap-1.5 px-2 text-sm font-normal",
+            !value && "text-muted-foreground italic",
+            className
+          )}
+        >
+          <CalendarIcon className="h-4 w-4" />
+          <span>{formatDateForDisplay(value)}</span>
+          {value && (
+            <X
+              className="h-3 w-3 ml-1 opacity-50 hover:opacity-100"
+              onClick={handleClear}
+            />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={handleSelect}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useEffect,
 } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@holaai/convex";
@@ -51,6 +52,21 @@ interface AgendaContextValue {
   toggleHabitCheckIn: ReturnType<typeof useMutation>;
   updateIssueStatus: ReturnType<typeof useMutation>;
   toggleTopPriority: ReturnType<typeof useMutation>;
+
+  // Daily Fields data
+  dailyFields:
+    | Array<{
+        definition: Doc<"lifeos_dailyFieldDefinitions">;
+        value: Doc<"lifeos_dailyFieldValues"> | null;
+      }>
+    | undefined;
+  isLoadingDailyFields: boolean;
+
+  // Daily Fields mutations
+  setFieldValue: ReturnType<typeof useMutation>;
+  createFieldDefinition: ReturnType<typeof useMutation>;
+  updateFieldDefinition: ReturnType<typeof useMutation>;
+  archiveFieldDefinition: ReturnType<typeof useMutation>;
 
   // Helpers
   formatDate: (date: Date) => string;
@@ -115,10 +131,36 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     date: dateString,
   });
 
+  // Daily fields query
+  const dailyFields = useQuery(api.lifeos.daily_fields.getFieldsWithValuesForDate, {
+    date: dateString,
+  });
+
+  // Initialize default fields on mount
+  const initializeDefaultFields = useMutation(
+    api.lifeos.daily_fields.initializeDefaultFields
+  );
+
+  useEffect(() => {
+    initializeDefaultFields();
+  }, [initializeDefaultFields]);
+
   // Mutations
   const toggleHabitCheckIn = useMutation(api.lifeos.habits_checkins.toggleCheckIn);
   const updateIssueStatus = useMutation(api.lifeos.pm_issues.updateIssueStatus);
   const toggleTopPriority = useMutation(api.lifeos.pm_issues.toggleTopPriority);
+
+  // Daily fields mutations
+  const setFieldValue = useMutation(api.lifeos.daily_fields.setFieldValue);
+  const createFieldDefinition = useMutation(
+    api.lifeos.daily_fields.createFieldDefinition
+  );
+  const updateFieldDefinition = useMutation(
+    api.lifeos.daily_fields.updateFieldDefinition
+  );
+  const archiveFieldDefinition = useMutation(
+    api.lifeos.daily_fields.archiveFieldDefinition
+  );
 
   // Action for AI summary generation
   const generateDailySummaryAction = useAction(
@@ -214,6 +256,16 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     toggleHabitCheckIn,
     updateIssueStatus,
     toggleTopPriority,
+
+    // Daily Fields data
+    dailyFields,
+    isLoadingDailyFields: dailyFields === undefined,
+
+    // Daily Fields mutations
+    setFieldValue,
+    createFieldDefinition,
+    updateFieldDefinition,
+    archiveFieldDefinition,
 
     // Helpers
     formatDate: formatDateStr,

@@ -1,9 +1,11 @@
+import { useNavigate } from "react-router-dom";
 import { usePM, CycleStatus } from "@/lib/contexts/PMContext";
 import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { RefreshCw, Play, CheckCircle, Clock, LucideIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import type { Id } from "@holaai/convex";
 
 const STATUS_CONFIG: Record<CycleStatus, { label: string; icon: LucideIcon; color: string; bg: string }> = {
   upcoming: {
@@ -27,7 +29,12 @@ const STATUS_CONFIG: Record<CycleStatus, { label: string; icon: LucideIcon; colo
 };
 
 export function CycleList() {
-  const { cycles, isLoadingCycles, setSelectedCycleForDetail, openCycleDetailView } = usePM();
+  const navigate = useNavigate();
+  const { cycles, isLoadingCycles, setSelectedCycleForDetail } = usePM();
+
+  const handleCycleClick = (cycleId: Id<"lifeos_pmCycles">) => {
+    navigate(`/lifeos/pm/cycles/${cycleId}`);
+  };
 
   if (isLoadingCycles) {
     return (
@@ -86,7 +93,7 @@ export function CycleList() {
             return (
               <div
                 key={cycle._id}
-                onClick={() => openCycleDetailView(cycle._id)}
+                onClick={() => handleCycleClick(cycle._id)}
                 className="cursor-pointer rounded-lg border-2 border-green-500/30 bg-green-500/5 p-6 transition-colors hover:bg-green-500/10"
               >
                 <div className="mb-4 flex items-center justify-between">
@@ -169,7 +176,7 @@ export function CycleList() {
               return (
                 <div
                   key={cycle._id}
-                  onClick={() => openCycleDetailView(cycle._id)}
+                  onClick={() => handleCycleClick(cycle._id)}
                   className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
                 >
                   <div className="flex items-center gap-3">
@@ -233,7 +240,7 @@ export function CycleList() {
               return (
                 <div
                   key={cycle._id}
-                  onClick={() => openCycleDetailView(cycle._id)}
+                  onClick={() => handleCycleClick(cycle._id)}
                   className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-card/50 p-4 opacity-70 transition-opacity hover:opacity-100"
                 >
                   <div className="flex items-center gap-3">
