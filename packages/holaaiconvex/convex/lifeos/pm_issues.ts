@@ -349,7 +349,7 @@ export const updateIssue = mutation({
     priority: v.optional(priorityValidator),
     estimate: v.optional(v.number()),
     labelIds: v.optional(v.array(v.id("lifeos_pmLabels"))),
-    dueDate: v.optional(v.number()),
+    dueDate: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -369,7 +369,10 @@ export const updateIssue = mutation({
     if (args.priority !== undefined) updates.priority = args.priority;
     if (args.estimate !== undefined) updates.estimate = args.estimate;
     if (args.labelIds !== undefined) updates.labelIds = args.labelIds;
-    if (args.dueDate !== undefined) updates.dueDate = args.dueDate;
+    // Handle dueDate: null means clear, undefined means don't change
+    if (args.dueDate !== undefined) {
+      updates.dueDate = args.dueDate === null ? undefined : args.dueDate;
+    }
 
     await ctx.db.patch(args.issueId, updates);
     return args.issueId;
@@ -823,6 +826,67 @@ export const getTopPriorityTasks = query({
       if (priorityDiff !== 0) return priorityDiff;
       return a.sortOrder - b.sortOrder;
     });
+  },
+});
+
+/**
+ * Get tasks for a date range (used by Week View)
+ * Returns tasks grouped by day
+ */
+export const getTasksForDateRange = query({
+  args: {
+    startDate: v.string(), // YYYY-MM-DD
+    endDate: v.string(), // YYYY-MM-DD
+    includeCompleted: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Parse dates to timestamps
+    const startOfWeek = new Date(args.startDate).setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(args.endDate).setHours(23, 59, 59, 999);
+
+    // Get all issues for the user
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Filter by date range
+    const tasksForWeek = allIssues.filter((issue) => {
+      if (!issue.dueDate) return false;
+      if (issue.status === "cancelled") return false;
+      if (!args.includeCompleted && issue.status === "done") return false;
+      return issue.dueDate >= startOfWeek && issue.dueDate <= endOfWeek;
+    });
+
+    // Group by day (YYYY-MM-DD format)
+    const tasksByDay: Record<string, typeof tasksForWeek> = {};
+    for (const task of tasksForWeek) {
+      const date = new Date(task.dueDate!);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const dayStr = `${year}-${month}-${day}`;
+
+      if (!tasksByDay[dayStr]) {
+        tasksByDay[dayStr] = [];
+      }
+      tasksByDay[dayStr].push(task);
+    }
+
+    // Sort tasks within each day by priority then sortOrder
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+    for (const day of Object.keys(tasksByDay)) {
+      tasksByDay[day].sort((a, b) => {
+        const priorityDiff =
+          priorityOrder[a.priority] - priorityOrder[b.priority];
+        if (priorityDiff !== 0) return priorityDiff;
+        return a.sortOrder - b.sortOrder;
+      });
+    }
+
+    return tasksByDay;
   },
 });
 

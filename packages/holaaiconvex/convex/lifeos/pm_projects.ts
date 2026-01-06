@@ -208,8 +208,8 @@ export const updateProject = mutation({
     status: v.optional(projectStatusValidator),
     health: v.optional(projectHealthValidator),
     priority: v.optional(priorityValidator),
-    startDate: v.optional(v.number()),
-    targetDate: v.optional(v.number()),
+    startDate: v.optional(v.union(v.number(), v.null())),
+    targetDate: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -236,8 +236,13 @@ export const updateProject = mutation({
     }
     if (args.health !== undefined) updates.health = args.health;
     if (args.priority !== undefined) updates.priority = args.priority;
-    if (args.startDate !== undefined) updates.startDate = args.startDate;
-    if (args.targetDate !== undefined) updates.targetDate = args.targetDate;
+    // Handle dates: null means clear, undefined means don't change
+    if (args.startDate !== undefined) {
+      updates.startDate = args.startDate === null ? undefined : args.startDate;
+    }
+    if (args.targetDate !== undefined) {
+      updates.targetDate = args.targetDate === null ? undefined : args.targetDate;
+    }
 
     await ctx.db.patch(args.projectId, updates);
     return args.projectId;

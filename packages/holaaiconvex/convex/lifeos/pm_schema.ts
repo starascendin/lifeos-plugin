@@ -301,4 +301,30 @@ export const pmTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_date", ["userId", "date"]),
+
+  // ==================== WEEKLY SUMMARIES (for Agenda Weekly View) ====================
+  lifeos_weeklySummaries: defineTable({
+    userId: v.id("users"),
+    weekStartDate: v.string(), // YYYY-MM-DD format (Monday of the week)
+    weekEndDate: v.string(), // YYYY-MM-DD format (Sunday of the week)
+    // Custom prompt for weekly summary (user editable, persistent)
+    customPrompt: v.optional(v.string()),
+    // AI-generated summary
+    aiSummary: v.optional(v.string()),
+    generatedAt: v.optional(v.number()),
+    // Model and usage info
+    model: v.optional(v.string()), // e.g., "openai/gpt-4o-mini"
+    usage: v.optional(
+      v.object({
+        promptTokens: v.number(),
+        completionTokens: v.number(),
+        totalTokens: v.number(),
+      })
+    ),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_week", ["userId", "weekStartDate"]),
 };

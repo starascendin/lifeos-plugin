@@ -7,6 +7,7 @@ import { demoAgentTables } from "./demo_agent_schema";
 import { habitsTables } from "./habits_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
 import { pmTables } from "./pm_schema";
+import { proxyCouncilTables } from "./proxy_council_schema";
 import { voiceAgentTables } from "./voiceagent_schema";
 
 /**
@@ -28,6 +29,8 @@ export const lifeosTables = {
   ...llmcouncilTables,
   // Project Management tables
   ...pmTables,
+  // Proxy Council tables
+  ...proxyCouncilTables,
   // Habit Tracker tables
   ...habitsTables,
   // Voice Agent tables

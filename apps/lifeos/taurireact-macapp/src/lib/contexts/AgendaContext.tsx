@@ -14,6 +14,20 @@ import type { SupportedModelId } from "@/components/agenda/ModelSelector";
 // Types
 export type ViewMode = "daily" | "weekly" | "monthly";
 
+// Weekly data types
+interface WeeklyTasksByDay {
+  [date: string]: Doc<"lifeos_pmIssues">[];
+}
+
+interface WeeklyFieldValues {
+  fieldDefinition: Doc<"lifeos_dailyFieldDefinitions"> | null;
+  valuesByDate: Record<string, number | null>;
+}
+
+interface WeeklyMemo extends Doc<"life_voiceMemos"> {
+  audioUrl: string | null;
+}
+
 interface AgendaContextValue {
   // Date navigation
   currentDate: Date;
@@ -22,6 +36,14 @@ interface AgendaContextValue {
   goToPreviousDay: () => void;
   goToNextDay: () => void;
   dateString: string; // YYYY-MM-DD format
+
+  // Week navigation
+  currentWeekStart: Date;
+  weekStartDate: string; // YYYY-MM-DD (Monday)
+  weekEndDate: string; // YYYY-MM-DD (Sunday)
+  goToPreviousWeek: () => void;
+  goToNextWeek: () => void;
+  goToThisWeek: () => void;
 
   // View mode (for future weekly/monthly views)
   viewMode: ViewMode;
@@ -43,6 +65,19 @@ interface AgendaContextValue {
   isLoadingSummary: boolean;
   isGeneratingSummary: boolean;
   generateSummary: () => Promise<void>;
+
+  // Weekly data (only fetched when viewMode === "weekly")
+  weeklyTasks: WeeklyTasksByDay | undefined;
+  weeklyFieldValues: WeeklyFieldValues | undefined;
+  weeklyMemos: WeeklyMemo[] | undefined;
+  isLoadingWeeklyData: boolean;
+
+  // Weekly summary
+  weeklySummary: Doc<"lifeos_weeklySummaries"> | null | undefined;
+  isLoadingWeeklySummary: boolean;
+  isGeneratingWeeklySummary: boolean;
+  generateWeeklySummary: () => Promise<void>;
+  updateWeeklyPrompt: ReturnType<typeof useMutation>;
 
   // Model selection
   selectedModel: SupportedModelId;
@@ -72,6 +107,7 @@ interface AgendaContextValue {
   formatDate: (date: Date) => string;
   getCheckInKey: (habitId: Id<"lifeos_habits">, date: Date) => string;
   isHabitCompleted: (habitId: Id<"lifeos_habits">) => boolean;
+  getWeeklyAverage: () => number | null;
 }
 
 const AgendaContext = createContext<AgendaContextValue | null>(null);
@@ -84,6 +120,30 @@ function formatDateStr(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Get the Monday of the week containing the given date
+ * Uses ISO week standard (Monday = 1, Sunday = 7)
+ */
+function getWeekStartDate(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  // day: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  // Adjust so Monday = 0
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Get the Sunday of the week (6 days after Monday)
+ */
+function getWeekEndDate(weekStart: Date): Date {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + 6);
+  return d;
+}
+
 export function AgendaProvider({ children }: { children: React.ReactNode }) {
   // Date navigation state
   const [currentDate, setCurrentDate] = useState<Date>(() => {
@@ -93,12 +153,28 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   });
   const [viewMode, setViewMode] = useState<ViewMode>("daily");
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isGeneratingWeeklySummary, setIsGeneratingWeeklySummary] =
+    useState(false);
   const [selectedModel, setSelectedModel] = useState<SupportedModelId>(
     "openai/gpt-4o-mini"
   );
 
-  // Calculate date string for queries
+  // Week navigation state - derived from currentDate
+  const currentWeekStart = useMemo(
+    () => getWeekStartDate(currentDate),
+    [currentDate]
+  );
+
+  // Calculate date strings for queries
   const dateString = useMemo(() => formatDateStr(currentDate), [currentDate]);
+  const weekStartDate = useMemo(
+    () => formatDateStr(currentWeekStart),
+    [currentWeekStart]
+  );
+  const weekEndDate = useMemo(
+    () => formatDateStr(getWeekEndDate(currentWeekStart)),
+    [currentWeekStart]
+  );
 
   // Habits queries
   const todaysHabits = useQuery(api.lifeos.habits.getHabitsForDate, {
@@ -136,6 +212,34 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     date: dateString,
   });
 
+  // Weekly data queries (only fetch when in weekly view mode)
+  const weeklyTasks = useQuery(
+    api.lifeos.pm_issues.getTasksForDateRange,
+    viewMode === "weekly"
+      ? { startDate: weekStartDate, endDate: weekEndDate, includeCompleted: true }
+      : "skip"
+  );
+
+  const weeklyFieldValues = useQuery(
+    api.lifeos.daily_fields.getFieldValuesForDateRange,
+    viewMode === "weekly"
+      ? { startDate: weekStartDate, endDate: weekEndDate }
+      : "skip"
+  );
+
+  const weeklyMemos = useQuery(
+    api.lifeos.voicememo.getMemosForDateRange,
+    viewMode === "weekly"
+      ? { startDate: weekStartDate, endDate: weekEndDate }
+      : "skip"
+  );
+
+  // Weekly summary query
+  const weeklySummary = useQuery(
+    api.lifeos.agenda.getWeeklySummary,
+    viewMode === "weekly" ? { weekStartDate } : "skip"
+  );
+
   // Initialize default fields on mount
   const initializeDefaultFields = useMutation(
     api.lifeos.daily_fields.initializeDefaultFields
@@ -167,7 +271,15 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     api.lifeos.agenda.generateDailySummary
   );
 
-  // Generate summary handler
+  // Weekly summary mutations and action
+  const updateWeeklyPromptMutation = useMutation(
+    api.lifeos.agenda.updateWeeklyPrompt
+  );
+  const generateWeeklySummaryAction = useAction(
+    api.lifeos.agenda.generateWeeklySummary
+  );
+
+  // Generate daily summary handler
   const generateSummary = useCallback(async () => {
     setIsGeneratingSummary(true);
     try {
@@ -179,7 +291,55 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     }
   }, [generateDailySummaryAction, dateString, selectedModel]);
 
-  // Navigation helpers
+  // Generate weekly summary handler
+  const generateWeeklySummary = useCallback(async () => {
+    setIsGeneratingWeeklySummary(true);
+    try {
+      await generateWeeklySummaryAction({
+        weekStartDate,
+        model: selectedModel,
+      });
+    } catch (error) {
+      console.error("Failed to generate weekly summary:", error);
+    } finally {
+      setIsGeneratingWeeklySummary(false);
+    }
+  }, [generateWeeklySummaryAction, weekStartDate, selectedModel]);
+
+  // Week navigation helpers
+  const goToPreviousWeek = useCallback(() => {
+    setCurrentDate((prev) => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() - 7);
+      return newDate;
+    });
+  }, []);
+
+  const goToNextWeek = useCallback(() => {
+    setCurrentDate((prev) => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() + 7);
+      return newDate;
+    });
+  }, []);
+
+  const goToThisWeek = useCallback(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setCurrentDate(today);
+  }, []);
+
+  // Get weekly average for End Day Score
+  const getWeeklyAverage = useCallback(() => {
+    if (!weeklyFieldValues?.valuesByDate) return null;
+    const scores = Object.values(weeklyFieldValues.valuesByDate).filter(
+      (s): s is number => s !== null
+    );
+    if (scores.length === 0) return null;
+    return scores.reduce((a, b) => a + b, 0) / scores.length;
+  }, [weeklyFieldValues]);
+
+  // Day navigation helpers
   const goToToday = useCallback(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -227,6 +387,14 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     goToNextDay,
     dateString,
 
+    // Week navigation
+    currentWeekStart,
+    weekStartDate,
+    weekEndDate,
+    goToPreviousWeek,
+    goToNextWeek,
+    goToThisWeek,
+
     // View mode
     viewMode,
     setViewMode,
@@ -247,6 +415,23 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     isLoadingSummary: dailySummary === undefined,
     isGeneratingSummary,
     generateSummary,
+
+    // Weekly data
+    weeklyTasks,
+    weeklyFieldValues,
+    weeklyMemos,
+    isLoadingWeeklyData:
+      viewMode === "weekly" &&
+      (weeklyTasks === undefined ||
+        weeklyFieldValues === undefined ||
+        weeklyMemos === undefined),
+
+    // Weekly summary
+    weeklySummary,
+    isLoadingWeeklySummary: viewMode === "weekly" && weeklySummary === undefined,
+    isGeneratingWeeklySummary,
+    generateWeeklySummary,
+    updateWeeklyPrompt: updateWeeklyPromptMutation,
 
     // Model selection
     selectedModel,
@@ -271,6 +456,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     formatDate: formatDateStr,
     getCheckInKey,
     isHabitCompleted,
+    getWeeklyAverage,
   };
 
   return (
@@ -301,6 +487,25 @@ export function formatShortDate(date: Date): string {
     month: "short",
     day: "numeric",
   });
+}
+
+export function formatWeekRange(weekStart: Date): string {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+
+  const startMonth = weekStart.toLocaleDateString("en-US", { month: "short" });
+  const startDay = weekStart.getDate();
+  const endMonth = weekEnd.toLocaleDateString("en-US", { month: "short" });
+  const endDay = weekEnd.getDate();
+  const year = weekEnd.getFullYear();
+
+  // If same month: "Jan 6-12, 2025"
+  // If different months: "Jan 27 - Feb 2, 2025"
+  if (startMonth === endMonth) {
+    return `${startMonth} ${startDay}-${endDay}, ${year}`;
+  } else {
+    return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+  }
 }
 
 export function isToday(date: Date): boolean {

@@ -98,8 +98,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const navigation: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
       { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
-      // Tauri-only: Proxy LLM Council (uses HTTP iframe, blocked on HTTPS web)
-      ...(isTauri ? [{ name: "Proxy LLM Council", href: "/lifeos/proxy-council", icon: Network }] : []),
+      { name: "Proxy Council", href: "/lifeos/proxy-council", icon: Network },
       { name: "Atlas", href: "/lifeos/atlas", icon: Globe },
       { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
       { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
@@ -123,7 +122,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
       { name: "Settings", href: "/lifeos/settings", icon: Settings },
     ];
     return items;
-  }, [isTauri]);
+  }, []);
 
   return (
     <aside

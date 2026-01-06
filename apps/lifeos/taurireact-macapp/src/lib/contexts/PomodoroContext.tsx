@@ -10,6 +10,9 @@ import React, {
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id, Doc } from "@holaai/convex";
+import { invoke } from "@tauri-apps/api/core";
+
+const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
 // ==================== TYPES ====================
 
@@ -213,6 +216,36 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     handleTimerComplete,
     handleBreakComplete,
   ]);
+
+  // Sync pomodoro timer to macOS menu bar tray
+  useEffect(() => {
+    if (!isTauri) return;
+
+    const syncTray = async () => {
+      try {
+        if (isInBreak && breakRemainingMs > 0) {
+          // Break mode: show coffee indicator
+          const time = formatTime(breakRemainingMs);
+          await invoke("set_tray_title", { title: `☕ ${time}` });
+        } else if (session?.status === "active" && remainingMs > 0) {
+          // Work mode: show tomato indicator
+          const time = formatTime(remainingMs);
+          await invoke("set_tray_title", { title: `🍅 ${time}` });
+        } else if (session?.status === "paused" && remainingMs > 0) {
+          // Paused: show pause indicator
+          const time = formatTime(remainingMs);
+          await invoke("set_tray_title", { title: `⏸ ${time}` });
+        } else {
+          // Idle: clear tray title
+          await invoke("clear_tray_title");
+        }
+      } catch (error) {
+        console.error("[PomodoroContext] Failed to update tray:", error);
+      }
+    };
+
+    syncTray();
+  }, [remainingMs, breakRemainingMs, isInBreak, session?.status]);
 
   // Actions
   const startPomodoro = useCallback(

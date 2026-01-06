@@ -65,8 +65,7 @@ export default function LifeOSApp() {
                 <Route path="agenda/:view" element={<LifeOSAgenda />} />
                 <Route path="chatnexus" element={<LifeOSChatNexus />} />
                 <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
-                {/* Tauri-only: Proxy LLM Council (uses HTTP iframe, blocked on HTTPS web) */}
-                {isTauri && <Route path="proxy-council" element={<LifeOSProxyLLMCouncil />} />}
+                <Route path="proxy-council" element={<LifeOSProxyLLMCouncil />} />
                 <Route path="pm" element={<LifeOSPM />} />
                 <Route path="pm/:view" element={<LifeOSPM />} />
                 <Route path="pm/:view/:id" element={<LifeOSPM />} />

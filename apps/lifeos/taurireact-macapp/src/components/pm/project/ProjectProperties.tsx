@@ -27,8 +27,8 @@ interface ProjectPropertiesProps {
     status?: ProjectStatus;
     health?: ProjectHealth;
     priority?: Priority;
-    targetDate?: number;
-    startDate?: number;
+    targetDate?: number | null;
+    startDate?: number | null;
   }) => Promise<void>;
 }
 

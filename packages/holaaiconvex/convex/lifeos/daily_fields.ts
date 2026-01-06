@@ -72,6 +72,72 @@ export const getFieldsWithValuesForDate = query({
   },
 });
 
+/**
+ * Get field values for a date range (used by Week View)
+ * Returns values grouped by date for the "End Day Score" field
+ */
+export const getFieldValuesForDateRange = query({
+  args: {
+    startDate: v.string(), // YYYY-MM-DD (Monday)
+    endDate: v.string(), // YYYY-MM-DD (Sunday)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Get the "End Day Score" field definition (default field)
+    const endDayScoreField = await ctx.db
+      .query("lifeos_dailyFieldDefinitions")
+      .withIndex("by_user_active", (q) =>
+        q.eq("userId", user._id).eq("isActive", true)
+      )
+      .filter((q) => q.eq(q.field("isDefault"), true))
+      .first();
+
+    if (!endDayScoreField) {
+      return {
+        fieldDefinition: null,
+        valuesByDate: {},
+      };
+    }
+
+    // Generate date range array
+    const dates: string[] = [];
+    const current = new Date(args.startDate);
+    const end = new Date(args.endDate);
+    while (current <= end) {
+      const year = current.getFullYear();
+      const month = String(current.getMonth() + 1).padStart(2, "0");
+      const day = String(current.getDate()).padStart(2, "0");
+      dates.push(`${year}-${month}-${day}`);
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Get all values for this user in the date range
+    const allValues = await ctx.db
+      .query("lifeos_dailyFieldValues")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Filter to only values for the End Day Score field in the date range
+    const valuesInRange = allValues.filter(
+      (v) =>
+        v.fieldDefinitionId === endDayScoreField._id && dates.includes(v.date)
+    );
+
+    // Create map of date -> value
+    const valuesByDate: Record<string, number | null> = {};
+    for (const date of dates) {
+      const value = valuesInRange.find((v) => v.date === date);
+      valuesByDate[date] = value?.numberValue ?? null;
+    }
+
+    return {
+      fieldDefinition: endDayScoreField,
+      valuesByDate,
+    };
+  },
+});
+
 // ==================== MUTATIONS ====================
 
 /**

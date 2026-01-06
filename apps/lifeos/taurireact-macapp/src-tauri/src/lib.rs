@@ -36,6 +36,21 @@ use voicememos::{
 };
 use youtube::fetch_youtube_transcript;
 
+// Tray title commands for Pomodoro timer display
+#[tauri::command]
+fn set_tray_title(app: tauri::AppHandle, title: String) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_title(Some(&title));
+    }
+}
+
+#[tauri::command]
+fn clear_tray_title(app: tauri::AppHandle) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_title(None::<&str>);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Load .env file for environment variables (like GROQ_API_KEY)
@@ -72,7 +87,7 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&sync_jobs, &lifeos_app, &quit])?;
 
             // Build tray icon with menu
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .icon_as_template(true) // macOS menu bar style
                 .menu(&menu)
@@ -260,6 +275,9 @@ pub fn run() {
             get_groq_api_key,
             delete_groq_api_key,
             open_full_disk_access_settings,
+            // Tray
+            set_tray_title,
+            clear_tray_title,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -370,3 +370,372 @@ Provide a 2-3 sentence summary that:
 2. Highlights key priorities for the day
 3. Gives an encouraging, actionable recommendation`;
 }
+
+// ==================== WEEKLY SUMMARY QUERIES ====================
+
+/**
+ * Get weekly summary for a specific week
+ */
+export const getWeeklySummary = query({
+  args: {
+    weekStartDate: v.string(), // YYYY-MM-DD format (Monday)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const summary = await ctx.db
+      .query("lifeos_weeklySummaries")
+      .withIndex("by_user_week", (q) =>
+        q.eq("userId", user._id).eq("weekStartDate", args.weekStartDate)
+      )
+      .first();
+
+    return summary;
+  },
+});
+
+// ==================== WEEKLY SUMMARY MUTATIONS ====================
+
+/**
+ * Save or update weekly summary
+ */
+export const saveWeeklySummary = mutation({
+  args: {
+    weekStartDate: v.string(), // YYYY-MM-DD (Monday)
+    weekEndDate: v.string(), // YYYY-MM-DD (Sunday)
+    aiSummary: v.string(),
+    model: v.optional(v.string()),
+    usage: v.optional(
+      v.object({
+        promptTokens: v.number(),
+        completionTokens: v.number(),
+        totalTokens: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("lifeos_weeklySummaries")
+      .withIndex("by_user_week", (q) =>
+        q.eq("userId", user._id).eq("weekStartDate", args.weekStartDate)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
+        generatedAt: now,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      return await ctx.db.insert("lifeos_weeklySummaries", {
+        userId: user._id,
+        weekStartDate: args.weekStartDate,
+        weekEndDate: args.weekEndDate,
+        aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
+        generatedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
+ * Update custom prompt for weekly summary (persistent per-week)
+ */
+export const updateWeeklyPrompt = mutation({
+  args: {
+    weekStartDate: v.string(), // YYYY-MM-DD (Monday)
+    customPrompt: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("lifeos_weeklySummaries")
+      .withIndex("by_user_week", (q) =>
+        q.eq("userId", user._id).eq("weekStartDate", args.weekStartDate)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        customPrompt: args.customPrompt,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      // Calculate week end date
+      const weekEnd = new Date(args.weekStartDate);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const weekEndStr = formatDateString(weekEnd);
+
+      return await ctx.db.insert("lifeos_weeklySummaries", {
+        userId: user._id,
+        weekStartDate: args.weekStartDate,
+        weekEndDate: weekEndStr,
+        customPrompt: args.customPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+// ==================== WEEKLY SUMMARY ACTION ====================
+
+// Default weekly prompt template
+const DEFAULT_WEEKLY_PROMPT = `Provide a weekly summary for {weekStartDate} to {weekEndDate}:
+
+END DAY SCORES: {dayScores}
+WEEKLY AVERAGE: {average}
+
+TASKS COMPLETED: {completedCount}
+{completedTasksList}
+
+TASKS REMAINING: {remainingCount}
+{remainingTasksList}
+
+VOICE MEMO HIGHLIGHTS:
+{memoTranscripts}
+
+Please provide:
+1. Week performance summary (2-3 sentences)
+2. Key accomplishments
+3. Focus recommendations for next week`;
+
+interface WeeklySummaryContext {
+  weekStartDate: string;
+  weekEndDate: string;
+  dayScores: Record<string, number | null>;
+  weeklyAverage: number | null;
+  completedTasks: Doc<"lifeos_pmIssues">[];
+  remainingTasks: Doc<"lifeos_pmIssues">[];
+  memos: Array<{
+    name: string;
+    transcript: string | undefined;
+    clientCreatedAt: number;
+  }>;
+  customPrompt?: string;
+}
+
+function formatDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildWeeklySummaryPrompt(context: WeeklySummaryContext): string {
+  const template = context.customPrompt || DEFAULT_WEEKLY_PROMPT;
+
+  // Format day scores
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const sortedDates = Object.keys(context.dayScores).sort();
+  const dayScoresStr = sortedDates
+    .map((date, i) => {
+      const score = context.dayScores[date];
+      return `${dayNames[i]}: ${score ?? "-"}`;
+    })
+    .join(", ");
+
+  // Calculate average
+  const scores = Object.values(context.dayScores).filter(
+    (s): s is number => s !== null
+  );
+  const average =
+    scores.length > 0
+      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+      : "N/A";
+
+  // Format tasks
+  const completedTasksList = context.completedTasks
+    .slice(0, 10)
+    .map((t) => `- ${t.title}`)
+    .join("\n");
+  const remainingTasksList = context.remainingTasks
+    .slice(0, 10)
+    .map((t) => `- ${t.title}`)
+    .join("\n");
+
+  // Format memos
+  const memoTranscripts = context.memos
+    .filter((m) => m.transcript)
+    .slice(0, 5)
+    .map((m) => {
+      const date = new Date(m.clientCreatedAt);
+      const dateStr = date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      const transcript =
+        m.transcript!.length > 200
+          ? m.transcript!.slice(0, 200) + "..."
+          : m.transcript!;
+      return `[${dateStr}] ${m.name}: ${transcript}`;
+    })
+    .join("\n");
+
+  return template
+    .replace("{weekStartDate}", context.weekStartDate)
+    .replace("{weekEndDate}", context.weekEndDate)
+    .replace("{dayScores}", dayScoresStr)
+    .replace("{average}", average)
+    .replace("{completedCount}", String(context.completedTasks.length))
+    .replace("{completedTasksList}", completedTasksList || "None")
+    .replace("{remainingCount}", String(context.remainingTasks.length))
+    .replace("{remainingTasksList}", remainingTasksList || "None")
+    .replace("{memoTranscripts}", memoTranscripts || "None recorded");
+}
+
+/**
+ * Generate AI summary for a specific week using Vercel AI Gateway
+ */
+export const generateWeeklySummary = action({
+  args: {
+    weekStartDate: v.string(), // YYYY-MM-DD format (Monday)
+    model: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<GenerateSummaryResult> => {
+    const selectedModel = args.model || "openai/gpt-4o-mini";
+
+    // Calculate week end date
+    const weekEnd = new Date(args.weekStartDate);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekEndDate = formatDateString(weekEnd);
+
+    // Fetch all week data in parallel
+    const [tasksByDay, fieldValues, memos, existingSummary] = await Promise.all(
+      [
+        ctx.runQuery(api.lifeos.pm_issues.getTasksForDateRange, {
+          startDate: args.weekStartDate,
+          endDate: weekEndDate,
+          includeCompleted: true,
+        }),
+        ctx.runQuery(api.lifeos.daily_fields.getFieldValuesForDateRange, {
+          startDate: args.weekStartDate,
+          endDate: weekEndDate,
+        }),
+        ctx.runQuery(api.lifeos.voicememo.getMemosForDateRange, {
+          startDate: args.weekStartDate,
+          endDate: weekEndDate,
+        }),
+        ctx.runQuery(api.lifeos.agenda.getWeeklySummary, {
+          weekStartDate: args.weekStartDate,
+        }),
+      ]
+    );
+
+    // Separate completed and remaining tasks
+    const allTasks = Object.values(tasksByDay).flat();
+    const completedTasks = allTasks.filter((t) => t.status === "done");
+    const remainingTasks = allTasks.filter((t) => t.status !== "done");
+
+    // Build prompt context
+    const promptContext: WeeklySummaryContext = {
+      weekStartDate: args.weekStartDate,
+      weekEndDate,
+      dayScores: fieldValues.valuesByDate,
+      weeklyAverage: null,
+      completedTasks,
+      remainingTasks,
+      memos: memos.map((m) => ({
+        name: m.name,
+        transcript: m.transcript,
+        clientCreatedAt: m.clientCreatedAt,
+      })),
+      customPrompt: existingSummary?.customPrompt ?? undefined,
+    };
+
+    const prompt = buildWeeklySummaryPrompt(promptContext);
+
+    // Save helper function
+    const saveViaPublicMutation = async (
+      summary: string,
+      model: string,
+      usage: UsageInfo | null
+    ) => {
+      await ctx.runMutation(api.lifeos.agenda.saveWeeklySummary, {
+        weekStartDate: args.weekStartDate,
+        weekEndDate,
+        aiSummary: summary,
+        model,
+        usage: usage ?? undefined,
+      });
+    };
+
+    // Call Vercel AI Gateway
+    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY;
+    if (!aiGatewayApiKey) {
+      const fallbackSummary = `Week ${args.weekStartDate} to ${weekEndDate}: ${completedTasks.length} tasks completed, ${remainingTasks.length} remaining, ${memos.length} voice memos recorded.`;
+      await saveViaPublicMutation(fallbackSummary, "fallback", null);
+      return { summary: fallbackSummary, model: "fallback", usage: null };
+    }
+
+    try {
+      const response = await fetch(
+        "https://gateway.ai.vercel.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${aiGatewayApiKey}`,
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are a helpful personal assistant that provides insightful weekly summaries. Keep responses concise but comprehensive, highlighting patterns and actionable insights.",
+              },
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            max_tokens: 500,
+            temperature: 0.7,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const aiSummary: string =
+        data.choices?.[0]?.message?.content ||
+        "Unable to generate weekly summary at this time.";
+
+      const usage: UsageInfo | null = data.usage
+        ? {
+            promptTokens: data.usage.prompt_tokens || 0,
+            completionTokens: data.usage.completion_tokens || 0,
+            totalTokens: data.usage.total_tokens || 0,
+          }
+        : null;
+
+      await saveViaPublicMutation(aiSummary, selectedModel, usage);
+      return { summary: aiSummary, model: selectedModel, usage };
+    } catch (error) {
+      console.error("Error generating weekly AI summary:", error);
+      const fallbackSummary = `Week ${args.weekStartDate} to ${weekEndDate}: ${completedTasks.length} tasks completed, ${remainingTasks.length} remaining.`;
+      await saveViaPublicMutation(fallbackSummary, "fallback", null);
+      return { summary: fallbackSummary, model: "fallback", usage: null };
+    }
+  },
+});

@@ -62,6 +62,8 @@ import type * as lifeos_pm_projects from "../lifeos/pm_projects.js";
 import type * as lifeos_pm_schema from "../lifeos/pm_schema.js";
 import type * as lifeos_pm_user_settings from "../lifeos/pm_user_settings.js";
 import type * as lifeos_pm_voice_agent from "../lifeos/pm_voice_agent.js";
+import type * as lifeos_proxy_council_schema from "../lifeos/proxy_council_schema.js";
+import type * as lifeos_proxy_council_settings from "../lifeos/proxy_council_settings.js";
 import type * as lifeos_screentime from "../lifeos/screentime.js";
 import type * as lifeos_tool_call from "../lifeos/tool_call.js";
 import type * as lifeos_voiceagent from "../lifeos/voiceagent.js";
@@ -130,6 +132,8 @@ declare const fullApi: ApiFromModules<{
   "lifeos/pm_schema": typeof lifeos_pm_schema;
   "lifeos/pm_user_settings": typeof lifeos_pm_user_settings;
   "lifeos/pm_voice_agent": typeof lifeos_pm_voice_agent;
+  "lifeos/proxy_council_schema": typeof lifeos_proxy_council_schema;
+  "lifeos/proxy_council_settings": typeof lifeos_proxy_council_settings;
   "lifeos/screentime": typeof lifeos_screentime;
   "lifeos/tool_call": typeof lifeos_tool_call;
   "lifeos/voiceagent": typeof lifeos_voiceagent;
