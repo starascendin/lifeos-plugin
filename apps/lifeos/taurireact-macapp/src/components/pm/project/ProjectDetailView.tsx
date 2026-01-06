@@ -42,8 +42,8 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
     status?: ProjectStatus;
     health?: ProjectHealth;
     priority?: Priority;
-    targetDate?: number;
-    startDate?: number;
+    targetDate?: number | null;
+    startDate?: number | null;
   }) => {
     await updateProject({ projectId, ...updates });
   };

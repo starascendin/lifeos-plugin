@@ -77,10 +77,30 @@ pub fn run() {
         .plugin(tauri_plugin_macos_permissions::init())
         .setup(|app| {
             // Create menu items for tray context menu
-            let sync_jobs =
-                MenuItem::with_id(app, "sync_jobs", "Background Sync Jobs\t⌃1", true, None::<&str>)?;
-            let lifeos_app =
-                MenuItem::with_id(app, "lifeos_app", "LifeOS App\t⌃2", true, None::<&str>)?;
+            // Shortcuts differ by build mode:
+            // - Production: Ctrl+1/2
+            // - Dev/Staging: Ctrl+Shift+1/2 (to avoid conflicts with production app)
+            let is_production = option_env!("TAURI_BUILD_MODE") == Some("production");
+            let (shortcut_hint_1, shortcut_hint_2) = if is_production {
+                ("⌃1", "⌃2")
+            } else {
+                ("⌃⇧1", "⌃⇧2")
+            };
+
+            let sync_jobs = MenuItem::with_id(
+                app,
+                "sync_jobs",
+                format!("Background Sync Jobs\t{}", shortcut_hint_1),
+                true,
+                None::<&str>,
+            )?;
+            let lifeos_app = MenuItem::with_id(
+                app,
+                "lifeos_app",
+                format!("LifeOS App\t{}", shortcut_hint_2),
+                true,
+                None::<&str>,
+            )?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
             // Build context menu
@@ -117,10 +137,14 @@ pub fn run() {
                 .build(app)?;
 
             // Register global keyboard shortcuts
-            // Ctrl+1 for Background Sync Jobs window
-            let shortcut_1 = Shortcut::new(Some(Modifiers::CONTROL), Code::Digit1);
-            // Ctrl+2 for LifeOS App window
-            let shortcut_2 = Shortcut::new(Some(Modifiers::CONTROL), Code::Digit2);
+            // Production: Ctrl+1/2, Dev/Staging: Ctrl+Shift+1/2
+            let modifiers = if is_production {
+                Some(Modifiers::CONTROL)
+            } else {
+                Some(Modifiers::CONTROL | Modifiers::SHIFT)
+            };
+            let shortcut_1 = Shortcut::new(modifiers, Code::Digit1);
+            let shortcut_2 = Shortcut::new(modifiers, Code::Digit2);
 
             let app_handle = app.handle().clone();
             app.handle().plugin(

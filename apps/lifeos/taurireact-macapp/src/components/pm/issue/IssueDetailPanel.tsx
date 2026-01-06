@@ -76,7 +76,7 @@ export function IssueDetailPanel() {
   const handleUpdate = async (updates: {
     status?: IssueStatus;
     priority?: Priority;
-    dueDate?: number;
+    dueDate?: number | null;
     estimate?: number;
     labelIds?: Id<"lifeos_pmLabels">[];
     projectId?: Id<"lifeos_pmProjects">;
