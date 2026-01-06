@@ -18,7 +18,13 @@
     "env:sync:all": "./scripts/sync-env.sh --all",
     "env:sync:all:prod": "./scripts/sync-env.sh --all --prod",
     "env:list": "./scripts/sync-env.sh --list",
-    "env:list:prod": "./scripts/sync-env.sh --list --prod"
+    "env:list:prod": "./scripts/sync-env.sh --list --prod",
+    "env:check": "./scripts/check-env-parity.sh",
+    "env:check:verbose": "./scripts/check-env-parity.sh --verbose",
+    "env:update": "./scripts/update-env.sh",
+    "env:update:dev": "./scripts/update-env.sh --target dev --file",
+    "env:update:staging": "./scripts/update-env.sh --target staging --file",
+    "env:update:prod": "./scripts/update-env.sh --target prod --file"
   },
   "exports": {
     ".": "./index.ts",

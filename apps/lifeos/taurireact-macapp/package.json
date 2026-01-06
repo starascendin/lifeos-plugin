@@ -13,7 +13,13 @@
     "tauri:staging": "TAURI_BUILD_MODE=staging tauri build -c src-tauri/tauri.staging.conf.json",
     "tauri:production": "TAURI_BUILD_MODE=production VITE_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsucmpsYWJzLmRldiQ tauri build -c src-tauri/tauri.production.conf.json",
     "lint:rust": "cd src-tauri && cargo clippy --all -- -D warnings",
-    "fmt:rust": "cd src-tauri && cargo fmt --all"
+    "fmt:rust": "cd src-tauri && cargo fmt --all",
+    "env:check": "./scripts/check-vercel-env-parity.sh",
+    "env:check:verbose": "./scripts/check-vercel-env-parity.sh --verbose",
+    "env:update": "./scripts/update-vercel-env.sh",
+    "env:update:preview": "./scripts/update-vercel-env.sh --target preview --file",
+    "env:update:staging": "./scripts/update-vercel-env.sh --target staging --file",
+    "env:update:production": "./scripts/update-vercel-env.sh --target production --file"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.0.0",

@@ -11,10 +11,7 @@ mod youtube;
 use api_keys::{
     delete_groq_api_key, get_groq_api_key, open_full_disk_access_settings, save_groq_api_key,
 };
-use council_server::{
-    get_council_server_status, start_council_server, start_server_internal, stop_council_server,
-    COUNCIL_PORT,
-};
+use council_server::{get_council_server_status, start_council_server, stop_council_server};
 use notes::{
     count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders,
     get_exported_notes, should_run_notes_sync,
@@ -211,22 +208,22 @@ pub fn run() {
                 }
             });
 
-            // Start Council server automatically on app launch
-            tauri::async_runtime::spawn(async {
-                // Short delay to let the app fully initialize
-                sleep(Duration::from_secs(3)).await;
-
-                println!(
-                    "[Council Server] Starting server automatically on port {}...",
-                    COUNCIL_PORT
-                );
-
-                if let Err(e) = start_server_internal(COUNCIL_PORT).await {
-                    eprintln!("[Council Server] Failed to start: {}", e);
-                } else {
-                    println!("[Council Server] Started successfully on port {}", COUNCIL_PORT);
-                }
-            });
+            // Council server auto-start disabled - can be started manually via start_council_server command
+            // tauri::async_runtime::spawn(async {
+            //     // Short delay to let the app fully initialize
+            //     sleep(Duration::from_secs(3)).await;
+            //
+            //     println!(
+            //         "[Council Server] Starting server automatically on port {}...",
+            //         COUNCIL_PORT
+            //     );
+            //
+            //     if let Err(e) = start_server_internal(COUNCIL_PORT).await {
+            //         eprintln!("[Council Server] Failed to start: {}", e);
+            //     } else {
+            //         println!("[Council Server] Started successfully on port {}", COUNCIL_PORT);
+            //     }
+            // });
 
             Ok(())
         })

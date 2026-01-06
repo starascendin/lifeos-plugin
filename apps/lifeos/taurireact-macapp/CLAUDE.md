@@ -22,6 +22,8 @@ This is my Lifeos app
     - the background jobs app IS ALWAYS tauri app.
     - the Life OS app can be BOTH BOTH tauri app AND a web app (deployed on vercel)
         - make sure whatever you do, it can handle both webapp + tauri
+
+- for the RUST part, make sure you CHECK LINT and fix any issues
 - use shadcn ui component has much as possible
 
 
