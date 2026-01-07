@@ -13,7 +13,7 @@ import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
 import { LifeOSLLMCouncil } from "./components/lifeos/LLMCouncil";
 import { LifeOSProxyLLMCouncil } from "./components/lifeos/ProxyLLMCouncil";
-import { LifeOSLLMCouncilAPI } from "./components/lifeos/LLMCouncilAPI";
+import { LifeOSLLMCouncilAPI } from "./components/lifeos/LLMCouncilAPIPage";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";

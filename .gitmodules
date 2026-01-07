@@ -1,0 +1,3 @@
+[submodule "packages/livekit-voice-agent"]
+	path = packages/livekit-voice-agent
+	url = git@github.com:starascendin/livekit-voice-agent.git
