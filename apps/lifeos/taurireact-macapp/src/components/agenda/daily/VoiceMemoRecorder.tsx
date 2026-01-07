@@ -1116,53 +1116,36 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Mic className="h-5 w-5" />
-          Voice Notes
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 space-y-4">
-        {/* Record button */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant={isRecording ? "destructive" : "default"}
-            size="lg"
-            onClick={handleRecordClick}
-            disabled={isSaving}
-            className="gap-2"
-          >
-            {isSaving ? (
-              <>Saving...</>
-            ) : isRecording ? (
-              <>
-                <Square className="h-4 w-4" />
-                Stop ({formatDuration(recordingDuration)})
-              </>
-            ) : (
-              <>
-                <Mic className="h-4 w-4" />
-                Record
-              </>
-            )}
-          </Button>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Mic className="h-5 w-5" />
+            Voice Notes
+          </CardTitle>
 
-          {isRecording && (
-            <div className="flex items-center gap-2">
-              <div className="h-3 w-3 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-sm text-muted-foreground">Recording...</span>
-            </div>
-          )}
-        </div>
+          {/* Record and bulk action buttons */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant={isRecording ? "destructive" : "default"}
+              size="sm"
+              onClick={handleRecordClick}
+              disabled={isSaving}
+              className="gap-1.5"
+            >
+              {isSaving ? (
+                <>Saving...</>
+              ) : isRecording ? (
+                <>
+                  <Square className="h-3.5 w-3.5" />
+                  Stop ({formatDuration(recordingDuration)})
+                </>
+              ) : (
+                <>
+                  <Mic className="h-3.5 w-3.5" />
+                  Record
+                </>
+              )}
+            </Button>
 
-        {error && (
-          <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Bulk action buttons */}
-        {memos.length > 0 && (memosNeedingTranscription > 0 || memosNeedingSync > 0) && (
-          <div className="flex items-center gap-2 flex-wrap">
             {memosNeedingTranscription > 0 && (
               <Button
                 variant="outline"
@@ -1176,9 +1159,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
                 ) : (
                   <FileText className="h-3.5 w-3.5" />
                 )}
-                Transcribe All ({memosNeedingTranscription})
+                Transcribe ({memosNeedingTranscription})
               </Button>
             )}
+
             {memosNeedingSync > 0 && (
               <Button
                 variant="outline"
@@ -1192,9 +1176,23 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
                 ) : (
                   <Cloud className="h-3.5 w-3.5" />
                 )}
-                Sync All ({memosNeedingSync})
+                Sync ({memosNeedingSync})
               </Button>
             )}
+          </div>
+        </div>
+
+        {isRecording && (
+          <div className="flex items-center gap-2 mt-2">
+            <div className="h-2.5 w-2.5 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-xs text-muted-foreground">Recording...</span>
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="pt-0 space-y-4">
+        {error && (
+          <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+            {error}
           </div>
         )}
 

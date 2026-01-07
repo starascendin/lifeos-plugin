@@ -280,7 +280,14 @@ export function SignIn() {
 
         const phoneCodeFactor = supportedFactors.find((f: any) => f.strategy === "phone_code");
         const totpFactor = supportedFactors.find((f: any) => f.strategy === "totp");
-        const detectedStrategy = phoneCodeFactor ? "phone_code" : totpFactor ? "totp" : "phone_code";
+
+        // If no 2FA strategies are available, something is misconfigured
+        if (!phoneCodeFactor && !totpFactor) {
+          console.error("[SignIn] needs_second_factor but no strategies available!");
+          throw new Error("Sign-in requires 2FA but no 2FA methods are configured for this account. Please configure TOTP or SMS in Clerk dashboard.");
+        }
+
+        const detectedStrategy = phoneCodeFactor ? "phone_code" : "totp";
         console.log("[SignIn] Detected 2FA strategy:", detectedStrategy);
         setSecondFactorStrategy(detectedStrategy);
 
