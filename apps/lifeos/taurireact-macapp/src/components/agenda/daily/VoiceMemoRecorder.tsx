@@ -64,7 +64,12 @@ function formatRelativeTime(timestamp: number): string {
 }
 
 // Sync status types
-type SyncStatus = "local" | "cloud" | "synced" | "exported";
+// - local: recorded in browser, saved to IndexedDB only
+// - cloud: synced to Convex with audio file
+// - synced: exists both locally and in cloud
+// - exported: macOS Voice Memo from Tauri SQLite (local only)
+// - transcript: transcript-only cloud memo (Voice Memo synced without audio)
+type SyncStatus = "local" | "cloud" | "synced" | "exported" | "transcript";
 
 // Runtime memo with object URL for playback
 interface RuntimeVoiceMemo extends StoredVoiceMemo {
@@ -209,6 +214,16 @@ function VoiceMemoItem({
           </span>
         );
       case "synced":
+        // If this is a synced Voice Memo, show "Voice Memo ✓" to maintain the distinction
+        if (memo.isExported) {
+          return (
+            <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-1">
+              <Smartphone className="h-3 w-3" />
+              Voice Memo
+              <Check className="h-3 w-3" />
+            </span>
+          );
+        }
         return (
           <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded flex items-center gap-1">
             <Check className="h-3 w-3" />
@@ -219,6 +234,14 @@ function VoiceMemoItem({
         return (
           <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-1">
             <Smartphone className="h-3 w-3" />
+            Voice Memo
+          </span>
+        );
+      case "transcript":
+        // Transcript-only cloud memo (Voice Memo synced without audio)
+        return (
+          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-1">
+            <FileText className="h-3 w-3" />
             Voice Memo
           </span>
         );
@@ -237,7 +260,12 @@ function VoiceMemoItem({
           size="icon"
           className="h-10 w-10 shrink-0"
           onClick={handlePlayPause}
-          disabled={isLoadingAudio || (memo.isExported && !memo.exportedLocalPath)}
+          disabled={
+            isLoadingAudio ||
+            (memo.isExported && !memo.exportedLocalPath) ||
+            memo.syncStatus === "transcript" // No audio for transcript-only memos
+          }
+          title={memo.syncStatus === "transcript" ? "No audio available (transcript only)" : undefined}
         >
           {isLoadingAudio ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -488,35 +516,41 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
             (lm) => lm.id === cloudMemo.localId || lm.convexMemoId === cloudMemo._id
           );
 
-          // Check if this is an exported memo that was synced to cloud
+          // Check if this is an exported memo that was synced to cloud (Tauri only)
           const isExportedInCloud = exportedMemos.some(
             (em) => em.uuid === cloudMemo.localId
           );
-
-          if (!hasLocal && !isExportedInCloud && cloudMemo.audioUrl) {
-            // Cloud only - use streaming URL
-            mergedMemos.push({
-              id: cloudMemo.localId,
-              name: cloudMemo.name,
-              audioBlob: new Blob(), // Empty blob for cloud-only
-              mimeType: "audio/webm",
-              extension: "webm",
-              duration: cloudMemo.duration / 1000, // Convert from ms to seconds
-              createdAt: cloudMemo.clientCreatedAt,
-              transcript: cloudMemo.transcript,
-              transcriptLanguage: cloudMemo.language,
-              audioUrl: cloudMemo.audioUrl,
-              syncStatus: "cloud",
-              convexId: cloudMemo._id,
-              syncedToConvex: true,
-              convexMemoId: cloudMemo._id,
-            });
-          }
 
           // Track exported memos that are in cloud
           if (isExportedInCloud) {
             processedExportedUuids.add(cloudMemo.localId);
           }
+
+          // Skip if we have this locally (will be shown from local/exported memos)
+          if (hasLocal || isExportedInCloud) {
+            continue;
+          }
+
+          // Determine if this is a transcript-only memo (Voice Memo synced without audio)
+          const isTranscriptOnly = !cloudMemo.audioUrl;
+
+          // Add cloud memo - either with audio URL or transcript-only
+          mergedMemos.push({
+            id: cloudMemo.localId,
+            name: cloudMemo.name,
+            audioBlob: new Blob(), // Empty blob for cloud-only
+            mimeType: isTranscriptOnly ? "audio/m4a" : "audio/webm",
+            extension: isTranscriptOnly ? "m4a" : "webm",
+            duration: cloudMemo.duration / 1000, // Convert from ms to seconds
+            createdAt: cloudMemo.clientCreatedAt,
+            transcript: cloudMemo.transcript,
+            transcriptLanguage: cloudMemo.language,
+            audioUrl: cloudMemo.audioUrl || "", // Empty for transcript-only
+            syncStatus: isTranscriptOnly ? "transcript" : "cloud",
+            convexId: cloudMemo._id,
+            syncedToConvex: true,
+            convexMemoId: cloudMemo._id,
+          });
         }
       }
     }
