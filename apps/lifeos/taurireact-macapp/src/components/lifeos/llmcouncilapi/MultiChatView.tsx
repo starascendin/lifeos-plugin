@@ -23,17 +23,20 @@ export function MultiChatView() {
     );
   }
 
-  // Grid class based on layout
+  // Grid class based on layout - stack on mobile
   const gridClass = cn(
-    "grid h-full gap-2 p-2",
-    currentLayout === 1 && "grid-cols-1",
-    currentLayout === 2 && "grid-cols-2",
-    currentLayout === 3 && "grid-cols-3",
-    currentLayout === 4 && "grid-cols-2 grid-rows-2"
+    "grid gap-2 p-2",
+    // Mobile: always single column with auto rows
+    "grid-cols-1 auto-rows-[minmax(250px,1fr)]",
+    // Desktop: use layout setting
+    currentLayout === 1 && "sm:grid-cols-1 sm:h-full",
+    currentLayout === 2 && "sm:grid-cols-2 sm:h-full",
+    currentLayout === 3 && "sm:grid-cols-3 sm:h-full",
+    currentLayout === 4 && "sm:grid-cols-2 sm:grid-rows-2 sm:h-full"
   );
 
   return (
-    <div className={gridClass}>
+    <div className={cn("h-full overflow-auto sm:overflow-hidden", gridClass)}>
       {panels.map((panel) => (
         <ChatPanel key={panel.id} panel={panel} />
       ))}

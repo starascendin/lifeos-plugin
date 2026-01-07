@@ -233,7 +233,7 @@ function StageNav({ message, messageId }: StageNavProps) {
   ];
 
   return (
-    <div className="flex flex-col items-center gap-1 py-2">
+    <div className="flex flex-col items-center gap-0.5 py-2 sm:gap-1">
       {stages.map((stage, idx) => (
         <div key={stage.num} className="flex flex-col items-center">
           {/* Stage indicator */}
@@ -241,7 +241,7 @@ function StageNav({ message, messageId }: StageNavProps) {
             onClick={() => scrollToStage(stage.num)}
             disabled={!stage.available}
             className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
+              "flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all sm:h-8 sm:w-8 sm:text-xs",
               stage.available
                 ? "cursor-pointer border-primary bg-primary text-primary-foreground hover:bg-primary/90"
                 : "cursor-not-allowed border-muted-foreground/30 bg-muted text-muted-foreground/50"
@@ -254,7 +254,7 @@ function StageNav({ message, messageId }: StageNavProps) {
           {idx < stages.length - 1 && (
             <div
               className={cn(
-                "h-4 w-0.5",
+                "h-3 w-0.5 sm:h-4",
                 stage.available && stages[idx + 1].available
                   ? "bg-primary"
                   : "bg-muted-foreground/30"

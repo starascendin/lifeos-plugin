@@ -191,16 +191,16 @@ export function LLMCouncilAPIToolbar() {
   } = useLLMCouncilAPI();
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-background/95 px-2 py-2 sm:gap-4 sm:px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       {/* Left: Mode Toggle + Layout/Models */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Mode Toggle */}
-        <div className="flex items-center rounded-lg bg-muted p-1">
+        <div className="flex items-center rounded-lg bg-muted p-0.5 sm:p-1">
           <Button
             variant={viewMode === "council" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("council")}
-            className="h-7 px-3 text-xs"
+            className="h-6 px-2 text-xs sm:h-7 sm:px-3"
           >
             Council
           </Button>
@@ -208,22 +208,22 @@ export function LLMCouncilAPIToolbar() {
             variant={viewMode === "multichat" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("multichat")}
-            className="h-7 px-3 text-xs"
+            className="h-6 px-2 text-xs sm:h-7 sm:px-3"
           >
-            Multi-Chat
+            Chat
           </Button>
         </div>
 
-        {/* Layout Selector (only in multichat mode) */}
+        {/* Layout Selector (only in multichat mode) - hide 3/4 panel options on mobile */}
         {viewMode === "multichat" && (
-          <div className="flex items-center gap-1 rounded-lg border bg-background p-1">
-            {LAYOUT_OPTIONS.map((option) => (
+          <div className="flex items-center gap-0.5 rounded-lg border bg-background p-0.5 sm:gap-1 sm:p-1">
+            {LAYOUT_OPTIONS.slice(0, 2).map((option) => (
               <Tooltip key={option.value}>
                 <TooltipTrigger asChild>
                   <Button
                     variant={currentLayout === option.value ? "default" : "ghost"}
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-6 w-6 sm:h-7 sm:w-7"
                     onClick={() => setCurrentLayout(option.value)}
                   >
                     {option.icon}
@@ -234,14 +234,34 @@ export function LLMCouncilAPIToolbar() {
                 </TooltipContent>
               </Tooltip>
             ))}
+            {/* Show 3/4 panel options only on larger screens */}
+            <div className="hidden sm:flex sm:gap-1">
+              {LAYOUT_OPTIONS.slice(2).map((option) => (
+                <Tooltip key={option.value}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={currentLayout === option.value ? "default" : "ghost"}
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setCurrentLayout(option.value)}
+                    >
+                      {option.icon}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>{option.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Model Selector (only in council mode) */}
         {viewMode === "council" && isConfigured && (
           <>
-            <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-1">
+            <div className="hidden h-4 w-px bg-border sm:block" />
+            <div className="flex items-center gap-0.5 sm:gap-1">
               {LLM_TYPES.map((llm) => {
                 const info = LLM_INFO[llm];
                 const isSelected = selectedLLMs.includes(llm);
@@ -254,7 +274,7 @@ export function LLMCouncilAPIToolbar() {
                         onClick={() => toggleLLM(llm)}
                         disabled={!isOnline}
                         className={cn(
-                          "relative flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-white transition-all",
+                          "relative flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold text-white transition-all sm:h-7 sm:w-7 sm:text-[10px]",
                           info.bgColor.replace("100", "500"),
                           isSelected && isOnline
                             ? "ring-2 ring-primary ring-offset-1"
@@ -269,7 +289,7 @@ export function LLMCouncilAPIToolbar() {
                         {/* Status indicator */}
                         <span
                           className={cn(
-                            "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-background",
+                            "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-background sm:h-2.5 sm:w-2.5",
                             isOnline ? "bg-green-500" : "bg-red-500"
                           )}
                         />
@@ -284,18 +304,18 @@ export function LLMCouncilAPIToolbar() {
                 );
               })}
             </div>
-            <div className="h-4 w-px bg-border" />
+            <div className="hidden h-4 w-px bg-border sm:block" />
             <HistoryPopover />
           </>
         )}
       </div>
 
       {/* Right: Tier + Settings */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Tier Selector */}
         <Select value={currentTier} onValueChange={(v) => setCurrentTier(v as Tier)}>
-          <SelectTrigger className="h-7 w-24 text-xs">
-            <div className="flex items-center gap-1.5">
+          <SelectTrigger className="h-6 w-16 text-xs sm:h-7 sm:w-24">
+            <div className="flex items-center gap-1 sm:gap-1.5">
               <div
                 className={cn(
                   "h-2 w-2 rounded-full",

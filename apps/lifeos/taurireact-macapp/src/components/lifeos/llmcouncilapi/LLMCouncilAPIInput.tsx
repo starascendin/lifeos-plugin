@@ -69,7 +69,7 @@ export function LLMCouncilAPIInput() {
   };
 
   return (
-    <div className="border-t bg-background p-4">
+    <div className="border-t bg-background p-2 sm:p-4">
       <div className="mx-auto flex max-w-4xl items-end gap-2">
         <Textarea
           ref={textareaRef}
@@ -78,37 +78,37 @@ export function LLMCouncilAPIInput() {
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={!isConfigured || !isHealthy || isLoading}
-          className="min-h-[44px] max-h-[150px] resize-none"
+          className="min-h-[40px] max-h-[120px] resize-none text-sm sm:min-h-[44px] sm:max-h-[150px] sm:text-base"
           rows={1}
         />
         <Button
           onClick={handleSubmit}
           disabled={!canSend}
           size="icon"
-          className="h-11 w-11 shrink-0"
+          className="h-10 w-10 shrink-0 sm:h-11 sm:w-11"
         >
           {isLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin sm:h-5 sm:w-5" />
           ) : (
-            <Send className="h-5 w-5" />
+            <Send className="h-4 w-4 sm:h-5 sm:w-5" />
           )}
         </Button>
       </div>
 
       {/* Status messages */}
       {!isConfigured && (
-        <p className="mt-2 text-center text-xs text-muted-foreground">
-          Configure your Proxy Council settings to get started.
+        <p className="mt-1.5 text-center text-[10px] text-muted-foreground sm:mt-2 sm:text-xs">
+          Configure settings to get started.
         </p>
       )}
       {isConfigured && !isHealthy && (
-        <p className="mt-2 text-center text-xs text-destructive">
-          Not connected to council server. Check your settings.
+        <p className="mt-1.5 text-center text-[10px] text-destructive sm:mt-2 sm:text-xs">
+          Not connected. Check settings.
         </p>
       )}
       {viewMode === "council" && selectedLLMs.length < 2 && (
-        <p className="mt-2 text-center text-xs text-muted-foreground">
-          Select at least 2 models to use the council.
+        <p className="mt-1.5 text-center text-[10px] text-muted-foreground sm:mt-2 sm:text-xs">
+          Select at least 2 models.
         </p>
       )}
     </div>
