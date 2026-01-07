@@ -1,3 +1,0 @@
-[submodule "packages/patchwright-llmcouncil"]
-	path = packages/patchwright-llmcouncil
-	url = git@github.com:starascendin/patchwright-llmcouncil.git
