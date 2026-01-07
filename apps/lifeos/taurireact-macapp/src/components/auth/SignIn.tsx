@@ -262,6 +262,10 @@ export function SignIn() {
         password: passwordToUse,
       });
 
+      console.log("[SignIn] First factor result:", firstFactorResult);
+      console.log("[SignIn] First factor status:", firstFactorResult?.status);
+      console.log("[SignIn] supportedSecondFactors:", firstFactorResult?.supportedSecondFactors);
+
       if (firstFactorResult?.status === "complete" && firstFactorResult.createdSessionId) {
         await clerk.setActive({ session: firstFactorResult.createdSessionId });
         goToLifeOS();
@@ -270,12 +274,31 @@ export function SignIn() {
       }
 
       if (firstFactorResult?.status === "needs_second_factor") {
+        // Detect available 2FA strategy from the result
+        const supportedFactors = firstFactorResult.supportedSecondFactors || signInResource.supportedSecondFactors || [];
+        console.log("[SignIn] First factor needs 2FA. Supported factors:", supportedFactors);
+
+        const phoneCodeFactor = supportedFactors.find((f: any) => f.strategy === "phone_code");
+        const totpFactor = supportedFactors.find((f: any) => f.strategy === "totp");
+        const detectedStrategy = phoneCodeFactor ? "phone_code" : totpFactor ? "totp" : "phone_code";
+        console.log("[SignIn] Detected 2FA strategy:", detectedStrategy);
+        setSecondFactorStrategy(detectedStrategy);
+
+        // For phone_code, we need to call prepareSecondFactor first
+        if (detectedStrategy === "phone_code" && phoneCodeFactor) {
+          console.log("[SignIn] Preparing phone_code 2FA with phoneNumberId:", phoneCodeFactor.phoneNumberId);
+          await signInResource.prepareSecondFactor({
+            strategy: "phone_code",
+            phoneNumberId: phoneCodeFactor.phoneNumberId,
+          });
+        }
+
         const autoCode = opts?.autoSecondFactorCode?.trim();
         setNeedsSecondFactor(true);
         if (autoCode) {
           setTwoFactorCode(autoCode);
           setLoadingMode(null);
-          await handleSecondFactor({ code: autoCode });
+          await handleSecondFactor({ code: autoCode, strategy: detectedStrategy });
           return;
         }
         setLoadingMode(null);
@@ -290,7 +313,9 @@ export function SignIn() {
     }
   };
 
-  const handleSecondFactor = async (opts?: { code?: string }) => {
+  const [secondFactorStrategy, setSecondFactorStrategy] = useState<string | null>(null);
+
+  const handleSecondFactor = async (opts?: { code?: string; strategy?: string }) => {
     console.log("[SignIn] handleSecondFactor called, isLoaded:", isSignInLoaded, "signIn:", !!signIn);
     if (!isSignInLoaded || !signIn) return;
 
@@ -305,8 +330,23 @@ export function SignIn() {
 
     try {
       const signInResource: any = signIn;
+
+      // Use passed strategy, stored strategy, or detect from signIn object
+      let strategy = opts?.strategy || secondFactorStrategy;
+
+      if (!strategy) {
+        const supportedFactors = signInResource.supportedSecondFactors || [];
+        console.log("[SignIn] Available 2FA strategies:", supportedFactors.map((f: any) => f.strategy));
+
+        const phoneCodeFactor = supportedFactors.find((f: any) => f.strategy === "phone_code");
+        const totpFactor = supportedFactors.find((f: any) => f.strategy === "totp");
+        strategy = phoneCodeFactor ? "phone_code" : totpFactor ? "totp" : "phone_code";
+      }
+
+      console.log("[SignIn] Using 2FA strategy:", strategy);
+
       const result = await signInResource.attemptSecondFactor({
-        strategy: "totp",
+        strategy,
         code,
       });
 

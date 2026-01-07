@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@holaai/convex";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ import {
   Cloud,
   Loader2,
   Check,
+  HardDrive,
+  CloudOff,
+  Smartphone,
 } from "lucide-react";
 import {
   saveMemo,
@@ -28,6 +31,11 @@ import {
   getExtensionFromMimeType,
 } from "@/lib/services/transcriptionService";
 import { useApiKeys } from "@/lib/hooks/useApiKeys";
+import {
+  getVoiceMemos,
+  getMemoDisplayName,
+  type VoiceMemo as ExportedVoiceMemo,
+} from "@/lib/services/voicememos";
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -52,9 +60,17 @@ function formatRelativeTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
+// Sync status types
+type SyncStatus = "local" | "cloud" | "synced" | "exported";
+
 // Runtime memo with object URL for playback
 interface RuntimeVoiceMemo extends StoredVoiceMemo {
-  audioUrl: string; // Object URL created from blob for playback
+  audioUrl: string; // Object URL created from blob for playback, or empty for exported
+  syncStatus: SyncStatus; // local-only, cloud-only, synced to both, or exported from macOS
+  convexId?: string; // Convex document ID for cloud memos
+  isExported?: boolean; // True if from macOS Voice Memos export
+  exportedMemoId?: number; // ID in Tauri SQLite for exported memos
+  exportedLocalPath?: string | null; // Local file path for exported memos (needs to be loaded via readFile)
 }
 
 // Voice memo item with playback
@@ -77,9 +93,47 @@ function VoiceMemoItem({
 }: VoiceMemoItemProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [loadedAudioUrl, setLoadedAudioUrl] = useState<string | null>(null);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handlePlayPause = () => {
+  // Get the audio URL - either pre-loaded or needs async loading for exported memos
+  const audioUrl = memo.isExported ? loadedAudioUrl : memo.audioUrl;
+
+  // Load audio for exported memos using Tauri fs plugin
+  const loadExportedAudio = async () => {
+    if (!memo.exportedLocalPath || loadedAudioUrl || isLoadingAudio || !isTauri) return;
+
+    setIsLoadingAudio(true);
+    try {
+      const { readFile } = await import("@tauri-apps/plugin-fs");
+      const data = await readFile(memo.exportedLocalPath);
+      const blob = new Blob([data], { type: "audio/mp4" });
+      const url = URL.createObjectURL(blob);
+      setLoadedAudioUrl(url);
+    } catch (error) {
+      console.error("Failed to load exported audio:", error);
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  };
+
+  // Cleanup loaded audio URL on unmount
+  useEffect(() => {
+    return () => {
+      if (loadedAudioUrl) {
+        URL.revokeObjectURL(loadedAudioUrl);
+      }
+    };
+  }, [loadedAudioUrl]);
+
+  const handlePlayPause = async () => {
+    // For exported memos, load audio first if not loaded
+    if (memo.isExported && !loadedAudioUrl) {
+      await loadExportedAudio();
+      return; // Will auto-play after loading via effect
+    }
+
     if (!audioRef.current) return;
 
     if (isPlaying) {
@@ -90,6 +144,14 @@ function VoiceMemoItem({
     setIsPlaying(!isPlaying);
   };
 
+  // Auto-play when audio is first loaded for exported memos
+  useEffect(() => {
+    if (loadedAudioUrl && audioRef.current && memo.isExported) {
+      audioRef.current.play();
+    }
+  }, [loadedAudioUrl, memo.isExported]);
+
+  // Re-attach event listeners when audioUrl changes (important for exported memos loaded on demand)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -113,7 +175,7 @@ function VoiceMemoItem({
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("play", handlePlay);
     };
-  }, []);
+  }, [audioUrl]); // Re-run when audioUrl changes
 
   // Cleanup on unmount
   useEffect(() => {
@@ -125,11 +187,45 @@ function VoiceMemoItem({
   }, []);
 
   const hasTranscript = Boolean(memo.transcript);
-  const isSynced = Boolean(memo.syncedToConvex);
+
+  // Render sync status badge
+  const renderSyncBadge = () => {
+    switch (memo.syncStatus) {
+      case "local":
+        return (
+          <span className="text-xs px-1.5 py-0.5 bg-muted text-muted-foreground rounded flex items-center gap-1">
+            <HardDrive className="h-3 w-3" />
+            Local
+          </span>
+        );
+      case "cloud":
+        return (
+          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded flex items-center gap-1">
+            <Cloud className="h-3 w-3" />
+            Cloud
+          </span>
+        );
+      case "synced":
+        return (
+          <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded flex items-center gap-1">
+            <Check className="h-3 w-3" />
+            Synced
+          </span>
+        );
+      case "exported":
+        return (
+          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-1">
+            <Smartphone className="h-3 w-3" />
+            Voice Memo
+          </span>
+        );
+    }
+  };
 
   return (
     <div className="p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
-      <audio ref={audioRef} src={memo.audioUrl} preload="metadata" />
+      {/* Audio element - always render, src may be empty for exported memos until loaded */}
+      <audio ref={audioRef} src={audioUrl || undefined} preload="metadata" />
 
       <div className="flex items-start gap-3">
         {/* Play/Pause Button */}
@@ -138,8 +234,11 @@ function VoiceMemoItem({
           size="icon"
           className="h-10 w-10 shrink-0"
           onClick={handlePlayPause}
+          disabled={isLoadingAudio || (memo.isExported && !memo.exportedLocalPath)}
         >
-          {isPlaying ? (
+          {isLoadingAudio ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : isPlaying ? (
             <Pause className="h-4 w-4" />
           ) : (
             <Play className="h-4 w-4 ml-0.5" />
@@ -156,12 +255,7 @@ function VoiceMemoItem({
             <span className="text-xs text-muted-foreground">
               {formatRelativeTime(memo.createdAt)}
             </span>
-            {isSynced && (
-              <span className="text-xs text-green-500 flex items-center gap-0.5">
-                <Check className="h-3 w-3" />
-                synced
-              </span>
-            )}
+            {renderSyncBadge()}
           </div>
 
           {/* Progress bar */}
@@ -189,8 +283,8 @@ function VoiceMemoItem({
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Transcribe button */}
-          {!hasTranscript && (
+          {/* Transcribe button - only for local/synced memos (not exported, not cloud-only) */}
+          {!hasTranscript && !memo.isExported && memo.syncStatus !== "cloud" && (
             <Button
               variant="ghost"
               size="icon"
@@ -207,15 +301,15 @@ function VoiceMemoItem({
             </Button>
           )}
 
-          {/* Sync button */}
-          {!isSynced && (
+          {/* Sync button - only show for local-only memos */}
+          {memo.syncStatus === "local" && (
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8"
               onClick={onSync}
               disabled={isSyncing}
-              title="Sync to Convex"
+              title="Sync to Cloud"
             >
               {isSyncing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -225,16 +319,18 @@ function VoiceMemoItem({
             </Button>
           )}
 
-          {/* Delete button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            onClick={onDelete}
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {/* Delete button - only for local/synced recorded memos (not exported, not cloud-only) */}
+          {!memo.isExported && memo.syncStatus !== "cloud" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              onClick={onDelete}
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -248,16 +344,21 @@ interface VoiceMemoRecorderProps {
 export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingLocal, setIsLoadingLocal] = useState(true);
+  const [isLoadingExported, setIsLoadingExported] = useState(true);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [memos, setMemos] = useState<RuntimeVoiceMemo[]>([]);
   const [transcribingId, setTranscribingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [localMemos, setLocalMemos] = useState<StoredVoiceMemo[]>([]);
+  const [exportedMemos, setExportedMemos] = useState<ExportedVoiceMemo[]>([]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // Track blob URLs to revoke only on unmount or when memos are removed
+  const blobUrlsRef = useRef<Map<string, string>>(new Map());
 
   // API keys for GROQ
   const { groqApiKey, hasGroqApiKey } = useApiKeys();
@@ -266,30 +367,204 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   const generateUploadUrl = useMutation(api.lifeos.voicememo.generateUploadUrl);
   const createConvexMemo = useMutation(api.lifeos.voicememo.createMemo);
 
-  // Load memos from IndexedDB for the specific date
-  const loadMemos = useCallback(async () => {
-    setIsLoading(true);
+  // Convex action for server-side transcription (uses GROQ_API_KEY from server)
+  const transcribeMemoAction = useAction(api.lifeos.voicememo.transcribeMemo);
+
+  // Fetch cloud memos from Convex
+  const cloudMemos = useQuery(api.lifeos.voicememo.getMemosForDate, { date });
+
+  // Load local memos from IndexedDB for the specific date
+  const loadLocalMemos = useCallback(async () => {
+    setIsLoadingLocal(true);
     try {
       const storedMemos = await getMemosForDate(date);
-      // Create object URLs for playback
-      const runtimeMemos: RuntimeVoiceMemo[] = storedMemos.map((memo) => ({
-        ...memo,
-        audioUrl: URL.createObjectURL(memo.audioBlob),
-      }));
-      setMemos(runtimeMemos);
+      setLocalMemos(storedMemos);
     } catch (err) {
-      console.error("Failed to load memos:", err);
+      console.error("Failed to load local memos:", err);
       setError("Failed to load saved voice notes.");
     } finally {
-      setIsLoading(false);
+      setIsLoadingLocal(false);
     }
   }, [date]);
 
+  // Load exported macOS Voice Memos for the specific date (Tauri only)
+  const loadExportedMemos = useCallback(async () => {
+    if (!isTauri) {
+      setIsLoadingExported(false);
+      return;
+    }
+
+    setIsLoadingExported(true);
+    try {
+      const allExported = await getVoiceMemos();
+
+      // Filter by date
+      const [year, month, day] = date.split("-").map(Number);
+      const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
+      const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
+
+      const filteredExported = allExported.filter(
+        (memo) => memo.date >= dayStart && memo.date <= dayEnd
+      );
+
+      setExportedMemos(filteredExported);
+    } catch (err) {
+      console.error("Failed to load exported memos:", err);
+      // Don't show error - exported memos are optional
+    } finally {
+      setIsLoadingExported(false);
+    }
+  }, [date]);
+
+  // Load local and exported memos when date changes
   useEffect(() => {
-    // Revoke old URLs before loading new memos
-    memos.forEach((memo) => URL.revokeObjectURL(memo.audioUrl));
-    loadMemos();
-  }, [loadMemos]);
+    loadLocalMemos();
+    loadExportedMemos();
+  }, [loadLocalMemos, loadExportedMemos]);
+
+  // Helper to get or create blob URL (reuses existing URLs to prevent revocation issues)
+  const getOrCreateBlobUrl = useCallback((memoId: string, blob: Blob): string => {
+    const existing = blobUrlsRef.current.get(memoId);
+    if (existing) {
+      return existing;
+    }
+    const newUrl = URL.createObjectURL(blob);
+    blobUrlsRef.current.set(memoId, newUrl);
+    return newUrl;
+  }, []);
+
+  // Merge local, cloud, and exported memos
+  useEffect(() => {
+    const mergedMemos: RuntimeVoiceMemo[] = [];
+    const processedLocalIds = new Set<string>();
+    const processedExportedUuids = new Set<string>();
+    const currentMemoIds = new Set<string>();
+
+    // Process local recorded memos first
+    for (const localMemo of localMemos) {
+      currentMemoIds.add(localMemo.id);
+
+      // Check if this local memo exists in cloud
+      const cloudMatch = cloudMemos?.find(
+        (cm) => cm.localId === localMemo.id || cm._id === localMemo.convexMemoId
+      );
+
+      if (cloudMatch) {
+        // Memo exists in both - mark as synced
+        processedLocalIds.add(cloudMatch.localId);
+        mergedMemos.push({
+          ...localMemo,
+          audioUrl: getOrCreateBlobUrl(localMemo.id, localMemo.audioBlob),
+          syncStatus: "synced",
+          convexId: cloudMatch._id,
+          syncedToConvex: true,
+          convexMemoId: cloudMatch._id,
+          // Use cloud transcript if available (it may have server-side transcription)
+          transcript: cloudMatch.transcript ?? localMemo.transcript,
+          transcriptLanguage: cloudMatch.language ?? localMemo.transcriptLanguage,
+        });
+      } else {
+        // Local only
+        mergedMemos.push({
+          ...localMemo,
+          audioUrl: getOrCreateBlobUrl(localMemo.id, localMemo.audioBlob),
+          syncStatus: "local",
+        });
+      }
+    }
+
+    // Add cloud-only memos (not in local storage)
+    if (cloudMemos) {
+      for (const cloudMemo of cloudMemos) {
+        if (!processedLocalIds.has(cloudMemo.localId)) {
+          // Check if we have this locally by convexMemoId
+          const hasLocal = localMemos.some(
+            (lm) => lm.id === cloudMemo.localId || lm.convexMemoId === cloudMemo._id
+          );
+
+          // Check if this is an exported memo that was synced to cloud
+          const isExportedInCloud = exportedMemos.some(
+            (em) => em.uuid === cloudMemo.localId
+          );
+
+          if (!hasLocal && !isExportedInCloud && cloudMemo.audioUrl) {
+            // Cloud only - use streaming URL
+            mergedMemos.push({
+              id: cloudMemo.localId,
+              name: cloudMemo.name,
+              audioBlob: new Blob(), // Empty blob for cloud-only
+              mimeType: "audio/webm",
+              extension: "webm",
+              duration: cloudMemo.duration / 1000, // Convert from ms to seconds
+              createdAt: cloudMemo.clientCreatedAt,
+              transcript: cloudMemo.transcript,
+              transcriptLanguage: cloudMemo.language,
+              audioUrl: cloudMemo.audioUrl,
+              syncStatus: "cloud",
+              convexId: cloudMemo._id,
+              syncedToConvex: true,
+              convexMemoId: cloudMemo._id,
+            });
+          }
+
+          // Track exported memos that are in cloud
+          if (isExportedInCloud) {
+            processedExportedUuids.add(cloudMemo.localId);
+          }
+        }
+      }
+    }
+
+    // Add exported macOS Voice Memos
+    for (const exportedMemo of exportedMemos) {
+      // Check if already processed (synced to cloud)
+      const cloudMatch = cloudMemos?.find((cm) => cm.localId === exportedMemo.uuid);
+
+      // Only include exported memos that have a local audio file
+      if (exportedMemo.local_path) {
+        mergedMemos.push({
+          id: exportedMemo.uuid,
+          name: getMemoDisplayName(exportedMemo),
+          audioBlob: new Blob(), // No blob for exported memos
+          mimeType: "audio/m4a",
+          extension: "m4a",
+          duration: exportedMemo.duration,
+          createdAt: exportedMemo.date,
+          transcript: exportedMemo.transcription ?? undefined,
+          transcriptLanguage: exportedMemo.transcription_language ?? undefined,
+          audioUrl: "", // Will be loaded on demand via readFile
+          syncStatus: cloudMatch ? "synced" : "exported",
+          isExported: true,
+          exportedMemoId: exportedMemo.id,
+          exportedLocalPath: exportedMemo.local_path,
+          syncedToConvex: !!cloudMatch,
+          convexMemoId: cloudMatch?._id,
+        });
+      }
+    }
+
+    // Sort by createdAt descending
+    mergedMemos.sort((a, b) => b.createdAt - a.createdAt);
+
+    // Clean up blob URLs for memos that are no longer in the list
+    const urlsToRevoke: string[] = [];
+    blobUrlsRef.current.forEach((url, id) => {
+      if (!currentMemoIds.has(id)) {
+        urlsToRevoke.push(id);
+      }
+    });
+    for (const id of urlsToRevoke) {
+      const url = blobUrlsRef.current.get(id);
+      if (url) {
+        URL.revokeObjectURL(url);
+        blobUrlsRef.current.delete(id);
+      }
+    }
+
+    setMemos(mergedMemos);
+  }, [localMemos, cloudMemos, exportedMemos, getOrCreateBlobUrl]);
+
+  const isLoading = isLoadingLocal || isLoadingExported || cloudMemos === undefined;
 
   // Get supported MIME type for recording - prefer Opus for best compression
   const getSupportedMimeType = (): { mimeType: string; extension: string } => {
@@ -424,6 +699,79 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     [date]
   );
 
+  // Auto-sync a memo to cloud and trigger server-side transcription
+  const autoSyncMemo = async (memo: StoredVoiceMemo) => {
+    try {
+      setSyncingId(memo.id);
+
+      // Get upload URL from Convex
+      const uploadUrl = await generateUploadUrl();
+
+      // Upload the audio file
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": memo.mimeType || "audio/webm" },
+        body: memo.audioBlob,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.status}`);
+      }
+
+      const uploadResult = await uploadResponse.json();
+      const storageId = uploadResult.storageId;
+
+      if (!storageId) {
+        throw new Error("No storageId returned from upload");
+      }
+
+      // Create memo record in Convex
+      const convexMemoId = await createConvexMemo({
+        localId: memo.id,
+        name: memo.name,
+        storageId,
+        duration: memo.duration * 1000, // Convert to ms for Convex
+        clientCreatedAt: memo.createdAt,
+        clientUpdatedAt: Date.now(),
+      });
+
+      // Update IndexedDB with sync status
+      await updateMemo(memo.id, {
+        syncedToConvex: true,
+        convexMemoId: String(convexMemoId),
+      });
+
+      // Update local memos state to trigger re-merge
+      setLocalMemos((prev) =>
+        prev.map((m) =>
+          m.id === memo.id
+            ? { ...m, syncedToConvex: true, convexMemoId: String(convexMemoId) }
+            : m
+        )
+      );
+
+      // Trigger server-side transcription with Groq (fire and forget)
+      // The transcription result will be available via the cloudMemos query
+      transcribeMemoAction({ memoId: convexMemoId })
+        .then((result) => {
+          if (result.success) {
+            console.log("Auto-transcription completed:", result.transcript?.slice(0, 100));
+          } else {
+            console.warn("Auto-transcription failed:", result.error);
+          }
+        })
+        .catch((err) => {
+          console.warn("Auto-transcription error:", err);
+        });
+    } catch (err) {
+      console.error("Auto-sync failed:", err);
+      // Don't show error - auto-sync is best-effort
+      // User can manually sync later if needed
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
   // Handle record button click
   const handleRecordClick = async () => {
     if (isRecording) {
@@ -447,14 +795,13 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           // Save to IndexedDB
           await saveMemo(storedMemo);
 
-          // Only add to runtime state if the memo is for the currently viewed date
+          // Update local memos state (will be merged with cloud memos)
           if (isOnViewedDate(now)) {
-            const runtimeMemo: RuntimeVoiceMemo = {
-              ...storedMemo,
-              audioUrl: URL.createObjectURL(blob),
-            };
-            setMemos((prev) => [runtimeMemo, ...prev]);
+            setLocalMemos((prev) => [storedMemo, ...prev]);
           }
+
+          // Auto-sync to cloud in the background
+          autoSyncMemo(storedMemo);
         }
       } catch (err) {
         console.error("Failed to save memo:", err);
@@ -471,17 +818,25 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   // Handle delete
   const handleDelete = async (memoId: string) => {
     try {
-      // Revoke the object URL
       const memo = memos.find((m) => m.id === memoId);
-      if (memo) {
-        URL.revokeObjectURL(memo.audioUrl);
+      if (!memo) return;
+
+      // Revoke the blob URL from our ref (only for local memos)
+      if (memo.syncStatus !== "cloud") {
+        const blobUrl = blobUrlsRef.current.get(memoId);
+        if (blobUrl) {
+          URL.revokeObjectURL(blobUrl);
+          blobUrlsRef.current.delete(memoId);
+        }
       }
 
-      // Delete from IndexedDB
-      await deleteStoredMemo(memoId);
+      // Delete from IndexedDB (only if local)
+      if (memo.syncStatus !== "cloud") {
+        await deleteStoredMemo(memoId);
+      }
 
-      // Remove from state
-      setMemos((prev) => prev.filter((m) => m.id !== memoId));
+      // Remove from local memos state
+      setLocalMemos((prev) => prev.filter((m) => m.id !== memoId));
     } catch (err) {
       console.error("Failed to delete memo:", err);
       setError("Failed to delete voice note.");
@@ -496,7 +851,7 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
 
     const memo = memos.find((m) => m.id === memoId);
-    if (!memo) return;
+    if (!memo || memo.syncStatus === "cloud") return; // Can't transcribe cloud-only memos locally
 
     setTranscribingId(memoId);
     setError(null);
@@ -512,8 +867,8 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
         transcribedAt: Date.now(),
       });
 
-      // Update state
-      setMemos((prev) =>
+      // Update local memos state
+      setLocalMemos((prev) =>
         prev.map((m) =>
           m.id === memoId
             ? {
@@ -533,10 +888,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
   };
 
-  // Handle sync to Convex
+  // Handle sync to Convex (manual sync button)
   const handleSync = async (memoId: string) => {
     const memo = memos.find((m) => m.id === memoId);
-    if (!memo) return;
+    if (!memo || memo.syncStatus !== "local") return;
 
     setSyncingId(memoId);
     setError(null);
@@ -571,7 +926,7 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
         localId: memo.id,
         name: memo.name,
         storageId,
-        duration: memo.duration,
+        duration: memo.duration * 1000, // Convert to ms for Convex
         clientCreatedAt: memo.createdAt,
         clientUpdatedAt: Date.now(),
       });
@@ -582,8 +937,8 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
         convexMemoId: String(convexMemoId),
       });
 
-      // Update state
-      setMemos((prev) =>
+      // Update local memos state
+      setLocalMemos((prev) =>
         prev.map((m) =>
           m.id === memoId
             ? {
@@ -594,6 +949,19 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
             : m
         )
       );
+
+      // Trigger server-side transcription with Groq (fire and forget)
+      transcribeMemoAction({ memoId: convexMemoId })
+        .then((result) => {
+          if (result.success) {
+            console.log("Transcription completed:", result.transcript?.slice(0, 100));
+          } else {
+            console.warn("Transcription failed:", result.error);
+          }
+        })
+        .catch((err) => {
+          console.warn("Transcription error:", err);
+        });
     } catch (err) {
       console.error("Sync failed:", err);
       setError(err instanceof Error ? err.message : "Sync to Convex failed");
@@ -602,7 +970,7 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
   };
 
-  // Handle transcribe all (memos without transcripts)
+  // Handle transcribe all (local memos without transcripts)
   const [isTranscribingAll, setIsTranscribingAll] = useState(false);
   const handleTranscribeAll = async () => {
     if (!hasGroqApiKey || !groqApiKey) {
@@ -610,7 +978,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
       return;
     }
 
-    const memosToTranscribe = memos.filter((m) => !m.transcript);
+    // Only transcribe local memos (not cloud-only)
+    const memosToTranscribe = memos.filter(
+      (m) => !m.transcript && m.syncStatus !== "cloud"
+    );
     if (memosToTranscribe.length === 0) return;
 
     setIsTranscribingAll(true);
@@ -628,7 +999,7 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           transcribedAt: Date.now(),
         });
 
-        setMemos((prev) =>
+        setLocalMemos((prev) =>
           prev.map((m) =>
             m.id === memo.id
               ? {
@@ -650,10 +1021,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setIsTranscribingAll(false);
   };
 
-  // Handle sync all (memos not synced to Convex)
+  // Handle sync all (local-only memos)
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const handleSyncAll = async () => {
-    const memosToSync = memos.filter((m) => !m.syncedToConvex);
+    const memosToSync = memos.filter((m) => m.syncStatus === "local");
     if (memosToSync.length === 0) return;
 
     setIsSyncingAll(true);
@@ -685,7 +1056,7 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           localId: memo.id,
           name: memo.name,
           storageId,
-          duration: memo.duration,
+          duration: memo.duration * 1000, // Convert to ms for Convex
           clientCreatedAt: memo.createdAt,
           clientUpdatedAt: Date.now(),
         });
@@ -695,13 +1066,18 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           convexMemoId: String(convexMemoId),
         });
 
-        setMemos((prev) =>
+        setLocalMemos((prev) =>
           prev.map((m) =>
             m.id === memo.id
               ? { ...m, syncedToConvex: true, convexMemoId: String(convexMemoId) }
               : m
           )
         );
+
+        // Trigger server-side transcription (fire and forget)
+        transcribeMemoAction({ memoId: convexMemoId }).catch((err) => {
+          console.warn(`Auto-transcription failed for ${memo.name}:`, err);
+        });
       } catch (err) {
         console.error(`Failed to sync ${memo.name}:`, err);
         // Continue with next memo
@@ -712,9 +1088,11 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setIsSyncingAll(false);
   };
 
-  // Count memos needing actions
-  const memosNeedingTranscription = memos.filter((m) => !m.transcript).length;
-  const memosNeedingSync = memos.filter((m) => !m.syncedToConvex).length;
+  // Count memos needing actions (only local memos)
+  const memosNeedingTranscription = memos.filter(
+    (m) => !m.transcript && m.syncStatus !== "cloud"
+  ).length;
+  const memosNeedingSync = memos.filter((m) => m.syncStatus === "local").length;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -727,8 +1105,11 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           .getTracks()
           .forEach((track) => track.stop());
       }
-      // Revoke all object URLs
-      memos.forEach((memo) => URL.revokeObjectURL(memo.audioUrl));
+      // Revoke all blob URLs
+      blobUrlsRef.current.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      blobUrlsRef.current.clear();
     };
   }, []);
 
@@ -846,7 +1227,7 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Voice notes are stored locally on this device.
+          Voice notes are automatically synced to the cloud.
         </p>
       </CardContent>
     </Card>

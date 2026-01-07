@@ -199,6 +199,47 @@ export const getMemo = query({
 });
 
 /**
+ * Get memos for a specific date (used by Daily View)
+ */
+export const getMemosForDate = query({
+  args: {
+    date: v.string(), // YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Parse date to timestamps (start of day and end of day)
+    const startTimestamp = new Date(args.date).setHours(0, 0, 0, 0);
+    const endTimestamp = new Date(args.date).setHours(23, 59, 59, 999);
+
+    // Fetch all memos ordered by creation date
+    const memos = await ctx.db
+      .query("life_voiceMemos")
+      .withIndex("by_user_created", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .collect();
+
+    // Filter to the specific date
+    const filteredMemos = memos.filter((memo) => {
+      return (
+        memo.clientCreatedAt >= startTimestamp &&
+        memo.clientCreatedAt <= endTimestamp
+      );
+    });
+
+    // Generate URLs for audio files
+    return Promise.all(
+      filteredMemos.map(async (memo) => ({
+        ...memo,
+        audioUrl: memo.storageId
+          ? await ctx.storage.getUrl(memo.storageId)
+          : null,
+      }))
+    );
+  },
+});
+
+/**
  * Get memos for a date range (used by Week View)
  */
 export const getMemosForDateRange = query({

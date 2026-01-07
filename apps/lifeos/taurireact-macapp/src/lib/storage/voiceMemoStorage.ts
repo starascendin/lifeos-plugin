@@ -174,3 +174,25 @@ export async function getMemosForDate(dateStr: string): Promise<StoredVoiceMemo[
 
   return allMemos.filter((memo) => memo.createdAt >= dayStart && memo.createdAt <= dayEnd);
 }
+
+/**
+ * Get memos for a date range (YYYY-MM-DD format)
+ * Filters memos where createdAt timestamp falls within the given range
+ */
+export async function getMemosForDateRange(
+  startDateStr: string,
+  endDateStr: string
+): Promise<StoredVoiceMemo[]> {
+  const allMemos = await getMemos();
+
+  // Parse date strings and get range boundaries
+  const [startYear, startMonth, startDay] = startDateStr.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endDateStr.split("-").map(Number);
+
+  const rangeStart = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0).getTime();
+  const rangeEnd = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999).getTime();
+
+  return allMemos.filter(
+    (memo) => memo.createdAt >= rangeStart && memo.createdAt <= rangeEnd
+  );
+}
