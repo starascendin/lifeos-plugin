@@ -13,6 +13,7 @@ import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
 import { LifeOSLLMCouncil } from "./components/lifeos/LLMCouncil";
 import { LifeOSProxyLLMCouncil } from "./components/lifeos/ProxyLLMCouncil";
+import { LifeOSLLMCouncilAPI } from "./components/lifeos/LLMCouncilAPI";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
@@ -66,6 +67,7 @@ export default function LifeOSApp() {
                 <Route path="chatnexus" element={<LifeOSChatNexus />} />
                 <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
                 <Route path="proxy-council" element={<LifeOSProxyLLMCouncil />} />
+                <Route path="council-api" element={<LifeOSLLMCouncilAPI />} />
                 <Route path="pm" element={<LifeOSPM />} />
                 <Route path="pm/:view" element={<LifeOSPM />} />
                 <Route path="pm/:view/:id" element={<LifeOSPM />} />

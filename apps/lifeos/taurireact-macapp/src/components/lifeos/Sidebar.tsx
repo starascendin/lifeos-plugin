@@ -104,6 +104,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
     const items: NavItem[] = [
       { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
       { name: "Proxy Council", href: "/lifeos/proxy-council", icon: Network },
+      { name: "Council API", href: "/lifeos/council-api", icon: Cpu },
       { name: "Atlas", href: "/lifeos/atlas", icon: Globe },
       { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
       { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
