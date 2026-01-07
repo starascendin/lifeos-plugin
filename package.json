@@ -17,7 +17,8 @@
     "ios": "pnpm --filter @holaai/rnapp ios",
     "android": "pnpm --filter @holaai/rnapp android",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "deploy:prod": "bash scripts/deploy-prod.sh"
   },
   "devDependencies": {
     "typescript": "~5.9.2",
