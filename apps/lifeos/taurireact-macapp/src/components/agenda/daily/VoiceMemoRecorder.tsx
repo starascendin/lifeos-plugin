@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useMutation, useQuery, useAction } from "convex/react";
+import { useMutation, useQuery, useAction, useConvex } from "convex/react";
 import { api } from "@holaai/convex";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,10 @@ import { useApiKeys } from "@/lib/hooks/useApiKeys";
 import {
   getVoiceMemos,
   getMemoDisplayName,
+  transcribeVoiceMemo as transcribeExportedMemo,
+  syncTranscriptsToConvex,
   type VoiceMemo as ExportedVoiceMemo,
+  type ConvexSyncProgress,
 } from "@/lib/services/voicememos";
 
 // Detect if running in Tauri
@@ -362,6 +365,9 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
 
   // API keys for GROQ
   const { groqApiKey, hasGroqApiKey } = useApiKeys();
+
+  // Convex client for sync operations
+  const convexClient = useConvex();
 
   // Convex mutations for syncing
   const generateUploadUrl = useMutation(api.lifeos.voicememo.generateUploadUrl);
@@ -845,11 +851,6 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
 
   // Handle transcription
   const handleTranscribe = async (memoId: string) => {
-    if (!hasGroqApiKey || !groqApiKey) {
-      setError("GROQ API key not configured. Please set it in Settings > API Keys.");
-      return;
-    }
-
     const memo = memos.find((m) => m.id === memoId);
     if (!memo || memo.syncStatus === "cloud") return; // Can't transcribe cloud-only memos locally
 
@@ -857,29 +858,48 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setError(null);
 
     try {
-      const filename = `audio.${getExtensionFromMimeType(memo.mimeType)}`;
-      const result = await transcribeAudio(memo.audioBlob, groqApiKey, filename);
+      if (memo.isExported && memo.exportedMemoId) {
+        // Use Tauri backend for exported macOS Voice Memos
+        // The Tauri backend uses the GROQ API key from settings
+        const result = await transcribeExportedMemo(memo.exportedMemoId);
 
-      // Update IndexedDB
-      await updateMemo(memoId, {
-        transcript: result.text,
-        transcriptLanguage: result.language,
-        transcribedAt: Date.now(),
-      });
+        if (!result.success) {
+          throw new Error(result.error || "Transcription failed");
+        }
 
-      // Update local memos state
-      setLocalMemos((prev) =>
-        prev.map((m) =>
-          m.id === memoId
-            ? {
-                ...m,
-                transcript: result.text,
-                transcriptLanguage: result.language,
-                transcribedAt: Date.now(),
-              }
-            : m
-        )
-      );
+        // Reload exported memos to get the updated transcription
+        await loadExportedMemos();
+      } else {
+        // Use browser-based transcription for local recorded memos
+        if (!hasGroqApiKey || !groqApiKey) {
+          setError("GROQ API key not configured. Please set it in Settings > API Keys.");
+          return;
+        }
+
+        const filename = `audio.${getExtensionFromMimeType(memo.mimeType)}`;
+        const result = await transcribeAudio(memo.audioBlob, groqApiKey, filename);
+
+        // Update IndexedDB
+        await updateMemo(memoId, {
+          transcript: result.text,
+          transcriptLanguage: result.language,
+          transcribedAt: Date.now(),
+        });
+
+        // Update local memos state
+        setLocalMemos((prev) =>
+          prev.map((m) =>
+            m.id === memoId
+              ? {
+                  ...m,
+                  transcript: result.text,
+                  transcriptLanguage: result.language,
+                  transcribedAt: Date.now(),
+                }
+              : m
+          )
+        );
+      }
     } catch (err) {
       console.error("Transcription failed:", err);
       setError(err instanceof Error ? err.message : "Transcription failed");
@@ -972,66 +992,122 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
 
   // Handle transcribe all (local memos without transcripts)
   const [isTranscribingAll, setIsTranscribingAll] = useState(false);
-  const handleTranscribeAll = async () => {
-    if (!hasGroqApiKey || !groqApiKey) {
-      setError("GROQ API key not configured. Please set it in Settings > API Keys.");
-      return;
-    }
+  const [transcribeProgress, setTranscribeProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
-    // Only transcribe local memos (not cloud-only)
+  const handleTranscribeAll = async () => {
+    // Only transcribe memos that need it (not cloud-only, no transcript yet)
     const memosToTranscribe = memos.filter(
       (m) => !m.transcript && m.syncStatus !== "cloud"
     );
     if (memosToTranscribe.length === 0) return;
 
+    // Split into exported and local recorded memos
+    const exportedMemos = memosToTranscribe.filter((m) => m.isExported && m.exportedMemoId);
+    const localRecordedMemos = memosToTranscribe.filter((m) => !m.isExported);
+
+    // Check API key only if we have local recorded memos to transcribe
+    if (localRecordedMemos.length > 0 && (!hasGroqApiKey || !groqApiKey)) {
+      setError("GROQ API key not configured. Please set it in Settings > API Keys.");
+      // Still continue with exported memos if any
+      if (exportedMemos.length === 0) return;
+    }
+
+    const total = memosToTranscribe.length;
+    let current = 0;
+
     setIsTranscribingAll(true);
+    setTranscribeProgress({ current: 0, total });
     setError(null);
 
-    for (const memo of memosToTranscribe) {
+    // Transcribe exported memos using Tauri backend
+    for (const memo of exportedMemos) {
       try {
+        current++;
+        setTranscribeProgress({ current, total });
         setTranscribingId(memo.id);
-        const filename = `audio.${memo.extension || "webm"}`;
-        const result = await transcribeAudio(memo.audioBlob, groqApiKey, filename);
-
-        await updateMemo(memo.id, {
-          transcript: result.text,
-          transcriptLanguage: result.language,
-          transcribedAt: Date.now(),
-        });
-
-        setLocalMemos((prev) =>
-          prev.map((m) =>
-            m.id === memo.id
-              ? {
-                  ...m,
-                  transcript: result.text,
-                  transcriptLanguage: result.language,
-                  transcribedAt: Date.now(),
-                }
-              : m
-          )
-        );
+        const result = await transcribeExportedMemo(memo.exportedMemoId!);
+        if (!result.success) {
+          console.error(`Failed to transcribe ${memo.name}:`, result.error);
+        }
       } catch (err) {
         console.error(`Failed to transcribe ${memo.name}:`, err);
-        // Continue with next memo
+      }
+    }
+
+    // Reload exported memos if any were transcribed
+    if (exportedMemos.length > 0) {
+      await loadExportedMemos();
+    }
+
+    // Transcribe local recorded memos using browser-based transcription
+    if (hasGroqApiKey && groqApiKey) {
+      for (const memo of localRecordedMemos) {
+        try {
+          current++;
+          setTranscribeProgress({ current, total });
+          setTranscribingId(memo.id);
+          const filename = `audio.${memo.extension || "webm"}`;
+          const result = await transcribeAudio(memo.audioBlob, groqApiKey, filename);
+
+          await updateMemo(memo.id, {
+            transcript: result.text,
+            transcriptLanguage: result.language,
+            transcribedAt: Date.now(),
+          });
+
+          setLocalMemos((prev) =>
+            prev.map((m) =>
+              m.id === memo.id
+                ? {
+                    ...m,
+                    transcript: result.text,
+                    transcriptLanguage: result.language,
+                    transcribedAt: Date.now(),
+                  }
+                : m
+            )
+          );
+        } catch (err) {
+          console.error(`Failed to transcribe ${memo.name}:`, err);
+          // Continue with next memo
+        }
       }
     }
 
     setTranscribingId(null);
+    setTranscribeProgress(null);
     setIsTranscribingAll(false);
   };
 
   // Handle sync all (local-only memos)
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+
+  // Handle cloud sync for transcribed Voice Memos (transcript only)
+  const [isSyncingToCloud, setIsSyncingToCloud] = useState(false);
+  const [cloudSyncProgress, setCloudSyncProgress] = useState<ConvexSyncProgress | null>(null);
+
   const handleSyncAll = async () => {
     const memosToSync = memos.filter((m) => m.syncStatus === "local");
     if (memosToSync.length === 0) return;
 
+    const total = memosToSync.length;
+    let current = 0;
+
     setIsSyncingAll(true);
+    setSyncProgress({ current: 0, total });
     setError(null);
 
     for (const memo of memosToSync) {
       try {
+        current++;
+        setSyncProgress({ current, total });
         setSyncingId(memo.id);
 
         const uploadUrl = await generateUploadUrl();
@@ -1085,7 +1161,38 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
 
     setSyncingId(null);
+    setSyncProgress(null);
     setIsSyncingAll(false);
+  };
+
+  // Handle cloud sync for transcribed Voice Memos (transcript only, no audio)
+  const handleSyncTranscriptsToCloud = async () => {
+    if (!isTauri) {
+      setError("Cloud sync is only available in the Tauri app");
+      return;
+    }
+
+    setIsSyncingToCloud(true);
+    setError(null);
+
+    try {
+      const result = await syncTranscriptsToConvex(convexClient, (progress) => {
+        setCloudSyncProgress(progress);
+      });
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        // Reload exported memos to update sync status badges
+        await loadExportedMemos();
+      }
+    } catch (err) {
+      console.error("Cloud sync failed:", err);
+      setError(err instanceof Error ? err.message : "Cloud sync failed");
+    } finally {
+      setIsSyncingToCloud(false);
+      setCloudSyncProgress(null);
+    }
   };
 
   // Count memos needing actions (only local memos)
@@ -1093,6 +1200,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     (m) => !m.transcript && m.syncStatus !== "cloud"
   ).length;
   const memosNeedingSync = memos.filter((m) => m.syncStatus === "local").length;
+  // Count transcribed Voice Memos that need cloud sync (exported with transcript but not synced)
+  const memosNeedingCloudSync = memos.filter(
+    (m) => m.isExported && m.transcript && m.syncStatus === "exported"
+  ).length;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1151,15 +1262,22 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleTranscribeAll}
-                disabled={isTranscribingAll || !hasGroqApiKey}
+                disabled={isTranscribingAll}
                 className="gap-1.5"
               >
                 {isTranscribingAll ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {transcribeProgress
+                      ? `${transcribeProgress.current}/${transcribeProgress.total}`
+                      : "..."}
+                  </>
                 ) : (
-                  <FileText className="h-3.5 w-3.5" />
+                  <>
+                    <FileText className="h-3.5 w-3.5" />
+                    Transcribe ({memosNeedingTranscription})
+                  </>
                 )}
-                Transcribe ({memosNeedingTranscription})
               </Button>
             )}
 
@@ -1172,11 +1290,43 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
                 className="gap-1.5"
               >
                 {isSyncingAll ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {syncProgress
+                      ? `${syncProgress.current}/${syncProgress.total}`
+                      : "..."}
+                  </>
                 ) : (
-                  <Cloud className="h-3.5 w-3.5" />
+                  <>
+                    <Cloud className="h-3.5 w-3.5" />
+                    Sync ({memosNeedingSync})
+                  </>
                 )}
-                Sync ({memosNeedingSync})
+              </Button>
+            )}
+
+            {/* Cloud sync for transcribed Voice Memos (Tauri only) */}
+            {isTauri && memosNeedingCloudSync > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncTranscriptsToCloud}
+                disabled={isSyncingToCloud}
+                className="gap-1.5"
+              >
+                {isSyncingToCloud ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {cloudSyncProgress
+                      ? `${cloudSyncProgress.current}/${cloudSyncProgress.total}`
+                      : "..."}
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="h-3.5 w-3.5" />
+                    Cloud ({memosNeedingCloudSync})
+                  </>
+                )}
               </Button>
             )}
           </div>
