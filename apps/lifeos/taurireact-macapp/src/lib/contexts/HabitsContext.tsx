@@ -62,6 +62,10 @@ interface HabitsContextValue {
   // Mutations - Check-ins
   toggleCheckIn: ReturnType<typeof useMutation>;
   updateCheckIn: ReturnType<typeof useMutation>;
+  skipCheckIn: ReturnType<typeof useMutation>;
+  checkHabit: ReturnType<typeof useMutation>;
+  uncheckHabit: ReturnType<typeof useMutation>;
+  markIncomplete: ReturnType<typeof useMutation>;
 
   // Helpers
   isHabitScheduledForDate: (habit: Doc<"lifeos_habits">, date: Date) => boolean;
@@ -156,6 +160,10 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   // Mutations - Check-ins
   const toggleCheckIn = useMutation(api.lifeos.habits_checkins.toggleCheckIn);
   const updateCheckIn = useMutation(api.lifeos.habits_checkins.updateCheckIn);
+  const skipCheckIn = useMutation(api.lifeos.habits_checkins.skipCheckIn);
+  const checkHabit = useMutation(api.lifeos.habits_checkins.checkHabit);
+  const uncheckHabit = useMutation(api.lifeos.habits_checkins.uncheckHabit);
+  const markIncomplete = useMutation(api.lifeos.habits_checkins.markIncomplete);
 
   // Navigation helpers
   const goToPreviousWeek = useCallback(() => {
@@ -236,6 +244,10 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     // Mutations - Check-ins
     toggleCheckIn,
     updateCheckIn,
+    skipCheckIn,
+    checkHabit,
+    uncheckHabit,
+    markIncomplete,
 
     // Helpers
     isHabitScheduledForDate: isHabitScheduled,

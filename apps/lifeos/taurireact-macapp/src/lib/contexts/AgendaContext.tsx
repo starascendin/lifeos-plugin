@@ -87,6 +87,10 @@ interface AgendaContextValue {
 
   // Mutations
   toggleHabitCheckIn: ReturnType<typeof useMutation>;
+  skipHabitCheckIn: ReturnType<typeof useMutation>;
+  checkHabit: ReturnType<typeof useMutation>;
+  uncheckHabit: ReturnType<typeof useMutation>;
+  markIncomplete: ReturnType<typeof useMutation>;
   updateIssueStatus: ReturnType<typeof useMutation>;
   toggleTopPriority: ReturnType<typeof useMutation>;
 
@@ -267,6 +271,10 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
 
   // Mutations
   const toggleHabitCheckIn = useMutation(api.lifeos.habits_checkins.toggleCheckIn);
+  const skipHabitCheckIn = useMutation(api.lifeos.habits_checkins.skipCheckIn);
+  const checkHabit = useMutation(api.lifeos.habits_checkins.checkHabit);
+  const uncheckHabit = useMutation(api.lifeos.habits_checkins.uncheckHabit);
+  const markIncomplete = useMutation(api.lifeos.habits_checkins.markIncomplete);
   const updateIssueStatus = useMutation(api.lifeos.pm_issues.updateIssueStatus);
   const toggleTopPriority = useMutation(api.lifeos.pm_issues.toggleTopPriority);
 
@@ -458,6 +466,10 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
 
     // Mutations
     toggleHabitCheckIn,
+    skipHabitCheckIn,
+    checkHabit,
+    uncheckHabit,
+    markIncomplete,
     updateIssueStatus,
     toggleTopPriority,
 

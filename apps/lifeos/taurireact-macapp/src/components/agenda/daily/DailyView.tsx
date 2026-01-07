@@ -4,8 +4,11 @@ import { HabitsSection } from "./HabitsSection";
 import { TasksSection } from "./TasksSection";
 import { VoiceMemoRecorder } from "./VoiceMemoRecorder";
 import { ScreenTimeSummary } from "./ScreenTimeSummary";
+import { useAgenda } from "@/lib/contexts/AgendaContext";
 
 export function DailyView() {
+  const { dateString } = useAgenda();
+
   return (
     <div className="p-4 space-y-4 md:p-6 md:space-y-6">
       {/* AI Summary at top */}
@@ -21,7 +24,7 @@ export function DailyView() {
       </div>
 
       {/* Voice memo recording */}
-      <VoiceMemoRecorder />
+      <VoiceMemoRecorder date={dateString} />
 
       {/* Screen time summary */}
       <ScreenTimeSummary />

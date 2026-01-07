@@ -159,3 +159,18 @@ export async function getMemo(id: string): Promise<StoredVoiceMemo | null> {
     request.onerror = () => reject(request.error);
   });
 }
+
+/**
+ * Get memos for a specific date (YYYY-MM-DD format)
+ * Filters memos where createdAt timestamp falls within the given day
+ */
+export async function getMemosForDate(dateStr: string): Promise<StoredVoiceMemo[]> {
+  const allMemos = await getMemos();
+
+  // Parse date string and get day boundaries
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
+  const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
+
+  return allMemos.filter((memo) => memo.createdAt >= dayStart && memo.createdAt <= dayEnd);
+}

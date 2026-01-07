@@ -2,9 +2,12 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Id } from "@holaai/convex";
+
+// Habit states for calendar
+type HabitState = "pending" | "complete" | "incomplete" | "skipped";
 
 interface HabitCalendarProps {
   habitId: Id<"lifeos_habits">;
@@ -148,7 +151,7 @@ export function HabitCalendar({ habitId }: HabitCalendarProps) {
               return <div key={index} className="aspect-square" />;
             }
 
-            const isCompleted = calendarData?.calendarData[day] ?? false;
+            const state: HabitState = calendarData?.calendarData[day] ?? "pending";
             const isTodayDate = isToday(day);
 
             return (
@@ -157,16 +160,16 @@ export function HabitCalendar({ habitId }: HabitCalendarProps) {
                 className={cn(
                   "aspect-square flex items-center justify-center rounded-md text-xs relative",
                   isTodayDate && "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                  isCompleted
-                    ? "bg-primary/20 text-primary"
-                    : "text-muted-foreground"
+                  state === "complete" && "bg-green-500/20 text-green-600",
+                  state === "incomplete" && "bg-red-500/20 text-red-600",
+                  state === "skipped" && "bg-yellow-500/20 text-yellow-600",
+                  state === "pending" && "text-muted-foreground"
                 )}
               >
-                {isCompleted ? (
-                  <Check className="h-4 w-4 text-primary" />
-                ) : (
-                  <span>{day}</span>
-                )}
+                {state === "complete" && <Check className="h-4 w-4" />}
+                {state === "incomplete" && <X className="h-4 w-4" />}
+                {state === "skipped" && <SkipForward className="h-3.5 w-3.5" />}
+                {state === "pending" && <span>{day}</span>}
               </div>
             );
           })}
@@ -175,9 +178,18 @@ export function HabitCalendar({ habitId }: HabitCalendarProps) {
 
       {/* Stats for the month */}
       {calendarData && (
-        <div className="text-xs text-muted-foreground text-center">
-          {calendarData.completedDays} of {calendarData.scheduledDays} days
-          completed ({calendarData.completionRate}%)
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Check className="h-3 w-3 text-green-600" />
+            {calendarData.completedDays}
+          </span>
+          <span className="flex items-center gap-1">
+            <SkipForward className="h-3 w-3 text-yellow-600" />
+            {calendarData.skippedDays}
+          </span>
+          <span>
+            {calendarData.completionRate}% of {calendarData.scheduledDays} days
+          </span>
         </div>
       )}
     </div>

@@ -84,7 +84,9 @@ export const habitsTables = {
     date: v.string(),
     // Whether the habit was completed
     completed: v.boolean(),
-    // Optional note
+    // Whether the habit was skipped (not completed but intentionally skipped)
+    skipped: v.optional(v.boolean()),
+    // Optional note (can be used for skip reason)
     note: v.optional(v.string()),
     // Timestamps
     createdAt: v.number(),

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import {
   saveMemo,
-  getMemos,
+  getMemosForDate,
   deleteMemo as deleteStoredMemo,
   updateMemo,
   type StoredVoiceMemo,
@@ -28,6 +28,9 @@ import {
   getExtensionFromMimeType,
 } from "@/lib/services/transcriptionService";
 import { useApiKeys } from "@/lib/hooks/useApiKeys";
+
+// Detect if running in Tauri
+const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
 // Format duration as MM:SS
 function formatDuration(seconds: number): string {
@@ -238,7 +241,11 @@ function VoiceMemoItem({
   );
 }
 
-export function VoiceMemoRecorder() {
+interface VoiceMemoRecorderProps {
+  date: string; // YYYY-MM-DD format
+}
+
+export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -259,10 +266,11 @@ export function VoiceMemoRecorder() {
   const generateUploadUrl = useMutation(api.lifeos.voicememo.generateUploadUrl);
   const createConvexMemo = useMutation(api.lifeos.voicememo.createMemo);
 
-  // Load memos from IndexedDB on mount
+  // Load memos from IndexedDB for the specific date
   const loadMemos = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const storedMemos = await getMemos();
+      const storedMemos = await getMemosForDate(date);
       // Create object URLs for playback
       const runtimeMemos: RuntimeVoiceMemo[] = storedMemos.map((memo) => ({
         ...memo,
@@ -275,9 +283,11 @@ export function VoiceMemoRecorder() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [date]);
 
   useEffect(() => {
+    // Revoke old URLs before loading new memos
+    memos.forEach((memo) => URL.revokeObjectURL(memo.audioUrl));
     loadMemos();
   }, [loadMemos]);
 
@@ -308,6 +318,28 @@ export function VoiceMemoRecorder() {
   // Start recording using Web API
   const startWebRecording = async () => {
     try {
+      // Check/request macOS microphone permission in Tauri before getUserMedia
+      if (isTauri) {
+        try {
+          const { checkMicrophonePermission, requestMicrophonePermission } =
+            await import("tauri-plugin-macos-permissions-api");
+
+          const hasPermission = await checkMicrophonePermission();
+          if (!hasPermission) {
+            const granted = await requestMicrophonePermission();
+            if (!granted) {
+              setError(
+                "Microphone access denied. Please allow in System Preferences > Privacy & Security > Microphone."
+              );
+              return;
+            }
+          }
+        } catch (pluginError) {
+          console.warn("Could not check macOS permissions:", pluginError);
+          // Continue anyway - the getUserMedia call will handle the error
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const format = getSupportedMimeType();
@@ -381,6 +413,17 @@ export function VoiceMemoRecorder() {
     });
   };
 
+  // Helper to check if a timestamp falls on the currently viewed date
+  const isOnViewedDate = useCallback(
+    (timestamp: number): boolean => {
+      const [year, month, day] = date.split("-").map(Number);
+      const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
+      const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
+      return timestamp >= dayStart && timestamp <= dayEnd;
+    },
+    [date]
+  );
+
   // Handle record button click
   const handleRecordClick = async () => {
     if (isRecording) {
@@ -404,12 +447,14 @@ export function VoiceMemoRecorder() {
           // Save to IndexedDB
           await saveMemo(storedMemo);
 
-          // Add to runtime state with object URL
-          const runtimeMemo: RuntimeVoiceMemo = {
-            ...storedMemo,
-            audioUrl: URL.createObjectURL(blob),
-          };
-          setMemos((prev) => [runtimeMemo, ...prev]);
+          // Only add to runtime state if the memo is for the currently viewed date
+          if (isOnViewedDate(now)) {
+            const runtimeMemo: RuntimeVoiceMemo = {
+              ...storedMemo,
+              audioUrl: URL.createObjectURL(blob),
+            };
+            setMemos((prev) => [runtimeMemo, ...prev]);
+          }
         }
       } catch (err) {
         console.error("Failed to save memo:", err);

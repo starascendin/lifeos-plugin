@@ -61,8 +61,12 @@ export const getCheckInsForHabit = query({
   },
 });
 
+// Habit states for calendar
+type HabitState = "pending" | "complete" | "incomplete" | "skipped";
+
 /**
  * Get calendar data for a habit (monthly view)
+ * Returns state for each day: pending, complete, incomplete, skipped
  */
 export const getHabitCalendarData = query({
   args: {
@@ -90,15 +94,23 @@ export const getHabitCalendarData = query({
       .filter((q) => q.lte(q.field("date"), endDate))
       .collect();
 
-    // Build calendar map: day -> completed
-    const calendarData: Record<number, boolean> = {};
+    // Build calendar map: day -> state
+    const calendarData: Record<number, HabitState> = {};
     for (const checkIn of checkIns) {
       const day = parseInt(checkIn.date.split("-")[2], 10);
-      calendarData[day] = checkIn.completed;
+      if (checkIn.completed) {
+        calendarData[day] = "complete";
+      } else if (checkIn.skipped) {
+        calendarData[day] = "skipped";
+      } else {
+        // Record exists but not completed and not skipped = incomplete
+        calendarData[day] = "incomplete";
+      }
     }
 
     // Calculate stats for the month
     const completedDays = checkIns.filter((c) => c.completed).length;
+    const skippedDays = checkIns.filter((c) => c.skipped).length;
 
     // Calculate scheduled days up to today (or end of month if past)
     const now = new Date();
@@ -120,6 +132,7 @@ export const getHabitCalendarData = query({
       habit,
       calendarData,
       completedDays,
+      skippedDays,
       scheduledDays,
       completionRate:
         scheduledDays > 0
@@ -186,6 +199,58 @@ export const toggleCheckIn = mutation({
 });
 
 /**
+ * Skip a habit for a specific date
+ */
+export const skipCheckIn = mutation({
+  args: {
+    habitId: v.id("lifeos_habits"),
+    date: v.string(), // YYYY-MM-DD
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const habit = await ctx.db.get(args.habitId);
+    if (!habit || habit.userId !== user._id) {
+      throw new Error("Habit not found or access denied");
+    }
+
+    // Check if check-in exists
+    const existingCheckIn = await ctx.db
+      .query("lifeos_habitCheckIns")
+      .withIndex("by_habit_date", (q) =>
+        q.eq("habitId", args.habitId).eq("date", args.date)
+      )
+      .first();
+
+    if (existingCheckIn) {
+      // Update existing check-in to skipped
+      await ctx.db.patch(existingCheckIn._id, {
+        completed: false,
+        skipped: true,
+        note: args.reason,
+        updatedAt: now,
+      });
+    } else {
+      // Create new check-in as skipped
+      await ctx.db.insert("lifeos_habitCheckIns", {
+        userId: user._id,
+        habitId: args.habitId,
+        date: args.date,
+        completed: false,
+        skipped: true,
+        note: args.reason,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { skipped: true };
+  },
+});
+
+/**
  * Update check-in with a note
  */
 export const updateCheckIn = mutation({
@@ -194,6 +259,7 @@ export const updateCheckIn = mutation({
     date: v.string(), // YYYY-MM-DD
     note: v.optional(v.string()),
     completed: v.optional(v.boolean()),
+    skipped: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -218,6 +284,7 @@ export const updateCheckIn = mutation({
       };
       if (args.note !== undefined) updates.note = args.note;
       if (args.completed !== undefined) updates.completed = args.completed;
+      if (args.skipped !== undefined) updates.skipped = args.skipped;
 
       await ctx.db.patch(existingCheckIn._id, updates);
 
@@ -231,6 +298,7 @@ export const updateCheckIn = mutation({
         habitId: args.habitId,
         date: args.date,
         completed: true,
+        skipped: false,
         note: args.note,
         createdAt: now,
         updatedAt: now,
@@ -238,6 +306,143 @@ export const updateCheckIn = mutation({
 
       await recalculateHabitStats(ctx, args.habitId, habit);
     }
+  },
+});
+
+/**
+ * Reset a habit to pending state for a specific date (delete the check-in record)
+ */
+export const uncheckHabit = mutation({
+  args: {
+    habitId: v.id("lifeos_habits"),
+    date: v.string(), // YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const habit = await ctx.db.get(args.habitId);
+    if (!habit || habit.userId !== user._id) {
+      throw new Error("Habit not found or access denied");
+    }
+
+    // Check if check-in exists
+    const existingCheckIn = await ctx.db
+      .query("lifeos_habitCheckIns")
+      .withIndex("by_habit_date", (q) =>
+        q.eq("habitId", args.habitId).eq("date", args.date)
+      )
+      .first();
+
+    if (existingCheckIn) {
+      // Delete the record to reset to pending state
+      await ctx.db.delete(existingCheckIn._id);
+      await recalculateHabitStats(ctx, args.habitId, habit);
+    }
+    // If no check-in exists, it's already pending
+
+    return { reset: true };
+  },
+});
+
+/**
+ * Mark a habit as incomplete for a specific date
+ */
+export const markIncomplete = mutation({
+  args: {
+    habitId: v.id("lifeos_habits"),
+    date: v.string(), // YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const habit = await ctx.db.get(args.habitId);
+    if (!habit || habit.userId !== user._id) {
+      throw new Error("Habit not found or access denied");
+    }
+
+    // Check if check-in exists
+    const existingCheckIn = await ctx.db
+      .query("lifeos_habitCheckIns")
+      .withIndex("by_habit_date", (q) =>
+        q.eq("habitId", args.habitId).eq("date", args.date)
+      )
+      .first();
+
+    if (existingCheckIn) {
+      // Update to incomplete (not completed, not skipped)
+      await ctx.db.patch(existingCheckIn._id, {
+        completed: false,
+        skipped: false,
+        updatedAt: now,
+      });
+    } else {
+      // Create new check-in as incomplete
+      await ctx.db.insert("lifeos_habitCheckIns", {
+        userId: user._id,
+        habitId: args.habitId,
+        date: args.date,
+        completed: false,
+        skipped: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await recalculateHabitStats(ctx, args.habitId, habit);
+
+    return { incomplete: true };
+  },
+});
+
+/**
+ * Mark a habit as completed for a specific date
+ */
+export const checkHabit = mutation({
+  args: {
+    habitId: v.id("lifeos_habits"),
+    date: v.string(), // YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const habit = await ctx.db.get(args.habitId);
+    if (!habit || habit.userId !== user._id) {
+      throw new Error("Habit not found or access denied");
+    }
+
+    // Check if check-in exists
+    const existingCheckIn = await ctx.db
+      .query("lifeos_habitCheckIns")
+      .withIndex("by_habit_date", (q) =>
+        q.eq("habitId", args.habitId).eq("date", args.date)
+      )
+      .first();
+
+    if (existingCheckIn) {
+      // Update to completed
+      await ctx.db.patch(existingCheckIn._id, {
+        completed: true,
+        skipped: false,
+        updatedAt: now,
+      });
+    } else {
+      // Create new check-in as completed
+      await ctx.db.insert("lifeos_habitCheckIns", {
+        userId: user._id,
+        habitId: args.habitId,
+        date: args.date,
+        completed: true,
+        skipped: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await recalculateHabitStats(ctx, args.habitId, habit);
+
+    return { checked: true };
   },
 });
 

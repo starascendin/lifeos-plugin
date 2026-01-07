@@ -357,67 +357,69 @@ export function VoiceMemosTab() {
                 </Button>
               )}
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleSync}
-                    disabled={!isTauri || isAnyOperationInProgress}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {isSyncing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    <span className="ml-2 hidden sm:inline">Sync</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Sync voice memos from Mac</p>
-                </TooltipContent>
-              </Tooltip>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleSync}
+                      disabled={!isTauri || isAnyOperationInProgress}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {isSyncing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      <span className="ml-2 hidden sm:inline">Sync</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Sync voice memos from Mac</p>
+                  </TooltipContent>
+                </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleTranscribe}
-                    disabled={!isTauri || selectedIds.size === 0 || isAnyOperationInProgress}
-                    size="sm"
-                  >
-                    {isTranscribing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <FileText className="h-4 w-4" />
-                    )}
-                    <span className="ml-2">Transcribe{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Transcribe selected memos using AI</p>
-                </TooltipContent>
-              </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleTranscribe}
+                      disabled={!isTauri || selectedIds.size === 0 || isAnyOperationInProgress}
+                      size="sm"
+                    >
+                      {isTranscribing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                      <span className="ml-2">Transcribe{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Transcribe selected memos using AI</p>
+                  </TooltipContent>
+                </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleSyncToConvex}
-                    disabled={transcribedCount === 0 || isAnyOperationInProgress}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Cloud className="h-4 w-4" />
-                    )}
-                    <span className="ml-2 hidden sm:inline">Cloud</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Sync transcriptions to cloud</p>
-                </TooltipContent>
-              </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleSyncToConvex}
+                      disabled={transcribedCount === 0 || isAnyOperationInProgress}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Cloud className="h-4 w-4" />
+                      )}
+                      <span className="ml-2 hidden sm:inline">Cloud</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Sync transcriptions to cloud</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
 

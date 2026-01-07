@@ -9,7 +9,8 @@ import { ScreenTimeDashboard } from "./screentime/ScreenTimeDashboard";
 import { NotesTab } from "./notes/NotesTab";
 import { VoiceMemosTab } from "./voicememos/VoiceMemosTab";
 import { SettingsTab } from "./settings/SettingsTab";
-import { CouncilServerTab } from "./council/CouncilServerTab";
+// Council tab hidden for now
+// import { CouncilServerTab } from "./council/CouncilServerTab";
 
 type Tab = "youtube" | "screentime" | "notes" | "voicememos" | "council" | "settings";
 
@@ -59,9 +60,10 @@ export function MainContent() {
     if (activeTab === "voicememos") {
       return "Voice Memos";
     }
-    if (activeTab === "council") {
-      return "Council Server";
-    }
+    // Council tab hidden for now
+    // if (activeTab === "council") {
+    //   return "Council Server";
+    // }
     if (showTranscript && selectedVideo) {
       return "Transcript";
     }
@@ -142,6 +144,7 @@ export function MainContent() {
         >
           Voice
         </button>
+        {/* Council tab hidden for now
         <button
           onClick={() => setActiveTab("council")}
           className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
@@ -152,6 +155,7 @@ export function MainContent() {
         >
           Council
         </button>
+        */}
         <button
           onClick={() => setActiveTab("settings")}
           className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
@@ -168,9 +172,9 @@ export function MainContent() {
       <main className="flex-1 overflow-hidden p-3">
         {activeTab === "settings" ? (
           <SettingsTab />
-        ) : activeTab === "council" ? (
+        ) : /* activeTab === "council" ? (
           <CouncilServerTab />
-        ) : activeTab === "voicememos" ? (
+        ) : */ activeTab === "voicememos" ? (
           <VoiceMemosTab />
         ) : activeTab === "notes" ? (
           <NotesTab />
