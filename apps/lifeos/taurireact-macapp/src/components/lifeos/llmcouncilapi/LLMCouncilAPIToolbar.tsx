@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -13,6 +14,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   Square,
   Columns2,
   Columns3,
@@ -20,13 +27,19 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
+  History,
+  Clock,
+  MessageSquare,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useLLMCouncilAPI,
+  LLM_INFO,
   type ViewMode,
   type LayoutType,
   type Tier,
+  type LLMType,
 } from "@/lib/contexts/LLMCouncilAPIContext";
 import { LLMCouncilAPISettings } from "./LLMCouncilAPISettings";
 
@@ -42,6 +55,119 @@ const TIER_OPTIONS: { value: Tier; label: string; color: string }[] = [
   { value: "normal", label: "Normal", color: "bg-blue-500" },
   { value: "pro", label: "Pro", color: "bg-purple-500" },
 ];
+
+const LLM_TYPES: LLMType[] = ["chatgpt", "claude", "gemini", "xai"];
+
+// History Popover Component
+function HistoryPopover() {
+  const {
+    conversations,
+    isLoadingConversations,
+    fetchConversations,
+    loadConversation,
+    currentConversationId,
+    isCouncilLoading,
+  } = useLLMCouncilAPI();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleOpen = (open: boolean) => {
+    setIsOpen(open);
+    if (open && conversations.length === 0) {
+      fetchConversations();
+    }
+  };
+
+  const handleSelect = async (id: string) => {
+    await loadConversation(id);
+    setIsOpen(false);
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <Popover open={isOpen} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          disabled={isCouncilLoading}
+        >
+          <History className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start">
+        <div className="border-b px-3 py-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Recent Conversations</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => fetchConversations()}
+              disabled={isLoadingConversations}
+            >
+              {isLoadingConversations ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                "Refresh"
+              )}
+            </Button>
+          </div>
+        </div>
+        <ScrollArea className="h-64">
+          {isLoadingConversations && conversations.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+              <MessageSquare className="h-8 w-8 opacity-50" />
+              <span className="text-sm">No conversations yet</span>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {conversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => handleSelect(conv.id)}
+                  className={cn(
+                    "flex w-full flex-col gap-1 px-3 py-2 text-left transition-colors hover:bg-muted/50",
+                    currentConversationId === conv.id && "bg-primary/5"
+                  )}
+                >
+                  <span className="line-clamp-2 text-sm">{conv.query}</span>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {formatDate(conv.createdAt)}
+                    {conv.tier && (
+                      <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                        {conv.tier}
+                      </Badge>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export function LLMCouncilAPIToolbar() {
   const {
@@ -59,11 +185,14 @@ export function LLMCouncilAPIToolbar() {
     baseUrl,
     apiKey,
     saveSettings,
+    isConfigured,
+    selectedLLMs,
+    toggleLLM,
   } = useLLMCouncilAPI();
 
   return (
     <div className="flex items-center justify-between gap-4 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* Left: Mode Toggle + Layout (if multichat) */}
+      {/* Left: Mode Toggle + Layout/Models */}
       <div className="flex items-center gap-3">
         {/* Mode Toggle */}
         <div className="flex items-center rounded-lg bg-muted p-1">
@@ -107,55 +236,62 @@ export function LLMCouncilAPIToolbar() {
             ))}
           </div>
         )}
+
+        {/* Model Selector (only in council mode) */}
+        {viewMode === "council" && isConfigured && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-1">
+              {LLM_TYPES.map((llm) => {
+                const info = LLM_INFO[llm];
+                const isSelected = selectedLLMs.includes(llm);
+                const isOnline = authStatus[llm];
+
+                return (
+                  <Tooltip key={llm}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => toggleLLM(llm)}
+                        disabled={!isOnline}
+                        className={cn(
+                          "relative flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-white transition-all",
+                          info.bgColor.replace("100", "500"),
+                          isSelected && isOnline
+                            ? "ring-2 ring-primary ring-offset-1"
+                            : "opacity-50",
+                          !isOnline && "cursor-not-allowed grayscale"
+                        )}
+                      >
+                        {llm === "chatgpt" && "G"}
+                        {llm === "claude" && "A"}
+                        {llm === "gemini" && "+"}
+                        {llm === "xai" && "X"}
+                        {/* Status indicator */}
+                        <span
+                          className={cn(
+                            "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-background",
+                            isOnline ? "bg-green-500" : "bg-red-500"
+                          )}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>
+                        {info.name} - {isOnline ? (isSelected ? "Selected" : "Click to select") : "Offline"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+            <div className="h-4 w-px bg-border" />
+            <HistoryPopover />
+          </>
+        )}
       </div>
 
-      {/* Right: Status + Tier + Settings */}
+      {/* Right: Tier + Settings */}
       <div className="flex items-center gap-3">
-        {/* Connection Status */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                checkHealth();
-                checkAuthStatus();
-              }}
-              disabled={isCheckingAuth}
-              className="h-7 gap-1.5 px-2"
-            >
-              {isCheckingAuth ? (
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              ) : isHealthy ? (
-                <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-              ) : (
-                <XCircle className="h-3.5 w-3.5 text-red-500" />
-              )}
-              <span className="text-xs">{isHealthy ? "Connected" : "Offline"}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
-            <div className="space-y-1">
-              <p className="font-medium">LLM Status</p>
-              <div className="flex flex-wrap gap-1.5">
-                {(["chatgpt", "claude", "gemini", "xai"] as const).map((llm) => (
-                  <Badge
-                    key={llm}
-                    variant={authStatus[llm] ? "default" : "secondary"}
-                    className="text-xs"
-                  >
-                    {llm === "chatgpt" && "GPT"}
-                    {llm === "claude" && "Claude"}
-                    {llm === "gemini" && "Gemini"}
-                    {llm === "xai" && "Grok"}
-                    {authStatus[llm] ? " ✓" : " ✗"}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-
         {/* Tier Selector */}
         <Select value={currentTier} onValueChange={(v) => setCurrentTier(v as Tier)}>
           <SelectTrigger className="h-7 w-24 text-xs">

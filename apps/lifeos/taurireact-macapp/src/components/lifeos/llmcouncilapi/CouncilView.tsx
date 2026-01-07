@@ -7,11 +7,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import {
   ChevronDown,
@@ -19,11 +14,8 @@ import {
   Clock,
   Loader2,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   User,
   Bot,
-  History,
   MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
@@ -35,7 +27,6 @@ import {
   LLM_INFO,
   type LLMType,
   type CouncilMessage,
-  type ConversationListItem,
 } from "@/lib/contexts/LLMCouncilAPIContext";
 
 // Markdown renderer component
@@ -47,179 +38,6 @@ function Markdown({ children }: { children: string }) {
   );
 }
 
-// ==================== CONVERSATION HISTORY ====================
-
-function ConversationHistory() {
-  const {
-    conversations,
-    isLoadingConversations,
-    fetchConversations,
-    loadConversation,
-    currentConversationId,
-    isCouncilLoading,
-  } = useLLMCouncilAPI();
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleOpen = (open: boolean) => {
-    setIsOpen(open);
-    if (open && conversations.length === 0) {
-      fetchConversations();
-    }
-  };
-
-  const handleSelect = async (id: string) => {
-    await loadConversation(id);
-    setIsOpen(false);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  return (
-    <Popover open={isOpen} onOpenChange={handleOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1.5 text-xs"
-          disabled={isCouncilLoading}
-        >
-          <History className="h-3.5 w-3.5" />
-          History
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start">
-        <div className="border-b px-3 py-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Recent Conversations</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              onClick={() => fetchConversations()}
-              disabled={isLoadingConversations}
-            >
-              {isLoadingConversations ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                "Refresh"
-              )}
-            </Button>
-          </div>
-        </div>
-        <ScrollArea className="h-64">
-          {isLoadingConversations && conversations.length === 0 ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
-              <MessageSquare className="h-8 w-8 opacity-50" />
-              <span className="text-sm">No conversations yet</span>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {conversations.map((conv) => (
-                <button
-                  key={conv.id}
-                  onClick={() => handleSelect(conv.id)}
-                  className={cn(
-                    "flex w-full flex-col gap-1 px-3 py-2 text-left transition-colors hover:bg-muted/50",
-                    currentConversationId === conv.id && "bg-primary/5"
-                  )}
-                >
-                  <span className="line-clamp-2 text-sm">
-                    {conv.query}
-                  </span>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {formatDate(conv.createdAt)}
-                    {conv.tier && (
-                      <Badge variant="outline" className="h-4 px-1 text-[10px]">
-                        {conv.tier}
-                      </Badge>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// ==================== MODEL SELECTOR ====================
-
-function ModelSelector() {
-  const { selectedLLMs, toggleLLM, authStatus } = useLLMCouncilAPI();
-
-  const llmTypes: LLMType[] = ["chatgpt", "claude", "gemini", "xai"];
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">Models:</span>
-      {llmTypes.map((llm) => {
-        const info = LLM_INFO[llm];
-        const isSelected = selectedLLMs.includes(llm);
-        const isOnline = authStatus[llm];
-
-        return (
-          <button
-            key={llm}
-            onClick={() => toggleLLM(llm)}
-            disabled={!isOnline}
-            title={`${info.name} - ${isOnline ? (isSelected ? "Selected" : "Click to select") : "Offline"}`}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border-2 py-1 pl-1 pr-2 text-xs font-medium transition-all",
-              isSelected && isOnline
-                ? "border-primary bg-primary/10"
-                : "border-transparent bg-muted/50",
-              isOnline
-                ? "cursor-pointer hover:bg-muted"
-                : "cursor-not-allowed opacity-40"
-            )}
-          >
-            <div
-              className={cn(
-                "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white",
-                info.bgColor.replace("100", "500")
-              )}
-            >
-              {llm === "chatgpt" && "G"}
-              {llm === "claude" && "A"}
-              {llm === "gemini" && "+"}
-              {llm === "xai" && "X"}
-            </div>
-            <span>{info.name}</span>
-            {isOnline ? (
-              isSelected ? (
-                <CheckCircle className="h-3 w-3 text-green-500" />
-              ) : (
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-              )
-            ) : (
-              <XCircle className="h-3 w-3 text-muted-foreground" />
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 // ==================== COUNCIL STAGES ====================
 
@@ -531,36 +349,24 @@ export function CouncilView() {
     <div className="flex h-full flex-col">
       <ScrollArea className="flex-1">
         <div className="mx-auto max-w-4xl space-y-4 p-4">
-          {/* Header + Model Selector - Compact */}
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-primary">LLM Council</h1>
-                <span className="text-xs text-muted-foreground">
-                  Multi-model deliberation with ranking & synthesis
-                </span>
-                {isConfigured && <ConversationHistory />}
-              </div>
-              {isConfigured && <ModelSelector />}
+          {/* Not configured message */}
+          {!isConfigured && (
+            <div className="rounded-lg border border-amber-500/50 bg-amber-50 px-3 py-2 dark:bg-amber-950/30">
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                Click the <strong>Settings</strong> icon (gear) in the toolbar to configure your API URL and Key.
+              </p>
             </div>
-
-            {!isConfigured && (
-              <div className="rounded-lg border border-amber-500/50 bg-amber-50 px-3 py-2 dark:bg-amber-950/30">
-                <p className="text-xs text-amber-800 dark:text-amber-200">
-                  Click the <strong>Settings</strong> icon (gear) in the toolbar to configure your API URL and Key.
-                </p>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Messages */}
           {councilMessages.length > 0 && (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Conversation</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between py-2">
+                <CardTitle className="text-sm">Conversation</CardTitle>
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-7 text-xs"
                   onClick={clearCouncilMessages}
                   disabled={isCouncilLoading}
                 >
@@ -575,6 +381,14 @@ export function CouncilView() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Empty state */}
+          {isConfigured && councilMessages.length === 0 && (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
+              <MessageSquare className="h-12 w-12 opacity-30" />
+              <p className="text-sm">Send a message to start a council deliberation</p>
+            </div>
           )}
         </div>
       </ScrollArea>
