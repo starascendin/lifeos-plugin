@@ -2,6 +2,7 @@ import { action, mutation, query, internalMutation, internalQuery } from "../_ge
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
+import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== AI LESSONS ====================
 
@@ -528,6 +529,16 @@ export const generateLesson = action({
     level: v.string(), // "A1", "A2", "B1"
   },
   handler: async (ctx, args): Promise<{ lessonId: Id<"hola_aiLessons">; lesson: unknown }> => {
+    const feature: MeteringFeature = "holaai_lesson";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not configured");
@@ -575,6 +586,23 @@ Generate the lesson in JSON format.`;
 
     const lessonContent = JSON.parse(content);
 
+    // Deduct credits if not unlimited access
+    if (!creditCheck.hasUnlimitedAccess) {
+      const usageMetadata = data.usageMetadata;
+      const tokenUsage = {
+        promptTokens: usageMetadata?.promptTokenCount || 0,
+        completionTokens: usageMetadata?.candidatesTokenCount || 0,
+        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
+      };
+      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+        userId: creditCheck.userId,
+        feature,
+        tokenUsage,
+        model: "gemini-2.5-flash",
+        description: "AI Lesson generation",
+      });
+    }
+
     // Save to database
     const lessonId: Id<"hola_aiLessons"> = await ctx.runMutation(internal.holaai.ai.saveAiLesson, {
       userId: args.userId,
@@ -602,6 +630,16 @@ export const generateBellaConversation = action({
     level: v.string(), // "A1", "A2"
   },
   handler: async (ctx, args): Promise<{ conversationId: Id<"hola_bellaConversations">; conversation: unknown }> => {
+    const feature: MeteringFeature = "holaai_conversation";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not configured");
@@ -646,6 +684,23 @@ Generate a natural conversation scenario in JSON format.`;
     }
 
     const conversationContent = JSON.parse(content);
+
+    // Deduct credits if not unlimited access
+    if (!creditCheck.hasUnlimitedAccess) {
+      const usageMetadata = data.usageMetadata;
+      const tokenUsage = {
+        promptTokens: usageMetadata?.promptTokenCount || 0,
+        completionTokens: usageMetadata?.candidatesTokenCount || 0,
+        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
+      };
+      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+        userId: creditCheck.userId,
+        feature,
+        tokenUsage,
+        model: "gemini-2.5-flash",
+        description: "Bella Conversation generation",
+      });
+    }
 
     // Save to database
     const conversationId: Id<"hola_bellaConversations"> = await ctx.runMutation(internal.holaai.ai.saveBellaConversation, {
@@ -713,6 +768,16 @@ export const generateJourneyConversation = action({
     situation: v.string(),
   },
   handler: async (ctx, args): Promise<{ conversationId: Id<"hola_journeyConversations">; sessionId: Id<"hola_conversationSessions">; conversation: unknown }> => {
+    const feature: MeteringFeature = "holaai_conversation";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not configured");
@@ -800,6 +865,23 @@ Generate a natural A1-level conversation that uses vocabulary and concepts from 
     const conversationContent = JSON.parse(content);
     const conversationTitle = conversationContent.title || "Untitled Conversation";
 
+    // Deduct credits if not unlimited access
+    if (!creditCheck.hasUnlimitedAccess) {
+      const usageMetadata = data.usageMetadata;
+      const tokenUsage = {
+        promptTokens: usageMetadata?.promptTokenCount || 0,
+        completionTokens: usageMetadata?.candidatesTokenCount || 0,
+        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
+      };
+      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+        userId: creditCheck.userId,
+        feature,
+        tokenUsage,
+        model: "gemini-2.5-flash",
+        description: "Journey Conversation generation",
+      });
+    }
+
     // Handle session: use existing or create new
     let sessionId = args.sessionId;
     if (!sessionId) {
@@ -865,6 +947,16 @@ export const generateSuggestions = action({
     context: v.union(v.literal("before_generation"), v.literal("after_conversation")),
   },
   handler: async (ctx, args): Promise<{ suggestions: Array<{ title: string; description: string; scenario: string }> }> => {
+    const feature: MeteringFeature = "holaai_suggestions";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY not configured");
@@ -942,6 +1034,24 @@ Generate suggestions that would be engaging and useful for this specific learner
     }
 
     const result = JSON.parse(content);
+
+    // Deduct credits if not unlimited access
+    if (!creditCheck.hasUnlimitedAccess) {
+      const usageMetadata = data.usageMetadata;
+      const tokenUsage = {
+        promptTokens: usageMetadata?.promptTokenCount || 0,
+        completionTokens: usageMetadata?.candidatesTokenCount || 0,
+        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
+      };
+      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+        userId: creditCheck.userId,
+        feature,
+        tokenUsage,
+        model: "gemini-2.5-flash",
+        description: "Suggestion generation",
+      });
+    }
+
     return { suggestions: result.suggestions || [] };
   },
 });

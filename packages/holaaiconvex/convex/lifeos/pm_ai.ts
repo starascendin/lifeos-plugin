@@ -7,8 +7,9 @@ import { Agent } from "@convex-dev/agent";
 import { gateway } from "@ai-sdk/gateway";
 import { v } from "convex/values";
 import { action } from "../_generated/server";
-import { components } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import { pmTools } from "./lib/pm_tools";
+import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== AGENT DEFINITION ====================
 
@@ -61,8 +62,38 @@ export const sendMessage = action({
     toolCalls?: Array<{ name: string; args: unknown }>;
     toolResults?: Array<{ name: string; result: unknown }>;
   }> => {
+    const feature: MeteringFeature = "pm_agent";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     const { thread } = await pmAgent.continueThread(ctx, { threadId });
     const result = await thread.generateText({ prompt: message });
+
+    // Deduct credits if not unlimited access and we have usage data
+    if (!creditCheck.hasUnlimitedAccess && result.usage) {
+      // AI SDK v3+ uses inputTokens/outputTokens instead of promptTokens/completionTokens
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const usageAny = result.usage as any;
+      const tokenUsage = {
+        promptTokens: usageAny.promptTokens ?? usageAny.inputTokens ?? 0,
+        completionTokens: usageAny.completionTokens ?? usageAny.outputTokens ?? 0,
+        totalTokens: usageAny.totalTokens ?? 0,
+      };
+      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+        userId: creditCheck.userId,
+        feature,
+        tokenUsage,
+        model: "google/gemini-2.5-flash-lite",
+        description: "PM Agent message",
+      });
+    }
+
     return {
       text: result.text,
       toolCalls: result.toolCalls?.map((tc: any) => ({

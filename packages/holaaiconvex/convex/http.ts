@@ -61,6 +61,24 @@ http.route({
         });
       }
 
+      // Check credits before processing AI request
+      const creditCheck = await ctx.runQuery(internal.common.credits.checkCreditsInternal, {
+        userId: user._id,
+      });
+      if (!creditCheck.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: "OUT_OF_CREDITS",
+            message: creditCheck.reason || "You have run out of AI credits.",
+            currentBalance: creditCheck.currentBalance,
+          }),
+          {
+            status: 402, // Payment Required
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
       // 2. Parse request body
       const body = await request.json();
       const { conversationId, message, broadcastId, panels } = body as {
@@ -447,6 +465,24 @@ http.route({
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // Check credits before processing AI request
+      const creditCheck = await ctx.runQuery(internal.common.credits.checkCreditsInternal, {
+        userId: user._id,
+      });
+      if (!creditCheck.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: "OUT_OF_CREDITS",
+            message: creditCheck.reason || "You have run out of AI credits.",
+            currentBalance: creditCheck.currentBalance,
+          }),
+          {
+            status: 402, // Payment Required
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       // 2. Parse request body

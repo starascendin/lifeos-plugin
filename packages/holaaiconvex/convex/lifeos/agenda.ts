@@ -8,6 +8,7 @@ import {
 import { requireUser } from "../_lib/auth";
 import { Doc } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
+import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== QUERIES ====================
 
@@ -173,6 +174,15 @@ export const generateDailySummary = action({
   },
   handler: async (ctx, args): Promise<GenerateSummaryResult> => {
     const selectedModel = args.model || "openai/gpt-4o-mini";
+    const feature: MeteringFeature = "agenda_daily_summary";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
 
     // Get today's habits
     const habits: Doc<"lifeos_habits">[] = await ctx.runQuery(
@@ -295,6 +305,18 @@ export const generateDailySummary = action({
 
       // Save the summary with model and usage info
       await saveViaPublicMutation(aiSummary, selectedModel, usage);
+
+      // Deduct credits if not unlimited access and we have usage data
+      if (!creditCheck.hasUnlimitedAccess && usage) {
+        await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+          userId: creditCheck.userId,
+          feature,
+          tokenUsage: usage,
+          model: selectedModel,
+          description: `Daily summary for ${args.date}`,
+        });
+      }
+
       return { summary: aiSummary, model: selectedModel, usage };
     } catch (error) {
       console.error("Error generating AI summary:", error);
@@ -609,6 +631,15 @@ export const generateWeeklySummary = action({
   },
   handler: async (ctx, args): Promise<GenerateSummaryResult> => {
     const selectedModel = args.model || "openai/gpt-4o-mini";
+    const feature: MeteringFeature = "agenda_weekly_summary";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
 
     // Calculate week end date
     const weekEnd = new Date(args.weekStartDate);
@@ -730,6 +761,18 @@ export const generateWeeklySummary = action({
         : null;
 
       await saveViaPublicMutation(aiSummary, selectedModel, usage);
+
+      // Deduct credits if not unlimited access and we have usage data
+      if (!creditCheck.hasUnlimitedAccess && usage) {
+        await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+          userId: creditCheck.userId,
+          feature,
+          tokenUsage: usage,
+          model: selectedModel,
+          description: `Weekly summary for ${args.weekStartDate}`,
+        });
+      }
+
       return { summary: aiSummary, model: selectedModel, usage };
     } catch (error) {
       console.error("Error generating weekly AI summary:", error);

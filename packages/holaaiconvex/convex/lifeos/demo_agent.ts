@@ -10,6 +10,7 @@ import { action, internalMutation, internalQuery } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { demoTools } from "./lib/demo_tools";
 import { vTokenUsage } from "./demo_agent_schema";
+import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== AVAILABLE MODELS ====================
 
@@ -191,6 +192,16 @@ export const sendMessage = action({
     };
     modelUsed: string;
   }> => {
+    const feature: MeteringFeature = "demo_agent";
+
+    // Check credits before making AI call
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     // Validate and use the specified model, or fall back to default
     const validModelId = (
       modelId && DEMO_AGENT_MODELS.includes(modelId as DemoAgentModelId)
@@ -252,6 +263,17 @@ export const sendMessage = action({
       internal.lifeos.demo_agent.getThreadUsage,
       { threadId }
     );
+
+    // Deduct credits if not unlimited access and we have usage data
+    if (!creditCheck.hasUnlimitedAccess && usageData.usage.totalTokens > 0) {
+      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+        userId: creditCheck.userId,
+        feature,
+        tokenUsage: usageData.usage,
+        model: validModelId,
+        description: "Demo Agent message",
+      });
+    }
 
     return {
       text: finalText,

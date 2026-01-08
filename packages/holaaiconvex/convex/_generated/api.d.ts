@@ -10,7 +10,10 @@
 
 import type * as _lib_algorithms_sm2 from "../_lib/algorithms/sm2.js";
 import type * as _lib_auth from "../_lib/auth.js";
+import type * as _lib_credits from "../_lib/credits.js";
 import type * as _lib_roles from "../_lib/roles.js";
+import type * as common_credits from "../common/credits.js";
+import type * as common_credits_schema from "../common/credits_schema.js";
 import type * as common_dev from "../common/dev.js";
 import type * as common_messages from "../common/messages.js";
 import type * as common_migrations from "../common/migrations.js";
@@ -82,7 +85,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   "_lib/algorithms/sm2": typeof _lib_algorithms_sm2;
   "_lib/auth": typeof _lib_auth;
+  "_lib/credits": typeof _lib_credits;
   "_lib/roles": typeof _lib_roles;
+  "common/credits": typeof common_credits;
+  "common/credits_schema": typeof common_credits_schema;
   "common/dev": typeof common_dev;
   "common/messages": typeof common_messages;
   "common/migrations": typeof common_migrations;

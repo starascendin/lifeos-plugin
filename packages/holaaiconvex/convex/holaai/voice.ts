@@ -1,5 +1,7 @@
 import { action, mutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
+import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== LIVEKIT INTEGRATION ====================
 
@@ -9,7 +11,17 @@ export const generateLiveKitToken = action({
     roomName: v.string(),
     participantName: v.string(),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    const feature: MeteringFeature = "holaai_voice";
+
+    // Check credits before generating token for voice AI
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
     const livekitUrl = process.env.LIVEKIT_URL;
@@ -72,6 +84,22 @@ export const generateLiveKitToken = action({
 
     const token = `${message}.${signatureB64}`;
 
+    // Deduct credits for voice session if not unlimited access
+    // Voice sessions are charged a flat rate per session since we don't track real-time usage
+    if (!creditCheck.hasUnlimitedAccess) {
+      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+        userId: creditCheck.userId,
+        feature,
+        tokenUsage: {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 1000, // Flat rate for voice session initiation
+        },
+        model: "livekit-voice",
+        description: "Voice conversation session",
+      });
+    }
+
     return {
       token,
       url: livekitUrl,
@@ -85,7 +113,15 @@ export const dispatchLiveKitAgent = action({
   args: {
     roomName: v.string(),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    // Check credits before dispatching agent
+    const creditCheck = await ctx.runQuery(
+      internal.common.credits.checkCreditsForAction
+    );
+    if (!creditCheck.allowed) {
+      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
+    }
+
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
     const livekitUrl = process.env.LIVEKIT_URL;

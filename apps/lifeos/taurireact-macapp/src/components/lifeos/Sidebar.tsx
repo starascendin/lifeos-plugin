@@ -46,6 +46,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useMemo, useState } from "react";
+import { CreditBalance } from "./CreditBalance";
 
 interface NavItem {
   name: string;
@@ -381,6 +382,16 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* Credit Balance */}
+        <div
+          className={cn(
+            "border-sidebar-border border-t",
+            effectiveCollapsed ? "p-2" : "px-2 py-2",
+          )}
+        >
+          <CreditBalance isCollapsed={effectiveCollapsed} />
+        </div>
 
         {/* User Profile */}
         {user && (

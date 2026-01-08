@@ -1,6 +1,7 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 import { getDefaultRole } from "./roles";
+import { initializeUserCredits } from "./credits";
 
 /**
  * Get the current user's identity from Clerk JWT
@@ -67,6 +68,10 @@ export async function getOrCreateUser(ctx: MutationCtx) {
       role: expectedRole === "developer" ? expectedRole : existingUser.role,
       updatedAt: Date.now(),
     });
+
+    // Ensure credits are initialized (for existing users) and update unlimited status
+    await initializeUserCredits(ctx, existingUser._id, identity.email!);
+
     return existingUser._id;
   }
 
@@ -84,6 +89,10 @@ export async function getOrCreateUser(ctx: MutationCtx) {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });
+
+  // Initialize credits for new user
+  // Developers get unlimited access, others start with 0 credits
+  await initializeUserCredits(ctx, userId, email);
 
   return userId;
 }
