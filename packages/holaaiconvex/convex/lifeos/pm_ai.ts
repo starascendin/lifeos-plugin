@@ -9,7 +9,7 @@ import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { pmTools } from "./lib/pm_tools";
-import type { MeteringFeature } from "../_lib/credits";
+import { createMeteredUsageHandler } from "../common/ai";
 
 // ==================== AGENT DEFINITION ====================
 
@@ -34,6 +34,8 @@ Guidelines:
 - After creating items, report the ID/identifier so the user can reference it
 - Always call get_pm_context first to understand the current state if you need context`,
   tools: pmTools,
+  // Use centralized metered usage handler for automatic credit deduction
+  usageHandler: createMeteredUsageHandler("pm_agent"),
 });
 
 // ==================== EXPOSED ACTIONS ====================
@@ -51,6 +53,7 @@ export const createThread = action({
 
 /**
  * Send a message to the PM AI and get a response
+ * Credit deduction is handled automatically by the usageHandler in pmAgent
  */
 export const sendMessage = action({
   args: {
@@ -62,9 +65,7 @@ export const sendMessage = action({
     toolCalls?: Array<{ name: string; args: unknown }>;
     toolResults?: Array<{ name: string; result: unknown }>;
   }> => {
-    const feature: MeteringFeature = "pm_agent";
-
-    // Check credits before making AI call
+    // Check credits before making AI call (fail fast)
     const creditCheck = await ctx.runQuery(
       internal.common.credits.checkCreditsForAction
     );
@@ -72,34 +73,18 @@ export const sendMessage = action({
       throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
     }
 
+    // Make AI call - credit deduction handled by usageHandler
     const { thread } = await pmAgent.continueThread(ctx, { threadId });
     const result = await thread.generateText({ prompt: message });
 
-    // Deduct credits if not unlimited access and we have usage data
-    if (!creditCheck.hasUnlimitedAccess && result.usage) {
-      // AI SDK v3+ uses inputTokens/outputTokens instead of promptTokens/completionTokens
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const usageAny = result.usage as any;
-      const tokenUsage = {
-        promptTokens: usageAny.promptTokens ?? usageAny.inputTokens ?? 0,
-        completionTokens: usageAny.completionTokens ?? usageAny.outputTokens ?? 0,
-        totalTokens: usageAny.totalTokens ?? 0,
-      };
-      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-        userId: creditCheck.userId,
-        feature,
-        tokenUsage,
-        model: "google/gemini-2.5-flash-lite",
-        description: "PM Agent message",
-      });
-    }
-
     return {
       text: result.text,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolCalls: result.toolCalls?.map((tc: any) => ({
         name: tc.toolName,
         args: tc.args,
       })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toolResults: result.toolResults?.map((tr: any) => ({
         name: tr.toolName,
         result: tr.result,

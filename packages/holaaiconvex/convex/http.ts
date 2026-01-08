@@ -234,6 +234,18 @@ http.route({
                 isComplete: true,
               });
 
+              // Deduct credits for this streaming response (if not unlimited)
+              if (!creditCheck.hasUnlimitedAccess && fullContent.length > 0) {
+                await ctx.runMutation(internal.common.credits.deductStreamingCreditsFromText, {
+                  userId: user._id,
+                  feature: "chatnexus",
+                  model: panel.modelId,
+                  generatedText: fullContent,
+                  promptText: message,
+                  description: `ChatNexus: ${panel.modelId}`,
+                });
+              }
+
               sendEvent({ panelId: panel.panelId, done: true });
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -582,6 +594,18 @@ http.route({
                   isComplete: true,
                 });
 
+                // Deduct credits for Stage 1 response (if not unlimited)
+                if (!creditCheck.hasUnlimitedAccess && response.length > 0) {
+                  await ctx.runMutation(internal.common.credits.deductStreamingCreditsFromText, {
+                    userId: user._id,
+                    feature: "llm_council",
+                    model: model.modelId,
+                    generatedText: response,
+                    promptText: query,
+                    description: `LLM Council Stage 1: ${model.modelName}`,
+                  });
+                }
+
                 sendEvent("stage1_model_complete", {
                   modelId: model.modelId,
                   modelName: model.modelName,
@@ -715,6 +739,18 @@ Replace the order with your actual ranking (best first). For example: "FINAL RAN
                   labelToModel,
                 });
 
+                // Deduct credits for Stage 2 evaluation (if not unlimited)
+                if (!creditCheck.hasUnlimitedAccess && evaluation.length > 0) {
+                  await ctx.runMutation(internal.common.credits.deductStreamingCreditsFromText, {
+                    userId: user._id,
+                    feature: "llm_council",
+                    model: evaluator.modelId,
+                    generatedText: evaluation,
+                    promptText: rankingPrompt,
+                    description: `LLM Council Stage 2: ${evaluator.modelName}`,
+                  });
+                }
+
                 sendEvent("stage2_model_complete", {
                   evaluatorModelId: evaluator.modelId,
                   evaluatorModelName: evaluator.modelName,
@@ -812,6 +848,18 @@ Provide a well-structured, complete answer that represents the wisdom of the cou
                 response: synthesizedResponse,
                 isComplete: true,
               });
+
+              // Deduct credits for Stage 3 synthesis (if not unlimited)
+              if (!creditCheck.hasUnlimitedAccess && synthesizedResponse.length > 0) {
+                await ctx.runMutation(internal.common.credits.deductStreamingCreditsFromText, {
+                  userId: user._id,
+                  feature: "llm_council",
+                  model: chairmanModel.modelId,
+                  generatedText: synthesizedResponse,
+                  promptText: synthesisPrompt,
+                  description: `LLM Council Stage 3: ${chairmanModel.modelName}`,
+                });
+              }
 
               sendEvent("stage3_complete", {
                 modelId: chairmanModel.modelId,

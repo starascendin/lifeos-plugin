@@ -540,3 +540,75 @@ export const initializeCreditsInternal = internalMutation({
     await getOrCreateUserCredits(ctx, args.userId, args.email);
   },
 });
+
+// ==================== STREAMING SUPPORT ====================
+
+/**
+ * Deduct credits for streaming responses (internal)
+ *
+ * For HTTP streaming, we don't get usage data until completion.
+ * Call this after the stream finishes with estimated token count.
+ */
+export const deductStreamingCredits = internalMutation({
+  args: {
+    userId: v.id("users"),
+    feature: v.string(),
+    model: v.string(),
+    estimatedTokens: v.number(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Create flat-rate usage estimate (30% prompt, 70% completion)
+    const tokenUsage = {
+      promptTokens: Math.floor(args.estimatedTokens * 0.3),
+      completionTokens: Math.floor(args.estimatedTokens * 0.7),
+      totalTokens: args.estimatedTokens,
+    };
+
+    await deductCreditsMutation(ctx, {
+      userId: args.userId,
+      feature: args.feature as MeteringFeature,
+      tokenUsage,
+      model: args.model,
+      description: args.description || `Streaming: ${args.feature}`,
+    });
+  },
+});
+
+/**
+ * Estimate tokens from text and deduct credits after streaming completes (internal)
+ *
+ * Convenience function that estimates tokens from the generated text.
+ * ~4 characters per token for English text.
+ */
+export const deductStreamingCreditsFromText = internalMutation({
+  args: {
+    userId: v.id("users"),
+    feature: v.string(),
+    model: v.string(),
+    generatedText: v.string(),
+    promptText: v.optional(v.string()),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Estimate tokens from text content (~4 chars per token)
+    const completionTokens = Math.ceil(args.generatedText.length / 4);
+    const promptTokens = args.promptText
+      ? Math.ceil(args.promptText.length / 4)
+      : Math.floor(completionTokens * 0.5); // Rough estimate if prompt not provided
+
+    const tokenUsage = {
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+    };
+
+    await deductCreditsMutation(ctx, {
+      userId: args.userId,
+      feature: args.feature as MeteringFeature,
+      tokenUsage,
+      model: args.model,
+      description: args.description || `Streaming: ${args.feature}`,
+    });
+  },
+});

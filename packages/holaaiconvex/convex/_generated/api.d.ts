@@ -8,10 +8,18 @@
  * @module
  */
 
+import type * as _lib_ai_index from "../_lib/ai/index.js";
+import type * as _lib_ai_models from "../_lib/ai/models.js";
+import type * as _lib_ai_providers_gateway from "../_lib/ai/providers/gateway.js";
+import type * as _lib_ai_providers_gemini from "../_lib/ai/providers/gemini.js";
+import type * as _lib_ai_providers_index from "../_lib/ai/providers/index.js";
+import type * as _lib_ai_token_extractors from "../_lib/ai/token_extractors.js";
+import type * as _lib_ai_types from "../_lib/ai/types.js";
 import type * as _lib_algorithms_sm2 from "../_lib/algorithms/sm2.js";
 import type * as _lib_auth from "../_lib/auth.js";
 import type * as _lib_credits from "../_lib/credits.js";
 import type * as _lib_roles from "../_lib/roles.js";
+import type * as common_ai from "../common/ai.js";
 import type * as common_credits from "../common/credits.js";
 import type * as common_credits_schema from "../common/credits_schema.js";
 import type * as common_dev from "../common/dev.js";
@@ -83,10 +91,18 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "_lib/ai/index": typeof _lib_ai_index;
+  "_lib/ai/models": typeof _lib_ai_models;
+  "_lib/ai/providers/gateway": typeof _lib_ai_providers_gateway;
+  "_lib/ai/providers/gemini": typeof _lib_ai_providers_gemini;
+  "_lib/ai/providers/index": typeof _lib_ai_providers_index;
+  "_lib/ai/token_extractors": typeof _lib_ai_token_extractors;
+  "_lib/ai/types": typeof _lib_ai_types;
   "_lib/algorithms/sm2": typeof _lib_algorithms_sm2;
   "_lib/auth": typeof _lib_auth;
   "_lib/credits": typeof _lib_credits;
   "_lib/roles": typeof _lib_roles;
+  "common/ai": typeof common_ai;
   "common/credits": typeof common_credits;
   "common/credits_schema": typeof common_credits_schema;
   "common/dev": typeof common_dev;

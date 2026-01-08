@@ -2,7 +2,6 @@ import { action, mutation, query, internalMutation, internalQuery } from "../_ge
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
-import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== AI LESSONS ====================
 
@@ -521,7 +520,7 @@ Respond in JSON format:
   ]
 }`;
 
-// Generate AI Lesson using Gemini
+// Generate AI Lesson using centralized AI service
 export const generateLesson = action({
   args: {
     userId: v.id("users"),
@@ -529,21 +528,6 @@ export const generateLesson = action({
     level: v.string(), // "A1", "A2", "B1"
   },
   handler: async (ctx, args): Promise<{ lessonId: Id<"hola_aiLessons">; lesson: unknown }> => {
-    const feature: MeteringFeature = "holaai_lesson";
-
-    // Check credits before making AI call
-    const creditCheck = await ctx.runQuery(
-      internal.common.credits.checkCreditsForAction
-    );
-    if (!creditCheck.allowed) {
-      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY not configured");
-    }
-
     const levelDescription =
       args.level === "A1"
         ? "beginner (very basic vocabulary and simple present tense)"
@@ -558,50 +542,25 @@ User request: ${args.prompt}
 
 Generate the lesson in JSON format.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.7,
-          },
-        }),
-      }
-    );
+    // Use centralized AI service (handles credit check, AI call, and deduction)
+    const result = await ctx.runAction(internal.common.ai.executeAICall, {
+      request: {
+        model: "gemini-2.5-flash",
+        messages: [{ role: "user", content: fullPrompt }],
+        temperature: 0.7,
+        responseFormat: "json",
+      },
+      context: {
+        feature: "holaai_lesson",
+        description: "AI Lesson generation",
+      },
+    });
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!content) {
+    if (!result.content) {
       throw new Error("No content generated");
     }
 
-    const lessonContent = JSON.parse(content);
-
-    // Deduct credits if not unlimited access
-    if (!creditCheck.hasUnlimitedAccess) {
-      const usageMetadata = data.usageMetadata;
-      const tokenUsage = {
-        promptTokens: usageMetadata?.promptTokenCount || 0,
-        completionTokens: usageMetadata?.candidatesTokenCount || 0,
-        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
-      };
-      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-        userId: creditCheck.userId,
-        feature,
-        tokenUsage,
-        model: "gemini-2.5-flash",
-        description: "AI Lesson generation",
-      });
-    }
+    const lessonContent = JSON.parse(result.content);
 
     // Save to database
     const lessonId: Id<"hola_aiLessons"> = await ctx.runMutation(internal.holaai.ai.saveAiLesson, {
@@ -622,7 +581,7 @@ Generate the lesson in JSON format.`;
   },
 });
 
-// Generate Bella Conversation using Gemini
+// Generate Bella Conversation using centralized AI service
 export const generateBellaConversation = action({
   args: {
     userId: v.id("users"),
@@ -630,21 +589,6 @@ export const generateBellaConversation = action({
     level: v.string(), // "A1", "A2"
   },
   handler: async (ctx, args): Promise<{ conversationId: Id<"hola_bellaConversations">; conversation: unknown }> => {
-    const feature: MeteringFeature = "holaai_conversation";
-
-    // Check credits before making AI call
-    const creditCheck = await ctx.runQuery(
-      internal.common.credits.checkCreditsForAction
-    );
-    if (!creditCheck.allowed) {
-      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY not configured");
-    }
-
     const levelDescription =
       args.level === "A1"
         ? "beginner (use very simple vocabulary, short sentences, present tense only)"
@@ -657,50 +601,25 @@ Situation: ${args.situation}
 
 Generate a natural conversation scenario in JSON format.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.8,
-          },
-        }),
-      }
-    );
+    // Use centralized AI service (handles credit check, AI call, and deduction)
+    const result = await ctx.runAction(internal.common.ai.executeAICall, {
+      request: {
+        model: "gemini-2.5-flash",
+        messages: [{ role: "user", content: fullPrompt }],
+        temperature: 0.8,
+        responseFormat: "json",
+      },
+      context: {
+        feature: "holaai_conversation",
+        description: "Bella Conversation generation",
+      },
+    });
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!content) {
+    if (!result.content) {
       throw new Error("No content generated");
     }
 
-    const conversationContent = JSON.parse(content);
-
-    // Deduct credits if not unlimited access
-    if (!creditCheck.hasUnlimitedAccess) {
-      const usageMetadata = data.usageMetadata;
-      const tokenUsage = {
-        promptTokens: usageMetadata?.promptTokenCount || 0,
-        completionTokens: usageMetadata?.candidatesTokenCount || 0,
-        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
-      };
-      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-        userId: creditCheck.userId,
-        feature,
-        tokenUsage,
-        model: "gemini-2.5-flash",
-        description: "Bella Conversation generation",
-      });
-    }
+    const conversationContent = JSON.parse(result.content);
 
     // Save to database
     const conversationId: Id<"hola_bellaConversations"> = await ctx.runMutation(internal.holaai.ai.saveBellaConversation, {
@@ -758,7 +677,7 @@ export const getLearnerProfileInternal = internalQuery({
   },
 });
 
-// Generate Journey Conversation using Gemini (contextualized to module)
+// Generate Journey Conversation using centralized AI service (contextualized to module)
 export const generateJourneyConversation = action({
   args: {
     userId: v.id("users"),
@@ -768,21 +687,6 @@ export const generateJourneyConversation = action({
     situation: v.string(),
   },
   handler: async (ctx, args): Promise<{ conversationId: Id<"hola_journeyConversations">; sessionId: Id<"hola_conversationSessions">; conversation: unknown }> => {
-    const feature: MeteringFeature = "holaai_conversation";
-
-    // Check credits before making AI call
-    const creditCheck = await ctx.runQuery(
-      internal.common.credits.checkCreditsForAction
-    );
-    if (!creditCheck.allowed) {
-      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY not configured");
-    }
-
     // Fetch module context
     const module = await ctx.runQuery(internal.holaai.ai.getModuleContextInternal, {
       moduleId: args.moduleId,
@@ -836,51 +740,26 @@ User's situation/scenario: ${args.situation}
 
 Generate a natural A1-level conversation that uses vocabulary and concepts from the module context above. Keep it simple and practical.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.8,
-          },
-        }),
-      }
-    );
+    // Use centralized AI service (handles credit check, AI call, and deduction)
+    const result = await ctx.runAction(internal.common.ai.executeAICall, {
+      request: {
+        model: "gemini-2.5-flash",
+        messages: [{ role: "user", content: fullPrompt }],
+        temperature: 0.8,
+        responseFormat: "json",
+      },
+      context: {
+        feature: "holaai_conversation",
+        description: "Journey Conversation generation",
+      },
+    });
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!content) {
+    if (!result.content) {
       throw new Error("No content generated");
     }
 
-    const conversationContent = JSON.parse(content);
+    const conversationContent = JSON.parse(result.content);
     const conversationTitle = conversationContent.title || "Untitled Conversation";
-
-    // Deduct credits if not unlimited access
-    if (!creditCheck.hasUnlimitedAccess) {
-      const usageMetadata = data.usageMetadata;
-      const tokenUsage = {
-        promptTokens: usageMetadata?.promptTokenCount || 0,
-        completionTokens: usageMetadata?.candidatesTokenCount || 0,
-        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
-      };
-      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-        userId: creditCheck.userId,
-        feature,
-        tokenUsage,
-        model: "gemini-2.5-flash",
-        description: "Journey Conversation generation",
-      });
-    }
 
     // Handle session: use existing or create new
     let sessionId = args.sessionId;
@@ -939,7 +818,7 @@ Respond in JSON format:
   ]
 }`;
 
-// Generate personalized scenario suggestions
+// Generate personalized scenario suggestions using centralized AI service
 export const generateSuggestions = action({
   args: {
     userId: v.id("users"),
@@ -947,21 +826,6 @@ export const generateSuggestions = action({
     context: v.union(v.literal("before_generation"), v.literal("after_conversation")),
   },
   handler: async (ctx, args): Promise<{ suggestions: Array<{ title: string; description: string; scenario: string }> }> => {
-    const feature: MeteringFeature = "holaai_suggestions";
-
-    // Check credits before making AI call
-    const creditCheck = await ctx.runQuery(
-      internal.common.credits.checkCreditsForAction
-    );
-    if (!creditCheck.allowed) {
-      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY not configured");
-    }
-
     // Fetch module context
     const module = await ctx.runQuery(internal.holaai.ai.getModuleContextInternal, {
       moduleId: args.moduleId,
@@ -1007,52 +871,27 @@ Context: ${contextNote}
 
 Generate suggestions that would be engaging and useful for this specific learner.`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.9,
-          },
-        }),
-      }
-    );
+    // Use centralized AI service (handles credit check, AI call, and deduction)
+    const result = await ctx.runAction(internal.common.ai.executeAICall, {
+      request: {
+        model: "gemini-2.5-flash",
+        messages: [{ role: "user", content: fullPrompt }],
+        temperature: 0.9,
+        responseFormat: "json",
+      },
+      context: {
+        feature: "holaai_suggestions",
+        description: "Suggestion generation",
+      },
+    });
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!content) {
+    if (!result.content) {
       throw new Error("No content generated");
     }
 
-    const result = JSON.parse(content);
+    const parsed = JSON.parse(result.content);
 
-    // Deduct credits if not unlimited access
-    if (!creditCheck.hasUnlimitedAccess) {
-      const usageMetadata = data.usageMetadata;
-      const tokenUsage = {
-        promptTokens: usageMetadata?.promptTokenCount || 0,
-        completionTokens: usageMetadata?.candidatesTokenCount || 0,
-        totalTokens: (usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0),
-      };
-      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-        userId: creditCheck.userId,
-        feature,
-        tokenUsage,
-        model: "gemini-2.5-flash",
-        description: "Suggestion generation",
-      });
-    }
-
-    return { suggestions: result.suggestions || [] };
+    return { suggestions: parsed.suggestions || [] };
   },
 });
 

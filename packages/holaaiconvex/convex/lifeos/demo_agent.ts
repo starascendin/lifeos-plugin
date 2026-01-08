@@ -10,7 +10,6 @@ import { action, internalMutation, internalQuery } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { demoTools } from "./lib/demo_tools";
 import { vTokenUsage } from "./demo_agent_schema";
-import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== AVAILABLE MODELS ====================
 
@@ -124,7 +123,7 @@ function createDemoAgent(modelId: DemoAgentModelId = DEFAULT_MODEL) {
     // 2. Receive tool result(s)
     // 3. Generate final text response
     maxSteps: 5,
-    // Track token usage - saves to database for each LLM call
+    // Track token usage - saves to database AND deducts credits
     usageHandler: async (ctx, args) => {
       const { usage, model, provider, agentName, threadId } = args;
 
@@ -134,20 +133,35 @@ function createDemoAgent(modelId: DemoAgentModelId = DEFAULT_MODEL) {
       const usageAny = usage as any;
       const promptTokens = usageAny.promptTokens ?? usageAny.inputTokens ?? 0;
       const completionTokens = usageAny.completionTokens ?? usageAny.outputTokens ?? 0;
+      const tokenUsage = {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+      };
 
-      // Save usage to database
+      // Save usage to database (for analytics)
       await ctx.runMutation(internal.lifeos.demo_agent.saveUsage, {
         threadId: threadId ?? "unknown",
         agentName: agentName ?? "Demo Assistant",
         model: model ?? modelId,
         provider: provider ?? modelId.split("/")[0],
-        usage: {
-          promptTokens,
-          completionTokens,
-          totalTokens: promptTokens + completionTokens,
-        },
+        usage: tokenUsage,
         providerMetadata: args.providerMetadata,
       });
+
+      // Deduct credits (skip for unlimited access users)
+      const creditCheck = await ctx.runQuery(
+        internal.common.credits.checkCreditsForAction
+      );
+      if (!creditCheck.hasUnlimitedAccess && tokenUsage.totalTokens > 0) {
+        await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
+          userId: creditCheck.userId,
+          feature: "demo_agent",
+          tokenUsage,
+          model: model ?? modelId,
+          description: "Demo Agent call",
+        });
+      }
     },
   });
 }
@@ -171,6 +185,7 @@ export const createThread = action({
 /**
  * Send a message to the Demo AI and get a response
  * Supports dynamic model selection and returns token usage
+ * Credit deduction is handled automatically by the usageHandler in createDemoAgent
  */
 export const sendMessage = action({
   args: {
@@ -192,9 +207,7 @@ export const sendMessage = action({
     };
     modelUsed: string;
   }> => {
-    const feature: MeteringFeature = "demo_agent";
-
-    // Check credits before making AI call
+    // Check credits before making AI call (fail fast)
     const creditCheck = await ctx.runQuery(
       internal.common.credits.checkCreditsForAction
     );
@@ -210,6 +223,7 @@ export const sendMessage = action({
     ) as DemoAgentModelId;
 
     // Create agent with specified model
+    // Credit deduction is handled by usageHandler
     const agent = createDemoAgent(validModelId);
 
     const { thread } = await agent.continueThread(ctx, { threadId });
@@ -258,22 +272,11 @@ export const sendMessage = action({
     // Use result.text if available, otherwise join text parts from steps
     const finalText = result.text || textParts.join("\n");
 
-    // Fetch usage from database (saved by usageHandler)
+    // Fetch usage from database (saved by usageHandler) for client display
     const usageData = await ctx.runQuery(
       internal.lifeos.demo_agent.getThreadUsage,
       { threadId }
     );
-
-    // Deduct credits if not unlimited access and we have usage data
-    if (!creditCheck.hasUnlimitedAccess && usageData.usage.totalTokens > 0) {
-      await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-        userId: creditCheck.userId,
-        feature,
-        tokenUsage: usageData.usage,
-        model: validModelId,
-        description: "Demo Agent message",
-      });
-    }
 
     return {
       text: finalText,

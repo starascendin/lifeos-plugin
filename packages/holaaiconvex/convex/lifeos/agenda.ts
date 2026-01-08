@@ -8,7 +8,6 @@ import {
 import { requireUser } from "../_lib/auth";
 import { Doc } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
-import type { MeteringFeature } from "../_lib/credits";
 
 // ==================== QUERIES ====================
 
@@ -164,7 +163,7 @@ interface GenerateSummaryResult {
 }
 
 /**
- * Generate AI summary for a specific date using Vercel AI Gateway
+ * Generate AI summary for a specific date using centralized AI service
  * Supports multiple models: openai/gpt-4o-mini, google/gemini-2.5-flash-lite, xai/grok-4.1-fast-non-reasoning
  */
 export const generateDailySummary = action({
@@ -174,15 +173,6 @@ export const generateDailySummary = action({
   },
   handler: async (ctx, args): Promise<GenerateSummaryResult> => {
     const selectedModel = args.model || "openai/gpt-4o-mini";
-    const feature: MeteringFeature = "agenda_daily_summary";
-
-    // Check credits before making AI call
-    const creditCheck = await ctx.runQuery(
-      internal.common.credits.checkCreditsForAction
-    );
-    if (!creditCheck.allowed) {
-      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
-    }
 
     // Get today's habits
     const habits: Doc<"lifeos_habits">[] = await ctx.runQuery(
@@ -233,7 +223,7 @@ export const generateDailySummary = action({
     });
 
     // Save helper function
-    const saveViaPublicMutation = async (
+    const saveSummary = async (
       summary: string,
       model: string,
       usage: UsageInfo | null
@@ -246,83 +236,46 @@ export const generateDailySummary = action({
       });
     };
 
-    // Call Vercel AI Gateway
-    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!aiGatewayApiKey) {
-      // Return a simple summary if no API key
-      const fallbackSummary = `Today (${args.date}): ${totalHabits} habits scheduled (${habitCompletionCount} completed), ${totalTasks} tasks due, ${topPriorityCount} top priorities.`;
-
-      await saveViaPublicMutation(fallbackSummary, "fallback", null);
-      return { summary: fallbackSummary, model: "fallback", usage: null };
-    }
-
     try {
-      const response = await fetch(
-        "https://gateway.ai.vercel.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${aiGatewayApiKey}`,
-          },
-          body: JSON.stringify({
-            model: selectedModel,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a helpful personal assistant that provides concise daily summaries. Keep responses brief (2-3 sentences) and actionable.",
-              },
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-            max_tokens: 200,
-            temperature: 0.7,
-          }),
-        }
-      );
+      // Use centralized AI service (handles credit check, AI call, and deduction)
+      const result = await ctx.runAction(internal.common.ai.executeAICall, {
+        request: {
+          model: selectedModel,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a helpful personal assistant that provides concise daily summaries. Keep responses brief (2-3 sentences) and actionable.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          maxTokens: 200,
+          temperature: 0.7,
+        },
+        context: {
+          feature: "agenda_daily_summary",
+          description: `Daily summary for ${args.date}`,
+        },
+      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      const aiSummary: string =
-        data.choices?.[0]?.message?.content ||
-        "Unable to generate summary at this time.";
-
-      // Extract usage info
-      const usage: UsageInfo | null = data.usage
-        ? {
-            promptTokens: data.usage.prompt_tokens || 0,
-            completionTokens: data.usage.completion_tokens || 0,
-            totalTokens: data.usage.total_tokens || 0,
-          }
-        : null;
+      const usage: UsageInfo = {
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        totalTokens: result.usage.totalTokens,
+      };
 
       // Save the summary with model and usage info
-      await saveViaPublicMutation(aiSummary, selectedModel, usage);
+      await saveSummary(result.content, selectedModel, usage);
 
-      // Deduct credits if not unlimited access and we have usage data
-      if (!creditCheck.hasUnlimitedAccess && usage) {
-        await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-          userId: creditCheck.userId,
-          feature,
-          tokenUsage: usage,
-          model: selectedModel,
-          description: `Daily summary for ${args.date}`,
-        });
-      }
-
-      return { summary: aiSummary, model: selectedModel, usage };
+      return { summary: result.content, model: selectedModel, usage };
     } catch (error) {
       console.error("Error generating AI summary:", error);
       const fallbackSummary = `Today: ${totalHabits} habits scheduled, ${totalTasks} tasks due, ${topPriorityCount} top priorities.`;
 
-      await saveViaPublicMutation(fallbackSummary, "fallback", null);
+      await saveSummary(fallbackSummary, "fallback", null);
       return { summary: fallbackSummary, model: "fallback", usage: null };
     }
   },
@@ -622,7 +575,7 @@ function buildWeeklySummaryPrompt(context: WeeklySummaryContext): string {
 }
 
 /**
- * Generate AI summary for a specific week using Vercel AI Gateway
+ * Generate AI summary for a specific week using centralized AI service
  */
 export const generateWeeklySummary = action({
   args: {
@@ -631,15 +584,6 @@ export const generateWeeklySummary = action({
   },
   handler: async (ctx, args): Promise<GenerateSummaryResult> => {
     const selectedModel = args.model || "openai/gpt-4o-mini";
-    const feature: MeteringFeature = "agenda_weekly_summary";
-
-    // Check credits before making AI call
-    const creditCheck = await ctx.runQuery(
-      internal.common.credits.checkCreditsForAction
-    );
-    if (!creditCheck.allowed) {
-      throw new Error(creditCheck.reason || "OUT_OF_CREDITS");
-    }
 
     // Calculate week end date
     const weekEnd = new Date(args.weekStartDate);
@@ -692,7 +636,7 @@ export const generateWeeklySummary = action({
     const prompt = buildWeeklySummaryPrompt(promptContext);
 
     // Save helper function
-    const saveViaPublicMutation = async (
+    const saveSummary = async (
       summary: string,
       model: string,
       usage: UsageInfo | null
@@ -706,78 +650,44 @@ export const generateWeeklySummary = action({
       });
     };
 
-    // Call Vercel AI Gateway
-    const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY;
-    if (!aiGatewayApiKey) {
-      const fallbackSummary = `Week ${args.weekStartDate} to ${weekEndDate}: ${completedTasks.length} tasks completed, ${remainingTasks.length} remaining, ${memos.length} voice memos recorded.`;
-      await saveViaPublicMutation(fallbackSummary, "fallback", null);
-      return { summary: fallbackSummary, model: "fallback", usage: null };
-    }
-
     try {
-      const response = await fetch(
-        "https://gateway.ai.vercel.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${aiGatewayApiKey}`,
-          },
-          body: JSON.stringify({
-            model: selectedModel,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a helpful personal assistant that provides insightful weekly summaries. Keep responses concise but comprehensive, highlighting patterns and actionable insights.",
-              },
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-            max_tokens: 500,
-            temperature: 0.7,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      const aiSummary: string =
-        data.choices?.[0]?.message?.content ||
-        "Unable to generate weekly summary at this time.";
-
-      const usage: UsageInfo | null = data.usage
-        ? {
-            promptTokens: data.usage.prompt_tokens || 0,
-            completionTokens: data.usage.completion_tokens || 0,
-            totalTokens: data.usage.total_tokens || 0,
-          }
-        : null;
-
-      await saveViaPublicMutation(aiSummary, selectedModel, usage);
-
-      // Deduct credits if not unlimited access and we have usage data
-      if (!creditCheck.hasUnlimitedAccess && usage) {
-        await ctx.runMutation(internal.common.credits.deductCreditsInternal, {
-          userId: creditCheck.userId,
-          feature,
-          tokenUsage: usage,
+      // Use centralized AI service (handles credit check, AI call, and deduction)
+      const result = await ctx.runAction(internal.common.ai.executeAICall, {
+        request: {
           model: selectedModel,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a helpful personal assistant that provides insightful weekly summaries. Keep responses concise but comprehensive, highlighting patterns and actionable insights.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          maxTokens: 500,
+          temperature: 0.7,
+        },
+        context: {
+          feature: "agenda_weekly_summary",
           description: `Weekly summary for ${args.weekStartDate}`,
-        });
-      }
+        },
+      });
 
-      return { summary: aiSummary, model: selectedModel, usage };
+      const usage: UsageInfo = {
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        totalTokens: result.usage.totalTokens,
+      };
+
+      await saveSummary(result.content, selectedModel, usage);
+
+      return { summary: result.content, model: selectedModel, usage };
     } catch (error) {
       console.error("Error generating weekly AI summary:", error);
       const fallbackSummary = `Week ${args.weekStartDate} to ${weekEndDate}: ${completedTasks.length} tasks completed, ${remainingTasks.length} remaining.`;
-      await saveViaPublicMutation(fallbackSummary, "fallback", null);
+      await saveSummary(fallbackSummary, "fallback", null);
       return { summary: fallbackSummary, model: "fallback", usage: null };
     }
   },
