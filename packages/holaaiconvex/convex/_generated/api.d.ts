@@ -42,6 +42,8 @@ import type * as holaai_translate from "../holaai/translate.js";
 import type * as holaai_vocab from "../holaai/vocab.js";
 import type * as holaai_voice from "../holaai/voice.js";
 import type * as http from "../http.js";
+import type * as inspiration_items from "../inspiration/items.js";
+import type * as inspiration_tags from "../inspiration/tags.js";
 import type * as lifeos_agenda from "../lifeos/agenda.js";
 import type * as lifeos_avatar_schema from "../lifeos/avatar_schema.js";
 import type * as lifeos_avatar_stats from "../lifeos/avatar_stats.js";
@@ -125,6 +127,8 @@ declare const fullApi: ApiFromModules<{
   "holaai/vocab": typeof holaai_vocab;
   "holaai/voice": typeof holaai_voice;
   http: typeof http;
+  "inspiration/items": typeof inspiration_items;
+  "inspiration/tags": typeof inspiration_tags;
   "lifeos/agenda": typeof lifeos_agenda;
   "lifeos/avatar_schema": typeof lifeos_avatar_schema;
   "lifeos/avatar_stats": typeof lifeos_avatar_stats;

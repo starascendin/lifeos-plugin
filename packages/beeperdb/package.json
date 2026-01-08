@@ -3,6 +3,9 @@
   "private": true,
   "scripts": {
     "clone:whatsapp": "bash ./beeperdb.sh clone",
+    "clone:all": "bash ./beeperdb.sh clone-all",
+    "export": "bash ./beeperdb.sh export",
+    "sync": "bash ./beeperdb.sh sync",
     "latest50": "bash ./beeperdb.sh latest50"
   }
 }

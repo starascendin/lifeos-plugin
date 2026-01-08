@@ -33,7 +33,9 @@
     "cap:open:android": "npx cap open android",
     "build:mobile": "vite build --mode development && npx cap sync",
     "build:mobile:staging": "vite build --mode staging && npx cap sync",
-    "build:mobile:production": "vite build --mode production && npx cap sync"
+    "build:mobile:production": "vite build --mode production && npx cap sync",
+    "cap:ios:prod:build": "bash ./scripts/capacitor-ios-prod-build.sh",
+    "cap:ios:prod:install": "bash ./scripts/capacitor-ios-prod-install.sh"
   },
   "dependencies": {
     "@capacitor/app": "^7.0.0",
