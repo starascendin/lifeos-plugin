@@ -241,9 +241,15 @@ export function VoiceAgentProvider({ children }: VoiceAgentProviderProps) {
       const metadata = JSON.stringify({
         model: state.selectedModelId,
         userId: userId,
+        localTime: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
 
-      console.log("[VoiceAgent] Connecting with metadata:", { model: state.selectedModelId, userId: userId || 'undefined' });
+      console.log("[VoiceAgent] Connecting with metadata:", {
+        model: state.selectedModelId,
+        userId: userId || 'undefined',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
 
       const tokenResponse = await generateToken(targetRoom, undefined, undefined, metadata);
 

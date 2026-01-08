@@ -1148,6 +1148,9 @@ const AVAILABLE_TOOLS = [
   "get_recent_notes",
   "create_quick_note",
   "add_tags_to_note",
+  // Agenda tools
+  "get_daily_agenda",
+  "get_weekly_agenda",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -1308,6 +1311,23 @@ http.route({
             userId: auth.userId,
             noteId: params?.noteId as string,
             tags: params?.tags as string[],
+          });
+          break;
+
+        // Agenda tools
+        case "get_daily_agenda":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getDailyAgendaInternal, {
+            userId: auth.userId,
+            date: params?.date as string | undefined,
+            localTime: params?.localTime as string | undefined,
+          });
+          break;
+
+        case "get_weekly_agenda":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getWeeklyAgendaInternal, {
+            userId: auth.userId,
+            startDate: params?.startDate as string | undefined,
+            localTime: params?.localTime as string | undefined,
           });
           break;
       }

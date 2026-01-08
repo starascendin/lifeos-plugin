@@ -28,6 +28,9 @@ interface WeeklyMemo extends Doc<"life_voiceMemos"> {
   audioUrl: string | null;
 }
 
+// Weekly calendar events type
+type WeeklyEventsByDay = Record<string, Doc<"lifeos_calendarEvents">[]>;
+
 interface AgendaContextValue {
   // Date navigation
   currentDate: Date;
@@ -60,6 +63,14 @@ interface AgendaContextValue {
   overdueTasks: Doc<"lifeos_pmIssues">[] | undefined;
   completedTodayTasks: Doc<"lifeos_pmIssues">[] | undefined;
   isLoadingTasks: boolean;
+
+  // Calendar events data
+  todaysEvents: Doc<"lifeos_calendarEvents">[] | undefined;
+  weeklyEvents: WeeklyEventsByDay | undefined;
+  isLoadingEvents: boolean;
+  calendarSyncStatus: Doc<"lifeos_calendarSyncStatus"> | null | undefined;
+  syncCalendar: () => Promise<void>;
+  isSyncingCalendar: boolean;
 
   // Daily summary
   dailySummary: Doc<"lifeos_dailySummaries"> | null | undefined;
@@ -161,6 +172,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isGeneratingWeeklySummary, setIsGeneratingWeeklySummary] =
     useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
   const [selectedModel, setSelectedModel] = useState<SupportedModelId>(
     "openai/gpt-4o-mini"
   );
@@ -223,6 +235,21 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const dailyFields = useQuery(api.lifeos.daily_fields.getFieldsWithValuesForDate, {
     date: dateString,
   });
+
+  // Calendar events queries
+  const todaysEvents = useQuery(api.lifeos.calendar.getEventsForDate, {
+    date: dateString,
+  });
+
+  const calendarSyncStatus = useQuery(api.lifeos.calendar.getSyncStatus, {});
+
+  // Weekly calendar events (only fetch when in weekly view mode)
+  const weeklyEvents = useQuery(
+    api.lifeos.calendar.getEventsForDateRange,
+    viewMode === "weekly"
+      ? { startDate: weekStartDate, endDate: weekEndDate }
+      : "skip"
+  );
 
   // Weekly data queries (only fetch when in weekly view mode)
   const weeklyTasks = useQuery(
@@ -303,6 +330,9 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     api.lifeos.agenda.generateWeeklySummary
   );
 
+  // Calendar sync action
+  const syncCalendarAction = useAction(api.lifeos.calendar.syncCalendarEvents);
+
   // Generate daily summary handler
   const generateSummary = useCallback(async () => {
     setIsGeneratingSummary(true);
@@ -329,6 +359,18 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
       setIsGeneratingWeeklySummary(false);
     }
   }, [generateWeeklySummaryAction, weekStartDate, selectedModel]);
+
+  // Sync calendar handler
+  const syncCalendar = useCallback(async () => {
+    setIsSyncingCalendar(true);
+    try {
+      await syncCalendarAction({});
+    } catch (error) {
+      console.error("Failed to sync calendar:", error);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  }, [syncCalendarAction]);
 
   // Week navigation helpers
   const goToPreviousWeek = useCallback(() => {
@@ -434,6 +476,14 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     overdueTasks,
     completedTodayTasks,
     isLoadingTasks: todaysTasks === undefined || overdueTasks === undefined,
+
+    // Calendar events data
+    todaysEvents,
+    weeklyEvents,
+    isLoadingEvents: todaysEvents === undefined,
+    calendarSyncStatus,
+    syncCalendar,
+    isSyncingCalendar,
 
     // Daily summary
     dailySummary,

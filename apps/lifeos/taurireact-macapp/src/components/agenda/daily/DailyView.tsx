@@ -1,4 +1,5 @@
 import { AISummarySection } from "./AISummarySection";
+import { CalendarEventsSection } from "./CalendarEventsSection";
 import { DailyFieldsSection } from "./DailyFieldsSection";
 import { HabitsSection } from "./HabitsSection";
 import { TasksSection } from "./TasksSection";
@@ -16,6 +17,9 @@ export function DailyView() {
 
       {/* Daily Fields section */}
       <DailyFieldsSection />
+
+      {/* Calendar events section */}
+      <CalendarEventsSection />
 
       {/* Two-column layout for habits and tasks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

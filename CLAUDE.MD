@@ -14,3 +14,6 @@ For Lifeos Tauri app, read:
 For any development in convex, make sure:
 - all lint/build/ typecheck issues are corrected
 - make sure you deploy to dev w/ `npx convex dev --once` command
+
+For Voice Agent develop, read:
+- ai_notes/ai-agent-tools-guide.md

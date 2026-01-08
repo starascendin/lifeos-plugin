@@ -67,6 +67,21 @@ export const TOOL_DEFINITIONS = {
       tags: "required - array of tags to add",
     },
   },
+  // Agenda tools
+  get_daily_agenda: {
+    description: "Get today's full agenda: tasks, calendar events, and voice note count",
+    params: {
+      date: "optional - specific date in ISO format (default: today based on localTime)",
+      localTime: "optional - user's local time in ISO format for accurate date calculation",
+    },
+  },
+  get_weekly_agenda: {
+    description: "Get weekly agenda: tasks and events for the next 7 days, plus AI weekly summary",
+    params: {
+      startDate: "optional - start date in ISO format (default: today based on localTime)",
+      localTime: "optional - user's local time in ISO format for accurate date calculation",
+    },
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOL_DEFINITIONS;
@@ -515,6 +530,371 @@ export const addTagsToNoteInternal = internalMutation({
       success: true,
       noteId,
       tags: mergedTags,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 8: GET DAILY AGENDA ====================
+
+/**
+ * Get daily agenda for a user
+ * Returns tasks due today + calendar events + top priority tasks + voice note count
+ * Uses localTime to determine "today" accurately for user's timezone
+ * Optimized for voice responses
+ */
+export const getDailyAgendaInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    date: v.optional(v.string()),
+    localTime: v.optional(v.string()), // User's local time in ISO format
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    // Parse date or use localTime or server time
+    // Priority: explicit date > localTime > server time
+    let targetDate: Date;
+    if (args.date) {
+      targetDate = new Date(args.date);
+    } else if (args.localTime) {
+      targetDate = new Date(args.localTime);
+    } else {
+      targetDate = new Date();
+    }
+
+    const startOfDay = new Date(
+      targetDate.getFullYear(),
+      targetDate.getMonth(),
+      targetDate.getDate()
+    ).getTime();
+    const endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1;
+
+    // Get all issues for the user
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Filter: tasks due on target date OR marked as top priority
+    // Exclude done/cancelled
+    const relevantTasks = allIssues.filter((issue) => {
+      if (issue.status === "done" || issue.status === "cancelled") return false;
+
+      const isDueOnDate = issue.dueDate && issue.dueDate >= startOfDay && issue.dueDate <= endOfDay;
+      const isTopPriority = issue.isTopPriority === true;
+
+      return isDueOnDate || isTopPriority;
+    });
+
+    // Sort by: top priority first, then by priority level, then by sortOrder
+    const sortedTasks = relevantTasks.sort((a, b) => {
+      if (a.isTopPriority && !b.isTopPriority) return -1;
+      if (!a.isTopPriority && b.isTopPriority) return 1;
+
+      const priorityDiff =
+        PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] -
+        PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER];
+      if (priorityDiff !== 0) return priorityDiff;
+
+      return a.sortOrder - b.sortOrder;
+    });
+
+    // Get project info for tasks
+    const projectIds = [...new Set(sortedTasks.map((t) => t.projectId).filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined))];
+    const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
+    const projectMap = new Map(projects.filter(Boolean).map((p) => [p!._id, p!]));
+
+    // Build simplified task response for voice
+    const tasks = sortedTasks.map((task) => {
+      const project = task.projectId ? projectMap.get(task.projectId) : undefined;
+      return {
+        identifier: task.identifier,
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        isTopPriority: task.isTopPriority || false,
+        dueOnDate: task.dueDate ? task.dueDate >= startOfDay && task.dueDate <= endOfDay : false,
+        projectName: project?.name ?? "",
+      };
+    });
+
+    // Get calendar events for this date
+    const allEvents = await ctx.db
+      .query("lifeos_calendarEvents")
+      .withIndex("by_user_start_time", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Filter events that overlap with the target date and are not cancelled
+    const dayEvents = allEvents.filter((event) => {
+      if (event.status === "cancelled") return false;
+      // Event overlaps if it starts before end of day and ends after start of day
+      return event.startTime <= endOfDay && event.endTime >= startOfDay;
+    });
+
+    // Sort events by start time
+    dayEvents.sort((a, b) => a.startTime - b.startTime);
+
+    // Build simplified event response for voice
+    const events = dayEvents.map((event) => ({
+      title: event.title,
+      startTime: new Date(event.startTime).toISOString(),
+      endTime: new Date(event.endTime).toISOString(),
+      isAllDay: event.isAllDay || false,
+      location: event.location ?? null,
+    }));
+
+    // Count voice notes created on this date
+    const allMemos = await ctx.db
+      .query("life_voiceMemos")
+      .withIndex("by_user_created", (q) => q.eq("userId", userId))
+      .collect();
+
+    const voiceNoteCount = allMemos.filter(
+      (memo) => memo.clientCreatedAt >= startOfDay && memo.clientCreatedAt <= endOfDay
+    ).length;
+
+    // Build priority breakdown
+    const byPriority: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 };
+    for (const task of tasks) {
+      byPriority[task.priority] = (byPriority[task.priority] || 0) + 1;
+    }
+
+    return {
+      date: targetDate.toISOString().split("T")[0],
+      tasks,
+      events,
+      voiceNoteCount,
+      summary: {
+        totalTasks: tasks.length,
+        totalEvents: events.length,
+        topPriorityCount: tasks.filter((t) => t.isTopPriority).length,
+        dueOnDateCount: tasks.filter((t) => t.dueOnDate).length,
+        byPriority,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 9: GET WEEKLY AGENDA ====================
+
+/**
+ * Get weekly agenda for a user
+ * Returns tasks and events for the next 7 days grouped by date + AI weekly summary
+ * Uses localTime to determine "today" accurately for user's timezone
+ * Optimized for voice responses
+ */
+export const getWeeklyAgendaInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    startDate: v.optional(v.string()),
+    localTime: v.optional(v.string()), // User's local time in ISO format
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    // Parse start date or use localTime or server time
+    // Priority: explicit startDate > localTime > server time
+    let startDateObj: Date;
+    if (args.startDate) {
+      startDateObj = new Date(args.startDate);
+    } else if (args.localTime) {
+      startDateObj = new Date(args.localTime);
+    } else {
+      startDateObj = new Date();
+    }
+
+    const startOfStartDay = new Date(
+      startDateObj.getFullYear(),
+      startDateObj.getMonth(),
+      startDateObj.getDate()
+    ).getTime();
+    const endOfWeek = startOfStartDay + 7 * 24 * 60 * 60 * 1000 - 1;
+
+    // Get all issues for the user
+    const allIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Filter: tasks due within the 7-day window
+    // Exclude done/cancelled
+    const relevantTasks = allIssues.filter((issue) => {
+      if (issue.status === "done" || issue.status === "cancelled") return false;
+      if (!issue.dueDate) return false;
+
+      return issue.dueDate >= startOfStartDay && issue.dueDate <= endOfWeek;
+    });
+
+    // Get project info for tasks
+    const projectIds = [...new Set(relevantTasks.map((t) => t.projectId).filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined))];
+    const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
+    const projectMap = new Map(projects.filter(Boolean).map((p) => [p!._id, p!]));
+
+    // Define task type for grouping
+    type TaskEntry = {
+      identifier: string;
+      title: string;
+      status: string;
+      priority: string;
+      isTopPriority: boolean;
+      projectName: string;
+    };
+
+    // Define event type for grouping
+    type EventEntry = {
+      title: string;
+      startTime: string;
+      endTime: string;
+      isAllDay: boolean;
+      location: string | null;
+    };
+
+    // Initialize tasksByDay and eventsByDay for all 7 days
+    const tasksByDay: Record<string, TaskEntry[]> = {};
+    const eventsByDay: Record<string, EventEntry[]> = {};
+
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(startOfStartDay + i * 24 * 60 * 60 * 1000);
+      const dateKey = dayDate.toISOString().split("T")[0];
+      tasksByDay[dateKey] = [];
+      eventsByDay[dateKey] = [];
+    }
+
+    // Sort tasks into their respective days
+    for (const task of relevantTasks) {
+      if (!task.dueDate) continue;
+
+      const dueDate = new Date(task.dueDate);
+      const dateKey = dueDate.toISOString().split("T")[0];
+
+      if (tasksByDay[dateKey]) {
+        const project = task.projectId ? projectMap.get(task.projectId) : undefined;
+        tasksByDay[dateKey].push({
+          identifier: task.identifier,
+          title: task.title,
+          status: task.status,
+          priority: task.priority,
+          isTopPriority: task.isTopPriority || false,
+          projectName: project?.name ?? "",
+        });
+      }
+    }
+
+    // Sort tasks within each day by priority
+    for (const dateKey of Object.keys(tasksByDay)) {
+      tasksByDay[dateKey].sort((a, b) => {
+        if (a.isTopPriority && !b.isTopPriority) return -1;
+        if (!a.isTopPriority && b.isTopPriority) return 1;
+
+        const priorityDiff =
+          PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] -
+          PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER];
+        return priorityDiff;
+      });
+    }
+
+    // Get calendar events for the week
+    const allEvents = await ctx.db
+      .query("lifeos_calendarEvents")
+      .withIndex("by_user_start_time", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Filter events that overlap with the 7-day window and are not cancelled
+    const weekEvents = allEvents.filter((event) => {
+      if (event.status === "cancelled") return false;
+      // Event overlaps if it starts before end of week and ends after start of week
+      return event.startTime <= endOfWeek && event.endTime >= startOfStartDay;
+    });
+
+    // Sort events into their respective days
+    for (const event of weekEvents) {
+      // For multi-day events, add to each day they span
+      const eventStartDate = new Date(event.startTime);
+      const eventEndDate = new Date(event.endTime);
+
+      for (let i = 0; i < 7; i++) {
+        const dayStart = startOfStartDay + i * 24 * 60 * 60 * 1000;
+        const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
+        const dateKey = new Date(dayStart).toISOString().split("T")[0];
+
+        // Check if event overlaps with this day
+        if (event.startTime <= dayEnd && event.endTime >= dayStart) {
+          if (eventsByDay[dateKey]) {
+            eventsByDay[dateKey].push({
+              title: event.title,
+              startTime: eventStartDate.toISOString(),
+              endTime: eventEndDate.toISOString(),
+              isAllDay: event.isAllDay || false,
+              location: event.location ?? null,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort events within each day by start time
+    for (const dateKey of Object.keys(eventsByDay)) {
+      eventsByDay[dateKey].sort((a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+    }
+
+    // Try to get weekly summary if available
+    // Calculate the Monday of the week for the start date
+    const weekStart = new Date(startOfStartDay);
+    const dayOfWeek = weekStart.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to Monday
+    const mondayDate = new Date(startOfStartDay + mondayOffset * 24 * 60 * 60 * 1000);
+    const weekStartDateStr = mondayDate.toISOString().split("T")[0];
+
+    // Query for existing weekly summary using weekStartDate
+    const weeklySummaries = await ctx.db
+      .query("lifeos_weeklySummaries")
+      .withIndex("by_user_week", (q) => q.eq("userId", userId).eq("weekStartDate", weekStartDateStr))
+      .first();
+
+    // Build stats across all days
+    const byPriority: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 };
+    let totalTasks = 0;
+    let totalEvents = 0;
+    let daysWithTasks = 0;
+    let daysWithEvents = 0;
+
+    for (const dateKey of Object.keys(tasksByDay)) {
+      const dayTasks = tasksByDay[dateKey];
+      const dayEvents = eventsByDay[dateKey];
+
+      if (dayTasks.length > 0) {
+        daysWithTasks++;
+        totalTasks += dayTasks.length;
+        for (const task of dayTasks) {
+          byPriority[task.priority] = (byPriority[task.priority] || 0) + 1;
+        }
+      }
+
+      if (dayEvents.length > 0) {
+        daysWithEvents++;
+        totalEvents += dayEvents.length;
+      }
+    }
+
+    const endDate = new Date(endOfWeek);
+
+    return {
+      startDate: startDateObj.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
+      tasksByDay,
+      eventsByDay,
+      weekSummary: weeklySummaries?.aiSummary ?? null,
+      stats: {
+        totalTasks,
+        totalEvents,
+        daysWithTasks,
+        daysWithEvents,
+        byPriority,
+      },
       generatedAt: new Date().toISOString(),
     };
   },
