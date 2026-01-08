@@ -1,8 +1,6 @@
 import { useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 import { useState, useRef } from "react";
-
-// Check if running in Tauri
-const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+import { isTauri, isCapacitor } from "@/lib/platform";
 
 export function SignIn() {
   const { signIn, isLoaded: isSignInLoaded } = useSignIn();
@@ -204,6 +202,39 @@ export function SignIn() {
 
         // Open the OAuth URL in external browser
         await open(externalUrl.toString());
+
+      } else if (isCapacitor) {
+        // For Capacitor (iOS/Android): Use URL scheme callback
+        console.log("[SignIn] Using Capacitor OAuth flow with URL scheme callback...");
+
+        // Import Capacitor Browser plugin
+        const { Browser } = await import("@capacitor/browser");
+
+        // Create the OAuth sign-in with custom URL scheme redirect
+        const redirectUrl = "lifeos://callback";
+        console.log("[SignIn] Creating OAuth flow with redirect:", redirectUrl);
+
+        const result = await signIn.create({
+          strategy: "oauth_google",
+          redirectUrl,
+        });
+
+        console.log("[SignIn] signIn.create result:", result);
+
+        // Get the external verification URL
+        const externalUrl = result.firstFactorVerification?.externalVerificationRedirectURL;
+
+        if (!externalUrl) {
+          throw new Error("No external verification URL returned from Clerk");
+        }
+
+        console.log("[SignIn] Opening in-app browser:", externalUrl);
+
+        // Open in in-app browser - AppUrlListener will handle the callback
+        await Browser.open({ url: externalUrl.toString() });
+
+        // Note: The AppUrlListener component handles the OAuth callback
+        // and completes the authentication flow
 
       } else {
         // For web: Use standard redirect flow

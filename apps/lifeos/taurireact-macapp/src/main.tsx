@@ -11,10 +11,9 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
 import LifeOSApp from "./LifeOSApp";
 import { ConfigProvider } from "./lib/config";
+import { isTauri, isCapacitor } from "./lib/platform";
+import { AppUrlListener } from "./components/auth/AppUrlListener";
 import "./App.css";
-
-// Check if running in Tauri
-const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -42,13 +41,17 @@ async function initializeApp() {
       <ClerkProvider
         {...(clerkInstance ? { Clerk: clerkInstance as any } : {})}
         publishableKey={clerkPublishableKey}
-        allowedRedirectProtocols={isTauri ? ["tauri:"] : undefined}
+        allowedRedirectProtocols={
+          isTauri ? ["tauri:"] : isCapacitor ? ["lifeos:"] : undefined
+        }
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
           <ConfigProvider>
             <HashRouter>
+              {/* Capacitor URL listener for OAuth callbacks */}
+              {isCapacitor && <AppUrlListener />}
               <Routes>
-                {/* On web, redirect / to /lifeos. On Tauri, show menu bar app */}
+                {/* On web/Capacitor, redirect / to /lifeos. On Tauri, show menu bar app */}
                 <Route
                   path="/"
                   element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
