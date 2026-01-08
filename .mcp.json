@@ -1,12 +1,3 @@
 {
-  "mcpServers": {
-    "dokploy-mcp": {
-      "command": "npx",
-      "args": ["-y", "@ahdev/dokploy-mcp"],
-      "env": {
-        "DOKPLOY_URL": "https://app.dokploy.com/api",
-        "DOKPLOY_API_KEY": "MjWBcxlnAVDRWruRDJVyIvGxBmdqJySeSShOBuphELeCCRYjcjdkxvyuZafiwDnH"
-      }
-    }
-  }
-}           
+  "mcpServers": {}
+}

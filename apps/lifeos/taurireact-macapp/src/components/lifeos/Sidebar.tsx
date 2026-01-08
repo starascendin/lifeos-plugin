@@ -12,13 +12,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSidebar } from "@/lib/contexts/SidebarContext";
-import { useTheme } from "@/lib/contexts/ThemeContext";
 import { useVoiceAgent } from "@/lib/contexts/VoiceAgentContext";
 import { cn } from "@/lib/utils";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Bot,
+  Box,
   Calendar,
   ChevronDown,
   ChevronLeft,
@@ -29,17 +29,16 @@ import {
   Globe,
   Headphones,
   Kanban,
+  Mic,
   Network,
   LayoutDashboard,
   ListTodo,
   LogOut,
   MessageSquare,
-  Moon,
   FolderKanban,
   RefreshCw,
   Settings,
   Sparkles,
-  Sun,
   Target,
   User,
   UserCircle,
@@ -66,9 +65,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const { signOut } = useClerk();
   const { user } = useUser();
   const { isCollapsed, toggleSidebar, closeMobileSidebar } = useSidebar();
-  const { resolvedTheme, setTheme } = useTheme();
   const { connectionState, connect, disconnect, isConfigured } = useVoiceAgent();
-  const [mounted, setMounted] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(["Projects"]);
 
   const signOutToLifeOS = async () => {
@@ -81,10 +78,6 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
 
   // Track previous pathname to detect actual route changes
   const prevPathnameRef = useRef(pathname);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Close mobile sidebar on route change (not on initial mount)
   useEffect(() => {
@@ -103,12 +96,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const navigation: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
       { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
-      { name: "Proxy Council", href: "/lifeos/proxy-council", icon: Network },
-      { name: "Council API", href: "/lifeos/council-api", icon: Cpu },
-      { name: "Atlas", href: "/lifeos/atlas", icon: Globe },
       { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
-      { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
-      { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
       {
         name: "Projects",
         href: "/lifeos/pm",
@@ -121,10 +109,43 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
       },
       { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
       { name: "Habits", href: "/lifeos/habits", icon: Target },
-      { name: "Avatar", href: "/lifeos/avatar", icon: UserCircle },
-      { name: "Voice Agent", href: "/lifeos/voiceagent", icon: Headphones },
-      { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
-      { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
+      {
+        name: "3D Views",
+        href: "/lifeos/atlas",
+        icon: Box,
+        children: [
+          { name: "Atlas", href: "/lifeos/atlas", icon: Globe },
+          { name: "Avatar", href: "/lifeos/avatar", icon: UserCircle },
+        ],
+      },
+      {
+        name: "LLM Councils",
+        href: "/lifeos/proxy-council",
+        icon: Users,
+        children: [
+          { name: "Proxy Council", href: "/lifeos/proxy-council", icon: Network },
+          { name: "Council API", href: "/lifeos/council-api", icon: Cpu },
+          { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
+          { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
+        ],
+      },
+      {
+        name: "Voice AI",
+        href: "/lifeos/voiceagent",
+        icon: Headphones,
+        children: [
+          { name: "Voice Agent", href: "/lifeos/voiceagent", icon: Headphones },
+          { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
+        ],
+      },
+      {
+        name: "Voice Notes",
+        href: "/lifeos/voicenotes",
+        icon: Mic,
+        children: [
+          { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
+        ],
+      },
       { name: "Settings", href: "/lifeos/settings", icon: Settings },
       {
         name: "Logout",
@@ -251,12 +272,21 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           )}
         >
           {navigation.map((item) => {
+            const hasChildren = item.children && item.children.length > 0;
+            // Check if any child route is active
+            const isChildActive = hasChildren
+              ? item.children!.some(
+                  (child) =>
+                    pathname === child.href ||
+                    (child.href !== "/lifeos" && pathname?.startsWith(`${child.href}/`))
+                )
+              : false;
             const isActive =
               item.href
                 ? pathname === item.href ||
-                  (item.href !== "/lifeos" && pathname?.startsWith(`${item.href}/`))
-                : false;
-            const hasChildren = item.children && item.children.length > 0;
+                  (item.href !== "/lifeos" && pathname?.startsWith(`${item.href}/`)) ||
+                  isChildActive
+                : isChildActive;
             const isExpanded = expandedSections.includes(item.name);
 
             // For items with children, render expandable section
@@ -351,53 +381,6 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
             );
           })}
         </nav>
-
-        {/* Theme Toggle */}
-        <div
-          className={cn(
-            "border-sidebar-border border-t",
-            effectiveCollapsed ? "p-2" : "px-4 py-3",
-          )}
-        >
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size={effectiveCollapsed ? "icon" : "default"}
-                onClick={() =>
-                  setTheme(resolvedTheme === "dark" ? "light" : "dark")
-                }
-                className={cn("w-full", !effectiveCollapsed && "justify-start")}
-              >
-                {mounted ? (
-                  resolvedTheme === "dark" ? (
-                    <>
-                      <Sun className="h-5 w-5" />
-                      {!effectiveCollapsed && <span className="ml-3">Light Mode</span>}
-                    </>
-                  ) : (
-                    <>
-                      <Moon className="h-5 w-5" />
-                      {!effectiveCollapsed && <span className="ml-3">Dark Mode</span>}
-                    </>
-                  )
-                ) : (
-                  <>
-                    <Sun className="h-5 w-5" />
-                    {!effectiveCollapsed && <span className="ml-3">Toggle Theme</span>}
-                  </>
-                )}
-              </Button>
-            </TooltipTrigger>
-            {effectiveCollapsed && mounted && (
-              <TooltipContent side="right">
-                {resolvedTheme === "dark"
-                  ? "Switch to light mode"
-                  : "Switch to dark mode"}
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </div>
 
         {/* User Profile */}
         {user && (
