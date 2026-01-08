@@ -210,11 +210,24 @@ export function SignIn() {
         // Import Capacitor Browser plugin
         const { Browser } = await import("@capacitor/browser");
 
-        // Create the OAuth sign-in with custom URL scheme redirect
-        const redirectUrl = "lifeos://callback";
+        // Clerk validates `redirect_url` as http(s). For Capacitor, we use an http(s)
+        // callback page that then deep-links back into the app (lifeos://callback).
+        const redirectUrlFromEnv = import.meta.env
+          .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
+        const defaultRedirectUrl = window.location.origin.startsWith("http")
+          ? `${window.location.origin}/clerk-callback.html`
+          : undefined;
+
+        const redirectUrl = redirectUrlFromEnv ?? defaultRedirectUrl;
+        if (!redirectUrl || !/^https?:\/\//.test(redirectUrl)) {
+          throw new Error(
+            "Invalid OAuth redirect URL for Capacitor. Set VITE_CLERK_OAUTH_REDIRECT_URL to an http(s) URL (e.g. http://localhost:1420/clerk-callback.html) and ensure the app is served from that origin."
+          );
+        }
+
         console.log("[SignIn] Creating OAuth flow with redirect:", redirectUrl);
 
-        const result = await signIn.create({
+        const result = await (signIn as any).create({
           strategy: "oauth_google",
           redirectUrl,
         });

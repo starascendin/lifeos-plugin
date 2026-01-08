@@ -1,0 +1,8 @@
+{
+  "name": "beeperdb",
+  "private": true,
+  "scripts": {
+    "clone:whatsapp": "bash ./beeperdb.sh clone",
+    "latest50": "bash ./beeperdb.sh latest50"
+  }
+}

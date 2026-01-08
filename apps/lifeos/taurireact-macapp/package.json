@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mobile": "vite --host 0.0.0.0 --port 1420",
     "build": "tsc && vite build",
     "build:staging": "tsc && vite build --mode staging",
     "build:production": "tsc && vite build --mode production",
@@ -26,9 +27,13 @@
     "env:update:staging": "./scripts/update-vercel-env.sh --target staging --file",
     "env:update:production": "./scripts/update-vercel-env.sh --target production --file",
     "cap:sync": "npx cap sync",
+    "cap:sync:dev": "CAP_SERVER_URL=http://localhost:1420 npx cap sync",
     "cap:open:ios": "npx cap open ios",
+    "cap:open:ios:dev": "CAP_SERVER_URL=http://localhost:1420 npx cap open ios",
     "cap:open:android": "npx cap open android",
-    "build:mobile": "vite build && npx cap sync"
+    "build:mobile": "vite build --mode development && npx cap sync",
+    "build:mobile:staging": "vite build --mode staging && npx cap sync",
+    "build:mobile:production": "vite build --mode production && npx cap sync"
   },
   "dependencies": {
     "@capacitor/app": "^7.0.0",

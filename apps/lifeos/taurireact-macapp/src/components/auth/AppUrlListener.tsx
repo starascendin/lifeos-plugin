@@ -23,6 +23,14 @@ export function AppUrlListener() {
       console.log("[AppUrlListener] URL opened:", event.url);
 
       try {
+        // Close the in-app browser if this deep link came from an OAuth flow.
+        try {
+          const { Browser } = await import("@capacitor/browser");
+          await Browser.close();
+        } catch {
+          // Ignore (plugin may be unavailable on some platforms).
+        }
+
         const url = new URL(event.url);
 
         // Handle OAuth callback - check for both path formats
