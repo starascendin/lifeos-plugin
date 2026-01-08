@@ -14,8 +14,8 @@ import { useTheme } from "@/lib/contexts/ThemeContext";
 import { useApiKeys } from "@/lib/hooks/useApiKeys";
 import { useUser } from "@clerk/clerk-react";
 import { api } from "@holaai/convex";
-import { useAction, useQuery } from "convex/react";
-import { Check, CheckCircle, Eye, EyeOff, ExternalLink, Key, Loader2, Mic, Monitor, Moon, Settings2, Sun, Trash2, XCircle } from "lucide-react";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { Check, CheckCircle, Clock, Coins, Eye, EyeOff, ExternalLink, History, Infinity, Key, Loader2, Mic, Monitor, Moon, Send, Settings2, Sparkles, Sun, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useConfig } from "@/lib/config";
 
@@ -159,6 +159,22 @@ function SettingsContent() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* AI Credits & Usage */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            AI Credits & Usage
+          </CardTitle>
+          <CardDescription>
+            Monitor your AI credit balance and usage history
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AICreditsSection />
         </CardContent>
       </Card>
 
@@ -567,6 +583,255 @@ function EnvVarRow({
       ) : (
         <span className="text-xs text-muted-foreground italic">Not set</span>
       )}
+    </div>
+  );
+}
+
+function AICreditsSection() {
+  const credits = useQuery(api.common.credits.getMyCredits);
+  const transactions = useQuery(api.common.credits.getMyTransactions, { limit: 20 });
+  const pendingRequest = useQuery(api.common.credits.getMyPendingRequest);
+  const requestCredits = useMutation(api.common.credits.requestCredits);
+
+  const [requestMessage, setRequestMessage] = useState("");
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
+
+  const handleRequestCredits = async () => {
+    if (!requestMessage.trim()) return;
+    setIsRequesting(true);
+    try {
+      await requestCredits({ message: requestMessage.trim() });
+      setRequestMessage("");
+      setShowRequestForm(false);
+    } catch (error) {
+      console.error("Failed to request credits:", error);
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
+  if (credits === undefined) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>Loading credit info...</span>
+      </div>
+    );
+  }
+
+  // Format numbers for display
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(2)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(2)}K`;
+    return num.toLocaleString();
+  };
+
+  // Format date for display
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Get feature display name
+  const getFeatureDisplayName = (feature?: string) => {
+    const featureNames: Record<string, string> = {
+      agenda_daily_summary: "Daily Summary",
+      agenda_weekly_summary: "Weekly Summary",
+      pm_agent: "PM Agent",
+      demo_agent: "Demo Agent",
+      chatnexus: "Chat Nexus",
+      llm_council: "LLM Council",
+      holaai_lesson: "AI Lesson",
+      holaai_conversation: "Conversation",
+      holaai_suggestions: "Suggestions",
+      holaai_voice: "Voice Agent",
+    };
+    return feature ? featureNames[feature] || feature : "Unknown";
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Credit Balance */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <Coins className="h-4 w-4" />
+            Current Balance
+          </div>
+          <div className="flex items-center gap-2">
+            {credits?.hasUnlimitedAccess ? (
+              <>
+                <Infinity className="h-6 w-6 text-green-500" />
+                <span className="text-2xl font-bold text-green-500">Unlimited</span>
+              </>
+            ) : (
+              <span className={`text-2xl font-bold ${credits?.balance === 0 ? "text-red-500" : ""}`}>
+                {formatNumber(credits?.balance || 0)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <History className="h-4 w-4" />
+            Total Used
+          </div>
+          <span className="text-2xl font-bold">
+            {formatNumber(credits?.totalConsumed || 0)}
+          </span>
+        </div>
+
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <Sparkles className="h-4 w-4" />
+            Total Granted
+          </div>
+          <span className="text-2xl font-bold">
+            {formatNumber(credits?.totalGranted || 0)}
+          </span>
+        </div>
+      </div>
+
+      {/* Pending Request Status */}
+      {pendingRequest && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950 p-4">
+          <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+            <Clock className="h-4 w-4" />
+            <span className="font-medium">Credit Request Pending</span>
+          </div>
+          <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+            Your request is being reviewed. Submitted on{" "}
+            {new Date(pendingRequest.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+      )}
+
+      {/* Request Credits Button (only show if not unlimited and no pending request) */}
+      {!credits?.hasUnlimitedAccess && !pendingRequest && (
+        <div className="space-y-3">
+          {!showRequestForm ? (
+            <Button
+              variant="outline"
+              onClick={() => setShowRequestForm(true)}
+              className="gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Request Credits
+            </Button>
+          ) : (
+            <div className="space-y-3 rounded-lg border p-4">
+              <Label htmlFor="request-message">Why do you need credits?</Label>
+              <textarea
+                id="request-message"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                rows={3}
+                placeholder="Tell us how you plan to use LifeOS AI features..."
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleRequestCredits}
+                  disabled={isRequesting || !requestMessage.trim()}
+                >
+                  {isRequesting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Request"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowRequestForm(false);
+                    setRequestMessage("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Usage History */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium flex items-center gap-2">
+          <History className="h-4 w-4" />
+          Recent AI Usage
+        </h4>
+
+        {transactions === undefined ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading transactions...
+          </div>
+        ) : transactions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No AI usage recorded yet. Start using AI features to see your history here.
+          </p>
+        ) : (
+          <div className="rounded-lg border overflow-hidden">
+            <div className="max-h-[400px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">Time</th>
+                    <th className="px-4 py-2 text-left font-medium">Feature</th>
+                    <th className="px-4 py-2 text-left font-medium">Model</th>
+                    <th className="px-4 py-2 text-right font-medium">Tokens</th>
+                    <th className="px-4 py-2 text-right font-medium">Credits</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {transactions.map((tx) => (
+                    <tr key={tx._id} className="hover:bg-muted/30">
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {formatDate(tx.createdAt)}
+                      </td>
+                      <td className="px-4 py-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {getFeatureDisplayName(tx.feature)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2 text-muted-foreground font-mono text-xs">
+                        {tx.model || "-"}
+                      </td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">
+                        {tx.tokenUsage?.totalTokens
+                          ? formatNumber(tx.tokenUsage.totalTokens)
+                          : "-"}
+                      </td>
+                      <td className={`px-4 py-2 text-right font-medium ${
+                        tx.type === "deduction" ? "text-red-500" : "text-green-500"
+                      }`}>
+                        {tx.type === "deduction" ? "-" : "+"}
+                        {formatNumber(Math.abs(tx.amount))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
