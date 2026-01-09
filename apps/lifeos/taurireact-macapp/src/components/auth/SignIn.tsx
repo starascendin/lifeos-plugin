@@ -225,33 +225,34 @@ export function SignIn() {
         // So: open a hosted "/#/cap-oauth-start" route in the system browser, which
         // performs `signIn.create({ redirectUrl })` and then redirects to Google.
         //
-        // After Google consent, Clerk redirects to our callback page
-        // ("/clerk-callback.html"), which deep-links back into the app (lifeos://callback).
-        const redirectUrlFromEnv = import.meta.env
+        // After Google consent, Clerk must redirect back into the app with a
+        // `rotating_token_nonce` query param so the app can reload the sign-in attempt.
+        //
+        // With Clerk Native API enabled, this can be a custom scheme redirect:
+        //   lifeos://callback?rotating_token_nonce=...
+        //
+        // We still start OAuth in the system browser via a hosted "/#/cap-oauth-start" page
+        // to keep the flow in a single browser session.
+        const redirectUrlForClerk = "lifeos://callback";
+
+        const envRedirectUrl = import.meta.env
           .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
-        const defaultRedirectUrl = window.location.origin.startsWith("http")
-          ? `${window.location.origin}/clerk-callback.html`
-          : undefined;
 
-        const redirectUrl = redirectUrlFromEnv ?? defaultRedirectUrl;
-        if (!redirectUrl || !/^https?:\/\//.test(redirectUrl)) {
+        const startOrigin = window.location.origin.startsWith("http")
+          ? window.location.origin
+          : envRedirectUrl && /^https?:\/\//.test(envRedirectUrl)
+            ? new URL(envRedirectUrl).origin
+            : undefined;
+
+        if (!startOrigin) {
           throw new Error(
-            "Invalid OAuth redirect URL for Capacitor. Set VITE_CLERK_OAUTH_REDIRECT_URL to an http(s) URL (e.g. http://localhost:1420/clerk-callback.html) and ensure the app is served from that origin."
+            "Cannot determine OAuth start origin for Capacitor. Ensure the app is served from an http(s) origin (e.g. CAP_SERVER_URL in dev or CAP_SERVER_URL_PROD in prod), or set VITE_CLERK_OAUTH_REDIRECT_URL to an http(s) URL so its origin can be used."
           );
         }
 
-        let capOrigin: string;
-        try {
-          capOrigin = new URL(redirectUrl).origin;
-        } catch {
-          throw new Error(
-            "Invalid VITE_CLERK_OAUTH_REDIRECT_URL. It must be a full http(s) URL to /clerk-callback.html."
-          );
-        }
-
-        const startUrl = new URL(`${capOrigin}/#/cap-oauth-start`);
+        const startUrl = new URL(`${startOrigin}/#/cap-oauth-start`);
         startUrl.searchParams.set("strategy", "oauth_google");
-        startUrl.searchParams.set("redirect_url", redirectUrl);
+        startUrl.searchParams.set("redirect_url", redirectUrlForClerk);
 
         console.log("[SignIn] Opening OAuth start page:", startUrl.toString());
 

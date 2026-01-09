@@ -27,16 +27,24 @@ export function CapOAuthStart() {
         const redirectUrlFromEnv = import.meta.env
           .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
 
-        const defaultRedirectUrl = window.location.origin.startsWith("http")
-          ? `${window.location.origin}/clerk-callback.html`
-          : undefined;
-
-        const redirectUrl =
-          redirectUrlFromQuery ?? redirectUrlFromEnv ?? defaultRedirectUrl;
-
-        if (!redirectUrl || !/^https?:\/\//.test(redirectUrl)) {
+        const redirectUrl = redirectUrlFromQuery ?? redirectUrlFromEnv;
+        if (!redirectUrl) {
           throw new Error(
-            "Invalid redirect_url. Provide ?redirect_url=https://<origin>/clerk-callback.html (or set VITE_CLERK_OAUTH_REDIRECT_URL)."
+            "Missing redirect_url. Provide ?redirect_url=lifeos://callback (recommended) or set VITE_CLERK_OAUTH_REDIRECT_URL."
+          );
+        }
+
+        let protocol: string;
+        try {
+          protocol = new URL(redirectUrl).protocol;
+        } catch {
+          throw new Error("Invalid redirect_url. It must be a valid URL.");
+        }
+
+        const allowedProtocols = new Set(["http:", "https:", "lifeos:"]);
+        if (!allowedProtocols.has(protocol)) {
+          throw new Error(
+            `Invalid redirect_url protocol (${protocol}). Expected http(s) or lifeos://.`
           );
         }
 
@@ -133,4 +141,3 @@ export function CapOAuthStart() {
     </div>
   );
 }
-

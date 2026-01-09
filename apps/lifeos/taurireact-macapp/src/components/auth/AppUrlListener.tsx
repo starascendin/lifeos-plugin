@@ -49,7 +49,9 @@ export function AppUrlListener() {
           }
 
           // Extract the rotating token nonce from URL
-          let rotatingTokenNonce = url.searchParams.get("rotating_token_nonce");
+          let rotatingTokenNonce =
+            url.searchParams.get("rotating_token_nonce") ??
+            url.searchParams.get("rotatingTokenNonce");
 
           // If not in query string, check hash fragment
           if (!rotatingTokenNonce && url.hash) {
