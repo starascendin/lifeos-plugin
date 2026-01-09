@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-const capServerUrl = process.env.CAP_SERVER_URL;
+const capServerUrl = (process.env.CAP_SERVER_URL || "").trim() || undefined;
 const isProd = process.env.CAP_ENV === "prod";
 
 const config: CapacitorConfig = {

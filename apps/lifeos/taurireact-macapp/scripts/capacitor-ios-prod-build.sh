@@ -59,4 +59,3 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 
 echo "[cap:ios:prod:build] Built: $APP_PATH"
-

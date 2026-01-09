@@ -14,12 +14,18 @@ This repo uses an **HTTP(S) callback page** (`public/clerk-callback.html`) that 
 - `VITE_CLERK_PUBLISHABLE_KEY=pk_test_...`
 - `VITE_CONVEX_URL=https://...convex.cloud`
 - `VITE_CLERK_OAUTH_REDIRECT_URL=http://localhost:1420/clerk-callback.html`
+- Optional (recommended for Capacitor): `CAP_SERVER_URL=http://localhost:1420`
 
 ### Production (`.env.production`)
 
 - `VITE_CLERK_PUBLISHABLE_KEY=pk_live_...`
 - `VITE_CONVEX_URL=https://...convex.cloud`
 - `VITE_CLERK_OAUTH_REDIRECT_URL=https://<your-vercel-domain>/clerk-callback.html`
+- Recommended: `CAP_SERVER_URL_PROD=https://<your-vercel-domain>`
+
+Notes:
+- `npx cap sync` does **not** automatically load Vite `.env*` files. In this repo, production sync is done via `./scripts/cap-sync-prod.sh`, which loads `.env.production` and sets `CAP_SERVER_URL` for the sync.
+- If `CAP_SERVER_URL_PROD` is not set, the script will derive the origin from `VITE_CLERK_OAUTH_REDIRECT_URL`.
 
 Why the redirect URL must be `http(s)`:
 - Clerk rejects non-`http(s)` OAuth redirect URLs (e.g. `lifeos://callback`) with `invalid_url_scheme`.
@@ -65,7 +71,6 @@ This helps cookie/session behavior in native WebViews.
 `ios/App/App/Info.plist` includes:
 - `NSAppTransportSecurity` exceptions (Clerk + localhost)
 - Cookie accept policy (`NSHTTPCookieAcceptPolicyAlways`)
-- `WKAppBoundDomains` (Clerk domains)
 
 These match the working reference configuration from the Capacitor Clerk tutorial project.
 
@@ -115,8 +120,8 @@ Terminal B:
 
 ```bash
 cd apps/lifeos/taurireact-macapp
-pnpm cap:sync:dev
-pnpm cap:open:ios:dev
+CAP_SERVER_URL=http://localhost:1420 pnpm cap:sync
+pnpm cap:open:ios
 ```
 
 If you still see old behavior, uninstall the sim app:
@@ -138,6 +143,7 @@ Deploy the web app to Vercel and confirm:
 
 Then set:
 - `VITE_CLERK_OAUTH_REDIRECT_URL=https://<your-vercel-domain>/clerk-callback.html` in `.env.production`
+- (Recommended) `CAP_SERVER_URL_PROD=https://<your-vercel-domain>` in `.env.production`
 
 ### B) Build (Release)
 
@@ -182,4 +188,3 @@ Cause:
 
 Fix:
 - Do not pass YouTube scopes in `signIn.create`. If you need extra Google scopes, do a separate post-sign-in consent/reauthorize flow.
-
