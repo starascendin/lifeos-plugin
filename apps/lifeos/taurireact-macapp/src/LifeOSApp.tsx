@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { SignIn } from "./components/auth/SignIn";
@@ -39,6 +40,27 @@ export default function LifeOSApp() {
         event.preventDefault();
         await appWindow.hide();
       });
+
+      // Check Full Disk Access permission for Voice Memos
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const hasPermission = await invoke<boolean>("check_voicememos_permission");
+
+        if (!hasPermission) {
+          toast.warning("Full Disk Access Required", {
+            description: "Grant Full Disk Access to sync Voice Memos from macOS.",
+            duration: Infinity,
+            action: {
+              label: "Open Settings",
+              onClick: async () => {
+                await invoke("open_full_disk_access_settings");
+              },
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Failed to check voice memos permission:", error);
+      }
 
       return unlisten;
     };

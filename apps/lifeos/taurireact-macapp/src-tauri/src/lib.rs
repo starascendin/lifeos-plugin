@@ -31,8 +31,8 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 use tokio::time::sleep;
 use voicememos::{
-    check_transcription_eligibility, get_voicememo, get_voicememos, sync_voicememos,
-    transcribe_voicememo, transcribe_voicememos_batch,
+    check_transcription_eligibility, check_voicememos_permission, get_voicememo, get_voicememos,
+    sync_voicememos, transcribe_voicememo, transcribe_voicememos_batch,
 };
 use youtube::fetch_youtube_transcript;
 
@@ -290,6 +290,7 @@ pub fn run() {
             transcribe_voicememo,
             transcribe_voicememos_batch,
             check_transcription_eligibility,
+            check_voicememos_permission,
             // Council Server
             start_council_server,
             stop_council_server,

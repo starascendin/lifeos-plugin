@@ -434,6 +434,22 @@ export const upsertTranscriptBatch = mutation({
   },
 });
 
+/**
+ * Get the GROQ API key for local (Tauri) transcription
+ * Returns the key from server environment variables
+ */
+export const getGroqApiKey = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireUser(ctx);
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return null;
+    }
+    return apiKey;
+  },
+});
+
 // ==================== ACTIONS ====================
 
 /**

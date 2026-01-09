@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { useConvex, useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { Id } from "@holaai/convex/convex/_generated/dataModel";
@@ -137,6 +138,9 @@ export function VoiceMemosTab() {
   );
   const syncedUuidSet = new Set(syncedMemos?.map((m) => m.localId) ?? []);
 
+  // Query GROQ API key from Convex
+  const groqApiKey = useQuery(api.lifeos.voicememo.getGroqApiKey, {});
+
   // Extraction dialog state
   const [extractionDialogOpen, setExtractionDialogOpen] = useState(false);
   const [extractionMemo, setExtractionMemo] = useState<{
@@ -191,19 +195,41 @@ export function VoiceMemosTab() {
   const handleTranscribe = async () => {
     if (selectedIds.size === 0) return;
 
+    // Check for API key first
+    if (!groqApiKey) {
+      toast.error("GROQ API Key Not Configured", {
+        description: "Please set GROQ_API_KEY in your Convex environment variables.",
+        duration: 10000,
+      });
+      return;
+    }
+
     setIsTranscribing(true);
     setTranscriptionProgress(null);
     setTranscriptionErrors([]);
 
     try {
       const memoIds = Array.from(selectedIds);
-      const results = await transcribeVoiceMemosBatch(memoIds, setTranscriptionProgress);
+      const results = await transcribeVoiceMemosBatch(memoIds, groqApiKey, setTranscriptionProgress);
 
       // Capture any failed transcriptions
       const failed = results.filter(r => !r.success && r.error);
       if (failed.length > 0) {
         setTranscriptionErrors(failed);
         console.error("Transcription errors:", failed);
+
+        // Show toast for each failed transcription (or summarize if many)
+        if (failed.length === 1) {
+          toast.error("Transcription Failed", {
+            description: failed[0].error,
+            duration: 10000,
+          });
+        } else {
+          toast.error(`${failed.length} Transcriptions Failed`, {
+            description: failed[0].error,
+            duration: 10000,
+          });
+        }
       }
 
       // Count successful transcriptions
@@ -221,13 +247,18 @@ export function VoiceMemosTab() {
       }
     } catch (error) {
       console.error("Transcription error:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       setTranscriptionErrors([{
         memo_id: 0,
         transcription: "",
         language: null,
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       }]);
+      toast.error("Transcription Failed", {
+        description: errorMessage,
+        duration: 10000,
+      });
     } finally {
       setIsTranscribing(false);
       setTranscriptionProgress(null);

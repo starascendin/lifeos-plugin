@@ -357,6 +357,7 @@ export async function checkTranscriptionEligibility(
  */
 export async function transcribeVoiceMemo(
   memoId: number,
+  apiKey: string,
   onProgress?: (progress: TranscriptionProgress) => void
 ): Promise<TranscriptionResult> {
   if (!isTauri) {
@@ -366,6 +367,16 @@ export async function transcribeVoiceMemo(
       language: null,
       success: false,
       error: "Not running in Tauri",
+    };
+  }
+
+  if (!apiKey) {
+    return {
+      memo_id: memoId,
+      transcription: "",
+      language: null,
+      success: false,
+      error: "GROQ API key not configured. Please set GROQ_API_KEY in Convex environment.",
     };
   }
 
@@ -382,7 +393,7 @@ export async function transcribeVoiceMemo(
       }
     );
 
-    return await invoke<TranscriptionResult>("transcribe_voicememo", { memoId });
+    return await invoke<TranscriptionResult>("transcribe_voicememo", { memoId, apiKey });
   } finally {
     if (unlisten) {
       unlisten();
@@ -395,6 +406,7 @@ export async function transcribeVoiceMemo(
  */
 export async function transcribeVoiceMemosBatch(
   memoIds: number[],
+  apiKey: string,
   onProgress?: (progress: TranscriptionProgress) => void
 ): Promise<TranscriptionResult[]> {
   if (!isTauri) {
@@ -404,6 +416,16 @@ export async function transcribeVoiceMemosBatch(
       language: null,
       success: false,
       error: "Not running in Tauri",
+    }));
+  }
+
+  if (!apiKey) {
+    return memoIds.map((id) => ({
+      memo_id: id,
+      transcription: "",
+      language: null,
+      success: false,
+      error: "GROQ API key not configured. Please set GROQ_API_KEY in Convex environment.",
     }));
   }
 
@@ -420,6 +442,7 @@ export async function transcribeVoiceMemosBatch(
 
     return await invoke<TranscriptionResult[]>("transcribe_voicememos_batch", {
       memoIds,
+      apiKey,
     });
   } finally {
     if (unlisten) {

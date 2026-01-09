@@ -21,3 +21,8 @@ For any development in convex, make sure:
 
 For Voice Agent develop, read:
 - ai_notes/ai-agent-tools-guide.md
+
+
+
+!!! IMPORTANT !!!
+- RAISE YOUR RIGHT HAND 🙋‍♂️ AND SWEAR YOU HAVE READ ALL THE INSTRUCTIONS IN THIS DOC, AND ALL THE OTHER DOCS I HAVE INSTRUCTED YOU TO READ. REPEAT THE INSTRUCTIONS OUT LOUD.

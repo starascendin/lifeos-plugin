@@ -391,8 +391,11 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   // Track blob URLs to revoke only on unmount or when memos are removed
   const blobUrlsRef = useRef<Map<string, string>>(new Map());
 
-  // API keys for GROQ
+  // API keys for GROQ (from Tauri store for browser transcription)
   const { groqApiKey, hasGroqApiKey } = useApiKeys();
+
+  // GROQ API key from Convex (for Tauri transcription of exported memos)
+  const convexGroqApiKey = useQuery(api.lifeos.voicememo.getGroqApiKey, {});
 
   // Convex client for sync operations
   const convexClient = useConvex();
@@ -894,8 +897,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     try {
       if (memo.isExported && memo.exportedMemoId) {
         // Use Tauri backend for exported macOS Voice Memos
-        // The Tauri backend uses the GROQ API key from settings
-        const result = await transcribeExportedMemo(memo.exportedMemoId);
+        if (!convexGroqApiKey) {
+          throw new Error("GROQ API key not configured. Please set GROQ_API_KEY in Convex environment.");
+        }
+        const result = await transcribeExportedMemo(memo.exportedMemoId, convexGroqApiKey);
 
         if (!result.success) {
           throw new Error(result.error || "Transcription failed");
@@ -1062,7 +1067,11 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
         current++;
         setTranscribeProgress({ current, total });
         setTranscribingId(memo.id);
-        const result = await transcribeExportedMemo(memo.exportedMemoId!);
+        if (!convexGroqApiKey) {
+          console.error(`Failed to transcribe ${memo.name}: GROQ API key not configured`);
+          continue;
+        }
+        const result = await transcribeExportedMemo(memo.exportedMemoId!, convexGroqApiKey);
         if (!result.success) {
           console.error(`Failed to transcribe ${memo.name}:`, result.error);
         }

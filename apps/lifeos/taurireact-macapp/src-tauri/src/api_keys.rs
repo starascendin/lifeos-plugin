@@ -60,23 +60,3 @@ pub async fn delete_groq_api_key(app: AppHandle) -> Result<(), String> {
 
     Ok(())
 }
-
-/// Internal function to get API key (for use by other modules)
-/// Falls back to environment variable if store key is not set
-pub fn get_groq_api_key_internal(app: &AppHandle) -> Result<String, String> {
-    // First try the store
-    if let Ok(store) = app.store(STORE_FILE) {
-        if let Some(api_key) = store.get(GROQ_API_KEY) {
-            if let Ok(key) = serde_json::from_value::<String>(api_key.clone()) {
-                if !key.is_empty() {
-                    return Ok(key);
-                }
-            }
-        }
-    }
-
-    // Fall back to environment variable (for development)
-    std::env::var("GROQ_API_KEY").map_err(|_| {
-        "GROQ_API_KEY not configured. Please set it in Settings > API Keys.".to_string()
-    })
-}

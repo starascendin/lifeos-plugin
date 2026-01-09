@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 
-IOS_DIR="$APP_DIR/ios"
+IOS_DIR="$APP_DIR/ios-prod"
 DERIVED_DATA="$IOS_DIR/build/DerivedData"
 SCHEME="App"
 

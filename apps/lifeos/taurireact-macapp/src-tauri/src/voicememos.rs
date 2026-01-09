@@ -1,7 +1,6 @@
 // Voice Memos export and transcription module
 // Reads from macOS Voice Memos database and supports Groq Whisper transcription
 
-use crate::api_keys::get_groq_api_key_internal;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -456,6 +455,33 @@ fn sync_voicememos_internal(app: &AppHandle) -> Result<VoiceMemosExportResult, S
     })
 }
 
+/// Check if Full Disk Access is granted for Voice Memos database
+#[command]
+pub fn check_voicememos_permission() -> bool {
+    let db_path = match get_voicememos_source_db_path() {
+        Some(path) => path,
+        None => return false,
+    };
+
+    if !db_path.exists() {
+        // If Voice Memos app hasn't been used yet, return true (not a permission issue)
+        return true;
+    }
+
+    // Try to open the database - this will fail without Full Disk Access
+    match Connection::open_with_flags(
+        &db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) {
+        Ok(conn) => {
+            // Try a simple query to verify we can actually read
+            conn.query_row("SELECT COUNT(*) FROM ZCLOUDRECORDING LIMIT 1", [], |_| Ok(()))
+                .is_ok()
+        }
+        Err(_) => false,
+    }
+}
+
 /// Get all synced voice memos from local database
 #[command]
 pub fn get_voicememos() -> Result<Vec<VoiceMemo>, String> {
@@ -647,9 +673,11 @@ fn preprocess_audio_for_transcription(input_path: &Path) -> Result<PathBuf, Stri
 pub async fn transcribe_voicememo(
     app: AppHandle,
     memo_id: i64,
+    api_key: String,
 ) -> Result<TranscriptionResult, String> {
-    // Get API key from store (falls back to env var for development)
-    let api_key = get_groq_api_key_internal(&app)?;
+    if api_key.is_empty() {
+        return Err("GROQ API key is required. Please configure it in Convex environment.".to_string());
+    }
 
     // Get memo details
     let memo = get_voicememo(memo_id)?.ok_or("Memo not found")?;
@@ -832,7 +860,12 @@ pub async fn transcribe_voicememo(
 pub async fn transcribe_voicememos_batch(
     app: AppHandle,
     memo_ids: Vec<i64>,
+    api_key: String,
 ) -> Result<Vec<TranscriptionResult>, String> {
+    if api_key.is_empty() {
+        return Err("GROQ API key is required. Please configure it in Convex environment.".to_string());
+    }
+
     let total = memo_ids.len();
     let mut results = Vec::new();
 
@@ -855,7 +888,7 @@ pub async fn transcribe_voicememos_batch(
             },
         );
 
-        match transcribe_voicememo(app.clone(), *memo_id).await {
+        match transcribe_voicememo(app.clone(), *memo_id, api_key.clone()).await {
             Ok(result) => results.push(result),
             Err(e) => results.push(TranscriptionResult {
                 memo_id: *memo_id,

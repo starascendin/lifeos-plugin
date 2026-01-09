@@ -5,20 +5,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(dirname "$SCRIPT_DIR")"
 
-IOS_DIR="$APP_DIR/ios"
+IOS_DIR="$APP_DIR/ios-prod"
 WORKSPACE="$IOS_DIR/App/App.xcworkspace"
 SCHEME="App"
 DERIVED_DATA="$IOS_DIR/build/DerivedData"
 
 if [ ! -d "$IOS_DIR" ]; then
   echo "[cap:ios:prod:build] Missing iOS project at $IOS_DIR"
-  echo "[cap:ios:prod:build] Run: pnpm cap:sync"
+  echo "[cap:ios:prod:build] Run: pnpm cap:sync:prod"
   exit 1
 fi
 
-if [ ! -f "$WORKSPACE" ]; then
+if [ ! -d "$WORKSPACE" ]; then
   echo "[cap:ios:prod:build] Missing Xcode workspace: $WORKSPACE"
-  echo "[cap:ios:prod:build] Run: pnpm cap:sync"
+  echo "[cap:ios:prod:build] Run: pnpm cap:sync:prod"
   exit 1
 fi
 

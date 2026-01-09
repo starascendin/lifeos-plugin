@@ -1,11 +1,18 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const capServerUrl = process.env.CAP_SERVER_URL;
+const isProd = process.env.CAP_ENV === "prod";
 
 const config: CapacitorConfig = {
-  appId: "com.holaai.lifeos",
-  appName: "LifeOS",
+  appId: isProd ? "com.holaai.lifeos" : "com.holaai.lifeos.dev",
+  appName: isProd ? "LifeOS" : "LifeOS DEV",
   webDir: "dist",
+  ios: {
+    path: isProd ? "ios-prod" : "ios",
+  },
+  android: {
+    path: isProd ? "android-prod" : "android",
+  },
   // Clerk's web SDK expects `window.location.href` to be http(s) in some internal
   // flows (e.g. redirect_url params). Capacitor's default app origin is
   // `capacitor://localhost`, which can cause Clerk to throw during initialization.
@@ -25,9 +32,6 @@ const config: CapacitorConfig = {
         },
       }
     : {}),
-  android: {
-    // Android-specific config
-  },
   plugins: {
     App: {
       // Enable URL scheme handling for OAuth
