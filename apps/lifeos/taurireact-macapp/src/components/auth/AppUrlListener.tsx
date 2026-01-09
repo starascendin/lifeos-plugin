@@ -39,17 +39,34 @@ export function AppUrlListener() {
 
           // Extract the rotating token nonce from URL
           let rotatingTokenNonce = url.searchParams.get("rotating_token_nonce");
+          let createdSessionId = url.searchParams.get("created_session_id");
 
           // If not in query string, check hash fragment
-          if (!rotatingTokenNonce && url.hash) {
+          if ((!rotatingTokenNonce || !createdSessionId) && url.hash) {
             const hashParams = new URLSearchParams(url.hash.slice(1));
-            rotatingTokenNonce = hashParams.get("rotating_token_nonce");
+            if (!rotatingTokenNonce)
+              rotatingTokenNonce = hashParams.get("rotating_token_nonce");
+            if (!createdSessionId)
+              createdSessionId = hashParams.get("created_session_id");
           }
 
           console.log(
             "[AppUrlListener] rotatingTokenNonce:",
             rotatingTokenNonce ? "found" : "not found"
           );
+          console.log(
+            "[AppUrlListener] createdSessionId:",
+            createdSessionId ? "found" : "not found"
+          );
+
+          // Some Clerk flows return `created_session_id` directly (no rotating token nonce).
+          // In that case we can activate the session immediately.
+          if (createdSessionId) {
+            await clerk.setActive({ session: createdSessionId });
+            console.log("[AppUrlListener] Session activated from created_session_id");
+            window.location.hash = "#/lifeos";
+            return;
+          }
 
           if (rotatingTokenNonce && signIn) {
             try {

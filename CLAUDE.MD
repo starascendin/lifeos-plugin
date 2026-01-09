@@ -1,4 +1,5 @@
 - when starting a new feature, use worktrunk skill to create a new GIT WORK WORKTREE, then proceed to do what the user asks. 
+    - when you created a new worktree, you can use pnpm env:decrypt to decrypt the environment variables for all apps and packages.
 
 - this repo has react native
     - DO NOT UPDATE REACT NATIVE PACKAGE VERSIONS, IT MIGHT BREAK THE APP
