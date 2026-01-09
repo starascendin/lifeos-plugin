@@ -183,9 +183,13 @@ export function AppUrlListener() {
                   }
                 }
               } catch (pollError) {
-                console.log(
+                console.error(
                   "[AppUrlListener] Polling error:",
-                  pollError
+                  pollError,
+                  "Message:",
+                  pollError instanceof Error ? pollError.message : String(pollError),
+                  "Stack:",
+                  pollError instanceof Error ? pollError.stack : "N/A"
                 );
                 // If polling fails, check if there's now an active session
                 if (clerk.session) {
@@ -209,7 +213,14 @@ export function AppUrlListener() {
           }
         }
       } catch (error) {
-        console.error("[AppUrlListener] Error handling URL:", error);
+        console.error(
+          "[AppUrlListener] Error handling URL:",
+          error,
+          "Message:",
+          error instanceof Error ? error.message : String(error),
+          "Stack:",
+          error instanceof Error ? error.stack : "N/A"
+        );
       }
     };
 
