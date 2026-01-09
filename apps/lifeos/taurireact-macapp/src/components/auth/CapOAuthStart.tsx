@@ -30,7 +30,12 @@ export function CapOAuthStart() {
         const redirectUrl = redirectUrlFromQuery ?? redirectUrlFromEnv;
         if (!redirectUrl) {
           throw new Error(
-            "Missing redirect_url. Provide ?redirect_url=lifeos://callback (recommended) or set VITE_CLERK_OAUTH_REDIRECT_URL."
+            "Missing redirect_url. Provide ?redirect_url=https://<origin>/clerk-callback.html or set VITE_CLERK_OAUTH_REDIRECT_URL."
+          );
+        }
+        if (!/^https?:\/\//.test(redirectUrl)) {
+          throw new Error(
+            "Invalid redirect_url. For Clerk OAuth it must be an http(s) URL (e.g. https://www.rjlabs.dev/clerk-callback.html)."
           );
         }
 

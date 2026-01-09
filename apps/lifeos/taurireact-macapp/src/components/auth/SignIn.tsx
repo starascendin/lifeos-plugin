@@ -225,24 +225,22 @@ export function SignIn() {
         // So: open a hosted "/#/cap-oauth-start" route in the system browser, which
         // performs `signIn.create({ redirectUrl })` and then redirects to Google.
         //
-        // After Google consent, Clerk must redirect back into the app with a
-        // `rotating_token_nonce` query param so the app can reload the sign-in attempt.
-        //
-        // With Clerk Native API enabled, this can be a custom scheme redirect:
-        //   lifeos://callback?rotating_token_nonce=...
-        //
-        // We still start OAuth in the system browser via a hosted "/#/cap-oauth-start" page
-        // to keep the flow in a single browser session.
-        const redirectUrlForClerk = "lifeos://callback";
-
+        // Clerk's `redirect_url` for OAuth must be http(s). We use a hosted callback page
+        // that immediately deep-links back into the app (lifeos://callback?...).
         const envRedirectUrl = import.meta.env
           .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
 
+        if (!envRedirectUrl || !/^https?:\/\//.test(envRedirectUrl)) {
+          throw new Error(
+            "Invalid OAuth redirect URL for Capacitor. Set VITE_CLERK_OAUTH_REDIRECT_URL to an https URL (e.g. https://www.rjlabs.dev/clerk-callback.html)."
+          );
+        }
+
+        const redirectUrlForClerk = envRedirectUrl;
+
         const startOrigin = window.location.origin.startsWith("http")
           ? window.location.origin
-          : envRedirectUrl && /^https?:\/\//.test(envRedirectUrl)
-            ? new URL(envRedirectUrl).origin
-            : undefined;
+          : new URL(envRedirectUrl).origin;
 
         if (!startOrigin) {
           throw new Error(
