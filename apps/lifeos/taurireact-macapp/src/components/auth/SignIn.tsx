@@ -50,6 +50,14 @@ export function SignIn() {
     setError(null);
 
     try {
+      // If there's already a session, sign out first to avoid "You're already signed in" error
+      if (clerk.session) {
+        console.log("[SignIn] Active session detected, signing out before OAuth...");
+        await clerk.signOut();
+        // Wait a bit for sign out to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       if (isTauri) {
         // For Tauri: Use localhost server for OAuth callback
         console.log("[SignIn] Using external browser OAuth flow with localhost callback...");

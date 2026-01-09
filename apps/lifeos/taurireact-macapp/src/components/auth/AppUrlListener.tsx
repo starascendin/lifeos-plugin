@@ -37,6 +37,15 @@ export function AppUrlListener() {
         if (url.pathname === "/callback" || url.host === "callback") {
           console.log("[AppUrlListener] OAuth callback detected");
 
+          // Check if user is already signed in (might have succeeded already)
+          if (clerk.session) {
+            console.log(
+              "[AppUrlListener] User already has active session, navigating to app"
+            );
+            window.location.hash = "#/lifeos";
+            return;
+          }
+
           // Extract the rotating token nonce from URL
           let rotatingTokenNonce = url.searchParams.get("rotating_token_nonce");
 
@@ -111,6 +120,15 @@ export function AppUrlListener() {
               "[AppUrlListener] No nonce in callback, polling signIn status..."
             );
 
+            // First check if there's already an active session (OAuth might have auto-completed)
+            if (clerk.session) {
+              console.log(
+                "[AppUrlListener] Active session found, navigating to app"
+              );
+              window.location.hash = "#/lifeos";
+              return;
+            }
+
             if (!signIn) return;
 
             let attempts = 0;
@@ -123,40 +141,56 @@ export function AppUrlListener() {
                 `[AppUrlListener] Polling attempt ${attempts}/${maxAttempts}...`
               );
 
-              const reloadedSignIn = await signIn.reload();
+              try {
+                const reloadedSignIn = await signIn.reload();
 
-              if (
-                reloadedSignIn.status === "complete" &&
-                reloadedSignIn.createdSessionId
-              ) {
-                await clerk.setActive({
-                  session: reloadedSignIn.createdSessionId,
-                });
-                console.log(
-                  "[AppUrlListener] Session activated via polling"
-                );
-                window.location.hash = "#/lifeos";
-                return;
-              }
-
-              if (
-                reloadedSignIn.firstFactorVerification?.status === "transferable"
-              ) {
-                console.log(
-                  "[AppUrlListener] Transfer scenario detected via polling"
-                );
-                if (!signUp)
-                  throw new Error("signUp not available for transfer");
-
-                const newSignUp = await signUp.create({ transfer: true });
-                const reloadedSignUp = await newSignUp.reload();
-
-                if (reloadedSignUp.createdSessionId) {
+                if (
+                  reloadedSignIn.status === "complete" &&
+                  reloadedSignIn.createdSessionId
+                ) {
                   await clerk.setActive({
-                    session: reloadedSignUp.createdSessionId,
+                    session: reloadedSignIn.createdSessionId,
                   });
                   console.log(
-                    "[AppUrlListener] Session activated from signUp via polling"
+                    "[AppUrlListener] Session activated via polling"
+                  );
+                  window.location.hash = "#/lifeos";
+                  return;
+                }
+
+                if (
+                  reloadedSignIn.firstFactorVerification?.status ===
+                  "transferable"
+                ) {
+                  console.log(
+                    "[AppUrlListener] Transfer scenario detected via polling"
+                  );
+                  if (!signUp)
+                    throw new Error("signUp not available for transfer");
+
+                  const newSignUp = await signUp.create({ transfer: true });
+                  const reloadedSignUp = await newSignUp.reload();
+
+                  if (reloadedSignUp.createdSessionId) {
+                    await clerk.setActive({
+                      session: reloadedSignUp.createdSessionId,
+                    });
+                    console.log(
+                      "[AppUrlListener] Session activated from signUp via polling"
+                    );
+                    window.location.hash = "#/lifeos";
+                    return;
+                  }
+                }
+              } catch (pollError) {
+                console.log(
+                  "[AppUrlListener] Polling error:",
+                  pollError
+                );
+                // If polling fails, check if there's now an active session
+                if (clerk.session) {
+                  console.log(
+                    "[AppUrlListener] Session found after polling error, navigating to app"
                   );
                   window.location.hash = "#/lifeos";
                   return;
