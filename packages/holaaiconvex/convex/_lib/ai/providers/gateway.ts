@@ -9,8 +9,8 @@ import type { AIRequest, AIResponse, AIMessage } from "../types";
 import { AIProviderError } from "../types";
 import { extractGatewayUsage } from "../token_extractors";
 
-// Gateway endpoint
-const GATEWAY_URL = "https://gateway.ai.vercel.com/v1/chat/completions";
+// Gateway endpoint (Vercel AI Gateway)
+const GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/chat/completions";
 
 /**
  * Convert our AIMessage format to OpenAI-compatible format
@@ -43,9 +43,11 @@ export async function callGateway(
       max_tokens: request.maxTokens,
       temperature: request.temperature,
       stream: false,
-      ...(request.responseFormat === "json" && {
-        response_format: { type: "json_object" },
-      }),
+      // Only OpenAI models support response_format parameter
+      ...(request.responseFormat === "json" &&
+        request.model.startsWith("openai/") && {
+          response_format: { type: "json_object" },
+        }),
     }),
   });
 
@@ -99,9 +101,11 @@ export async function streamGateway(
       max_tokens: request.maxTokens,
       temperature: request.temperature,
       stream: true,
-      ...(request.responseFormat === "json" && {
-        response_format: { type: "json_object" },
-      }),
+      // Only OpenAI models support response_format parameter
+      ...(request.responseFormat === "json" &&
+        request.model.startsWith("openai/") && {
+          response_format: { type: "json_object" },
+        }),
     }),
   });
 

@@ -23,6 +23,7 @@ export type MeteringFeature =
   | "demo_agent"
   | "chatnexus"
   | "llm_council"
+  | "voice_memo_extraction"
   // HolaAI features
   | "holaai_lesson"
   | "holaai_conversation"
@@ -42,6 +43,7 @@ export const FEATURE_COSTS: Record<MeteringFeature, number> = {
   demo_agent: 1,
   chatnexus: 2,
   llm_council: 5, // Multi-model, more expensive
+  voice_memo_extraction: 1,
   // HolaAI features
   holaai_lesson: 3,
   holaai_conversation: 2,

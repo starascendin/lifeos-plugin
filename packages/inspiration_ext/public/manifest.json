@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Inspiration Saver",
+  "version": "1.0.0",
+  "description": "Save webpages as inspiration links with notes and tags",
+  "permissions": ["activeTab", "storage"],
+  "action": {
+    "default_popup": "src/popup/index.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "host_permissions": [
+    "https://*.clerk.accounts.dev/*",
+    "https://*.convex.cloud/*"
+  ]
+}

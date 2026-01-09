@@ -157,6 +157,7 @@ export const DEFAULT_MODELS: Record<MeteringFeature, string> = {
   demo_agent: "google/gemini-2.5-flash-lite",
   chatnexus: "openai/gpt-4o-mini",
   llm_council: "openai/gpt-4o",
+  voice_memo_extraction: "google/gemini-2.5-flash", // Use Gateway
 
   // HolaAI features (use direct Gemini for lower latency)
   holaai_lesson: "gemini-2.5-flash",

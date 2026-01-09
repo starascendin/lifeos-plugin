@@ -327,6 +327,43 @@ export const getSyncedLocalIds = query({
 });
 
 /**
+ * Get synced memos with their Convex IDs and extraction status
+ * Used by VoiceMemosTab to show extraction button/status
+ */
+export const getSyncedMemosWithStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+
+    // Get all synced memos
+    const memos = await ctx.db
+      .query("life_voiceMemos")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Get extraction status for all memos
+    const extractions = await ctx.db
+      .query("life_voiceMemoExtractions")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", user._id).eq("status", "completed")
+      )
+      .collect();
+
+    // Build set of memoIds that have completed extractions
+    const extractedMemoIds = new Set(extractions.map((e) => e.voiceMemoId.toString()));
+
+    // Return mapping with status
+    return memos.map((m) => ({
+      localId: m.localId,
+      convexId: m._id,
+      name: m.name,
+      hasExtraction: extractedMemoIds.has(m._id.toString()),
+      hasTranscript: !!m.transcript,
+    }));
+  },
+});
+
+/**
  * Batch upsert transcribed voice memos (transcript only, no audio)
  * Creates or updates memos based on localId (deduplication)
  */

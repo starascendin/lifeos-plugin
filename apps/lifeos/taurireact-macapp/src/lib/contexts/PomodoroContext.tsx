@@ -140,6 +140,19 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     completingRef.current = true;
 
     try {
+      // Immediately clear the work timer display and set remainingMs to 0
+      // This prevents the "00:01" lingering issue during the async mutation
+      setRemainingMs(0);
+
+      // Clear tray immediately before async work (prevents stale 00:01 display)
+      if (isTauri) {
+        try {
+          await invoke("clear_tray_title");
+        } catch (e) {
+          console.error("[PomodoroContext] Failed to clear tray on complete:", e);
+        }
+      }
+
       // Complete the pomodoro
       await completePomodoroMutation({ sessionId: session._id });
 

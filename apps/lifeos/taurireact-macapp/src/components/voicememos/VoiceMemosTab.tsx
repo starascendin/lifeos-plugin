@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useConvex, useQuery } from "convex/react";
 import { api } from "@holaai/convex";
+import { Id } from "@holaai/convex/convex/_generated/dataModel";
 import {
   type VoiceMemo,
   type VoiceMemosSyncProgress,
@@ -67,6 +68,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   ChevronDown,
+  Sparkles,
 } from "lucide-react";
 import {
   Tooltip,
@@ -74,6 +76,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ExtractionDialog } from "./extraction";
 
 type ViewFilter = "all" | "transcribed" | "not_transcribed" | "cloud_only";
 
@@ -127,9 +130,20 @@ export function VoiceMemosTab() {
   const [pageSize, setPageSize] = useState<number>(10);
   const convex = useConvex();
 
-  // Query synced local IDs from Convex to show cloud sync status
-  const syncedLocalIds = useQuery(api.lifeos.voicememo.getSyncedLocalIds, {});
-  const syncedUuidSet = new Set(syncedLocalIds ?? []);
+  // Query synced memos from Convex with extraction status
+  const syncedMemos = useQuery(api.lifeos.voicememo.getSyncedMemosWithStatus, {});
+  const syncedMemoMap = new Map(
+    (syncedMemos ?? []).map((m) => [m.localId, m])
+  );
+  const syncedUuidSet = new Set(syncedMemos?.map((m) => m.localId) ?? []);
+
+  // Extraction dialog state
+  const [extractionDialogOpen, setExtractionDialogOpen] = useState(false);
+  const [extractionMemo, setExtractionMemo] = useState<{
+    convexId: Id<"life_voiceMemos">;
+    name: string;
+    transcript: string;
+  } | null>(null);
 
   // Load memos on mount
   const loadMemos = useCallback(async () => {
@@ -688,20 +702,34 @@ export function VoiceMemosTab() {
                 <TableHead className="w-[80px]">Size</TableHead>
                 <TableHead className="w-[100px]">Status</TableHead>
                 <TableHead className="w-[80px]">Play</TableHead>
+                <TableHead className="w-[80px]">AI</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedMemos.map((memo) => (
-                <VoiceMemoRow
-                  key={memo.id}
-                  memo={memo}
-                  isSelected={selectedIds.has(memo.id)}
-                  onToggleSelect={() => toggleSelection(memo.id)}
-                  isTranscribing={isTranscribing}
-                  isTauri={isTauri}
-                  isSyncedToCloud={syncedUuidSet.has(memo.uuid)}
-                />
-              ))}
+              {paginatedMemos.map((memo) => {
+                const syncedMemo = syncedMemoMap.get(memo.uuid);
+                return (
+                  <VoiceMemoRow
+                    key={memo.id}
+                    memo={memo}
+                    isSelected={selectedIds.has(memo.id)}
+                    onToggleSelect={() => toggleSelection(memo.id)}
+                    isTranscribing={isTranscribing}
+                    isTauri={isTauri}
+                    isSyncedToCloud={syncedUuidSet.has(memo.uuid)}
+                    convexId={syncedMemo?.convexId}
+                    hasExtraction={syncedMemo?.hasExtraction ?? false}
+                    onExtract={syncedMemo && memo.transcription ? () => {
+                      setExtractionMemo({
+                        convexId: syncedMemo.convexId,
+                        name: memo.custom_label || memo.original_path?.split('/').pop() || 'Voice Memo',
+                        transcript: memo.transcription!,
+                      });
+                      setExtractionDialogOpen(true);
+                    } : undefined}
+                  />
+                );
+              })}
             </TableBody>
           </Table>
 
@@ -756,6 +784,20 @@ export function VoiceMemosTab() {
           )}
         </Card>
       )}
+
+      {/* Extraction Dialog */}
+      {extractionMemo && (
+        <ExtractionDialog
+          open={extractionDialogOpen}
+          onOpenChange={setExtractionDialogOpen}
+          memoId={extractionMemo.convexId}
+          memoName={extractionMemo.name}
+          transcript={extractionMemo.transcript}
+          onSuccess={() => {
+            // Optionally refresh data
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -767,9 +809,12 @@ interface VoiceMemoRowProps {
   isTranscribing: boolean;
   isTauri: boolean;
   isSyncedToCloud: boolean;
+  convexId?: Id<"life_voiceMemos">;
+  hasExtraction: boolean;
+  onExtract?: () => void;
 }
 
-function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTauri, isSyncedToCloud }: VoiceMemoRowProps) {
+function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTauri, isSyncedToCloud, hasExtraction, onExtract }: VoiceMemoRowProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -968,10 +1013,42 @@ function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTaur
             </>
           )}
         </TableCell>
+        <TableCell>
+          {hasExtraction ? (
+            <Badge
+              variant="secondary"
+              className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-900/50"
+              onClick={onExtract}
+            >
+              <Sparkles className="h-3 w-3 mr-1" />
+              Enhanced
+            </Badge>
+          ) : onExtract ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onExtract}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Extract AI insights</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <span className="text-xs text-muted-foreground">-</span>
+          )}
+        </TableCell>
       </TableRow>
       {showTranscript && memo.transcription && (
         <TableRow>
-          <TableCell colSpan={7} className="bg-muted/50">
+          <TableCell colSpan={8} className="bg-muted/50">
             <div className="p-3">
               <p className="text-sm whitespace-pre-wrap">{memo.transcription}</p>
             </div>

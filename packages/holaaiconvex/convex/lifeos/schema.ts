@@ -266,4 +266,47 @@ export const lifeosTables = {
       searchField: "transcript",
       filterFields: ["userId"],
     }),
+
+  // ==================== VOICE MEMO AI EXTRACTIONS ====================
+  life_voiceMemoExtractions: defineTable({
+    // User who owns this extraction
+    userId: v.id("users"),
+    // Reference to the source voice memo
+    voiceMemoId: v.id("life_voiceMemos"),
+    // Version number for this extraction (1, 2, 3, etc. for history)
+    version: v.number(),
+    // Custom prompt used for this extraction (user-editable)
+    customPrompt: v.optional(v.string()),
+    // AI model used for extraction
+    model: v.string(),
+
+    // === AI Extraction Output (fixed schema) ===
+    summary: v.string(),
+    labels: v.array(v.string()),
+    actionItems: v.array(v.string()),
+    keyPoints: v.array(v.string()),
+    sentiment: v.union(
+      v.literal("positive"),
+      v.literal("neutral"),
+      v.literal("negative")
+    ),
+
+    // Processing status
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    error: v.optional(v.string()),
+
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_voiceMemo", ["voiceMemoId"])
+    .index("by_user_voiceMemo", ["userId", "voiceMemoId"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_status", ["userId", "status"]),
 };
