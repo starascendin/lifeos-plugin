@@ -18,6 +18,7 @@
     "android": "pnpm --filter @holaai/rnapp android",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
+    "submodule:update": "git add packages/livekit-voice-agent && git commit -m 'chore: update livekit-voice-agent submodule' && git push",
     "deploy:prod": "bash scripts/deploy-prod.sh"
   },
   "devDependencies": {
