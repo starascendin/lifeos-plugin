@@ -218,8 +218,15 @@ export function SignIn() {
         // Import Capacitor Browser plugin
         const { Browser } = await import("@capacitor/browser");
 
-        // Clerk validates `redirect_url` as http(s). For Capacitor, we use an http(s)
-        // callback page that then deep-links back into the app (lifeos://callback).
+        // Clerk OAuth must be started from the same browser session that will follow the
+        // `externalVerificationRedirectURL` (cookies/state are not shared between the
+        // WKWebView and the system browser on iOS).
+        //
+        // So: open a hosted "/#/cap-oauth-start" route in the system browser, which
+        // performs `signIn.create({ redirectUrl })` and then redirects to Google.
+        //
+        // After Google consent, Clerk redirects to our callback page
+        // ("/clerk-callback.html"), which deep-links back into the app (lifeos://callback).
         const redirectUrlFromEnv = import.meta.env
           .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
         const defaultRedirectUrl = window.location.origin.startsWith("http")
@@ -233,26 +240,24 @@ export function SignIn() {
           );
         }
 
-        console.log("[SignIn] Creating OAuth flow with redirect:", redirectUrl);
-
-        const result = await (signIn as any).create({
-          strategy: "oauth_google",
-          redirectUrl,
-        });
-
-        console.log("[SignIn] signIn.create result:", result);
-
-        // Get the external verification URL
-        const externalUrl = result.firstFactorVerification?.externalVerificationRedirectURL;
-
-        if (!externalUrl) {
-          throw new Error("No external verification URL returned from Clerk");
+        let capOrigin: string;
+        try {
+          capOrigin = new URL(redirectUrl).origin;
+        } catch {
+          throw new Error(
+            "Invalid VITE_CLERK_OAUTH_REDIRECT_URL. It must be a full http(s) URL to /clerk-callback.html."
+          );
         }
 
-        console.log("[SignIn] Opening in-app browser:", externalUrl);
+        const startUrl = new URL(`${capOrigin}/#/cap-oauth-start`);
+        startUrl.searchParams.set("strategy", "oauth_google");
+        startUrl.searchParams.set("redirect_url", redirectUrl);
 
-        // Open in in-app browser - AppUrlListener will handle the callback
-        await Browser.open({ url: externalUrl.toString() });
+        console.log("[SignIn] Opening OAuth start page:", startUrl.toString());
+
+        // Open in system browser (SFSafariViewController/Custom Tabs).
+        // AppUrlListener will handle the deep-link callback back into the app.
+        await Browser.open({ url: startUrl.toString() });
 
         // Note: The AppUrlListener component handles the OAuth callback
         // and completes the authentication flow

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { App, type URLOpenListenerEvent } from "@capacitor/app";
 import { useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 import { isCapacitor } from "@/lib/platform";
@@ -11,16 +11,18 @@ import { isCapacitor } from "@/lib/platform";
  * sign-ins and new user sign-ups (transfer flow).
  */
 export function AppUrlListener() {
-  const { signIn } = useSignIn();
-  const { signUp } = useSignUp();
+  const { signIn, isLoaded: isSignInLoaded } = useSignIn();
+  const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const clerk = useClerk();
+  const pendingUrlRef = useRef<string | null>(null);
+  const processingRef = useRef(false);
 
-  useEffect(() => {
-    // Only run on Capacitor
-    if (!isCapacitor) return;
+  const handleUrlString = useCallback(
+    async (urlString: string) => {
+      if (processingRef.current) return;
+      processingRef.current = true;
 
-    const handleUrlOpen = async (event: URLOpenListenerEvent) => {
-      console.log("[AppUrlListener] URL opened:", event.url);
+      console.log("[AppUrlListener] Processing URL:", urlString);
 
       try {
         // Close the in-app browser if this deep link came from an OAuth flow.
@@ -31,7 +33,7 @@ export function AppUrlListener() {
           // Ignore (plugin may be unavailable on some platforms).
         }
 
-        const url = new URL(event.url);
+        const url = new URL(urlString);
 
         // Handle OAuth callback - check for both path formats
         if (url.pathname === "/callback" || url.host === "callback") {
@@ -159,8 +161,7 @@ export function AppUrlListener() {
                 }
 
                 if (
-                  reloadedSignIn.firstFactorVerification?.status ===
-                  "transferable"
+                  reloadedSignIn.firstFactorVerification?.status === "transferable"
                 ) {
                   console.log(
                     "[AppUrlListener] Transfer scenario detected via polling"
@@ -187,7 +188,9 @@ export function AppUrlListener() {
                   "[AppUrlListener] Polling error:",
                   pollError,
                   "Message:",
-                  pollError instanceof Error ? pollError.message : String(pollError),
+                  pollError instanceof Error
+                    ? pollError.message
+                    : String(pollError),
                   "Stack:",
                   pollError instanceof Error ? pollError.stack : "N/A"
                 );
@@ -202,9 +205,7 @@ export function AppUrlListener() {
               }
 
               // Wait before next poll
-              await new Promise((resolve) =>
-                setTimeout(resolve, pollInterval)
-              );
+              await new Promise((resolve) => setTimeout(resolve, pollInterval));
             }
 
             console.error(
@@ -221,17 +222,80 @@ export function AppUrlListener() {
           "Stack:",
           error instanceof Error ? error.stack : "N/A"
         );
+      } finally {
+        processingRef.current = false;
+      }
+    },
+    [clerk, signIn, signUp]
+  );
+
+  useEffect(() => {
+    // Only run on Capacitor
+    if (!isCapacitor) return;
+
+    const handleUrlOpen = async (event: URLOpenListenerEvent) => {
+      console.log("[AppUrlListener] URL opened:", event.url);
+
+      // On cold start, the deep link can arrive before Clerk finishes loading.
+      if (!isSignInLoaded || !isSignUpLoaded) {
+        pendingUrlRef.current = event.url;
+        console.log(
+          "[AppUrlListener] Clerk not loaded yet; queued URL for later processing"
+        );
+        return;
+      }
+
+      try {
+        await handleUrlString(event.url);
+      } catch (error) {
+        console.error(
+          "[AppUrlListener] Error handling URL:",
+          error,
+          "Message:",
+          error instanceof Error ? error.message : String(error),
+          "Stack:",
+          error instanceof Error ? error.stack : "N/A"
+        );
       }
     };
 
     // Add listener for app URL open events
     const listenerPromise = App.addListener("appUrlOpen", handleUrlOpen);
 
+    // Also handle initial launch URL (cold start from deep link).
+    App.getLaunchUrl()
+      .then((res) => {
+        if (!res?.url) return;
+        console.log("[AppUrlListener] Launch URL:", res.url);
+
+        if (!isSignInLoaded || !isSignUpLoaded) {
+          pendingUrlRef.current = res.url;
+          console.log(
+            "[AppUrlListener] Clerk not loaded yet; queued launch URL for later processing"
+          );
+          return;
+        }
+
+        void handleUrlString(res.url);
+      })
+      .catch(() => {});
+
     // Cleanup on unmount
     return () => {
       listenerPromise.then((listener) => listener.remove());
     };
-  }, [signIn, signUp, clerk]);
+  }, [handleUrlString, isSignInLoaded, isSignUpLoaded]);
+
+  useEffect(() => {
+    if (!isCapacitor) return;
+    if (!isSignInLoaded || !isSignUpLoaded) return;
+
+    const pending = pendingUrlRef.current;
+    if (!pending) return;
+
+    pendingUrlRef.current = null;
+    void handleUrlString(pending);
+  }, [handleUrlString, isSignInLoaded, isSignUpLoaded]);
 
   // This component doesn't render anything
   return null;
