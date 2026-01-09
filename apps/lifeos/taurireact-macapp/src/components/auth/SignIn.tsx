@@ -227,20 +227,28 @@ export function SignIn() {
         //
         // Clerk's `redirect_url` for OAuth must be http(s). We use a hosted callback page
         // that immediately deep-links back into the app (lifeos://callback?...).
+        //
+        // Prefer deriving from the current origin when the app is served from http(s)
+        // (e.g. production uses Capacitor `server.url` -> https://www.rjlabs.dev).
         const envRedirectUrl = import.meta.env
           .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
 
-        if (!envRedirectUrl || !/^https?:\/\//.test(envRedirectUrl)) {
+        const startOrigin = window.location.origin.startsWith("http")
+          ? window.location.origin
+          : envRedirectUrl && /^https?:\/\//.test(envRedirectUrl)
+            ? new URL(envRedirectUrl).origin
+            : undefined;
+
+        if (!startOrigin) {
           throw new Error(
-            "Invalid OAuth redirect URL for Capacitor. Set VITE_CLERK_OAUTH_REDIRECT_URL to an https URL (e.g. https://www.rjlabs.dev/clerk-callback.html)."
+            "Invalid OAuth redirect URL for Capacitor. Serve the app from an https origin (via CAP_SERVER_URL_PROD) or set VITE_CLERK_OAUTH_REDIRECT_URL to an https URL (e.g. https://www.rjlabs.dev/clerk-callback.html)."
           );
         }
 
-        const redirectUrlForClerk = envRedirectUrl;
-
-        const startOrigin = window.location.origin.startsWith("http")
-          ? window.location.origin
-          : new URL(envRedirectUrl).origin;
+        const redirectUrlForClerk =
+          envRedirectUrl && /^https?:\/\//.test(envRedirectUrl)
+            ? envRedirectUrl
+            : `${startOrigin.replace(/\/$/, "")}/clerk-callback.html`;
 
         if (!startOrigin) {
           throw new Error(

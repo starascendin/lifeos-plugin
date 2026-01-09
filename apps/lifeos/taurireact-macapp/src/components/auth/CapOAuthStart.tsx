@@ -27,7 +27,12 @@ export function CapOAuthStart() {
         const redirectUrlFromEnv = import.meta.env
           .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
 
-        const redirectUrl = redirectUrlFromQuery ?? redirectUrlFromEnv;
+        const defaultRedirectUrl = window.location.origin.startsWith("http")
+          ? `${window.location.origin.replace(/\/$/, "")}/clerk-callback.html`
+          : undefined;
+
+        const redirectUrl =
+          redirectUrlFromQuery ?? redirectUrlFromEnv ?? defaultRedirectUrl;
         if (!redirectUrl) {
           throw new Error(
             "Missing redirect_url. Provide ?redirect_url=https://<origin>/clerk-callback.html or set VITE_CLERK_OAUTH_REDIRECT_URL."
