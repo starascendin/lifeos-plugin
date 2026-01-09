@@ -37,13 +37,19 @@ async function initializeApp() {
     clerkInstance = await initClerk(clerkPublishableKey);
   }
 
+  const allowLifeosRedirectProtocol =
+    isCapacitor ||
+    (typeof window !== "undefined" &&
+      typeof window.location?.hash === "string" &&
+      window.location.hash.startsWith("#/cap-oauth-start"));
+
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <ClerkProvider
         {...(clerkInstance ? { Clerk: clerkInstance as any } : {})}
         publishableKey={clerkPublishableKey}
         allowedRedirectProtocols={
-          isTauri ? ["tauri:"] : isCapacitor ? ["lifeos:"] : undefined
+          isTauri ? ["tauri:"] : allowLifeosRedirectProtocol ? ["lifeos:"] : undefined
         }
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>

@@ -34,37 +34,20 @@ export function CapOAuthStart() {
           );
         }
 
-        let protocol: string;
-        try {
-          protocol = new URL(redirectUrl).protocol;
-        } catch {
-          throw new Error("Invalid redirect_url. It must be a valid URL.");
-        }
+        // Use Clerk's redirect flow from within this hosted page (running in the
+        // system browser). This avoids navigating directly to Clerk API endpoints
+        // (which can show JSON errors) and lets Clerk manage the provider redirect.
+        //
+        // `allowedRedirectProtocols` is set in src/main.tsx for this route so a
+        // custom scheme like lifeos://callback is permitted here.
+        if (cancelled) return;
+        setState({ status: "redirecting", to: redirectUrl });
 
-        const allowedProtocols = new Set(["http:", "https:", "lifeos:"]);
-        if (!allowedProtocols.has(protocol)) {
-          throw new Error(
-            `Invalid redirect_url protocol (${protocol}). Expected http(s) or lifeos://.`
-          );
-        }
-
-        const result = await (signIn as any).create({
+        await (signIn as any).authenticateWithRedirect({
           strategy,
           redirectUrl,
+          redirectUrlComplete: redirectUrl,
         });
-
-        const externalUrl =
-          result.firstFactorVerification?.externalVerificationRedirectURL;
-
-        if (!externalUrl) {
-          throw new Error("No external verification URL returned from Clerk.");
-        }
-
-        if (cancelled) return;
-        setState({ status: "redirecting", to: externalUrl.toString() });
-
-        // Keep the whole flow in the same browser session so Clerk cookies/state match.
-        window.location.assign(externalUrl.toString());
       } catch (err) {
         if (cancelled) return;
         setState({

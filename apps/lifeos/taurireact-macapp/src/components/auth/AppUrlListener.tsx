@@ -64,6 +64,22 @@ export function AppUrlListener() {
             rotatingTokenNonce ? "found" : "not found"
           );
 
+          const mergedParams = new URLSearchParams(url.search);
+          if (url.hash && url.hash.length > 1) {
+            try {
+              const hashParams = new URLSearchParams(url.hash.slice(1));
+              for (const [k, v] of hashParams.entries()) {
+                if (!mergedParams.has(k)) mergedParams.set(k, v);
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          const hasClerkRedirectParams = Array.from(mergedParams.keys()).some((k) =>
+            k.startsWith("__clerk")
+          );
+
           if (rotatingTokenNonce && signIn) {
             try {
               const reloadedSignIn = await signIn.reload({ rotatingTokenNonce });
@@ -118,6 +134,16 @@ export function AppUrlListener() {
                 error
               );
             }
+          } else if (hasClerkRedirectParams) {
+            // If we received Clerk redirect params (e.g. __clerk_status/__clerk_ticket),
+            // route them into the in-app /sso-callback handler which runs
+            // <AuthenticateWithRedirectCallback />.
+            const next = `#/sso-callback?${mergedParams.toString()}`;
+            console.log(
+              "[AppUrlListener] Routing Clerk redirect params to:",
+              next
+            );
+            window.location.hash = next;
           } else if (!rotatingTokenNonce) {
             // No nonce - try polling (production mode)
             console.log(
