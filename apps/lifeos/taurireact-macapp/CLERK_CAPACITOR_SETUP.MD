@@ -80,9 +80,12 @@ These match the working reference configuration from the Capacitor Clerk tutoria
 
 ### A) Start OAuth
 
-On Capacitor, the app uses:
-- `redirectUrl = VITE_CLERK_OAUTH_REDIRECT_URL` (must be `http(s)`)
-- opens the provider page via `@capacitor/browser`
+On Capacitor, the app opens an external browser to:
+- `https://<your-hosted-origin>/#/cap-oauth-start?strategy=oauth_google`
+
+That route runs inside the external browser session and calls Clerk `signIn.create({ redirectUrl })`,
+then redirects to Google from there. This avoids cookie/state mismatches between WKWebView and the
+system browser.
 
 ### B) Clerk redirects to the callback page
 

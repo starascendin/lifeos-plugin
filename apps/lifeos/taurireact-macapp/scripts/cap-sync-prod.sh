@@ -56,6 +56,7 @@ if [ -z "$CAP_ORIGIN" ]; then
   exit 1
 fi
 
+CAP_ORIGIN="${CAP_ORIGIN%/}"
 export CAP_SERVER_URL="$CAP_ORIGIN"
 
 echo "[cap:sync:prod] Capacitor server.url: $CAP_SERVER_URL"
