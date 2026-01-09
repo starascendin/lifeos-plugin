@@ -514,8 +514,27 @@ export function VoiceMemosTab() {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground pl-[72px] truncate">
-                    {transcriptionProgress.status}: {transcriptionProgress.memo_name}
+                    {transcriptionProgress.status === "preprocessing" ? "Converting" : transcriptionProgress.status}: {transcriptionProgress.memo_name}
                   </p>
+                  {/* Format conversion info */}
+                  {transcriptionProgress.original_format && transcriptionProgress.converted_format && (
+                    <p className="text-xs text-muted-foreground pl-[72px]">
+                      <span className="font-mono">{transcriptionProgress.original_format.toUpperCase()}</span>
+                      {transcriptionProgress.original_size && (
+                        <span className="text-muted-foreground/70"> ({formatFileSize(transcriptionProgress.original_size)})</span>
+                      )}
+                      <span className="mx-1">→</span>
+                      <span className="font-mono">{transcriptionProgress.converted_format.toUpperCase()}</span>
+                      {transcriptionProgress.converted_size && (
+                        <span className="text-green-600"> ({formatFileSize(transcriptionProgress.converted_size)})</span>
+                      )}
+                      {transcriptionProgress.original_size && transcriptionProgress.converted_size && (
+                        <span className="text-green-600 ml-1">
+                          ({Math.round((1 - transcriptionProgress.converted_size / transcriptionProgress.original_size) * 100)}% smaller)
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </div>
               )}
 

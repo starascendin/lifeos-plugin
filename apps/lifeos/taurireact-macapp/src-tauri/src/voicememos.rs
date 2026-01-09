@@ -56,10 +56,15 @@ pub struct TranscriptionResult {
 pub struct TranscriptionProgress {
     pub memo_id: i64,
     pub memo_name: String,
-    pub status: String, // "uploading", "transcribing", "complete", "error"
+    pub status: String, // "preprocessing", "uploading", "transcribing", "complete", "error"
     pub current: i32,
     pub total: i32,
     pub error: Option<String>,
+    // Conversion info
+    pub original_format: Option<String>,
+    pub original_size: Option<i64>,
+    pub converted_format: Option<String>,
+    pub converted_size: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -703,30 +708,42 @@ pub async fn transcribe_voicememo(
 
     let memo_name = memo.custom_label.unwrap_or_else(|| "Recording".to_string());
 
-    // Preprocess large files to reduce size (Groq direct upload limit is ~25MB)
-    let preprocess_threshold: u64 = 20 * 1024 * 1024; // 20 MB
-    let (upload_path, cleanup_path): (PathBuf, Option<PathBuf>) =
-        if file_size > preprocess_threshold {
-            // Emit preprocessing status
-            let _ = app.emit(
-                "voicememos-transcription-progress",
-                TranscriptionProgress {
-                    memo_id,
-                    memo_name: memo_name.clone(),
-                    status: "preprocessing".to_string(),
-                    current: 0,
-                    total: 1,
-                    error: None,
-                },
-            );
+    // Get original format from file extension
+    let original_format = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("m4a")
+        .to_string();
+    let original_size = file_size as i64;
 
-            let preprocessed = preprocess_audio_for_transcription(&file_path)?;
-            (preprocessed.clone(), Some(preprocessed))
-        } else {
-            (file_path.clone(), None)
-        };
+    // Always preprocess audio to MP3 for efficient upload
+    // Converts to 16KHz mono MP3 at 64kbps - optimal for Whisper
+    let _ = app.emit(
+        "voicememos-transcription-progress",
+        TranscriptionProgress {
+            memo_id,
+            memo_name: memo_name.clone(),
+            status: "preprocessing".to_string(),
+            current: 0,
+            total: 1,
+            error: None,
+            original_format: Some(original_format.clone()),
+            original_size: Some(original_size),
+            converted_format: None,
+            converted_size: None,
+        },
+    );
 
-    // Emit progress
+    let preprocessed = preprocess_audio_for_transcription(&file_path)?;
+    let upload_path = preprocessed.clone();
+    let cleanup_path = Some(preprocessed);
+
+    // Get converted file size
+    let converted_metadata = fs::metadata(&upload_path)
+        .map_err(|e| format!("Failed to read converted file metadata: {}", e))?;
+    let converted_size = converted_metadata.len() as i64;
+
+    // Emit uploading progress with conversion info
     let _ = app.emit(
         "voicememos-transcription-progress",
         TranscriptionProgress {
@@ -736,6 +753,10 @@ pub async fn transcribe_voicememo(
             current: 0,
             total: 1,
             error: None,
+            original_format: Some(original_format.clone()),
+            original_size: Some(original_size),
+            converted_format: Some("mp3".to_string()),
+            converted_size: Some(converted_size),
         },
     );
 
@@ -746,12 +767,8 @@ pub async fn transcribe_voicememo(
     // Track upload file size for error messages
     let upload_size = file_bytes.len();
 
-    // Determine MIME type based on file extension
-    let (file_name, mime_type) = match upload_path.extension().and_then(|e| e.to_str()) {
-        Some("mp3") => ("audio.mp3", "audio/mpeg"),
-        Some("flac") => ("audio.flac", "audio/flac"),
-        _ => ("audio.m4a", "audio/m4a"),
-    };
+    // Always MP3 after preprocessing
+    let (file_name, mime_type) = ("audio.mp3", "audio/mpeg");
 
     // Create multipart form
     let file_part = reqwest::multipart::Part::bytes(file_bytes)
@@ -774,6 +791,10 @@ pub async fn transcribe_voicememo(
             current: 0,
             total: 1,
             error: None,
+            original_format: Some(original_format.clone()),
+            original_size: Some(original_size),
+            converted_format: Some("mp3".to_string()),
+            converted_size: Some(converted_size),
         },
     );
 
@@ -809,6 +830,10 @@ pub async fn transcribe_voicememo(
                 current: 0,
                 total: 1,
                 error: Some(format!("API error: {} - {}", status, error_text)),
+                original_format: Some(original_format),
+                original_size: Some(original_size),
+                converted_format: Some("mp3".to_string()),
+                converted_size: Some(converted_size),
             },
         );
         return Err(format!("Groq API error: {} - {}", status, error_text));
@@ -843,6 +868,10 @@ pub async fn transcribe_voicememo(
             current: 1,
             total: 1,
             error: None,
+            original_format: Some(original_format),
+            original_size: Some(original_size),
+            converted_format: Some("mp3".to_string()),
+            converted_size: Some(converted_size),
         },
     );
 
@@ -885,6 +914,10 @@ pub async fn transcribe_voicememos_batch(
                 current: (i + 1) as i32,
                 total: total as i32,
                 error: None,
+                original_format: None,
+                original_size: None,
+                converted_format: None,
+                converted_size: None,
             },
         );
 

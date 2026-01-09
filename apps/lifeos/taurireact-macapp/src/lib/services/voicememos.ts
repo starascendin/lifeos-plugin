@@ -45,10 +45,15 @@ export interface TranscriptionResult {
 export interface TranscriptionProgress {
   memo_id: number;
   memo_name: string;
-  status: "uploading" | "transcribing" | "complete" | "error";
+  status: "preprocessing" | "uploading" | "transcribing" | "complete" | "error";
   current: number;
   total: number;
   error: string | null;
+  // Conversion info
+  original_format: string | null;
+  original_size: number | null;
+  converted_format: string | null;
+  converted_size: number | null;
 }
 
 export interface TranscriptionEligibility {
