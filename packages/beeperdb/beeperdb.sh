@@ -224,7 +224,7 @@ beeperdb_export_sqlite() {
   acct_path_sql="$(beeperdb_sql_escape_squotes "$acct_db")"
 
   {
-    echo "PRAGMA journal_mode=WAL;"
+    echo "PRAGMA journal_mode=DELETE;"
     echo "PRAGMA synchronous=NORMAL;"
     echo "PRAGMA foreign_keys=ON;"
 
