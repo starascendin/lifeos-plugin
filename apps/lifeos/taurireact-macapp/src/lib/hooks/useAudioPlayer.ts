@@ -16,7 +16,7 @@ export interface UseAudioPlayerOptions {
 
 export interface UseAudioPlayerReturn {
   /** Ref to attach to audio element */
-  audioRef: React.RefObject<HTMLAudioElement>;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
   /** Current audio source URL (blob URL or remote URL) */
   audioSrc: string | null;
   /** Whether audio is currently playing */

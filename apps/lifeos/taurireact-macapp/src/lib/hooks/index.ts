@@ -22,7 +22,7 @@ export { useConvexSync, type UseConvexSyncReturn } from "./useConvexSync";
 export { useApiKeys } from "./useApiKeys";
 
 // Audio visualizer (existing)
-export { useAudioVisualizer } from "./useAudioVisualizer";
+export { useTrackVolume, useMultibandVolume, useStreamVolume } from "./useAudioVisualizer";
 
 // Screen time sync (existing)
 export { useScreenTimeSync } from "./useScreenTimeSync";
