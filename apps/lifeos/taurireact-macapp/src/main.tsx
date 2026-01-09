@@ -13,7 +13,6 @@ import LifeOSApp from "./LifeOSApp";
 import { ConfigProvider } from "./lib/config";
 import { isTauri, isCapacitor } from "./lib/platform";
 import { AppUrlListener } from "./components/auth/AppUrlListener";
-import { CapOAuthStart } from "./components/auth/CapOAuthStart";
 import "./App.css";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -67,7 +66,6 @@ async function initializeApp() {
                     />
                   }
                 />
-                <Route path="/cap-oauth-start" element={<CapOAuthStart />} />
                 <Route path="/lifeos/*" element={<LifeOSApp />} />
               </Routes>
             </HashRouter>
