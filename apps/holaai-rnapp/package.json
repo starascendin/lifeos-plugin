@@ -19,6 +19,7 @@
     "ios:device:dev": "bash scripts/ios-device-dev.sh",
     "ios:device:release": "bash scripts/ios-device-release.sh",
     "ios:device:release:staging": "bash scripts/ios-device-release-staging.sh",
+    "ios:device:release:prod": "bash scripts/ios-device-release-prod.sh",
     "ios:sim": "expo run:ios",
     "device:list": "xcrun xctrace list devices"
   },
