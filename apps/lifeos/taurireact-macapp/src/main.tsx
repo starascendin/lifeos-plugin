@@ -11,9 +11,7 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
 import LifeOSApp from "./LifeOSApp";
 import { ConfigProvider } from "./lib/config";
-import { isTauri, isCapacitor } from "./lib/platform";
-import { AppUrlListener } from "./components/auth/AppUrlListener";
-import { CapOAuthStart } from "./components/auth/CapOAuthStart";
+import { isTauri } from "./lib/platform";
 import "./App.css";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
@@ -37,45 +35,34 @@ async function initializeApp() {
     clerkInstance = await initClerk(clerkPublishableKey);
   }
 
-  const allowLifeosRedirectProtocol =
-    isCapacitor ||
-    (typeof window !== "undefined" &&
-      typeof window.location?.hash === "string" &&
-      window.location.hash.startsWith("#/cap-oauth-start"));
-
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <ClerkProvider
         {...(clerkInstance ? { Clerk: clerkInstance as any } : {})}
         publishableKey={clerkPublishableKey}
-        allowedRedirectProtocols={
-          isTauri ? ["tauri:"] : allowLifeosRedirectProtocol ? ["lifeos:"] : undefined
-        }
+        allowedRedirectProtocols={isTauri ? ["tauri:"] : undefined}
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
           <ConfigProvider>
             <HashRouter>
-              {/* Capacitor URL listener for OAuth callbacks */}
-              {isCapacitor && <AppUrlListener />}
-	              <Routes>
-                {/* On web/Capacitor, redirect / to /lifeos. On Tauri, show menu bar app */}
+              <Routes>
+                {/* On web, redirect / to /lifeos. On Tauri, show menu bar app */}
                 <Route
                   path="/"
                   element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
                 />
-	                <Route
-	                  path="/sso-callback"
-	                  element={
-	                    <AuthenticateWithRedirectCallback
-	                      // HashRouter: these should include the hash.
-	                      signInFallbackRedirectUrl="/#/lifeos"
-	                      signUpFallbackRedirectUrl="/#/lifeos"
-	                    />
-	                  }
-	                />
-	                <Route path="/cap-oauth-start" element={<CapOAuthStart />} />
-	                <Route path="/lifeos/*" element={<LifeOSApp />} />
-	              </Routes>
+                <Route
+                  path="/sso-callback"
+                  element={
+                    <AuthenticateWithRedirectCallback
+                      // HashRouter: these should include the hash.
+                      signInFallbackRedirectUrl="/#/lifeos"
+                      signUpFallbackRedirectUrl="/#/lifeos"
+                    />
+                  }
+                />
+                <Route path="/lifeos/*" element={<LifeOSApp />} />
+              </Routes>
             </HashRouter>
           </ConfigProvider>
         </ConvexProviderWithClerk>

@@ -1,6 +1,6 @@
 import { useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 import { useState, useRef } from "react";
-import { isTauri, isCapacitor } from "@/lib/platform";
+import { isTauri } from "@/lib/platform";
 
 export function SignIn() {
   const { signIn, isLoaded: isSignInLoaded } = useSignIn();
@@ -210,64 +210,6 @@ export function SignIn() {
 
         // Open the OAuth URL in external browser
         await open(externalUrl.toString());
-
-      } else if (isCapacitor) {
-        // For Capacitor (iOS/Android): Use URL scheme callback
-        console.log("[SignIn] Using Capacitor OAuth flow with URL scheme callback...");
-
-        // Import Capacitor Browser plugin
-        const { Browser } = await import("@capacitor/browser");
-
-        // Clerk OAuth must be started from the same browser session that will follow the
-        // `externalVerificationRedirectURL` (cookies/state are not shared between the
-        // WKWebView and the system browser on iOS).
-        //
-        // So: open a hosted "/#/cap-oauth-start" route in the system browser, which
-        // performs `signIn.create({ redirectUrl })` and then redirects to Google.
-        //
-        // Clerk's `redirect_url` for OAuth must be http(s). We use a hosted callback page
-        // that immediately deep-links back into the app (lifeos://callback?...).
-        //
-        // Prefer deriving from the current origin when the app is served from http(s)
-        // (e.g. production uses Capacitor `server.url` -> https://www.rjlabs.dev).
-        const envRedirectUrl = import.meta.env
-          .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
-
-        const startOrigin = window.location.origin.startsWith("http")
-          ? window.location.origin
-          : envRedirectUrl && /^https?:\/\//.test(envRedirectUrl)
-            ? new URL(envRedirectUrl).origin
-            : undefined;
-
-        if (!startOrigin) {
-          throw new Error(
-            "Invalid OAuth redirect URL for Capacitor. Serve the app from an https origin (via CAP_SERVER_URL_PROD) or set VITE_CLERK_OAUTH_REDIRECT_URL to an https URL (e.g. https://www.rjlabs.dev/clerk-callback.html)."
-          );
-        }
-
-        const redirectUrlForClerk =
-          envRedirectUrl && /^https?:\/\//.test(envRedirectUrl)
-            ? envRedirectUrl
-            : `${startOrigin.replace(/\/$/, "")}/clerk-callback.html`;
-
-        if (!startOrigin) {
-          throw new Error(
-            "Cannot determine OAuth start origin for Capacitor. Ensure the app is served from an http(s) origin (e.g. CAP_SERVER_URL in dev or CAP_SERVER_URL_PROD in prod), or set VITE_CLERK_OAUTH_REDIRECT_URL to an http(s) URL so its origin can be used."
-          );
-        }
-
-        const startUrl = new URL(`${startOrigin}/#/cap-oauth-start`);
-        startUrl.searchParams.set("strategy", "oauth_google");
-        startUrl.searchParams.set("redirect_url", redirectUrlForClerk);
-
-        console.log("[SignIn] Opening OAuth start page:", startUrl.toString());
-
-        // Open in system browser (SFSafariViewController/Custom Tabs).
-        // AppUrlListener will handle the deep-link callback back into the app.
-        await Browser.open({ url: startUrl.toString() });
-
-        // Note: The AppUrlListener component handles the OAuth callback
-        // and completes the authentication flow
 
       } else {
         // For web: Use standard redirect flow
