@@ -1,0 +1,57 @@
+# OSX
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Xcode
+ios/build/
+ios/Pods/
+ios/.xcode.env.local
+*.xcworkspace
+!ios/*.xcworkspace
+*.xcodeproj/xcuserdata
+*.xcodeproj/project.xcworkspace/xcuserdata
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+*.apk
+*.aab
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Metro
+.metro-health-check*
+
+# Environment files (encrypted versions are ok)
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+!*.env.age
+
+# Testing
+coverage/
+
+# Temporary files
+*.log
+*.tmp
+*.temp
