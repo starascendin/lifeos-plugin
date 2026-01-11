@@ -23,13 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
-
-# Capacitor native projects
-ios/
-ios-prod/
-android/
-android-prod/
-*.xcworkspace
-*.xcodeproj
-Pods/
-.gradle/

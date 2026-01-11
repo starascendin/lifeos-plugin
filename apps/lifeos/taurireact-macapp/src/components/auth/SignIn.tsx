@@ -1,6 +1,6 @@
 import { useSignIn, useSignUp, useClerk } from "@clerk/clerk-react";
 import { useState, useRef } from "react";
-import { isTauri, isCapacitor } from "@/lib/platform";
+import { isTauri } from "@/lib/platform";
 
 export function SignIn() {
   const { signIn, isLoaded: isSignInLoaded } = useSignIn();
@@ -202,52 +202,6 @@ export function SignIn() {
 
         // Open the OAuth URL in external browser
         await open(externalUrl.toString());
-
-      } else if (isCapacitor) {
-        // For Capacitor (iOS/Android): Use URL scheme callback
-        console.log("[SignIn] Using Capacitor OAuth flow with URL scheme callback...");
-
-        // Import Capacitor Browser plugin
-        const { Browser } = await import("@capacitor/browser");
-
-        // Clerk validates `redirect_url` as http(s). For Capacitor, we use an http(s)
-        // callback page that then deep-links back into the app (lifeos://callback).
-        const redirectUrlFromEnv = import.meta.env
-          .VITE_CLERK_OAUTH_REDIRECT_URL as string | undefined;
-        const defaultRedirectUrl = window.location.origin.startsWith("http")
-          ? `${window.location.origin}/clerk-callback.html`
-          : undefined;
-
-        const redirectUrl = redirectUrlFromEnv ?? defaultRedirectUrl;
-        if (!redirectUrl || !/^https?:\/\//.test(redirectUrl)) {
-          throw new Error(
-            "Invalid OAuth redirect URL for Capacitor. Set VITE_CLERK_OAUTH_REDIRECT_URL to an http(s) URL (e.g. http://localhost:1420/clerk-callback.html) and ensure the app is served from that origin."
-          );
-        }
-
-        console.log("[SignIn] Creating OAuth flow with redirect:", redirectUrl);
-
-        const result = await (signIn as any).create({
-          strategy: "oauth_google",
-          redirectUrl,
-        });
-
-        console.log("[SignIn] signIn.create result:", result);
-
-        // Get the external verification URL
-        const externalUrl = result.firstFactorVerification?.externalVerificationRedirectURL;
-
-        if (!externalUrl) {
-          throw new Error("No external verification URL returned from Clerk");
-        }
-
-        console.log("[SignIn] Opening in-app browser:", externalUrl);
-
-        // Open in in-app browser - AppUrlListener will handle the callback
-        await Browser.open({ url: externalUrl.toString() });
-
-        // Note: The AppUrlListener component handles the OAuth callback
-        // and completes the authentication flow
 
       } else {
         // For web: Use standard redirect flow
