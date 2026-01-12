@@ -3,16 +3,22 @@ import ReactDOM from "react-dom/client";
 import {
   AuthenticateWithRedirectCallback,
   ClerkProvider,
-  useAuth,
 } from "@clerk/clerk-react";
 import { ConvexReactClient } from "convex/react";
+import { ConvexProviderWithAuth } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
 import LifeOSApp from "./LifeOSApp";
 import { ConfigProvider } from "./lib/config";
-import { isTauri } from "./lib/platform";
+import { isCapacitor, isTauri } from "./lib/platform";
 import "./App.css";
+import {
+  CapacitorAuthProvider,
+  getApiBaseUrlForCapacitor,
+  useConvexAuthFromCapacitor,
+} from "@/lib/auth/capacitorAuth";
+import { useAuth as usePlatformAuth } from "@/lib/auth/platformClerk";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -35,38 +41,52 @@ async function initializeApp() {
     clerkInstance = await initClerk(clerkPublishableKey);
   }
 
+  const appTree = (
+    <ConfigProvider>
+      <HashRouter>
+        <Routes>
+          {/* On web, redirect / to /lifeos. On Tauri, show menu bar app */}
+          <Route
+            path="/"
+            element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
+          />
+          {!isCapacitor && (
+            <Route
+              path="/sso-callback"
+              element={
+                <AuthenticateWithRedirectCallback
+                  // HashRouter: these should include the hash.
+                  signInFallbackRedirectUrl="/#/lifeos"
+                  signUpFallbackRedirectUrl="/#/lifeos"
+                />
+              }
+            />
+          )}
+          <Route path="/lifeos/*" element={<LifeOSApp />} />
+        </Routes>
+      </HashRouter>
+    </ConfigProvider>
+  );
+
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <ClerkProvider
-        {...(clerkInstance ? { Clerk: clerkInstance as any } : {})}
-        publishableKey={clerkPublishableKey}
-        allowedRedirectProtocols={isTauri ? ["tauri:"] : undefined}
-      >
-        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <ConfigProvider>
-            <HashRouter>
-              <Routes>
-                {/* On web, redirect / to /lifeos. On Tauri, show menu bar app */}
-                <Route
-                  path="/"
-                  element={isTauri ? <App /> : <Navigate to="/lifeos" replace />}
-                />
-                <Route
-                  path="/sso-callback"
-                  element={
-                    <AuthenticateWithRedirectCallback
-                      // HashRouter: these should include the hash.
-                      signInFallbackRedirectUrl="/#/lifeos"
-                      signUpFallbackRedirectUrl="/#/lifeos"
-                    />
-                  }
-                />
-                <Route path="/lifeos/*" element={<LifeOSApp />} />
-              </Routes>
-            </HashRouter>
-          </ConfigProvider>
-        </ConvexProviderWithClerk>
-      </ClerkProvider>
+      {isCapacitor ? (
+        <CapacitorAuthProvider apiBaseUrl={getApiBaseUrlForCapacitor()}>
+          <ConvexProviderWithAuth client={convex} useAuth={useConvexAuthFromCapacitor}>
+            {appTree}
+          </ConvexProviderWithAuth>
+        </CapacitorAuthProvider>
+      ) : (
+        <ClerkProvider
+          {...(clerkInstance ? { Clerk: clerkInstance as any } : {})}
+          publishableKey={clerkPublishableKey}
+          allowedRedirectProtocols={isTauri ? ["tauri:"] : undefined}
+        >
+          <ConvexProviderWithClerk client={convex} useAuth={usePlatformAuth}>
+            {appTree}
+          </ConvexProviderWithClerk>
+        </ClerkProvider>
+      )}
     </React.StrictMode>
   );
 }

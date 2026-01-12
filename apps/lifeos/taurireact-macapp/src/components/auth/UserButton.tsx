@@ -1,4 +1,4 @@
-import { useUser, useClerk } from "@clerk/clerk-react";
+import { useUser, useClerk } from "@/lib/auth/platformClerk";
 import { useState, useRef, useEffect } from "react";
 
 export function UserButton() {

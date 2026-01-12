@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/lib/auth/platformClerk";
 import { api } from "@holaai/convex";
 import type { Doc, Id } from "@holaai/convex";
 import {

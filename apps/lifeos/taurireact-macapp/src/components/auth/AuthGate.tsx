@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/lib/auth/platformClerk";
 import { useEnsureUser } from "../../lib/hooks/useEnsureUser";
 
 interface AuthGateProps {

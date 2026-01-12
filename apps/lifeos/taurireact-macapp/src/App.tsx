@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { SignedIn, SignedOut } from "@/lib/auth/platformClerk";
 import { AuthGate } from "./components/auth/AuthGate";
-import { SignIn } from "./components/auth/SignIn";
+import { SignInEntry } from "./components/auth/SignInEntry";
 import { MainContent } from "./components/MainContent";
 import { SyncProvider } from "./lib/contexts/SyncContext";
 import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
@@ -38,7 +38,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="system">
       <SignedOut>
-        <SignIn />
+        <SignInEntry />
       </SignedOut>
       <SignedIn>
         <AuthGate>

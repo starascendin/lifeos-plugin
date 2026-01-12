@@ -14,7 +14,7 @@ import {
 import { useSidebar } from "@/lib/contexts/SidebarContext";
 import { useVoiceAgent } from "@/lib/contexts/VoiceAgentContext";
 import { cn } from "@/lib/utils";
-import { useClerk, useUser } from "@clerk/clerk-react";
+import { useClerk, useUser } from "@/lib/auth/platformClerk";
 import { Link, useLocation } from "react-router-dom";
 import {
   Bot,

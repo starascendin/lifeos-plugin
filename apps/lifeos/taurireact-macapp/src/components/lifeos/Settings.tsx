@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTheme } from "@/lib/contexts/ThemeContext";
 import { useApiKeys } from "@/lib/hooks/useApiKeys";
-import { useUser } from "@clerk/clerk-react";
+import { useUser } from "@/lib/auth/platformClerk";
 import { api } from "@holaai/convex";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { Check, CheckCircle, Clock, Coins, Eye, EyeOff, ExternalLink, History, Infinity, Key, Loader2, Mic, Monitor, Moon, Send, Settings2, Sparkles, Sun, Trash2, XCircle } from "lucide-react";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/lib/auth/platformClerk";
 import { useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 

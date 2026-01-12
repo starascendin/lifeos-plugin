@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/lib/auth/platformClerk";
 import { ChevronLeft, CheckCircle2, XCircle, Loader2, Key, Layers } from "lucide-react";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";

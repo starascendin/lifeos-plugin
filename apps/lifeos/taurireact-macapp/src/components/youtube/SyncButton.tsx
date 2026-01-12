@@ -1,4 +1,4 @@
-import { useSession } from "@clerk/clerk-react";
+import { useSession } from "@/lib/auth/platformClerk";
 import { useYouTubeSync } from "../../lib/contexts/SyncContext";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ export function SyncButton() {
   useEffect(() => {
     if (session?.user?.externalAccounts) {
       const googleAccount = session.user.externalAccounts.find(
-        (account) => account.provider === "google"
+        (account: any) => account.provider === "google"
       );
       setHasYouTubeAccess(!!googleAccount);
     }

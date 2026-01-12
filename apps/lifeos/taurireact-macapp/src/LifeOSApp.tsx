@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { SignedIn, SignedOut } from "@/lib/auth/platformClerk";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { SignIn } from "./components/auth/SignIn";
+import { SignInEntry } from "./components/auth/SignInEntry";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
@@ -79,7 +79,7 @@ export default function LifeOSApp() {
     <ThemeProvider defaultTheme="dark">
       <TooltipProvider delayDuration={300}>
         <SignedOut>
-          <SignIn />
+          <SignInEntry />
         </SignedOut>
         <SignedIn>
           <AuthGate>
