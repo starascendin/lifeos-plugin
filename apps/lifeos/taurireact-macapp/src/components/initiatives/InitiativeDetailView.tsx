@@ -27,8 +27,8 @@ import {
   InitiativeProgressRing,
 } from "./InitiativeProgressBar";
 import { InitiativeForm } from "./InitiativeForm";
-import { LinkProjectsDialog } from "./LinkProjectsDialog";
-import { LinkHabitsDialog } from "./LinkHabitsDialog";
+import { LinkProjectsDropdown } from "./LinkProjectsDialog";
+import { LinkHabitsDropdown } from "./LinkHabitsDialog";
 import {
   INITIATIVE_CATEGORIES,
   type InitiativeCategory,
@@ -45,7 +45,6 @@ import {
   CheckSquare,
   ExternalLink,
   LinkIcon,
-  Plus,
   Briefcase,
   Heart,
   BookOpen,
@@ -108,8 +107,6 @@ export function InitiativeDetailView({
   const navigate = useNavigate();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showLinkProjects, setShowLinkProjects] = useState(false);
-  const [showLinkHabits, setShowLinkHabits] = useState(false);
 
   // Queries
   const initiative = useQuery(initiativesApi.getInitiative, { initiativeId });
@@ -345,14 +342,15 @@ export function InitiativeDetailView({
                   <FolderKanban className="h-4 w-4" />
                   Linked Projects ({projectCount})
                 </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowLinkProjects(true)}
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Link Project
-                </Button>
+                <LinkProjectsDropdown
+                  initiativeId={initiativeId}
+                  initiativeColor={displayColor}
+                  currentlyLinkedIds={
+                    linkedProjects?.map(
+                      (p: Doc<"lifeos_pmProjects">) => p._id,
+                    ) ?? []
+                  }
+                />
               </div>
             </CardHeader>
             <CardContent>
@@ -403,14 +401,13 @@ export function InitiativeDetailView({
                   <Target className="h-4 w-4" />
                   Linked Habits ({habitCount})
                 </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowLinkHabits(true)}
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Link Habit
-                </Button>
+                <LinkHabitsDropdown
+                  initiativeId={initiativeId}
+                  initiativeColor={displayColor}
+                  currentlyLinkedIds={
+                    linkedHabits?.map((h: Doc<"lifeos_habits">) => h._id) ?? []
+                  }
+                />
               </div>
             </CardHeader>
             <CardContent>
@@ -484,28 +481,6 @@ export function InitiativeDetailView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Link Projects Dialog */}
-      <LinkProjectsDialog
-        open={showLinkProjects}
-        onOpenChange={setShowLinkProjects}
-        initiativeId={initiativeId}
-        initiativeColor={displayColor}
-        currentlyLinkedIds={
-          linkedProjects?.map((p: Doc<"lifeos_pmProjects">) => p._id) ?? []
-        }
-      />
-
-      {/* Link Habits Dialog */}
-      <LinkHabitsDialog
-        open={showLinkHabits}
-        onOpenChange={setShowLinkHabits}
-        initiativeId={initiativeId}
-        initiativeColor={displayColor}
-        currentlyLinkedIds={
-          linkedHabits?.map((h: Doc<"lifeos_habits">) => h._id) ?? []
-        }
-      />
     </div>
   );
 }

@@ -1,213 +1,167 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id, Doc } from "@holaai/convex";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Target, Check, Loader2 } from "lucide-react";
+import { Plus, Check, Target } from "lucide-react";
 
 // Note: These API paths will be available after running `convex codegen`
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const habitsApi = (api as any).lifeos.habits;
 
-interface LinkHabitsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface LinkHabitsDropdownProps {
   initiativeId: Id<"lifeos_yearlyInitiatives">;
   initiativeColor?: string;
   currentlyLinkedIds: Id<"lifeos_habits">[];
 }
 
-export function LinkHabitsDialog({
-  open,
-  onOpenChange,
+export function LinkHabitsDropdown({
   initiativeId,
   initiativeColor = "#6366f1",
   currentlyLinkedIds,
-}: LinkHabitsDialogProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<Id<"lifeos_habits">>>(
-    new Set(currentlyLinkedIds),
-  );
-  const [isSaving, setIsSaving] = useState(false);
+}: LinkHabitsDropdownProps) {
+  const [open, setOpen] = useState(false);
 
   // Get all user's habits
   const allHabits = useQuery(habitsApi.getHabits, {});
   const updateHabit = useMutation(habitsApi.updateHabit);
 
-  // Reset selection when dialog opens
-  useEffect(() => {
-    if (open) {
-      setSelectedIds(new Set(currentlyLinkedIds));
-    }
-  }, [open, currentlyLinkedIds]);
+  const linkedSet = useMemo(
+    () => new Set(currentlyLinkedIds),
+    [currentlyLinkedIds],
+  );
 
-  const handleToggle = (habitId: Id<"lifeos_habits">) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(habitId)) {
-        next.delete(habitId);
-      } else {
-        next.add(habitId);
-      }
-      return next;
-    });
-  };
+  const handleToggle = async (habit: Doc<"lifeos_habits">) => {
+    const isCurrentlyLinked = linkedSet.has(habit._id);
 
-  const handleSave = async () => {
-    setIsSaving(true);
     try {
-      const currentSet = new Set(currentlyLinkedIds);
-      const newSet = selectedIds;
-
-      // Find habits to link (in newSet but not in currentSet)
-      const toLink = [...newSet].filter((id) => !currentSet.has(id));
-
-      // Find habits to unlink (in currentSet but not in newSet)
-      const toUnlink = [...currentSet].filter((id) => !newSet.has(id));
-
-      // Perform updates
-      await Promise.all([
-        ...toLink.map((habitId) => updateHabit({ habitId, initiativeId })),
-        ...toUnlink.map((habitId) =>
-          updateHabit({ habitId, initiativeId: null }),
-        ),
-      ]);
-
-      onOpenChange(false);
+      await updateHabit({
+        habitId: habit._id,
+        initiativeId: isCurrentlyLinked ? null : initiativeId,
+      });
     } catch (error) {
-      console.error("Failed to update habit links:", error);
-    } finally {
-      setIsSaving(false);
+      console.error("Failed to update habit link:", error);
     }
   };
 
-  const hasChanges = () => {
-    const currentSet = new Set(currentlyLinkedIds);
-    if (currentSet.size !== selectedIds.size) return true;
-    for (const id of selectedIds) {
-      if (!currentSet.has(id)) return true;
+  // Separate linked and available habits
+  const { linkedHabits, availableHabits } = useMemo(() => {
+    if (!allHabits) return { linkedHabits: [], availableHabits: [] };
+
+    const linked: Doc<"lifeos_habits">[] = [];
+    const available: Doc<"lifeos_habits">[] = [];
+
+    for (const habit of allHabits) {
+      if (linkedSet.has(habit._id)) {
+        linked.push(habit);
+      } else if (!habit.initiativeId) {
+        // Only show unlinked habits as available
+        available.push(habit);
+      }
     }
-    return false;
-  };
+
+    return { linkedHabits: linked, availableHabits: available };
+  }, [allHabits, linkedSet]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Link Habits
-          </DialogTitle>
-          <DialogDescription>
-            Select habits to link to this initiative. Linked habits help track
-            consistency toward your goals.
-          </DialogDescription>
-        </DialogHeader>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Plus className="h-3 w-3 mr-1" />
+          Link Habit
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0" align="end">
+        <Command>
+          <CommandInput placeholder="Search habits..." />
+          <CommandList>
+            <CommandEmpty>
+              <div className="py-4 text-center text-sm text-muted-foreground">
+                <Target className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                No habits found
+              </div>
+            </CommandEmpty>
 
-        <ScrollArea className="max-h-[400px] pr-4">
-          {allHabits === undefined ? (
-            <div className="space-y-2">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-lg" />
-              ))}
-            </div>
-          ) : allHabits.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No habits found</p>
-              <p className="text-xs">Create a habit first to link it here</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {allHabits.map((habit: Doc<"lifeos_habits">) => {
-                const isSelected = selectedIds.has(habit._id);
-                const isLinkedToOther =
-                  habit.initiativeId && habit.initiativeId !== initiativeId;
-
-                return (
-                  <button
+            {linkedHabits.length > 0 && (
+              <CommandGroup heading="Linked">
+                {linkedHabits.map((habit) => (
+                  <CommandItem
                     key={habit._id}
-                    onClick={() => !isLinkedToOther && handleToggle(habit._id)}
-                    disabled={isLinkedToOther}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
-                      isLinkedToOther
-                        ? "opacity-50 cursor-not-allowed bg-muted/30"
-                        : isSelected
-                          ? "border-primary bg-primary/5"
-                          : "hover:bg-accent/50"
-                    }`}
+                    value={habit.name}
+                    onSelect={() => handleToggle(habit)}
+                    className="cursor-pointer"
                   >
-                    <Checkbox
-                      checked={isSelected}
-                      disabled={isLinkedToOther}
-                      className="pointer-events-none"
-                    />
-                    <div
-                      className="w-2 h-8 rounded-full shrink-0"
-                      style={{
-                        backgroundColor: isSelected
-                          ? initiativeColor
-                          : habit.color || "#6366f1",
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate flex items-center gap-2">
-                        {habit.icon && <span>{habit.icon}</span>}
-                        {habit.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span className="capitalize">{habit.frequency}</span>
-                        {isLinkedToOther && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            Linked to another
-                          </Badge>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 flex-1">
+                      <div
+                        className="w-2 h-4 rounded-full shrink-0"
+                        style={{ backgroundColor: initiativeColor }}
+                      />
+                      {habit.icon && (
+                        <span className="text-sm">{habit.icon}</span>
+                      )}
+                      <span className="truncate">{habit.name}</span>
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-[10px] capitalize"
+                      >
+                        {habit.frequency}
+                      </Badge>
                     </div>
-                    {isSelected && (
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </ScrollArea>
-
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving || !hasChanges()}>
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                Save Changes
-                {hasChanges() && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {selectedIds.size}
-                  </Badge>
-                )}
-              </>
+                    <Check className="h-4 w-4 text-primary ml-2" />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+            {availableHabits.length > 0 && (
+              <CommandGroup heading="Available">
+                {availableHabits.map((habit) => (
+                  <CommandItem
+                    key={habit._id}
+                    value={habit.name}
+                    onSelect={() => handleToggle(habit)}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 flex-1">
+                      <div
+                        className="w-2 h-4 rounded-full shrink-0"
+                        style={{ backgroundColor: habit.color || "#6366f1" }}
+                      />
+                      {habit.icon && (
+                        <span className="text-sm">{habit.icon}</span>
+                      )}
+                      <span className="truncate">{habit.name}</span>
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-[10px] capitalize"
+                      >
+                        {habit.frequency}
+                      </Badge>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
+
+// Keep old export name for backward compatibility, but it's now a dropdown
+export { LinkHabitsDropdown as LinkHabitsDialog };
