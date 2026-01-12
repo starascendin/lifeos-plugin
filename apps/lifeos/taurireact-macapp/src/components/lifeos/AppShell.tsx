@@ -38,7 +38,7 @@ function AppShellContent({ children }: AppShellProps) {
             isMobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <div className="h-full p-2">
+          <div className="h-full px-2 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
             <Sidebar isMobile />
           </div>
         </div>
