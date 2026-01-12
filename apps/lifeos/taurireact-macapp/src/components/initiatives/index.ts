@@ -10,3 +10,5 @@ export {
   LinkToInitiativeDialog,
   InitiativeSelector,
 } from "./LinkToInitiativeDialog";
+export { LinkProjectsDialog } from "./LinkProjectsDialog";
+export { LinkHabitsDialog } from "./LinkHabitsDialog";

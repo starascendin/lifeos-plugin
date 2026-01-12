@@ -27,6 +27,8 @@ import {
   InitiativeProgressRing,
 } from "./InitiativeProgressBar";
 import { InitiativeForm } from "./InitiativeForm";
+import { LinkProjectsDialog } from "./LinkProjectsDialog";
+import { LinkHabitsDialog } from "./LinkHabitsDialog";
 import {
   INITIATIVE_CATEGORIES,
   type InitiativeCategory,
@@ -106,6 +108,8 @@ export function InitiativeDetailView({
   const navigate = useNavigate();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLinkProjects, setShowLinkProjects] = useState(false);
+  const [showLinkHabits, setShowLinkHabits] = useState(false);
 
   // Queries
   const initiative = useQuery(initiativesApi.getInitiative, { initiativeId });
@@ -344,7 +348,7 @@ export function InitiativeDetailView({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate("/lifeos/pm/projects")}
+                  onClick={() => setShowLinkProjects(true)}
                 >
                   <Plus className="h-3 w-3 mr-1" />
                   Link Project
@@ -402,7 +406,7 @@ export function InitiativeDetailView({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate("/lifeos/habits")}
+                  onClick={() => setShowLinkHabits(true)}
                 >
                   <Plus className="h-3 w-3 mr-1" />
                   Link Habit
@@ -480,6 +484,28 @@ export function InitiativeDetailView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Link Projects Dialog */}
+      <LinkProjectsDialog
+        open={showLinkProjects}
+        onOpenChange={setShowLinkProjects}
+        initiativeId={initiativeId}
+        initiativeColor={displayColor}
+        currentlyLinkedIds={
+          linkedProjects?.map((p: Doc<"lifeos_pmProjects">) => p._id) ?? []
+        }
+      />
+
+      {/* Link Habits Dialog */}
+      <LinkHabitsDialog
+        open={showLinkHabits}
+        onOpenChange={setShowLinkHabits}
+        initiativeId={initiativeId}
+        initiativeColor={displayColor}
+        currentlyLinkedIds={
+          linkedHabits?.map((h: Doc<"lifeos_habits">) => h._id) ?? []
+        }
+      />
     </div>
   );
 }
