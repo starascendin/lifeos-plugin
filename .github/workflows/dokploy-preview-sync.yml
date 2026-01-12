@@ -88,19 +88,36 @@ jobs:
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               "https://api.vercel.com/v13/deployments/$DEPLOYMENT_ID?teamId=$VERCEL_ORG_ID")
 
-            # Debug: show structure
-            echo "Checking deployment env structure..."
+            # Debug: show available keys
+            echo "Deployment response keys:"
+            echo "$DEPLOYMENT_ENV" | jq -r 'keys[]' 2>/dev/null || echo "Failed to parse keys"
 
-            # Try to extract CONVEX_URL - handle both object and array formats
-            # First try as object keys
+            # Debug: show build.env structure
+            echo "Build env structure:"
+            echo "$DEPLOYMENT_ENV" | jq '.build.env | type' 2>/dev/null || echo "No build.env"
+
+            # Debug: show any env-related keys
+            echo "Looking for env vars..."
+            echo "$DEPLOYMENT_ENV" | jq '.build.env // .env // "none found"' 2>/dev/null || echo "No env found"
+
+            # Try multiple locations for CONVEX_URL
+            # 1. Try build.env array format
             CONVEX_URL=$(echo "$DEPLOYMENT_ENV" | jq -r '
-              .build.env // {} |
-              if type == "array" then
-                (.[] | select(.key == "CONVEX_URL" or .key == "VITE_CONVEX_URL") | .value) // empty
-              else
-                (.CONVEX_URL // .VITE_CONVEX_URL // empty)
-              end
-            ' 2>/dev/null || echo "")
+              (.build.env // [])[] | select(.key == "CONVEX_URL" or .key == "VITE_CONVEX_URL" or .key == "NEXT_PUBLIC_CONVEX_URL") | .value
+            ' 2>/dev/null | head -1 || echo "")
+
+            # 2. If not found, try build.env object format
+            if [ -z "$CONVEX_URL" ] || [ "$CONVEX_URL" == "null" ]; then
+              CONVEX_URL=$(echo "$DEPLOYMENT_ENV" | jq -r '
+                .build.env | if type == "object" then (.CONVEX_URL // .VITE_CONVEX_URL // .NEXT_PUBLIC_CONVEX_URL // empty) else empty end
+              ' 2>/dev/null || echo "")
+            fi
+
+            # 3. If still not found, check meta for Convex-related info
+            if [ -z "$CONVEX_URL" ] || [ "$CONVEX_URL" == "null" ]; then
+              echo "Checking meta for Convex info..."
+              echo "$DEPLOYMENT_ENV" | jq '.meta' 2>/dev/null
+            fi
 
             if [ -n "$CONVEX_URL" ] && [ "$CONVEX_URL" != "null" ]; then
               # Convert .convex.cloud to .convex.site for HTTP actions
