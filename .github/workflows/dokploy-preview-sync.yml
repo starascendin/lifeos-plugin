@@ -38,7 +38,7 @@ jobs:
         id: convex-preview
         working-directory: packages/holaaiconvex
         env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_PREVIEW_DEPLOY_KEY }}
         run: |
           # Create a preview name from the branch (sanitize for Convex)
           BRANCH_NAME="${{ github.head_ref }}"
