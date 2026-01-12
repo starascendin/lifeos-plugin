@@ -26,117 +26,59 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Wait for Vercel deployment
-        id: wait-vercel
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Convex CLI
+        run: npm install -g convex
+
+      - name: Deploy Convex Preview
+        id: convex-preview
+        working-directory: packages/holaaiconvex
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
         run: |
-          echo "Waiting for Vercel deployment to complete..."
-
-          # Wait up to 10 minutes for deployment
-          MAX_ATTEMPTS=60
-          ATTEMPT=0
-
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            # Get the latest deployment for this branch
-            DEPLOYMENTS=$(curl -s \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v6/deployments?teamId=$VERCEL_ORG_ID&limit=5&state=READY")
-
-            # Check if any deployment matches our branch
-            BRANCH_NAME="${{ github.head_ref }}"
-            DEPLOYMENT_URL=$(echo "$DEPLOYMENTS" | jq -r ".deployments[] | select(.meta.githubCommitRef == \"$BRANCH_NAME\") | .url" | head -1)
-
-            if [ -n "$DEPLOYMENT_URL" ] && [ "$DEPLOYMENT_URL" != "null" ]; then
-              echo "Found Vercel deployment: $DEPLOYMENT_URL"
-              echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
-              break
-            fi
-
-            echo "Attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS: Deployment not ready yet, waiting 10s..."
-            sleep 10
-            ATTEMPT=$((ATTEMPT + 1))
-          done
-
-          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-            echo "Timeout waiting for Vercel deployment"
-            echo "deployment_url=" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Get Convex Preview URL
-        id: get-convex-url
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        run: |
+          # Create a preview name from the branch (sanitize for Convex)
           BRANCH_NAME="${{ github.head_ref }}"
+          # Replace non-alphanumeric chars with dashes, lowercase
+          PREVIEW_NAME=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+          # Truncate to 32 chars max
+          PREVIEW_NAME="${PREVIEW_NAME:0:32}"
 
-          # Get deployment details to find CONVEX_URL
-          # First, get the deployment ID
-          DEPLOYMENTS=$(curl -s \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v6/deployments?teamId=$VERCEL_ORG_ID&limit=10")
+          echo "Deploying Convex preview: $PREVIEW_NAME"
 
-          DEPLOYMENT_ID=$(echo "$DEPLOYMENTS" | jq -r ".deployments[] | select(.meta.githubCommitRef == \"$BRANCH_NAME\") | .uid" | head -1)
+          # Deploy to preview and capture output
+          DEPLOY_OUTPUT=$(npx convex deploy --preview "$PREVIEW_NAME" 2>&1) || {
+            echo "Deploy output: $DEPLOY_OUTPUT"
+            exit 1
+          }
 
-          if [ -n "$DEPLOYMENT_ID" ] && [ "$DEPLOYMENT_ID" != "null" ]; then
-            echo "Found deployment ID: $DEPLOYMENT_ID"
+          echo "Deploy output:"
+          echo "$DEPLOY_OUTPUT"
 
-            # Get deployment environment variables
-            DEPLOYMENT_ENV=$(curl -s \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v13/deployments/$DEPLOYMENT_ID?teamId=$VERCEL_ORG_ID")
+          # Extract the preview URL from the output
+          # Convex outputs something like "Deployed to https://preview-name-abc123.convex.cloud"
+          CONVEX_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.convex\.cloud' | head -1)
 
-            # Debug: show available keys
-            echo "Deployment response keys:"
-            echo "$DEPLOYMENT_ENV" | jq -r 'keys[]' 2>/dev/null || echo "Failed to parse keys"
-
-            # Debug: show build.env structure
-            echo "Build env structure:"
-            echo "$DEPLOYMENT_ENV" | jq '.build.env | type' 2>/dev/null || echo "No build.env"
-
-            # Debug: show any env-related keys
-            echo "Looking for env vars..."
-            echo "$DEPLOYMENT_ENV" | jq '.build.env // .env // "none found"' 2>/dev/null || echo "No env found"
-
-            # Try multiple locations for CONVEX_URL
-            # 1. Try build.env array format
-            CONVEX_URL=$(echo "$DEPLOYMENT_ENV" | jq -r '
-              (.build.env // [])[] | select(.key == "CONVEX_URL" or .key == "VITE_CONVEX_URL" or .key == "NEXT_PUBLIC_CONVEX_URL") | .value
-            ' 2>/dev/null | head -1 || echo "")
-
-            # 2. If not found, try build.env object format
-            if [ -z "$CONVEX_URL" ] || [ "$CONVEX_URL" == "null" ]; then
-              CONVEX_URL=$(echo "$DEPLOYMENT_ENV" | jq -r '
-                .build.env | if type == "object" then (.CONVEX_URL // .VITE_CONVEX_URL // .NEXT_PUBLIC_CONVEX_URL // empty) else empty end
-              ' 2>/dev/null || echo "")
-            fi
-
-            # 3. If still not found, check meta for Convex-related info
-            if [ -z "$CONVEX_URL" ] || [ "$CONVEX_URL" == "null" ]; then
-              echo "Checking meta for Convex info..."
-              echo "$DEPLOYMENT_ENV" | jq '.meta' 2>/dev/null
-            fi
-
-            if [ -n "$CONVEX_URL" ] && [ "$CONVEX_URL" != "null" ]; then
-              # Convert .convex.cloud to .convex.site for HTTP actions
-              CONVEX_SITE_URL=$(echo "$CONVEX_URL" | sed 's/\.convex\.cloud/.convex.site/')
-              echo "Found Convex URL: $CONVEX_SITE_URL"
-              echo "convex_url=$CONVEX_SITE_URL" >> $GITHUB_OUTPUT
-            else
-              echo "Could not find CONVEX_URL in deployment, using default"
-              echo "convex_url=https://beaming-giraffe-300.convex.site" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "No deployment found for branch $BRANCH_NAME, using default Convex URL"
-            echo "convex_url=https://beaming-giraffe-300.convex.site" >> $GITHUB_OUTPUT
+          if [ -z "$CONVEX_URL" ]; then
+            echo "Could not extract Convex URL from deploy output, constructing it"
+            # Fall back to constructed URL pattern
+            CONVEX_URL="https://${PREVIEW_NAME}.convex.cloud"
           fi
+
+          # Convert .convex.cloud to .convex.site for HTTP actions
+          CONVEX_SITE_URL=$(echo "$CONVEX_URL" | sed 's/\.convex\.cloud/.convex.site/')
+
+          echo "Convex Preview URL: $CONVEX_SITE_URL"
+          echo "convex_url=$CONVEX_SITE_URL" >> $GITHUB_OUTPUT
+          echo "preview_name=$PREVIEW_NAME" >> $GITHUB_OUTPUT
 
       - name: Update Dokploy Preview Environment
         env:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
-          CONVEX_URL: ${{ steps.get-convex-url.outputs.convex_url }}
+          CONVEX_URL: ${{ steps.convex-preview.outputs.convex_url }}
         run: |
           echo "Updating Dokploy previewEnv with CONVEX_URL: $CONVEX_URL"
 
@@ -174,15 +116,17 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const convexUrl = '${{ steps.get-convex-url.outputs.convex_url }}';
-            const body = `## Dokploy Preview Sync
+            const convexUrl = '${{ steps.convex-preview.outputs.convex_url }}';
+            const previewName = '${{ steps.convex-preview.outputs.preview_name }}';
+            const body = `## 🚀 Dokploy Preview Sync
 
             LiveKit Voice Agent preview will use:
+            - **Convex Preview**: \`${previewName}\`
             - **Convex URL**: \`${convexUrl}\`
 
-            The Dokploy preview deployment has been configured to use this Convex backend.
+            The Dokploy preview deployment has been configured to use this Convex preview backend.
 
-            > Note: Preview deployments are created automatically when Dokploy detects the PR.`;
+            > Preview deployments are created automatically when Dokploy detects the PR.`;
 
             // Check if we already commented
             const { data: comments } = await github.rest.issues.listComments({
