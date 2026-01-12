@@ -127,6 +127,38 @@ export const getHabit = query({
 });
 
 /**
+ * Get habits linked to an initiative
+ */
+export const getHabitsByInitiative = query({
+  args: {
+    initiativeId: v.id("lifeos_yearlyInitiatives"),
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Verify initiative belongs to user
+    const initiative = await ctx.db.get(args.initiativeId);
+    if (!initiative || initiative.userId !== user._id) {
+      return [];
+    }
+
+    let habits = await ctx.db
+      .query("lifeos_habits")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", args.initiativeId),
+      )
+      .collect();
+
+    if (!args.includeArchived) {
+      habits = habits.filter((h) => !h.archivedAt);
+    }
+
+    return habits.sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+});
+
+/**
  * Get habit with extended stats
  */
 export const getHabitWithStats = query({
@@ -149,7 +181,7 @@ export const getHabitWithStats = query({
     const monthCheckIns = await ctx.db
       .query("lifeos_habitCheckIns")
       .withIndex("by_habit_date", (q) =>
-        q.eq("habitId", args.habitId).gte("date", startOfMonth)
+        q.eq("habitId", args.habitId).gte("date", startOfMonth),
       )
       .filter((q) => q.lte(q.field("date"), endOfMonth))
       .collect();
@@ -197,7 +229,7 @@ export const getHabitsForDate = query({
     const habits = await ctx.db
       .query("lifeos_habits")
       .withIndex("by_user_active", (q) =>
-        q.eq("userId", user._id).eq("isActive", true)
+        q.eq("userId", user._id).eq("isActive", true),
       )
       .collect();
 
@@ -209,7 +241,7 @@ export const getHabitsForDate = query({
 
     // Filter by schedule
     const scheduledHabits = activeHabits.filter((habit) =>
-      isHabitScheduledForDateInternal(habit, targetDate)
+      isHabitScheduledForDateInternal(habit, targetDate),
     );
 
     // Sort by sortOrder
@@ -222,7 +254,7 @@ export const getHabitsForDate = query({
  */
 function isHabitScheduledForDateInternal(
   habit: Doc<"lifeos_habits">,
-  date: Date
+  date: Date,
 ): boolean {
   if (habit.frequency === "daily") return true;
 
@@ -255,6 +287,7 @@ export const createHabit = mutation({
     icon: v.optional(v.string()),
     color: v.optional(v.string()),
     categoryId: v.optional(v.id("lifeos_habitCategories")),
+    initiativeId: v.optional(v.id("lifeos_yearlyInitiatives")),
     frequency: habitFrequencyValidator,
     targetDays: v.optional(v.array(dayOfWeekValidator)),
   },
@@ -267,6 +300,14 @@ export const createHabit = mutation({
       const category = await ctx.db.get(args.categoryId);
       if (!category || category.userId !== user._id) {
         throw new Error("Category not found or access denied");
+      }
+    }
+
+    // Validate initiative ownership if provided
+    if (args.initiativeId) {
+      const initiative = await ctx.db.get(args.initiativeId);
+      if (!initiative || initiative.userId !== user._id) {
+        throw new Error("Initiative not found or access denied");
       }
     }
 
@@ -287,12 +328,13 @@ export const createHabit = mutation({
 
     const maxSortOrder = existingHabits.reduce(
       (max, h) => Math.max(max, h.sortOrder),
-      -1
+      -1,
     );
 
     const habitId = await ctx.db.insert("lifeos_habits", {
       userId: user._id,
       categoryId: args.categoryId,
+      initiativeId: args.initiativeId,
       name: args.name,
       description: args.description,
       icon: args.icon ?? "✅",
@@ -323,6 +365,9 @@ export const updateHabit = mutation({
     icon: v.optional(v.string()),
     color: v.optional(v.string()),
     categoryId: v.optional(v.id("lifeos_habitCategories")),
+    initiativeId: v.optional(
+      v.union(v.id("lifeos_yearlyInitiatives"), v.null()),
+    ),
     frequency: v.optional(habitFrequencyValidator),
     targetDays: v.optional(v.array(dayOfWeekValidator)),
     isActive: v.optional(v.boolean()),
@@ -344,6 +389,14 @@ export const updateHabit = mutation({
       }
     }
 
+    // Validate new initiative ownership if changing
+    if (args.initiativeId !== undefined && args.initiativeId !== null) {
+      const initiative = await ctx.db.get(args.initiativeId);
+      if (!initiative || initiative.userId !== user._id) {
+        throw new Error("Initiative not found or access denied");
+      }
+    }
+
     const updates: Partial<Doc<"lifeos_habits">> = {
       updatedAt: now,
     };
@@ -353,6 +406,11 @@ export const updateHabit = mutation({
     if (args.icon !== undefined) updates.icon = args.icon;
     if (args.color !== undefined) updates.color = args.color;
     if (args.categoryId !== undefined) updates.categoryId = args.categoryId;
+    // Handle initiative linking: null means unlink, undefined means don't change
+    if (args.initiativeId !== undefined) {
+      updates.initiativeId =
+        args.initiativeId === null ? undefined : args.initiativeId;
+    }
     if (args.frequency !== undefined) {
       updates.frequency = args.frequency;
       // Clear targetDays if switching to daily
@@ -410,7 +468,7 @@ export const moveHabitToCategory = mutation({
 
     const maxSortOrder = existingHabits.reduce(
       (max, h) => Math.max(max, h.sortOrder),
-      -1
+      -1,
     );
 
     await ctx.db.patch(args.habitId, {
@@ -507,7 +565,7 @@ export const deleteHabit = mutation({
  */
 function isHabitScheduledForDate(
   habit: Doc<"lifeos_habits">,
-  date: Date
+  date: Date,
 ): boolean {
   if (habit.frequency === "daily") return true;
 

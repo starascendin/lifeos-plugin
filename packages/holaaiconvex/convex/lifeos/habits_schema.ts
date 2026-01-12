@@ -12,7 +12,7 @@ import { v } from "convex/values";
 
 export const habitFrequencyValidator = v.union(
   v.literal("daily"),
-  v.literal("weekly")
+  v.literal("weekly"),
 );
 
 export const dayOfWeekValidator = v.union(
@@ -22,7 +22,7 @@ export const dayOfWeekValidator = v.union(
   v.literal("wednesday"),
   v.literal("thursday"),
   v.literal("friday"),
-  v.literal("saturday")
+  v.literal("saturday"),
 );
 
 // ==================== TABLE DEFINITIONS ====================
@@ -48,6 +48,8 @@ export const habitsTables = {
   lifeos_habits: defineTable({
     userId: v.id("users"),
     categoryId: v.optional(v.id("lifeos_habitCategories")), // null = uncategorized
+    // Link to yearly initiative (optional)
+    initiativeId: v.optional(v.id("lifeos_yearlyInitiatives")),
     // Habit definition
     name: v.string(),
     description: v.optional(v.string()),
@@ -74,7 +76,8 @@ export const habitsTables = {
     .index("by_user", ["userId"])
     .index("by_category", ["categoryId"])
     .index("by_user_active", ["userId", "isActive"])
-    .index("by_user_order", ["userId", "sortOrder"]),
+    .index("by_user_order", ["userId", "sortOrder"])
+    .index("by_initiative", ["initiativeId"]),
 
   // ==================== HABIT CHECK-INS ====================
   lifeos_habitCheckIns: defineTable({

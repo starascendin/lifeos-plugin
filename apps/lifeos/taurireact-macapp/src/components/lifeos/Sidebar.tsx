@@ -37,6 +37,7 @@ import {
   MessageSquare,
   FolderKanban,
   RefreshCw,
+  Rocket,
   Settings,
   Sparkles,
   Target,
@@ -52,7 +53,11 @@ interface NavItem {
   name: string;
   href?: string;
   icon: React.ComponentType<{ className?: string }>;
-  children?: { name: string; href: string; icon?: React.ComponentType<{ className?: string }> }[];
+  children?: {
+    name: string;
+    href: string;
+    icon?: React.ComponentType<{ className?: string }>;
+  }[];
   onClick?: () => void | Promise<void>;
 }
 
@@ -66,8 +71,11 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const { signOut } = useClerk();
   const { user } = useUser();
   const { isCollapsed, toggleSidebar, closeMobileSidebar } = useSidebar();
-  const { connectionState, connect, disconnect, isConfigured } = useVoiceAgent();
-  const [expandedSections, setExpandedSections] = useState<string[]>(["Projects"]);
+  const { connectionState, connect, disconnect, isConfigured } =
+    useVoiceAgent();
+  const [expandedSections, setExpandedSections] = useState<string[]>([
+    "Projects",
+  ]);
 
   const signOutToLifeOS = async () => {
     // Keep user in the LifeOS route after logout so re-login doesn't land on the background app.
@@ -90,7 +98,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
 
   const toggleSection = (name: string) => {
     setExpandedSections((prev) =>
-      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
     );
   };
 
@@ -98,6 +106,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
     const items: NavItem[] = [
       { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
       { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
+      { name: "Initiatives", href: "/lifeos/initiatives", icon: Rocket },
       {
         name: "Projects",
         href: "/lifeos/pm",
@@ -124,9 +133,17 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
         href: "/lifeos/proxy-council",
         icon: Users,
         children: [
-          { name: "Proxy Council", href: "/lifeos/proxy-council", icon: Network },
+          {
+            name: "Proxy Council",
+            href: "/lifeos/proxy-council",
+            icon: Network,
+          },
           { name: "Council API", href: "/lifeos/council-api", icon: Cpu },
-          { name: "Chat Nexus", href: "/lifeos/chatnexus", icon: MessageSquare },
+          {
+            name: "Chat Nexus",
+            href: "/lifeos/chatnexus",
+            icon: MessageSquare,
+          },
           { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
         ],
       },
@@ -218,11 +235,16 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={connectionState === "connected" ? "default" : "outline"}
+                variant={
+                  connectionState === "connected" ? "default" : "outline"
+                }
                 className={cn(
                   "w-full transition-all",
-                  effectiveCollapsed ? "justify-center p-3" : "justify-start gap-3",
-                  connectionState === "connected" && "bg-primary hover:bg-primary/90",
+                  effectiveCollapsed
+                    ? "justify-center p-3"
+                    : "justify-start gap-3",
+                  connectionState === "connected" &&
+                    "bg-primary hover:bg-primary/90",
                 )}
                 onClick={() => {
                   if (connectionState === "connected") {
@@ -234,10 +256,12 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
                 disabled={!isConfigured || connectionState === "connecting"}
               >
                 <div className="relative">
-                  <Sparkles className={cn(
-                    "h-5 w-5",
-                    connectionState === "connecting" && "animate-pulse"
-                  )} />
+                  <Sparkles
+                    className={cn(
+                      "h-5 w-5",
+                      connectionState === "connecting" && "animate-pulse",
+                    )}
+                  />
                   {connectionState === "connected" && (
                     <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
                   )}
@@ -279,15 +303,16 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
               ? item.children!.some(
                   (child) =>
                     pathname === child.href ||
-                    (child.href !== "/lifeos" && pathname?.startsWith(`${child.href}/`))
+                    (child.href !== "/lifeos" &&
+                      pathname?.startsWith(`${child.href}/`)),
                 )
               : false;
-            const isActive =
-              item.href
-                ? pathname === item.href ||
-                  (item.href !== "/lifeos" && pathname?.startsWith(`${item.href}/`)) ||
-                  isChildActive
-                : isChildActive;
+            const isActive = item.href
+              ? pathname === item.href ||
+                (item.href !== "/lifeos" &&
+                  pathname?.startsWith(`${item.href}/`)) ||
+                isChildActive
+              : isChildActive;
             const isExpanded = expandedSections.includes(item.name);
 
             // For items with children, render expandable section
@@ -311,7 +336,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
                     <ChevronDown
                       className={cn(
                         "h-4 w-4 transition-transform",
-                        isExpanded && "rotate-180"
+                        isExpanded && "rotate-180",
                       )}
                     />
                   </button>
@@ -362,11 +387,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
                 {!effectiveCollapsed && <span>{item.name}</span>}
               </button>
             ) : (
-              <Link
-                key={item.name}
-                to={item.href!}
-                className={commonClassName}
-              >
+              <Link key={item.name} to={item.href!} className={commonClassName}>
                 <item.icon className="h-5 w-5 flex-shrink-0" />
                 {!effectiveCollapsed && <span>{item.name}</span>}
               </Link>
