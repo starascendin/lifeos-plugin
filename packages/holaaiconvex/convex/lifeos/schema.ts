@@ -6,6 +6,7 @@ import { chatnexusTables } from "./chatnexus_schema";
 import { dailyFieldsTables } from "./daily_fields_schema";
 import { demoAgentTables } from "./demo_agent_schema";
 import { habitsTables } from "./habits_schema";
+import { initiativesTables } from "./initiatives_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
 import { pmTables } from "./pm_schema";
 import { proxyCouncilTables } from "./proxy_council_schema";
@@ -28,14 +29,16 @@ export const lifeosTables = {
   ...dailyFieldsTables,
   // Demo Agent tables
   ...demoAgentTables,
+  // Habit Tracker tables
+  ...habitsTables,
+  // Yearly Initiatives tables
+  ...initiativesTables,
   // LLM Council tables
   ...llmcouncilTables,
   // Project Management tables
   ...pmTables,
   // Proxy Council tables
   ...proxyCouncilTables,
-  // Habit Tracker tables
-  ...habitsTables,
   // Voice Agent tables
   ...voiceAgentTables,
   // ==================== YOUTUBE PLAYLISTS ====================
@@ -116,8 +119,8 @@ export const lifeosTables = {
           start: v.number(), // Start time in seconds
           duration: v.number(), // Duration in seconds
           text: v.string(), // Segment text
-        })
-      )
+        }),
+      ),
     ),
     // Timestamps
     createdAt: v.number(),
@@ -177,14 +180,14 @@ export const lifeosTables = {
         category: v.optional(v.string()),
         seconds: v.number(),
         sessionCount: v.number(),
-      })
+      }),
     ),
     // Per-category breakdown
     categoryUsage: v.array(
       v.object({
         category: v.string(),
         seconds: v.number(),
-      })
+      }),
     ),
     // Device identifier
     deviceId: v.optional(v.string()),
@@ -212,8 +215,7 @@ export const lifeosTables = {
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   // ==================== VOICE MEMOS ====================
   life_voiceMemos: defineTable({
@@ -232,7 +234,7 @@ export const lifeosTables = {
       v.literal("pending"),
       v.literal("processing"),
       v.literal("completed"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
     // Error message if transcription failed
     transcriptionError: v.optional(v.string()),
@@ -245,8 +247,8 @@ export const lifeosTables = {
           start: v.number(), // Start time in seconds
           duration: v.number(), // Duration in seconds
           text: v.string(), // Segment text
-        })
-      )
+        }),
+      ),
     ),
     // Language detected/specified
     language: v.optional(v.string()),
@@ -288,7 +290,7 @@ export const lifeosTables = {
     sentiment: v.union(
       v.literal("positive"),
       v.literal("neutral"),
-      v.literal("negative")
+      v.literal("negative"),
     ),
 
     // Processing status
@@ -296,7 +298,7 @@ export const lifeosTables = {
       v.literal("pending"),
       v.literal("processing"),
       v.literal("completed"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
     error: v.optional(v.string()),
 

@@ -12,7 +12,7 @@ import type { Id, Doc } from "@holaai/convex";
 import type { SupportedModelId } from "@/components/agenda/ModelSelector";
 
 // Types
-export type ViewMode = "daily" | "weekly" | "monthly";
+export type ViewMode = "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
 
 // Weekly data types
 interface WeeklyTasksByDay {
@@ -48,7 +48,27 @@ interface AgendaContextValue {
   goToNextWeek: () => void;
   goToThisWeek: () => void;
 
-  // View mode (for future weekly/monthly views)
+  // Month navigation
+  currentMonth: number; // 1-12
+  currentMonthYear: number;
+  goToPreviousMonth: () => void;
+  goToNextMonth: () => void;
+  goToThisMonth: () => void;
+
+  // Quarter navigation
+  currentQuarter: number; // 1-4
+  currentQuarterYear: number;
+  goToPreviousQuarter: () => void;
+  goToNextQuarter: () => void;
+  goToThisQuarter: () => void;
+
+  // Year navigation
+  currentYear: number;
+  goToPreviousYear: () => void;
+  goToNextYear: () => void;
+  goToThisYear: () => void;
+
+  // View mode
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
 
@@ -173,25 +193,41 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const [isGeneratingWeeklySummary, setIsGeneratingWeeklySummary] =
     useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<SupportedModelId>(
-    "openai/gpt-4o-mini"
+  const [selectedModel, setSelectedModel] =
+    useState<SupportedModelId>("openai/gpt-4o-mini");
+
+  // Month/Quarter/Year state - independent for those views
+  const [currentMonthYear, setCurrentMonthYear] = useState(() =>
+    new Date().getFullYear(),
+  );
+  const [currentMonth, setCurrentMonth] = useState(
+    () => new Date().getMonth() + 1,
+  );
+  const [currentQuarterYear, setCurrentQuarterYear] = useState(() =>
+    new Date().getFullYear(),
+  );
+  const [currentQuarter, setCurrentQuarter] = useState(() =>
+    Math.ceil((new Date().getMonth() + 1) / 3),
+  );
+  const [currentYear, setCurrentYear] = useState(() =>
+    new Date().getFullYear(),
   );
 
   // Week navigation state - derived from currentDate
   const currentWeekStart = useMemo(
     () => getWeekStartDate(currentDate),
-    [currentDate]
+    [currentDate],
   );
 
   // Calculate date strings for queries
   const dateString = useMemo(() => formatDateStr(currentDate), [currentDate]);
   const weekStartDate = useMemo(
     () => formatDateStr(currentWeekStart),
-    [currentWeekStart]
+    [currentWeekStart],
   );
   const weekEndDate = useMemo(
     () => formatDateStr(getWeekEndDate(currentWeekStart)),
-    [currentWeekStart]
+    [currentWeekStart],
   );
 
   // Habits queries
@@ -204,7 +240,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     {
       startDate: dateString,
       endDate: dateString,
-    }
+    },
   );
 
   // Tasks queries (include completed to show in "Completed" section)
@@ -213,7 +249,10 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     includeCompleted: true,
   });
 
-  const topPriorityTasks = useQuery(api.lifeos.pm_issues.getTopPriorityTasks, {});
+  const topPriorityTasks = useQuery(
+    api.lifeos.pm_issues.getTopPriorityTasks,
+    {},
+  );
 
   // Overdue tasks query (tasks with past due dates that are not completed)
   const overdueTasks = useQuery(api.lifeos.pm_issues.getOverdueTasks, {
@@ -223,7 +262,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   // Completed tasks for today (by completedAt timestamp)
   const completedTodayTasks = useQuery(
     api.lifeos.pm_issues.getCompletedTasksForDate,
-    { date: dateString }
+    { date: dateString },
   );
 
   // Daily summary query
@@ -232,9 +271,12 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   });
 
   // Daily fields query
-  const dailyFields = useQuery(api.lifeos.daily_fields.getFieldsWithValuesForDate, {
-    date: dateString,
-  });
+  const dailyFields = useQuery(
+    api.lifeos.daily_fields.getFieldsWithValuesForDate,
+    {
+      date: dateString,
+    },
+  );
 
   // Calendar events queries
   const todaysEvents = useQuery(api.lifeos.calendar.getEventsForDate, {
@@ -248,15 +290,19 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     api.lifeos.calendar.getEventsForDateRange,
     viewMode === "weekly"
       ? { startDate: weekStartDate, endDate: weekEndDate }
-      : "skip"
+      : "skip",
   );
 
   // Weekly data queries (only fetch when in weekly view mode)
   const weeklyTasks = useQuery(
     api.lifeos.pm_issues.getTasksForDateRange,
     viewMode === "weekly"
-      ? { startDate: weekStartDate, endDate: weekEndDate, includeCompleted: false }
-      : "skip"
+      ? {
+          startDate: weekStartDate,
+          endDate: weekEndDate,
+          includeCompleted: false,
+        }
+      : "skip",
   );
 
   // Weekly completed tasks (by completedAt)
@@ -264,32 +310,32 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     api.lifeos.pm_issues.getCompletedTasksForDateRange,
     viewMode === "weekly"
       ? { startDate: weekStartDate, endDate: weekEndDate }
-      : "skip"
+      : "skip",
   );
 
   const weeklyFieldValues = useQuery(
     api.lifeos.daily_fields.getFieldValuesForDateRange,
     viewMode === "weekly"
       ? { startDate: weekStartDate, endDate: weekEndDate }
-      : "skip"
+      : "skip",
   );
 
   const weeklyMemos = useQuery(
     api.lifeos.voicememo.getMemosForDateRange,
     viewMode === "weekly"
       ? { startDate: weekStartDate, endDate: weekEndDate }
-      : "skip"
+      : "skip",
   );
 
   // Weekly summary query
   const weeklySummary = useQuery(
     api.lifeos.agenda.getWeeklySummary,
-    viewMode === "weekly" ? { weekStartDate } : "skip"
+    viewMode === "weekly" ? { weekStartDate } : "skip",
   );
 
   // Initialize default fields on mount
   const initializeDefaultFields = useMutation(
-    api.lifeos.daily_fields.initializeDefaultFields
+    api.lifeos.daily_fields.initializeDefaultFields,
   );
 
   useEffect(() => {
@@ -297,7 +343,9 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   }, [initializeDefaultFields]);
 
   // Mutations
-  const toggleHabitCheckIn = useMutation(api.lifeos.habits_checkins.toggleCheckIn);
+  const toggleHabitCheckIn = useMutation(
+    api.lifeos.habits_checkins.toggleCheckIn,
+  );
   const skipHabitCheckIn = useMutation(api.lifeos.habits_checkins.skipCheckIn);
   const checkHabit = useMutation(api.lifeos.habits_checkins.checkHabit);
   const uncheckHabit = useMutation(api.lifeos.habits_checkins.uncheckHabit);
@@ -308,26 +356,26 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   // Daily fields mutations
   const setFieldValue = useMutation(api.lifeos.daily_fields.setFieldValue);
   const createFieldDefinition = useMutation(
-    api.lifeos.daily_fields.createFieldDefinition
+    api.lifeos.daily_fields.createFieldDefinition,
   );
   const updateFieldDefinition = useMutation(
-    api.lifeos.daily_fields.updateFieldDefinition
+    api.lifeos.daily_fields.updateFieldDefinition,
   );
   const archiveFieldDefinition = useMutation(
-    api.lifeos.daily_fields.archiveFieldDefinition
+    api.lifeos.daily_fields.archiveFieldDefinition,
   );
 
   // Action for AI summary generation
   const generateDailySummaryAction = useAction(
-    api.lifeos.agenda.generateDailySummary
+    api.lifeos.agenda.generateDailySummary,
   );
 
   // Weekly summary mutations and action
   const updateWeeklyPromptMutation = useMutation(
-    api.lifeos.agenda.updateWeeklyPrompt
+    api.lifeos.agenda.updateWeeklyPrompt,
   );
   const generateWeeklySummaryAction = useAction(
-    api.lifeos.agenda.generateWeeklySummary
+    api.lifeos.agenda.generateWeeklySummary,
   );
 
   // Calendar sync action
@@ -337,7 +385,10 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const generateSummary = useCallback(async () => {
     setIsGeneratingSummary(true);
     try {
-      await generateDailySummaryAction({ date: dateString, model: selectedModel });
+      await generateDailySummaryAction({
+        date: dateString,
+        model: selectedModel,
+      });
     } catch (error) {
       console.error("Failed to generate summary:", error);
     } finally {
@@ -395,11 +446,78 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     setCurrentDate(today);
   }, []);
 
+  // Month navigation helpers
+  const goToPreviousMonth = useCallback(() => {
+    setCurrentMonth((prev) => {
+      if (prev === 1) {
+        setCurrentMonthYear((y) => y - 1);
+        return 12;
+      }
+      return prev - 1;
+    });
+  }, []);
+
+  const goToNextMonth = useCallback(() => {
+    setCurrentMonth((prev) => {
+      if (prev === 12) {
+        setCurrentMonthYear((y) => y + 1);
+        return 1;
+      }
+      return prev + 1;
+    });
+  }, []);
+
+  const goToThisMonth = useCallback(() => {
+    const today = new Date();
+    setCurrentMonthYear(today.getFullYear());
+    setCurrentMonth(today.getMonth() + 1);
+  }, []);
+
+  // Quarter navigation helpers
+  const goToPreviousQuarter = useCallback(() => {
+    setCurrentQuarter((prev) => {
+      if (prev === 1) {
+        setCurrentQuarterYear((y) => y - 1);
+        return 4;
+      }
+      return prev - 1;
+    });
+  }, []);
+
+  const goToNextQuarter = useCallback(() => {
+    setCurrentQuarter((prev) => {
+      if (prev === 4) {
+        setCurrentQuarterYear((y) => y + 1);
+        return 1;
+      }
+      return prev + 1;
+    });
+  }, []);
+
+  const goToThisQuarter = useCallback(() => {
+    const today = new Date();
+    setCurrentQuarterYear(today.getFullYear());
+    setCurrentQuarter(Math.ceil((today.getMonth() + 1) / 3));
+  }, []);
+
+  // Year navigation helpers
+  const goToPreviousYear = useCallback(() => {
+    setCurrentYear((prev) => prev - 1);
+  }, []);
+
+  const goToNextYear = useCallback(() => {
+    setCurrentYear((prev) => prev + 1);
+  }, []);
+
+  const goToThisYear = useCallback(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
+
   // Get weekly average for End Day Score
   const getWeeklyAverage = useCallback(() => {
     if (!weeklyFieldValues?.valuesByDate) return null;
     const scores = Object.values(weeklyFieldValues.valuesByDate).filter(
-      (s): s is number => s !== null
+      (s): s is number => s !== null,
     );
     if (scores.length === 0) return null;
     return scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -432,7 +550,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     (habitId: Id<"lifeos_habits">, date: Date): string => {
       return `${habitId}_${formatDateStr(date)}`;
     },
-    []
+    [],
   );
 
   const isHabitCompleted = useCallback(
@@ -441,7 +559,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
       const key = `${habitId}_${dateString}`;
       return todaysCheckIns[key]?.completed ?? false;
     },
-    [todaysCheckIns, dateString]
+    [todaysCheckIns, dateString],
   );
 
   const value: AgendaContextValue = {
@@ -460,6 +578,26 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     goToPreviousWeek,
     goToNextWeek,
     goToThisWeek,
+
+    // Month navigation
+    currentMonth,
+    currentMonthYear,
+    goToPreviousMonth,
+    goToNextMonth,
+    goToThisMonth,
+
+    // Quarter navigation
+    currentQuarter,
+    currentQuarterYear,
+    goToPreviousQuarter,
+    goToNextQuarter,
+    goToThisQuarter,
+
+    // Year navigation
+    currentYear,
+    goToPreviousYear,
+    goToNextYear,
+    goToThisYear,
 
     // View mode
     viewMode,
@@ -505,7 +643,8 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
 
     // Weekly summary
     weeklySummary,
-    isLoadingWeeklySummary: viewMode === "weekly" && weeklySummary === undefined,
+    isLoadingWeeklySummary:
+      viewMode === "weekly" && weeklySummary === undefined,
     isGeneratingWeeklySummary,
     generateWeeklySummary,
     updateWeeklyPrompt: updateWeeklyPromptMutation,

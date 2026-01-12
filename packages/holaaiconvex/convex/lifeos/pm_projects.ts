@@ -46,7 +46,7 @@ export const getProjects = query({
       projects = await ctx.db
         .query("lifeos_pmProjects")
         .withIndex("by_user_status", (q) =>
-          q.eq("userId", user._id).eq("status", args.status!)
+          q.eq("userId", user._id).eq("status", args.status!),
         )
         .order("desc")
         .take(limit);
@@ -102,9 +102,41 @@ export const getProjectByKey = query({
     return await ctx.db
       .query("lifeos_pmProjects")
       .withIndex("by_key", (q) =>
-        q.eq("userId", user._id).eq("key", args.key.toUpperCase())
+        q.eq("userId", user._id).eq("key", args.key.toUpperCase()),
       )
       .first();
+  },
+});
+
+/**
+ * Get projects linked to an initiative
+ */
+export const getProjectsByInitiative = query({
+  args: {
+    initiativeId: v.id("lifeos_yearlyInitiatives"),
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Verify initiative belongs to user
+    const initiative = await ctx.db.get(args.initiativeId);
+    if (!initiative || initiative.userId !== user._id) {
+      return [];
+    }
+
+    let projects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", args.initiativeId),
+      )
+      .collect();
+
+    if (!args.includeArchived) {
+      projects = projects.filter((p) => !p.archivedAt);
+    }
+
+    return projects;
   },
 });
 
@@ -151,10 +183,19 @@ export const createProject = mutation({
     priority: v.optional(priorityValidator),
     startDate: v.optional(v.number()),
     targetDate: v.optional(v.number()),
+    initiativeId: v.optional(v.id("lifeos_yearlyInitiatives")),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const now = Date.now();
+
+    // Verify initiative belongs to user if provided
+    if (args.initiativeId) {
+      const initiative = await ctx.db.get(args.initiativeId);
+      if (!initiative || initiative.userId !== user._id) {
+        throw new Error("Initiative not found or access denied");
+      }
+    }
 
     // Generate unique key
     let baseKey = generateProjectKey(args.name);
@@ -174,6 +215,7 @@ export const createProject = mutation({
 
     const projectId = await ctx.db.insert("lifeos_pmProjects", {
       userId: user._id,
+      initiativeId: args.initiativeId,
       key,
       name: args.name,
       description: args.description,
@@ -210,6 +252,9 @@ export const updateProject = mutation({
     priority: v.optional(priorityValidator),
     startDate: v.optional(v.union(v.number(), v.null())),
     targetDate: v.optional(v.union(v.number(), v.null())),
+    initiativeId: v.optional(
+      v.union(v.id("lifeos_yearlyInitiatives"), v.null()),
+    ),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -218,6 +263,14 @@ export const updateProject = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project || project.userId !== user._id) {
       throw new Error("Project not found or access denied");
+    }
+
+    // Verify initiative belongs to user if provided
+    if (args.initiativeId && args.initiativeId !== null) {
+      const initiative = await ctx.db.get(args.initiativeId);
+      if (!initiative || initiative.userId !== user._id) {
+        throw new Error("Initiative not found or access denied");
+      }
     }
 
     const updates: Partial<Doc<"lifeos_pmProjects">> = {
@@ -241,7 +294,13 @@ export const updateProject = mutation({
       updates.startDate = args.startDate === null ? undefined : args.startDate;
     }
     if (args.targetDate !== undefined) {
-      updates.targetDate = args.targetDate === null ? undefined : args.targetDate;
+      updates.targetDate =
+        args.targetDate === null ? undefined : args.targetDate;
+    }
+    // Handle initiative linking: null means unlink, undefined means don't change
+    if (args.initiativeId !== undefined) {
+      updates.initiativeId =
+        args.initiativeId === null ? undefined : args.initiativeId;
     }
 
     await ctx.db.patch(args.projectId, updates);
@@ -366,7 +425,7 @@ export const updateProjectCounts = mutation({
 
     const issueCount = allIssues.length;
     const completedIssueCount = allIssues.filter(
-      (i) => i.status === "done"
+      (i) => i.status === "done",
     ).length;
 
     await ctx.db.patch(args.projectId, {

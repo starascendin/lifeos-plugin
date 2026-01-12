@@ -24,6 +24,7 @@ import { LifeOSVoiceNotes } from "./components/lifeos/VoiceNotes";
 import { LifeOSAIAgent } from "./components/lifeos/AIAgent";
 import { LifeOSAgenda } from "./components/lifeos/Agenda";
 import { LifeOSAtlas } from "./components/lifeos/Atlas";
+import { LifeOSInitiatives } from "./components/lifeos/Initiatives";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -44,11 +45,14 @@ export default function LifeOSApp() {
       // Check Full Disk Access permission for Voice Memos
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        const hasPermission = await invoke<boolean>("check_voicememos_permission");
+        const hasPermission = await invoke<boolean>(
+          "check_voicememos_permission",
+        );
 
         if (!hasPermission) {
           toast.warning("Full Disk Access Required", {
-            description: "Grant Full Disk Access to sync Voice Memos from macOS.",
+            description:
+              "Grant Full Disk Access to sync Voice Memos from macOS.",
             duration: Infinity,
             action: {
               label: "Open Settings",
@@ -82,25 +86,29 @@ export default function LifeOSApp() {
             <VoiceAgentProvider>
               <PomodoroProvider>
                 <Routes>
-                <Route index element={<LifeOSDashboard />} />
-                <Route path="atlas" element={<LifeOSAtlas />} />
-                <Route path="agenda" element={<LifeOSAgenda />} />
-                <Route path="agenda/:view" element={<LifeOSAgenda />} />
-                <Route path="chatnexus" element={<LifeOSChatNexus />} />
-                <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
-                <Route path="proxy-council" element={<LifeOSProxyLLMCouncil />} />
-                <Route path="council-api" element={<LifeOSLLMCouncilAPI />} />
-                <Route path="pm" element={<LifeOSPM />} />
-                <Route path="pm/:view" element={<LifeOSPM />} />
-                <Route path="pm/:view/:id" element={<LifeOSPM />} />
-                <Route path="pm-ai" element={<LifeOSPMAI />} />
-                <Route path="habits" element={<LifeOSHabits />} />
-                <Route path="avatar" element={<LifeOSAvatar />} />
-                <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
-                <Route path="voicenotes" element={<LifeOSVoiceNotes />} />
-                <Route path="aiagent" element={<LifeOSAIAgent />} />
-                <Route path="settings" element={<LifeOSSettings />} />
-                <Route path="*" element={<Navigate to="/lifeos" replace />} />
+                  <Route index element={<LifeOSDashboard />} />
+                  <Route path="atlas" element={<LifeOSAtlas />} />
+                  <Route path="agenda" element={<LifeOSAgenda />} />
+                  <Route path="agenda/:view" element={<LifeOSAgenda />} />
+                  <Route path="initiatives" element={<LifeOSInitiatives />} />
+                  <Route path="chatnexus" element={<LifeOSChatNexus />} />
+                  <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
+                  <Route
+                    path="proxy-council"
+                    element={<LifeOSProxyLLMCouncil />}
+                  />
+                  <Route path="council-api" element={<LifeOSLLMCouncilAPI />} />
+                  <Route path="pm" element={<LifeOSPM />} />
+                  <Route path="pm/:view" element={<LifeOSPM />} />
+                  <Route path="pm/:view/:id" element={<LifeOSPM />} />
+                  <Route path="pm-ai" element={<LifeOSPMAI />} />
+                  <Route path="habits" element={<LifeOSHabits />} />
+                  <Route path="avatar" element={<LifeOSAvatar />} />
+                  <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
+                  <Route path="voicenotes" element={<LifeOSVoiceNotes />} />
+                  <Route path="aiagent" element={<LifeOSAIAgent />} />
+                  <Route path="settings" element={<LifeOSSettings />} />
+                  <Route path="*" element={<Navigate to="/lifeos" replace />} />
                 </Routes>
               </PomodoroProvider>
             </VoiceAgentProvider>

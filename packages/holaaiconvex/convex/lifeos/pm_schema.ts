@@ -15,7 +15,7 @@ export const priorityValidator = v.union(
   v.literal("high"),
   v.literal("medium"),
   v.literal("low"),
-  v.literal("none")
+  v.literal("none"),
 );
 
 export const issueStatusValidator = v.union(
@@ -24,7 +24,7 @@ export const issueStatusValidator = v.union(
   v.literal("in_progress"),
   v.literal("in_review"),
   v.literal("done"),
-  v.literal("cancelled")
+  v.literal("cancelled"),
 );
 
 export const projectStatusValidator = v.union(
@@ -32,29 +32,29 @@ export const projectStatusValidator = v.union(
   v.literal("in_progress"),
   v.literal("paused"),
   v.literal("completed"),
-  v.literal("cancelled")
+  v.literal("cancelled"),
 );
 
 export const projectHealthValidator = v.union(
   v.literal("on_track"),
   v.literal("at_risk"),
-  v.literal("off_track")
+  v.literal("off_track"),
 );
 
 export const cycleStatusValidator = v.union(
   v.literal("upcoming"),
   v.literal("active"),
-  v.literal("completed")
+  v.literal("completed"),
 );
 
 export const cycleDurationValidator = v.union(
   v.literal("1_week"),
-  v.literal("2_weeks")
+  v.literal("2_weeks"),
 );
 
 export const cycleStartDayValidator = v.union(
   v.literal("sunday"),
-  v.literal("monday")
+  v.literal("monday"),
 );
 
 export const cycleSettingsValidator = v.object({
@@ -76,7 +76,7 @@ export const pomodoroStatusValidator = v.union(
   v.literal("active"),
   v.literal("paused"),
   v.literal("completed"),
-  v.literal("abandoned")
+  v.literal("abandoned"),
 );
 
 // ==================== TABLE DEFINITIONS ====================
@@ -85,6 +85,8 @@ export const pmTables = {
   // ==================== PROJECTS ====================
   lifeos_pmProjects: defineTable({
     userId: v.id("users"),
+    // Link to yearly initiative (optional)
+    initiativeId: v.optional(v.id("lifeos_yearlyInitiatives")),
     // Project identification
     key: v.string(), // Short key like "PROJ", "LIFE" (auto-generated from name)
     name: v.string(),
@@ -113,7 +115,8 @@ export const pmTables = {
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
     .index("by_user_archived", ["userId", "archivedAt"])
-    .index("by_key", ["userId", "key"]),
+    .index("by_key", ["userId", "key"])
+    .index("by_initiative", ["initiativeId"]),
 
   // ==================== CYCLES/SPRINTS ====================
   lifeos_pmCycles: defineTable({
@@ -243,7 +246,7 @@ export const pmTables = {
         issueTitle: v.string(),
         completedCount: v.number(),
         totalFocusTimeMs: v.number(),
-      })
+      }),
     ),
     // Timestamps
     createdAt: v.number(),
@@ -293,7 +296,7 @@ export const pmTables = {
         promptTokens: v.number(),
         completionTokens: v.number(),
         totalTokens: v.number(),
-      })
+      }),
     ),
     // Timestamps
     createdAt: v.number(),
@@ -319,7 +322,7 @@ export const pmTables = {
         promptTokens: v.number(),
         completionTokens: v.number(),
         totalTokens: v.number(),
-      })
+      }),
     ),
     // Timestamps
     createdAt: v.number(),
