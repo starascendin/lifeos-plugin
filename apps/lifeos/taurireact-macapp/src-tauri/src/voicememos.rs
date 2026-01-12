@@ -480,8 +480,10 @@ pub fn check_voicememos_permission() -> bool {
     ) {
         Ok(conn) => {
             // Try a simple query to verify we can actually read
-            conn.query_row("SELECT COUNT(*) FROM ZCLOUDRECORDING LIMIT 1", [], |_| Ok(()))
-                .is_ok()
+            conn.query_row("SELECT COUNT(*) FROM ZCLOUDRECORDING LIMIT 1", [], |_| {
+                Ok(())
+            })
+            .is_ok()
         }
         Err(_) => false,
     }
@@ -681,7 +683,9 @@ pub async fn transcribe_voicememo(
     api_key: String,
 ) -> Result<TranscriptionResult, String> {
     if api_key.is_empty() {
-        return Err("GROQ API key is required. Please configure it in Convex environment.".to_string());
+        return Err(
+            "GROQ API key is required. Please configure it in Convex environment.".to_string(),
+        );
     }
 
     // Get memo details
@@ -892,7 +896,9 @@ pub async fn transcribe_voicememos_batch(
     api_key: String,
 ) -> Result<Vec<TranscriptionResult>, String> {
     if api_key.is_empty() {
-        return Err("GROQ API key is required. Please configure it in Convex environment.".to_string());
+        return Err(
+            "GROQ API key is required. Please configure it in Convex environment.".to_string(),
+        );
     }
 
     let total = memo_ids.len();
