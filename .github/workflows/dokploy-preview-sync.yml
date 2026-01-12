@@ -84,10 +84,21 @@ jobs:
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               "https://api.vercel.com/v13/deployments/$DEPLOYMENT_ID?teamId=$VERCEL_ORG_ID")
 
-            # Try to extract CONVEX_URL from build env
-            CONVEX_URL=$(echo "$DEPLOYMENT_ENV" | jq -r '.build.env.CONVEX_URL // .build.env.VITE_CONVEX_URL // empty')
+            # Debug: show structure
+            echo "Checking deployment env structure..."
 
-            if [ -n "$CONVEX_URL" ]; then
+            # Try to extract CONVEX_URL - handle both object and array formats
+            # First try as object keys
+            CONVEX_URL=$(echo "$DEPLOYMENT_ENV" | jq -r '
+              .build.env // {} |
+              if type == "array" then
+                (.[] | select(.key == "CONVEX_URL" or .key == "VITE_CONVEX_URL") | .value) // empty
+              else
+                (.CONVEX_URL // .VITE_CONVEX_URL // empty)
+              end
+            ' 2>/dev/null || echo "")
+
+            if [ -n "$CONVEX_URL" ] && [ "$CONVEX_URL" != "null" ]; then
               # Convert .convex.cloud to .convex.site for HTTP actions
               CONVEX_SITE_URL=$(echo "$CONVEX_URL" | sed 's/\.convex\.cloud/.convex.site/')
               echo "Found Convex URL: $CONVEX_SITE_URL"
