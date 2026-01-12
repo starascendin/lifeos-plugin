@@ -34,8 +34,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # Note: Convex dev deployment is for local development only
-      # CI deploys to Convex on staging (adorable-firefly-704) and prod (agreeable-ibex-949) branches
+      - name: Deploy Convex to Dev
+        working-directory: packages/holaaiconvex
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEV_DEPLOY_KEY }}
+        run: |
+          echo "=> Deploying to: https://beaming-giraffe-300.convex.cloud (DEV)"
+          npx convex dev --once
 
       - name: Install Vercel CLI
         run: npm install -g vercel
