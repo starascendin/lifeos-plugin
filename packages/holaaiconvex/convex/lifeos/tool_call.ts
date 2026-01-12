@@ -10,7 +10,8 @@
 
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { Id } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
+import { QueryCtx, MutationCtx } from "../_generated/server";
 
 // ==================== TOOL DEFINITIONS ====================
 
@@ -80,6 +81,36 @@ export const TOOL_DEFINITIONS = {
     params: {
       startDate: "optional - start date in ISO format (default: today based on localTime)",
       localTime: "optional - user's local time in ISO format for accurate date calculation",
+    },
+  },
+  // Issue Management tools
+  create_issue: {
+    description: "Create a new task/issue with optional project, priority, and due date",
+    params: {
+      title: "required - the task title",
+      description: "optional - detailed description",
+      projectIdOrKey: "optional - project ID or key (e.g., ACME)",
+      priority: "optional - urgent, high, medium, low, none",
+      dueDate: "optional - ISO date string",
+      cycleId: "optional - assign to specific cycle",
+    },
+  },
+  mark_issue_complete: {
+    description: "Mark a task as complete by ID or identifier (e.g., PROJ-123)",
+    params: {
+      issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
+    },
+  },
+  // Cycle Management tools
+  get_current_cycle: {
+    description: "Get the currently active cycle with progress stats and top issues",
+    params: {},
+  },
+  assign_issue_to_cycle: {
+    description: "Assign a task to a cycle (defaults to current active cycle)",
+    params: {
+      issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
+      cycleId: "optional - cycle ID (defaults to active cycle)",
     },
   },
 } as const;
@@ -895,6 +926,584 @@ export const getWeeklyAgendaInternal = internalQuery({
         daysWithEvents,
         byPriority,
       },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== HELPER FUNCTIONS ====================
+
+
+/**
+ * Resolve an issue by ID or identifier (e.g., "PROJ-123")
+ * Accepts both direct Convex ID and human-readable identifier
+ */
+async function resolveIssue(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+  issueIdOrIdentifier: string
+): Promise<Doc<"lifeos_pmIssues"> | null> {
+  // Try as direct ID first
+  try {
+    const issue = await ctx.db.get(issueIdOrIdentifier as Id<"lifeos_pmIssues">);
+    if (issue && issue.userId === userId) {
+      return issue;
+    }
+  } catch {
+    // Not a valid ID, continue to try identifier
+  }
+
+  // Try as identifier (e.g., "PROJ-123")
+  const issue = await ctx.db
+    .query("lifeos_pmIssues")
+    .withIndex("by_identifier", (q) =>
+      q.eq("userId", userId).eq("identifier", issueIdOrIdentifier.toUpperCase())
+    )
+    .first();
+
+  return issue;
+}
+
+/**
+ * Resolve a project by ID or key (e.g., "ACME")
+ * Accepts both direct Convex ID and human-readable project key
+ */
+async function resolveProject(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+  projectIdOrKey: string
+): Promise<Doc<"lifeos_pmProjects"> | null> {
+  // Try as direct ID first
+  try {
+    const project = await ctx.db.get(projectIdOrKey as Id<"lifeos_pmProjects">);
+    if (project && project.userId === userId) {
+      return project;
+    }
+  } catch {
+    // Not a valid ID, continue to try key
+  }
+
+  // Try as project key (e.g., "ACME")
+  const project = await ctx.db
+    .query("lifeos_pmProjects")
+    .withIndex("by_key", (q) =>
+      q.eq("userId", userId).eq("key", projectIdOrKey.toUpperCase())
+    )
+    .first();
+
+  return project;
+}
+
+// ==================== TOOL 10: CREATE ISSUE ====================
+
+/**
+ * Create a new issue/task
+ * Supports project resolution by key (e.g., "ACME") or ID
+ * Returns confirmation message for voice agent
+ */
+export const createIssueInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    projectIdOrKey: v.optional(v.string()),
+    priority: v.optional(v.string()),
+    dueDate: v.optional(v.string()), // ISO date string
+    cycleId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const now = Date.now();
+
+    // Resolve project if provided
+    let project: Doc<"lifeos_pmProjects"> | null = null;
+    let projectId: Id<"lifeos_pmProjects"> | undefined;
+
+    if (args.projectIdOrKey) {
+      project = await resolveProject(ctx, userId, args.projectIdOrKey);
+      if (!project) {
+        return {
+          success: false,
+          error: `I couldn't find a project called "${args.projectIdOrKey}". Please check the project name or create it first.`,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+      projectId = project._id;
+    }
+
+    // Resolve cycle if provided
+    let cycleId: Id<"lifeos_pmCycles"> | undefined;
+    let cycleName: string | undefined;
+
+    if (args.cycleId) {
+      try {
+        const cycle = await ctx.db.get(args.cycleId as Id<"lifeos_pmCycles">);
+        if (cycle && cycle.userId === userId) {
+          cycleId = cycle._id;
+          cycleName = cycle.name ?? `Cycle ${cycle.number}`;
+        }
+      } catch {
+        // Invalid cycle ID, ignore
+      }
+    }
+
+    // Generate identifier
+    let identifier: string;
+    let number: number;
+
+    if (project) {
+      number = project.nextIssueNumber;
+      identifier = `${project.key}-${number}`;
+
+      // Update project's next issue number and count
+      await ctx.db.patch(project._id, {
+        nextIssueNumber: number + 1,
+        issueCount: project.issueCount + 1,
+        updatedAt: now,
+      });
+    } else {
+      // Standalone issue without project
+      const allIssues = await ctx.db
+        .query("lifeos_pmIssues")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      number = allIssues.length + 1;
+      identifier = `ISS-${number}`;
+    }
+
+    // Update cycle count if assigned
+    if (cycleId) {
+      const cycle = await ctx.db.get(cycleId);
+      if (cycle) {
+        await ctx.db.patch(cycleId, {
+          issueCount: cycle.issueCount + 1,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Validate and set priority
+    type Priority = "urgent" | "high" | "medium" | "low" | "none";
+    const validPriorities: Priority[] = ["urgent", "high", "medium", "low", "none"];
+    const priority: Priority = args.priority && validPriorities.includes(args.priority as Priority)
+      ? (args.priority as Priority)
+      : "none";
+
+    // Parse due date
+    let dueDate: number | undefined;
+    if (args.dueDate) {
+      const parsed = new Date(args.dueDate);
+      if (!isNaN(parsed.getTime())) {
+        dueDate = parsed.getTime();
+      }
+    }
+
+    // Get sort order for backlog
+    const existingInBacklog = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_status", (q) => q.eq("userId", userId).eq("status", "backlog"))
+      .collect();
+    const maxSortOrder = existingInBacklog.reduce((max, i) => Math.max(max, i.sortOrder), 0);
+
+    // Create the issue
+    const issueId = await ctx.db.insert("lifeos_pmIssues", {
+      userId,
+      projectId,
+      cycleId,
+      parentId: undefined,
+      identifier,
+      number,
+      title: args.title,
+      description: args.description,
+      status: "backlog",
+      priority,
+      estimate: undefined,
+      labelIds: [],
+      dueDate,
+      sortOrder: maxSortOrder + 1000,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Build confirmation message
+    let confirmationMessage = `Created task ${identifier}: "${args.title}"`;
+    if (project) {
+      confirmationMessage += ` in project ${project.name}`;
+    }
+    if (priority !== "none") {
+      confirmationMessage += ` with ${priority} priority`;
+    }
+    if (dueDate) {
+      confirmationMessage += `, due ${new Date(dueDate).toLocaleDateString()}`;
+    }
+    if (cycleName) {
+      confirmationMessage += `, assigned to ${cycleName}`;
+    }
+    confirmationMessage += ".";
+
+    // Check if there's an active cycle to suggest
+    let suggestCycle = false;
+    let activeCycleName: string | null = null;
+
+    if (!cycleId) {
+      const activeCycles = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "active"))
+        .first();
+
+      if (activeCycles) {
+        suggestCycle = true;
+        activeCycleName = activeCycles.name ?? `Cycle ${activeCycles.number}`;
+        confirmationMessage += ` Would you like to add it to ${activeCycleName}?`;
+      }
+    }
+
+    return {
+      success: true,
+      issue: {
+        id: issueId,
+        identifier,
+        title: args.title,
+        projectId,
+        projectName: project?.name,
+        projectKey: project?.key,
+        priority,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+        cycleId,
+        cycleName,
+      },
+      suggestCycle,
+      activeCycleName,
+      confirmationMessage,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 11: MARK ISSUE COMPLETE ====================
+
+/**
+ * Mark an issue as complete (done status)
+ * Accepts issue by ID or identifier (e.g., "PROJ-123")
+ * Returns confirmation with cycle progress
+ */
+export const markIssueCompleteInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    issueIdOrIdentifier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const now = Date.now();
+
+    // Resolve the issue
+    const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
+
+    if (!issue) {
+      return {
+        success: false,
+        error: `I couldn't find a task "${args.issueIdOrIdentifier}". Please check the task identifier and try again.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Check if already done
+    if (issue.status === "done") {
+      return {
+        success: false,
+        error: `Task ${issue.identifier}: "${issue.title}" is already marked as complete.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const previousStatus = issue.status;
+
+    // Update the issue status
+    await ctx.db.patch(issue._id, {
+      status: "done",
+      completedAt: now,
+      updatedAt: now,
+    });
+
+    // Update project completed count
+    let projectName: string | undefined;
+    if (issue.projectId) {
+      const project = await ctx.db.get(issue.projectId);
+      if (project) {
+        projectName = project.name;
+        await ctx.db.patch(issue.projectId, {
+          completedIssueCount: project.completedIssueCount + 1,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Update cycle completed count and get progress
+    let cycleProgress: { completed: number; total: number; name: string } | null = null;
+    if (issue.cycleId) {
+      const cycle = await ctx.db.get(issue.cycleId);
+      if (cycle) {
+        const newCompletedCount = cycle.completedIssueCount + 1;
+        await ctx.db.patch(issue.cycleId, {
+          completedIssueCount: newCompletedCount,
+          updatedAt: now,
+        });
+        cycleProgress = {
+          completed: newCompletedCount,
+          total: cycle.issueCount,
+          name: cycle.name ?? `Cycle ${cycle.number}`,
+        };
+      }
+    }
+
+    // Build confirmation message
+    let confirmationMessage = `Done! Marked ${issue.identifier}: "${issue.title}" as complete.`;
+    if (cycleProgress) {
+      confirmationMessage += ` You've completed ${cycleProgress.completed} of ${cycleProgress.total} tasks in ${cycleProgress.name}.`;
+    }
+
+    return {
+      success: true,
+      issue: {
+        id: issue._id,
+        identifier: issue.identifier,
+        title: issue.title,
+        previousStatus,
+        projectId: issue.projectId,
+        projectName,
+      },
+      cycleProgress,
+      confirmationMessage,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 12: GET CURRENT CYCLE ====================
+
+/**
+ * Get the currently active cycle with progress stats
+ * Returns cycle info, progress breakdown, and top priority issues
+ */
+export const getCurrentCycleInternal = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    // Get active cycle
+    const activeCycle = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "active"))
+      .first();
+
+    if (!activeCycle) {
+      return {
+        success: false,
+        hasCycle: false,
+        error: "You don't have an active cycle right now. Would you like me to help you set one up?",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Calculate days remaining
+    const now = Date.now();
+    const daysRemaining = Math.max(0, Math.ceil((activeCycle.endDate - now) / (24 * 60 * 60 * 1000)));
+
+    // Get all issues in this cycle
+    const cycleIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", activeCycle._id))
+      .collect();
+
+    // Filter to only this user's issues
+    const userIssues = cycleIssues.filter((i) => i.userId === userId);
+
+    // Calculate progress breakdown
+    const progress = {
+      totalIssues: userIssues.length,
+      completed: userIssues.filter((i) => i.status === "done").length,
+      inProgress: userIssues.filter((i) => i.status === "in_progress" || i.status === "in_review").length,
+      todo: userIssues.filter((i) => i.status === "todo").length,
+      backlog: userIssues.filter((i) => i.status === "backlog").length,
+      completionPercent: userIssues.length > 0
+        ? Math.round((userIssues.filter((i) => i.status === "done").length / userIssues.length) * 100)
+        : 0,
+    };
+
+    // Get top priority issues (not done, sorted by priority)
+    const activeIssues = userIssues
+      .filter((i) => i.status !== "done" && i.status !== "cancelled")
+      .sort((a, b) => {
+        // Top priority first
+        if (a.isTopPriority && !b.isTopPriority) return -1;
+        if (!a.isTopPriority && b.isTopPriority) return 1;
+        // Then by priority level
+        return PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] -
+          PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER];
+      })
+      .slice(0, 5);
+
+    // Get project info for top issues
+    const projectIds = [...new Set(activeIssues.map((i) => i.projectId).filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined))];
+    const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
+    const projectMap = new Map(projects.filter(Boolean).map((p) => [p!._id, p!]));
+
+    const topIssues = activeIssues.map((issue) => {
+      const project = issue.projectId ? projectMap.get(issue.projectId) : undefined;
+      return {
+        identifier: issue.identifier,
+        title: issue.title,
+        status: issue.status,
+        priority: issue.priority,
+        isTopPriority: issue.isTopPriority || false,
+        projectName: project?.name ?? "",
+      };
+    });
+
+    return {
+      success: true,
+      hasCycle: true,
+      cycle: {
+        id: activeCycle._id,
+        name: activeCycle.name ?? `Cycle ${activeCycle.number}`,
+        number: activeCycle.number,
+        startDate: new Date(activeCycle.startDate).toISOString().split("T")[0],
+        endDate: new Date(activeCycle.endDate).toISOString().split("T")[0],
+        daysRemaining,
+        status: activeCycle.status,
+        goals: activeCycle.goals,
+      },
+      progress,
+      topIssues,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== TOOL 13: ASSIGN ISSUE TO CYCLE ====================
+
+/**
+ * Assign an issue to a cycle
+ * Defaults to current active cycle if no cycleId provided
+ * Accepts issue by ID or identifier
+ */
+export const assignIssueToCycleInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    issueIdOrIdentifier: v.string(),
+    cycleId: v.optional(v.string()), // Optional - defaults to active cycle
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const now = Date.now();
+
+    // Resolve the issue
+    const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
+
+    if (!issue) {
+      return {
+        success: false,
+        error: `I couldn't find a task "${args.issueIdOrIdentifier}". Please check the task identifier and try again.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Resolve the cycle (use provided or default to active)
+    let cycle: Doc<"lifeos_pmCycles"> | null = null;
+
+    if (args.cycleId) {
+      try {
+        cycle = await ctx.db.get(args.cycleId as Id<"lifeos_pmCycles">);
+        if (!cycle || cycle.userId !== userId) {
+          cycle = null;
+        }
+      } catch {
+        // Invalid cycle ID
+      }
+
+      if (!cycle) {
+        return {
+          success: false,
+          error: `I couldn't find that cycle. Please check the cycle ID and try again.`,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+    } else {
+      // Default to active cycle
+      cycle = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "active"))
+        .first();
+
+      if (!cycle) {
+        return {
+          success: false,
+          error: "You don't have an active cycle. Would you like me to help you create one?",
+          generatedAt: new Date().toISOString(),
+        };
+      }
+    }
+
+    // Check if already in this cycle
+    if (issue.cycleId === cycle._id) {
+      const cycleName = cycle.name ?? `Cycle ${cycle.number}`;
+      return {
+        success: false,
+        error: `Task ${issue.identifier}: "${issue.title}" is already in ${cycleName}.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Remove from old cycle if any
+    if (issue.cycleId) {
+      const oldCycle = await ctx.db.get(issue.cycleId);
+      if (oldCycle) {
+        await ctx.db.patch(issue.cycleId, {
+          issueCount: Math.max(0, oldCycle.issueCount - 1),
+          completedIssueCount: issue.status === "done"
+            ? Math.max(0, oldCycle.completedIssueCount - 1)
+            : oldCycle.completedIssueCount,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Add to new cycle
+    await ctx.db.patch(issue._id, {
+      cycleId: cycle._id,
+      updatedAt: now,
+    });
+
+    // Update cycle counts
+    await ctx.db.patch(cycle._id, {
+      issueCount: cycle.issueCount + 1,
+      completedIssueCount: issue.status === "done"
+        ? cycle.completedIssueCount + 1
+        : cycle.completedIssueCount,
+      updatedAt: now,
+    });
+
+    const cycleName = cycle.name ?? `Cycle ${cycle.number}`;
+    const newIssueCount = cycle.issueCount + 1;
+
+    // Build confirmation message
+    const confirmationMessage = `Added ${issue.identifier}: "${issue.title}" to ${cycleName}. The cycle now has ${newIssueCount} issues.`;
+
+    return {
+      success: true,
+      issue: {
+        id: issue._id,
+        identifier: issue.identifier,
+        title: issue.title,
+      },
+      cycle: {
+        id: cycle._id,
+        name: cycleName,
+        issueCount: newIssueCount,
+      },
+      confirmationMessage,
       generatedAt: new Date().toISOString(),
     };
   },

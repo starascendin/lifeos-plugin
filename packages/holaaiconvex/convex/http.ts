@@ -1235,6 +1235,12 @@ const AVAILABLE_TOOLS = [
   // Agenda tools
   "get_daily_agenda",
   "get_weekly_agenda",
+  // Issue Management tools
+  "create_issue",
+  "mark_issue_complete",
+  // Cycle Management tools
+  "get_current_cycle",
+  "assign_issue_to_cycle",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -1412,6 +1418,41 @@ http.route({
             userId: auth.userId,
             startDate: params?.startDate as string | undefined,
             localTime: params?.localTime as string | undefined,
+          });
+          break;
+
+        // Issue Management tools
+        case "create_issue":
+          result = await ctx.runMutation(internal.lifeos.tool_call.createIssueInternal, {
+            userId: auth.userId,
+            title: params?.title as string,
+            description: params?.description as string | undefined,
+            projectIdOrKey: params?.projectIdOrKey as string | undefined,
+            priority: params?.priority as string | undefined,
+            dueDate: params?.dueDate as string | undefined,
+            cycleId: params?.cycleId as string | undefined,
+          });
+          break;
+
+        case "mark_issue_complete":
+          result = await ctx.runMutation(internal.lifeos.tool_call.markIssueCompleteInternal, {
+            userId: auth.userId,
+            issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
+          });
+          break;
+
+        // Cycle Management tools
+        case "get_current_cycle":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getCurrentCycleInternal, {
+            userId: auth.userId,
+          });
+          break;
+
+        case "assign_issue_to_cycle":
+          result = await ctx.runMutation(internal.lifeos.tool_call.assignIssueToCycleInternal, {
+            userId: auth.userId,
+            issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
+            cycleId: params?.cycleId as string | undefined,
           });
           break;
       }
