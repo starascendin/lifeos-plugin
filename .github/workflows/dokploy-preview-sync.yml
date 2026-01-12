@@ -34,6 +34,10 @@ jobs:
       - name: Install Convex CLI
         run: npm install -g convex
 
+      - name: Install dependencies
+        working-directory: packages/holaaiconvex
+        run: npm install
+
       - name: Deploy Convex Preview
         id: convex-preview
         working-directory: packages/holaaiconvex
