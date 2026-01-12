@@ -91,6 +91,10 @@ export default function LifeOSApp() {
                   <Route path="agenda" element={<LifeOSAgenda />} />
                   <Route path="agenda/:view" element={<LifeOSAgenda />} />
                   <Route path="initiatives" element={<LifeOSInitiatives />} />
+                  <Route
+                    path="initiatives/:id"
+                    element={<LifeOSInitiatives />}
+                  />
                   <Route path="chatnexus" element={<LifeOSChatNexus />} />
                   <Route path="llmcouncil" element={<LifeOSLLMCouncil />} />
                   <Route

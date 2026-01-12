@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -19,7 +20,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  InitiativesProvider,
   useInitiatives,
   INITIATIVE_CATEGORIES,
   type InitiativeCategory,
@@ -30,7 +30,8 @@ import { InitiativeProgressRing } from "./InitiativeProgressBar";
 import { Plus, Rocket, Filter, LayoutGrid, List } from "lucide-react";
 import type { Doc, Id } from "@holaai/convex";
 
-function InitiativesContent() {
+export function InitiativesTab() {
+  const navigate = useNavigate();
   const {
     selectedYear,
     setSelectedYear,
@@ -248,6 +249,9 @@ function InitiativesContent() {
               <InitiativeCard
                 key={initiative._id}
                 initiative={initiative}
+                onClick={() =>
+                  navigate(`/lifeos/initiatives/${initiative._id}`)
+                }
                 onEdit={() => handleEdit(initiative)}
                 onArchive={() => handleArchive(initiative._id)}
                 onDelete={() => setDeleteConfirmId(initiative._id)}
@@ -309,13 +313,5 @@ function InitiativesContent() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-export function InitiativesTab() {
-  return (
-    <InitiativesProvider>
-      <InitiativesContent />
-    </InitiativesProvider>
   );
 }
