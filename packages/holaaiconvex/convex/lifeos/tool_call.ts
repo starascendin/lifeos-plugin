@@ -27,7 +27,8 @@ export const TOOL_DEFINITIONS = {
   get_projects: {
     description: "Get user's projects with issue counts and completion stats",
     params: {
-      status: "optional - filter by status (planned, in_progress, paused, completed, cancelled)",
+      status:
+        "optional - filter by status (planned, in_progress, paused, completed, cancelled)",
       includeArchived: "optional - include archived projects (default false)",
     },
   },
@@ -35,8 +36,10 @@ export const TOOL_DEFINITIONS = {
     description: "Get tasks with optional filters",
     params: {
       projectId: "optional - filter by project ID",
-      status: "optional - filter by status (backlog, todo, in_progress, in_review, done, cancelled)",
-      priority: "optional - filter by priority (urgent, high, medium, low, none)",
+      status:
+        "optional - filter by status (backlog, todo, in_progress, in_review, done, cancelled)",
+      priority:
+        "optional - filter by priority (urgent, high, medium, low, none)",
       limit: "optional - max results (default 50, max 100)",
     },
   },
@@ -70,22 +73,28 @@ export const TOOL_DEFINITIONS = {
   },
   // Agenda tools
   get_daily_agenda: {
-    description: "Get today's full agenda: tasks, calendar events, and voice note count",
+    description:
+      "Get today's full agenda: tasks, calendar events, and voice note count",
     params: {
       date: "optional - specific date in ISO format (default: today based on localTime)",
-      localTime: "optional - user's local time in ISO format for accurate date calculation",
+      localTime:
+        "optional - user's local time in ISO format for accurate date calculation",
     },
   },
   get_weekly_agenda: {
-    description: "Get weekly agenda: tasks and events for the next 7 days, plus AI weekly summary",
+    description:
+      "Get weekly agenda: tasks and events for the next 7 days, plus AI weekly summary",
     params: {
-      startDate: "optional - start date in ISO format (default: today based on localTime)",
-      localTime: "optional - user's local time in ISO format for accurate date calculation",
+      startDate:
+        "optional - start date in ISO format (default: today based on localTime)",
+      localTime:
+        "optional - user's local time in ISO format for accurate date calculation",
     },
   },
   // Issue Management tools
   create_issue: {
-    description: "Create a new task/issue with optional project, priority, and due date",
+    description:
+      "Create a new task/issue with optional project, priority, and due date",
     params: {
       title: "required - the task title",
       description: "optional - detailed description",
@@ -103,7 +112,8 @@ export const TOOL_DEFINITIONS = {
   },
   // Cycle Management tools
   get_current_cycle: {
-    description: "Get the currently active cycle with progress stats and top issues",
+    description:
+      "Get the currently active cycle with progress stats and top issues",
     params: {},
   },
   assign_issue_to_cycle: {
@@ -136,7 +146,11 @@ export const getTodaysTasksInternal = internalQuery({
 
     // Get today's date range
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).getTime();
     const endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1;
 
     // Get all issues for the user
@@ -150,7 +164,10 @@ export const getTodaysTasksInternal = internalQuery({
     const relevantTasks = allIssues.filter((issue) => {
       if (issue.status === "done" || issue.status === "cancelled") return false;
 
-      const isDueToday = issue.dueDate && issue.dueDate >= startOfDay && issue.dueDate <= endOfDay;
+      const isDueToday =
+        issue.dueDate &&
+        issue.dueDate >= startOfDay &&
+        issue.dueDate <= endOfDay;
       const isTopPriority = issue.isTopPriority === true;
 
       return isDueToday || isTopPriority;
@@ -179,7 +196,9 @@ export const getTodaysTasksInternal = internalQuery({
       status: task.status,
       priority: task.priority,
       isTopPriority: task.isTopPriority || false,
-      dueToday: task.dueDate ? task.dueDate >= startOfDay && task.dueDate <= endOfDay : false,
+      dueToday: task.dueDate
+        ? task.dueDate >= startOfDay && task.dueDate <= endOfDay
+        : false,
     }));
 
     // Build summary
@@ -239,7 +258,9 @@ export const getProjectsInternal = internalQuery({
       const issueCount = project.issueCount ?? 0;
       const completedIssueCount = project.completedIssueCount ?? 0;
       const completionPercentage =
-        issueCount > 0 ? Math.round((completedIssueCount / issueCount) * 100) : 0;
+        issueCount > 0
+          ? Math.round((completedIssueCount / issueCount) * 100)
+          : 0;
 
       return {
         id: project._id,
@@ -291,11 +312,25 @@ export const getTasksInternal = internalQuery({
     const limit = Math.min(args.limit ?? 50, 100); // Cap at 100
 
     // Type guard for status
-    type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled";
-    const validStatuses: IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"];
-    const status = args.status && validStatuses.includes(args.status as IssueStatus)
-      ? (args.status as IssueStatus)
-      : undefined;
+    type IssueStatus =
+      | "backlog"
+      | "todo"
+      | "in_progress"
+      | "in_review"
+      | "done"
+      | "cancelled";
+    const validStatuses: IssueStatus[] = [
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "done",
+      "cancelled",
+    ];
+    const status =
+      args.status && validStatuses.includes(args.status as IssueStatus)
+        ? (args.status as IssueStatus)
+        : undefined;
 
     // Get issues based on filters
     let issues;
@@ -306,7 +341,7 @@ export const getTasksInternal = internalQuery({
         issues = await ctx.db
           .query("lifeos_pmIssues")
           .withIndex("by_project_status", (q) =>
-            q.eq("projectId", projectId).eq("status", status)
+            q.eq("projectId", projectId).eq("status", status),
           )
           .collect();
       } else {
@@ -320,7 +355,9 @@ export const getTasksInternal = internalQuery({
     } else if (status) {
       issues = await ctx.db
         .query("lifeos_pmIssues")
-        .withIndex("by_status", (q) => q.eq("userId", userId).eq("status", status))
+        .withIndex("by_status", (q) =>
+          q.eq("userId", userId).eq("status", status),
+        )
         .collect();
     } else {
       issues = await ctx.db
@@ -352,13 +389,23 @@ export const getTasksInternal = internalQuery({
     const limitedIssues = issues.slice(0, limit);
 
     // Get project info for each issue (filter out undefined projectIds)
-    const projectIds = [...new Set(limitedIssues.map((i) => i.projectId).filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined))];
+    const projectIds = [
+      ...new Set(
+        limitedIssues
+          .map((i) => i.projectId)
+          .filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined),
+      ),
+    ];
     const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
-    const projectMap = new Map(projects.filter(Boolean).map((p) => [p!._id, p!]));
+    const projectMap = new Map(
+      projects.filter(Boolean).map((p) => [p!._id, p!]),
+    );
 
     // Build response
     const tasks = limitedIssues.map((issue) => {
-      const project = issue.projectId ? projectMap.get(issue.projectId) : undefined;
+      const project = issue.projectId
+        ? projectMap.get(issue.projectId)
+        : undefined;
       return {
         id: issue._id,
         identifier: issue.identifier,
@@ -404,7 +451,7 @@ export const searchNotesInternal = internalQuery({
     const results = await ctx.db
       .query("life_voiceMemos")
       .withSearchIndex("search_transcript", (q) =>
-        q.search("transcript", args.query).eq("userId", userId)
+        q.search("transcript", args.query).eq("userId", userId),
       )
       .take(limit);
 
@@ -597,7 +644,7 @@ export const getDailyAgendaInternal = internalQuery({
     const startOfDay = new Date(
       targetDate.getFullYear(),
       targetDate.getMonth(),
-      targetDate.getDate()
+      targetDate.getDate(),
     ).getTime();
     const endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1;
 
@@ -612,7 +659,10 @@ export const getDailyAgendaInternal = internalQuery({
     const relevantTasks = allIssues.filter((issue) => {
       if (issue.status === "done" || issue.status === "cancelled") return false;
 
-      const isDueOnDate = issue.dueDate && issue.dueDate >= startOfDay && issue.dueDate <= endOfDay;
+      const isDueOnDate =
+        issue.dueDate &&
+        issue.dueDate >= startOfDay &&
+        issue.dueDate <= endOfDay;
       const isTopPriority = issue.isTopPriority === true;
 
       return isDueOnDate || isTopPriority;
@@ -632,20 +682,32 @@ export const getDailyAgendaInternal = internalQuery({
     });
 
     // Get project info for tasks
-    const projectIds = [...new Set(sortedTasks.map((t) => t.projectId).filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined))];
+    const projectIds = [
+      ...new Set(
+        sortedTasks
+          .map((t) => t.projectId)
+          .filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined),
+      ),
+    ];
     const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
-    const projectMap = new Map(projects.filter(Boolean).map((p) => [p!._id, p!]));
+    const projectMap = new Map(
+      projects.filter(Boolean).map((p) => [p!._id, p!]),
+    );
 
     // Build simplified task response for voice
     const tasks = sortedTasks.map((task) => {
-      const project = task.projectId ? projectMap.get(task.projectId) : undefined;
+      const project = task.projectId
+        ? projectMap.get(task.projectId)
+        : undefined;
       return {
         identifier: task.identifier,
         title: task.title,
         status: task.status,
         priority: task.priority,
         isTopPriority: task.isTopPriority || false,
-        dueOnDate: task.dueDate ? task.dueDate >= startOfDay && task.dueDate <= endOfDay : false,
+        dueOnDate: task.dueDate
+          ? task.dueDate >= startOfDay && task.dueDate <= endOfDay
+          : false,
         projectName: project?.name ?? "",
       };
     });
@@ -682,11 +744,18 @@ export const getDailyAgendaInternal = internalQuery({
       .collect();
 
     const voiceNoteCount = allMemos.filter(
-      (memo) => memo.clientCreatedAt >= startOfDay && memo.clientCreatedAt <= endOfDay
+      (memo) =>
+        memo.clientCreatedAt >= startOfDay && memo.clientCreatedAt <= endOfDay,
     ).length;
 
     // Build priority breakdown
-    const byPriority: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 };
+    const byPriority: Record<string, number> = {
+      urgent: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      none: 0,
+    };
     for (const task of tasks) {
       byPriority[task.priority] = (byPriority[task.priority] || 0) + 1;
     }
@@ -739,7 +808,7 @@ export const getWeeklyAgendaInternal = internalQuery({
     const startOfStartDay = new Date(
       startDateObj.getFullYear(),
       startDateObj.getMonth(),
-      startDateObj.getDate()
+      startDateObj.getDate(),
     ).getTime();
     const endOfWeek = startOfStartDay + 7 * 24 * 60 * 60 * 1000 - 1;
 
@@ -759,9 +828,17 @@ export const getWeeklyAgendaInternal = internalQuery({
     });
 
     // Get project info for tasks
-    const projectIds = [...new Set(relevantTasks.map((t) => t.projectId).filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined))];
+    const projectIds = [
+      ...new Set(
+        relevantTasks
+          .map((t) => t.projectId)
+          .filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined),
+      ),
+    ];
     const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
-    const projectMap = new Map(projects.filter(Boolean).map((p) => [p!._id, p!]));
+    const projectMap = new Map(
+      projects.filter(Boolean).map((p) => [p!._id, p!]),
+    );
 
     // Define task type for grouping
     type TaskEntry = {
@@ -801,7 +878,9 @@ export const getWeeklyAgendaInternal = internalQuery({
       const dateKey = dueDate.toISOString().split("T")[0];
 
       if (tasksByDay[dateKey]) {
-        const project = task.projectId ? projectMap.get(task.projectId) : undefined;
+        const project = task.projectId
+          ? projectMap.get(task.projectId)
+          : undefined;
         tasksByDay[dateKey].push({
           identifier: task.identifier,
           title: task.title,
@@ -867,8 +946,9 @@ export const getWeeklyAgendaInternal = internalQuery({
 
     // Sort events within each day by start time
     for (const dateKey of Object.keys(eventsByDay)) {
-      eventsByDay[dateKey].sort((a, b) =>
-        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      eventsByDay[dateKey].sort(
+        (a, b) =>
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
       );
     }
 
@@ -877,17 +957,27 @@ export const getWeeklyAgendaInternal = internalQuery({
     const weekStart = new Date(startOfStartDay);
     const dayOfWeek = weekStart.getDay();
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to Monday
-    const mondayDate = new Date(startOfStartDay + mondayOffset * 24 * 60 * 60 * 1000);
+    const mondayDate = new Date(
+      startOfStartDay + mondayOffset * 24 * 60 * 60 * 1000,
+    );
     const weekStartDateStr = mondayDate.toISOString().split("T")[0];
 
     // Query for existing weekly summary using weekStartDate
     const weeklySummaries = await ctx.db
       .query("lifeos_weeklySummaries")
-      .withIndex("by_user_week", (q) => q.eq("userId", userId).eq("weekStartDate", weekStartDateStr))
+      .withIndex("by_user_week", (q) =>
+        q.eq("userId", userId).eq("weekStartDate", weekStartDateStr),
+      )
       .first();
 
     // Build stats across all days
-    const byPriority: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 };
+    const byPriority: Record<string, number> = {
+      urgent: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      none: 0,
+    };
     let totalTasks = 0;
     let totalEvents = 0;
     let daysWithTasks = 0;
@@ -933,7 +1023,6 @@ export const getWeeklyAgendaInternal = internalQuery({
 
 // ==================== HELPER FUNCTIONS ====================
 
-
 /**
  * Resolve an issue by ID or identifier (e.g., "PROJ-123")
  * Accepts both direct Convex ID and human-readable identifier
@@ -941,11 +1030,13 @@ export const getWeeklyAgendaInternal = internalQuery({
 async function resolveIssue(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
-  issueIdOrIdentifier: string
+  issueIdOrIdentifier: string,
 ): Promise<Doc<"lifeos_pmIssues"> | null> {
   // Try as direct ID first
   try {
-    const issue = await ctx.db.get(issueIdOrIdentifier as Id<"lifeos_pmIssues">);
+    const issue = await ctx.db.get(
+      issueIdOrIdentifier as Id<"lifeos_pmIssues">,
+    );
     if (issue && issue.userId === userId) {
       return issue;
     }
@@ -957,7 +1048,9 @@ async function resolveIssue(
   const issue = await ctx.db
     .query("lifeos_pmIssues")
     .withIndex("by_identifier", (q) =>
-      q.eq("userId", userId).eq("identifier", issueIdOrIdentifier.toUpperCase())
+      q
+        .eq("userId", userId)
+        .eq("identifier", issueIdOrIdentifier.toUpperCase()),
     )
     .first();
 
@@ -971,7 +1064,7 @@ async function resolveIssue(
 async function resolveProject(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
-  projectIdOrKey: string
+  projectIdOrKey: string,
 ): Promise<Doc<"lifeos_pmProjects"> | null> {
   // Try as direct ID first
   try {
@@ -987,7 +1080,7 @@ async function resolveProject(
   const project = await ctx.db
     .query("lifeos_pmProjects")
     .withIndex("by_key", (q) =>
-      q.eq("userId", userId).eq("key", projectIdOrKey.toUpperCase())
+      q.eq("userId", userId).eq("key", projectIdOrKey.toUpperCase()),
     )
     .first();
 
@@ -1008,12 +1101,26 @@ export const createIssueInternal = internalMutation({
     description: v.optional(v.string()),
     projectIdOrKey: v.optional(v.string()),
     priority: v.optional(v.string()),
-    dueDate: v.optional(v.string()), // ISO date string
+    dueDate: v.optional(v.string()),
     cycleId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId as Id<"users">;
     const now = Date.now();
+
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: `User not found. The provided userId "${args.userId}" does not exist in the users table.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
 
     // Resolve project if provided
     let project: Doc<"lifeos_pmProjects"> | null = null;
@@ -1084,10 +1191,17 @@ export const createIssueInternal = internalMutation({
 
     // Validate and set priority
     type Priority = "urgent" | "high" | "medium" | "low" | "none";
-    const validPriorities: Priority[] = ["urgent", "high", "medium", "low", "none"];
-    const priority: Priority = args.priority && validPriorities.includes(args.priority as Priority)
-      ? (args.priority as Priority)
-      : "none";
+    const validPriorities: Priority[] = [
+      "urgent",
+      "high",
+      "medium",
+      "low",
+      "none",
+    ];
+    const priority: Priority =
+      args.priority && validPriorities.includes(args.priority as Priority)
+        ? (args.priority as Priority)
+        : "none";
 
     // Parse due date
     let dueDate: number | undefined;
@@ -1101,9 +1215,14 @@ export const createIssueInternal = internalMutation({
     // Get sort order for backlog
     const existingInBacklog = await ctx.db
       .query("lifeos_pmIssues")
-      .withIndex("by_status", (q) => q.eq("userId", userId).eq("status", "backlog"))
+      .withIndex("by_status", (q) =>
+        q.eq("userId", userId).eq("status", "backlog"),
+      )
       .collect();
-    const maxSortOrder = existingInBacklog.reduce((max, i) => Math.max(max, i.sortOrder), 0);
+    const maxSortOrder = existingInBacklog.reduce(
+      (max, i) => Math.max(max, i.sortOrder),
+      0,
+    );
 
     // Create the issue
     const issueId = await ctx.db.insert("lifeos_pmIssues", {
@@ -1148,7 +1267,9 @@ export const createIssueInternal = internalMutation({
     if (!cycleId) {
       const activeCycles = await ctx.db
         .query("lifeos_pmCycles")
-        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "active"))
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", userId).eq("status", "active"),
+        )
         .first();
 
       if (activeCycles) {
@@ -1193,10 +1314,22 @@ export const markIssueCompleteInternal = internalMutation({
     issueIdOrIdentifier: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId as Id<"users">;
     const now = Date.now();
 
-    // Resolve the issue
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: `User not found. The provided userId does not exist.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
     const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
 
     if (!issue) {
@@ -1239,7 +1372,11 @@ export const markIssueCompleteInternal = internalMutation({
     }
 
     // Update cycle completed count and get progress
-    let cycleProgress: { completed: number; total: number; name: string } | null = null;
+    let cycleProgress: {
+      completed: number;
+      total: number;
+      name: string;
+    } | null = null;
     if (issue.cycleId) {
       const cycle = await ctx.db.get(issue.cycleId);
       if (cycle) {
@@ -1290,26 +1427,45 @@ export const getCurrentCycleInternal = internalQuery({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId as Id<"users">;
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
 
-    // Get active cycle
+    if (!user) {
+      return {
+        success: false,
+        hasCycle: false,
+        error: `User not found. The provided userId does not exist.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
     const activeCycle = await ctx.db
       .query("lifeos_pmCycles")
-      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "active"))
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", userId).eq("status", "active"),
+      )
       .first();
 
     if (!activeCycle) {
       return {
         success: false,
         hasCycle: false,
-        error: "You don't have an active cycle right now. Would you like me to help you set one up?",
+        error:
+          "You don't have an active cycle right now. Would you like me to help you set one up?",
         generatedAt: new Date().toISOString(),
       };
     }
 
     // Calculate days remaining
     const now = Date.now();
-    const daysRemaining = Math.max(0, Math.ceil((activeCycle.endDate - now) / (24 * 60 * 60 * 1000)));
+    const daysRemaining = Math.max(
+      0,
+      Math.ceil((activeCycle.endDate - now) / (24 * 60 * 60 * 1000)),
+    );
 
     // Get all issues in this cycle
     const cycleIssues = await ctx.db
@@ -1324,12 +1480,19 @@ export const getCurrentCycleInternal = internalQuery({
     const progress = {
       totalIssues: userIssues.length,
       completed: userIssues.filter((i) => i.status === "done").length,
-      inProgress: userIssues.filter((i) => i.status === "in_progress" || i.status === "in_review").length,
+      inProgress: userIssues.filter(
+        (i) => i.status === "in_progress" || i.status === "in_review",
+      ).length,
       todo: userIssues.filter((i) => i.status === "todo").length,
       backlog: userIssues.filter((i) => i.status === "backlog").length,
-      completionPercent: userIssues.length > 0
-        ? Math.round((userIssues.filter((i) => i.status === "done").length / userIssues.length) * 100)
-        : 0,
+      completionPercent:
+        userIssues.length > 0
+          ? Math.round(
+              (userIssues.filter((i) => i.status === "done").length /
+                userIssues.length) *
+                100,
+            )
+          : 0,
     };
 
     // Get top priority issues (not done, sorted by priority)
@@ -1340,18 +1503,30 @@ export const getCurrentCycleInternal = internalQuery({
         if (a.isTopPriority && !b.isTopPriority) return -1;
         if (!a.isTopPriority && b.isTopPriority) return 1;
         // Then by priority level
-        return PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] -
-          PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER];
+        return (
+          PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] -
+          PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER]
+        );
       })
       .slice(0, 5);
 
     // Get project info for top issues
-    const projectIds = [...new Set(activeIssues.map((i) => i.projectId).filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined))];
+    const projectIds = [
+      ...new Set(
+        activeIssues
+          .map((i) => i.projectId)
+          .filter((id): id is Id<"lifeos_pmProjects"> => id !== undefined),
+      ),
+    ];
     const projects = await Promise.all(projectIds.map((id) => ctx.db.get(id)));
-    const projectMap = new Map(projects.filter(Boolean).map((p) => [p!._id, p!]));
+    const projectMap = new Map(
+      projects.filter(Boolean).map((p) => [p!._id, p!]),
+    );
 
     const topIssues = activeIssues.map((issue) => {
-      const project = issue.projectId ? projectMap.get(issue.projectId) : undefined;
+      const project = issue.projectId
+        ? projectMap.get(issue.projectId)
+        : undefined;
       return {
         identifier: issue.identifier,
         title: issue.title,
@@ -1396,10 +1571,22 @@ export const assignIssueToCycleInternal = internalMutation({
     cycleId: v.optional(v.string()), // Optional - defaults to active cycle
   },
   handler: async (ctx, args) => {
-    const userId = args.userId as Id<"users">;
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: `User not found. The provided userId does not exist.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
     const now = Date.now();
 
-    // Resolve the issue
     const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
 
     if (!issue) {
@@ -1434,13 +1621,16 @@ export const assignIssueToCycleInternal = internalMutation({
       // Default to active cycle
       cycle = await ctx.db
         .query("lifeos_pmCycles")
-        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "active"))
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", userId).eq("status", "active"),
+        )
         .first();
 
       if (!cycle) {
         return {
           success: false,
-          error: "You don't have an active cycle. Would you like me to help you create one?",
+          error:
+            "You don't have an active cycle. Would you like me to help you create one?",
           generatedAt: new Date().toISOString(),
         };
       }
@@ -1462,9 +1652,10 @@ export const assignIssueToCycleInternal = internalMutation({
       if (oldCycle) {
         await ctx.db.patch(issue.cycleId, {
           issueCount: Math.max(0, oldCycle.issueCount - 1),
-          completedIssueCount: issue.status === "done"
-            ? Math.max(0, oldCycle.completedIssueCount - 1)
-            : oldCycle.completedIssueCount,
+          completedIssueCount:
+            issue.status === "done"
+              ? Math.max(0, oldCycle.completedIssueCount - 1)
+              : oldCycle.completedIssueCount,
           updatedAt: now,
         });
       }
@@ -1479,9 +1670,10 @@ export const assignIssueToCycleInternal = internalMutation({
     // Update cycle counts
     await ctx.db.patch(cycle._id, {
       issueCount: cycle.issueCount + 1,
-      completedIssueCount: issue.status === "done"
-        ? cycle.completedIssueCount + 1
-        : cycle.completedIssueCount,
+      completedIssueCount:
+        issue.status === "done"
+          ? cycle.completedIssueCount + 1
+          : cycle.completedIssueCount,
       updatedAt: now,
     });
 
