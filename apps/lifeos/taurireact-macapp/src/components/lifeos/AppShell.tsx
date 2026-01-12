@@ -46,7 +46,7 @@ function AppShellContent({ children }: AppShellProps) {
         {/* Main Content */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Mobile Header with hamburger */}
-          <div className="flex items-center gap-3 border-b bg-background px-4 py-3 md:hidden">
+          <div className="flex items-center gap-3 border-b bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:hidden">
             <Button
               variant="ghost"
               size="icon"

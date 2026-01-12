@@ -66,7 +66,11 @@ public class ClerkNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 try await self.ensureLoaded()
                 call.resolve(self.getSessionInfo(isLoaded: true))
             } catch {
-                call.reject("Failed to load Clerk", nil, error)
+                if let apiError = error as? ClerkAPIError {
+                    call.reject(apiError.longMessage ?? apiError.message ?? "Failed to load Clerk", apiError.code, apiError)
+                    return
+                }
+                call.reject(error.localizedDescription.isEmpty ? "Failed to load Clerk" : error.localizedDescription, nil, error)
             }
         }
     }
@@ -81,7 +85,11 @@ public class ClerkNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 try await self.ensureLoaded()
                 call.resolve(self.getSessionInfo(isLoaded: true))
             } catch {
-                call.reject("Failed to get session", nil, error)
+                if let apiError = error as? ClerkAPIError {
+                    call.reject(apiError.longMessage ?? apiError.message ?? "Failed to get session", apiError.code, apiError)
+                    return
+                }
+                call.reject(error.localizedDescription.isEmpty ? "Failed to get session" : error.localizedDescription, nil, error)
             }
         }
     }
@@ -106,7 +114,11 @@ public class ClerkNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 let token = try await session.getToken(.init(template: template, skipCache: skipCache))
                 call.resolve(["jwt": token?.jwt as Any])
             } catch {
-                call.reject("Failed to get token", nil, error)
+                if let apiError = error as? ClerkAPIError {
+                    call.reject(apiError.longMessage ?? apiError.message ?? "Failed to get token", apiError.code, apiError)
+                    return
+                }
+                call.reject(error.localizedDescription.isEmpty ? "Failed to get token" : error.localizedDescription, nil, error)
             }
         }
     }
@@ -160,7 +172,11 @@ public class ClerkNativePlugin: CAPPlugin, CAPBridgedPlugin {
                     call.resolve(self.getSessionInfo(isLoaded: true))
                     return
                 }
-                call.reject("OAuth sign-in failed", nil, error)
+                if let apiError = error as? ClerkAPIError {
+                    call.reject(apiError.longMessage ?? apiError.message ?? "OAuth sign-in failed", apiError.code, apiError)
+                    return
+                }
+                call.reject(error.localizedDescription.isEmpty ? "OAuth sign-in failed" : error.localizedDescription, nil, error)
             }
         }
     }
@@ -176,7 +192,11 @@ public class ClerkNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 try await Clerk.shared.signOut()
                 call.resolve()
             } catch {
-                call.reject("Sign out failed", nil, error)
+                if let apiError = error as? ClerkAPIError {
+                    call.reject(apiError.longMessage ?? apiError.message ?? "Sign out failed", apiError.code, apiError)
+                    return
+                }
+                call.reject(error.localizedDescription.isEmpty ? "Sign out failed" : error.localizedDescription, nil, error)
             }
         }
     }
