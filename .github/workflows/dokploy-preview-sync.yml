@@ -12,6 +12,10 @@ env:
   DOKPLOY_APP_ID: r92eMjky2Tf04b37F1cLg
   DOKPLOY_BASE_URL: https://app.dokploy.com
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   sync-preview:
     runs-on: ubuntu-latest
