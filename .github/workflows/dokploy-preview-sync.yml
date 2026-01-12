@@ -50,7 +50,8 @@ jobs:
           echo "Deploying Convex preview: $PREVIEW_NAME"
 
           # Deploy to preview and capture output
-          DEPLOY_OUTPUT=$(npx convex deploy --preview "$PREVIEW_NAME" 2>&1) || {
+          # Note: CONVEX_DEPLOY_KEY must be a Preview Deploy Key (not production)
+          DEPLOY_OUTPUT=$(npx convex deploy --preview-create "$PREVIEW_NAME" 2>&1) || {
             echo "Deploy output: $DEPLOY_OUTPUT"
             exit 1
           }
