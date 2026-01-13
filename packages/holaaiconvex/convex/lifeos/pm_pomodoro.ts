@@ -46,9 +46,7 @@ export const getActivePomodoro = query({
 export const getActivePomodoroWithIssue = query({
   args: {},
   handler: async (ctx) => {
-    console.debug("[pm_pomodoro] getActivePomodoroWithIssue called");
     const user = await requireUser(ctx);
-    console.debug("[pm_pomodoro] User found:", user._id);
 
     // Check for active pomodoro
     let session = await ctx.db
@@ -69,17 +67,14 @@ export const getActivePomodoroWithIssue = query({
     }
 
     if (!session) {
-      console.debug("[pm_pomodoro] No active session found, returning null");
       return null;
     }
 
-    console.debug("[pm_pomodoro] Found session:", session._id, "status:", session.status);
     const issue = session.issueId ? await ctx.db.get(session.issueId) : null;
     const project = session.projectId
       ? await ctx.db.get(session.projectId)
       : null;
 
-    console.debug("[pm_pomodoro] Returning session with issue:", issue?._id);
     return { session, issue, project };
   },
 });
@@ -90,9 +85,7 @@ export const getActivePomodoroWithIssue = query({
 export const getTodayStats = query({
   args: {},
   handler: async (ctx) => {
-    console.debug("[pm_pomodoro] getTodayStats called");
     const user = await requireUser(ctx);
-    console.debug("[pm_pomodoro] getTodayStats - User found:", user._id);
     const today = new Date().toISOString().split("T")[0];
 
     return await ctx.db
@@ -190,9 +183,7 @@ export const startPomodoro = mutation({
     breakMinutes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    console.debug("[pm_pomodoro] startPomodoro called with:", args);
     const user = await requireUser(ctx);
-    console.debug("[pm_pomodoro] startPomodoro - User:", user._id);
     const now = Date.now();
 
     // Check for existing active pomodoro
@@ -245,7 +236,6 @@ export const startPomodoro = mutation({
       updatedAt: now,
     });
 
-    console.debug("[pm_pomodoro] Created session:", sessionId, "for user:", user._id);
     return sessionId;
   },
 });
