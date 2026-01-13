@@ -1,12 +1,15 @@
-name: Sync Dokploy Preview with Convex
+name: Preview Deployments
 
-# Triggers when a PR is opened/updated AND livekit-voice-agent code changes
+# Unified preview deployment workflow for PRs
+# Handles: Convex Preview, Vercel Preview, Dokploy Preview
 on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - "packages/holaaiconvex/**"
       - "packages/livekit-voice-agent/**"
-      - ".github/workflows/dokploy-preview-sync.yml"
+      - "apps/lifeos/taurireact-macapp/**"
+      - ".github/workflows/preview-deploy.yml"
 
 env:
   DOKPLOY_APP_ID: r92eMjky2Tf04b37F1cLg
@@ -17,10 +20,14 @@ permissions:
   pull-requests: write
 
 jobs:
-  sync-preview:
+  # Step 1: Deploy Convex Preview (all other services depend on this)
+  convex-preview:
     runs-on: ubuntu-latest
-    # Only run on PRs, not on the default branch
     if: github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      convex_url: ${{ steps.deploy.outputs.convex_url }}
+      convex_site_url: ${{ steps.deploy.outputs.convex_site_url }}
+      preview_name: ${{ steps.deploy.outputs.preview_name }}
 
     steps:
       - name: Checkout code
@@ -29,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Convex CLI
         run: npm install -g convex
@@ -39,7 +46,7 @@ jobs:
         run: npm install
 
       - name: Deploy Convex Preview
-        id: convex-preview
+        id: deploy
         working-directory: packages/holaaiconvex
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_PREVIEW_DEPLOY_KEY }}
@@ -54,7 +61,6 @@ jobs:
           echo "Deploying Convex preview: $PREVIEW_NAME"
 
           # Deploy to preview and capture output
-          # Note: CONVEX_DEPLOY_KEY must be a Preview Deploy Key (not production)
           DEPLOY_OUTPUT=$(npx convex deploy --preview-create "$PREVIEW_NAME" 2>&1) || {
             echo "Deploy output: $DEPLOY_OUTPUT"
             exit 1
@@ -64,26 +70,94 @@ jobs:
           echo "$DEPLOY_OUTPUT"
 
           # Extract the preview URL from the output
-          # Convex outputs something like "Deployed to https://preview-name-abc123.convex.cloud"
           CONVEX_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.convex\.cloud' | head -1)
 
           if [ -z "$CONVEX_URL" ]; then
             echo "Could not extract Convex URL from deploy output, constructing it"
-            # Fall back to constructed URL pattern
             CONVEX_URL="https://${PREVIEW_NAME}.convex.cloud"
           fi
 
           # Convert .convex.cloud to .convex.site for HTTP actions
           CONVEX_SITE_URL=$(echo "$CONVEX_URL" | sed 's/\.convex\.cloud/.convex.site/')
 
-          echo "Convex Preview URL: $CONVEX_SITE_URL"
-          echo "convex_url=$CONVEX_SITE_URL" >> $GITHUB_OUTPUT
+          echo "Convex Preview URL: $CONVEX_URL"
+          echo "Convex Site URL: $CONVEX_SITE_URL"
+
+          echo "convex_url=$CONVEX_URL" >> $GITHUB_OUTPUT
+          echo "convex_site_url=$CONVEX_SITE_URL" >> $GITHUB_OUTPUT
           echo "preview_name=$PREVIEW_NAME" >> $GITHUB_OUTPUT
 
+  # Step 2: Deploy Vercel Preview with correct Convex URL
+  vercel-preview:
+    runs-on: ubuntu-latest
+    needs: convex-preview
+    outputs:
+      preview_url: ${{ steps.deploy.outputs.preview_url }}
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_TAURI_LIFEOSAPP_PROJECT_ID }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project with Preview Convex URL
+        env:
+          SKIP_CONVEX_DEPLOY: "1"
+          VITE_CONVEX_URL: ${{ needs.convex-preview.outputs.convex_url }}
+        run: |
+          echo "Building with VITE_CONVEX_URL=$VITE_CONVEX_URL"
+          vercel build --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel Preview
+        id: deploy
+        run: |
+          # Deploy and capture the preview URL
+          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          echo "$DEPLOY_OUTPUT"
+
+          # Extract the preview URL from output
+          PREVIEW_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.vercel\.app' | head -1)
+
+          if [ -z "$PREVIEW_URL" ]; then
+            # Try alternative pattern
+            PREVIEW_URL=$(echo "$DEPLOY_OUTPUT" | tail -1 | tr -d '[:space:]')
+          fi
+
+          echo "Vercel Preview URL: $PREVIEW_URL"
+          echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+
+  # Step 3: Update Dokploy Preview Environment (for LiveKit Voice Agent)
+  dokploy-preview:
+    runs-on: ubuntu-latest
+    needs: convex-preview
+    # Always update Dokploy previewEnv with the correct Convex URL
+
+    steps:
       - name: Update Dokploy Preview Environment
         env:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
-          CONVEX_URL: ${{ steps.convex-preview.outputs.convex_url }}
+          CONVEX_URL: ${{ needs.convex-preview.outputs.convex_site_url }}
         run: |
           echo "Updating Dokploy previewEnv with CONVEX_URL: $CONVEX_URL"
 
@@ -117,21 +191,39 @@ jobs:
             exit 1
           fi
 
+  # Step 4: Comment on PR with all preview URLs
+  comment:
+    runs-on: ubuntu-latest
+    needs: [convex-preview, vercel-preview, dokploy-preview]
+    if: always() && needs.convex-preview.result == 'success'
+
+    steps:
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
-            const convexUrl = '${{ steps.convex-preview.outputs.convex_url }}';
-            const previewName = '${{ steps.convex-preview.outputs.preview_name }}';
-            const body = `## 🚀 Dokploy Preview Sync
+            const convexUrl = '${{ needs.convex-preview.outputs.convex_url }}';
+            const convexSiteUrl = '${{ needs.convex-preview.outputs.convex_site_url }}';
+            const previewName = '${{ needs.convex-preview.outputs.preview_name }}';
+            const vercelUrl = '${{ needs.vercel-preview.outputs.preview_url }}' || 'N/A';
+            const dokployStatus = '${{ needs.dokploy-preview.result }}';
 
-            LiveKit Voice Agent preview will use:
-            - **Convex Preview**: \`${previewName}\`
-            - **Convex URL**: \`${convexUrl}\`
+            const body = `## 🚀 Preview Deployments
 
-            The Dokploy preview deployment has been configured to use this Convex preview backend.
+            | Service | URL | Status |
+            |---------|-----|--------|
+            | **Convex Preview** | \`${previewName}\` | ✅ Deployed |
+            | **Convex Cloud** | ${convexUrl} | ✅ Ready |
+            | **Convex Site** | ${convexSiteUrl} | ✅ Ready |
+            | **Vercel Preview** | ${vercelUrl} | ${vercelUrl !== 'N/A' ? '✅ Deployed' : '⏭️ Skipped'} |
+            | **Dokploy Preview** | (auto-created by Dokploy) | ${dokployStatus === 'success' ? '✅ Configured' : '⏭️ Skipped/Failed'} |
 
-            > Preview deployments are created automatically when Dokploy detects the PR.`;
+            ### Configuration
+            All preview services are configured to use the same Convex preview backend:
+            - **VITE_CONVEX_URL**: \`${convexUrl}\`
+            - **CONVEX_URL (LiveKit)**: \`${convexSiteUrl}\`
+
+            > Preview deployments are automatically coordinated via GitHub Actions.`;
 
             // Check if we already commented
             const { data: comments } = await github.rest.issues.listComments({
@@ -142,7 +234,7 @@ jobs:
 
             const botComment = comments.find(c =>
               c.user.type === 'Bot' &&
-              c.body.includes('Dokploy Preview Sync')
+              c.body.includes('Preview Deployments')
             );
 
             if (botComment) {
