@@ -20,6 +20,57 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Step 0: Pre-set Dokploy previewEnv IMMEDIATELY (before Dokploy webhook fires)
+  # This runs fast and sets previewEnv so Dokploy preview uses correct env
+  dokploy-preset:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Pre-calculate Convex Preview URL
+        id: calc
+        run: |
+          # Calculate expected preview name from branch (same logic as convex-preview job)
+          BRANCH_NAME="${{ github.head_ref }}"
+          PREVIEW_NAME=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+          PREVIEW_NAME="${PREVIEW_NAME:0:32}"
+
+          # Expected Convex site URL (may be overridden later if Convex generates different name)
+          EXPECTED_URL="https://${PREVIEW_NAME}.convex.site"
+          echo "Expected Convex URL: $EXPECTED_URL"
+          echo "expected_url=$EXPECTED_URL" >> $GITHUB_OUTPUT
+
+      - name: Pre-set Dokploy previewEnv (fast, before Dokploy webhook)
+        env:
+          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          EXPECTED_CONVEX_URL: ${{ steps.calc.outputs.expected_url }}
+        run: |
+          echo "Pre-setting Dokploy previewEnv with expected CONVEX_URL: $EXPECTED_CONVEX_URL"
+
+          PREVIEW_ENV="LIVEKIT_URL=wss://livekit-dev.rocketjump.tech
+          LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          CONVEX_URL=$EXPECTED_CONVEX_URL"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "$DOKPLOY_BASE_URL/api/trpc/application.update" \
+            -H "x-api-key: $DOKPLOY_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"json\": {
+                \"applicationId\": \"$DOKPLOY_APP_ID\",
+                \"previewEnv\": \"$(echo "$PREVIEW_ENV" | sed ':a;N;$!ba;s/\n/\\n/g')\"
+              }
+            }")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "Successfully pre-set Dokploy previewEnv"
+          else
+            echo "Warning: Could not pre-set previewEnv (HTTP $HTTP_CODE)"
+          fi
+
   # Step 1: Deploy Convex Preview (all other services depend on this)
   convex-preview:
     runs-on: ubuntu-latest
