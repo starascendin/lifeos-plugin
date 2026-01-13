@@ -195,6 +195,53 @@ jobs:
             exit 1
           fi
 
+      - name: Find and Redeploy Preview
+        env:
+          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "Finding preview deployment for PR #$PR_NUMBER..."
+
+          # Get the application to find preview deployments
+          APP_RESPONSE=$(curl -s -X GET \
+            "$DOKPLOY_BASE_URL/api/trpc/application.one?input=%7B%22json%22%3A%7B%22applicationId%22%3A%22$DOKPLOY_APP_ID%22%7D%7D" \
+            -H "x-api-key: $DOKPLOY_API_TOKEN" \
+            -H "Content-Type: application/json")
+
+          # Extract preview deployment ID for this PR
+          PREVIEW_ID=$(echo "$APP_RESPONSE" | jq -r ".result.data.json.previewDeployments[] | select(.pullRequestNumber == \"$PR_NUMBER\") | .previewDeploymentId" 2>/dev/null || echo "")
+
+          if [ -z "$PREVIEW_ID" ] || [ "$PREVIEW_ID" = "null" ]; then
+            echo "No preview deployment found for PR #$PR_NUMBER yet. Dokploy may create it automatically."
+            echo "Preview will use the updated previewEnv when created."
+            exit 0
+          fi
+
+          echo "Found preview deployment: $PREVIEW_ID"
+          echo "Triggering redeploy..."
+
+          # Trigger redeploy of the preview
+          REDEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.redeploy" \
+            -H "x-api-key: $DOKPLOY_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"json\": {
+                \"previewDeploymentId\": \"$PREVIEW_ID\"
+              }
+            }")
+
+          HTTP_CODE=$(echo "$REDEPLOY_RESPONSE" | tail -1)
+          BODY=$(echo "$REDEPLOY_RESPONSE" | head -n -1)
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "Successfully triggered redeploy of preview"
+          else
+            echo "Warning: Failed to redeploy preview (HTTP $HTTP_CODE). This may be expected if Dokploy doesn't support this endpoint."
+            echo "$BODY"
+            # Don't fail the workflow - the preview might still work
+          fi
+
   # Step 4: Comment on PR with all preview URLs
   comment:
     runs-on: ubuntu-latest
