@@ -156,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: convex-preview
     outputs:
-      preview_deleted: ${{ steps.delete_preview.outputs.preview_deleted }}
+      preview_triggered: ${{ steps.trigger_preview.outputs.preview_triggered }}
 
     steps:
       - name: Update Dokploy Preview Environment
@@ -196,56 +196,74 @@ jobs:
             exit 1
           fi
 
-      - name: Delete Preview (will be recreated on next push)
-        id: delete_preview
+      - name: Trigger Preview Deploy via Webhook
+        id: trigger_preview
         env:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.head_ref }}
         run: |
-          echo "Finding preview deployment for PR #$PR_NUMBER..."
+          echo "Triggering Dokploy preview deployment..."
+          echo "PR #$PR_NUMBER, Branch: $PR_BRANCH"
 
-          # Get the application to find preview deployments
+          # Get the application refresh token for webhook
           APP_RESPONSE=$(curl -s -X GET \
             "$DOKPLOY_BASE_URL/api/trpc/application.one?input=%7B%22json%22%3A%7B%22applicationId%22%3A%22$DOKPLOY_APP_ID%22%7D%7D" \
             -H "x-api-key: $DOKPLOY_API_TOKEN" \
             -H "Content-Type: application/json")
 
-          # Extract preview deployment ID for this PR
-          PREVIEW_ID=$(echo "$APP_RESPONSE" | jq -r ".result.data.json.previewDeployments[] | select(.pullRequestNumber == \"$PR_NUMBER\") | .previewDeploymentId" 2>/dev/null || echo "")
+          REFRESH_TOKEN=$(echo "$APP_RESPONSE" | jq -r '.result.data.json.refreshToken')
+          echo "Got refresh token: ${REFRESH_TOKEN:0:8}..."
 
-          if [ -z "$PREVIEW_ID" ] || [ "$PREVIEW_ID" = "null" ]; then
-            echo "No preview deployment found for PR #$PR_NUMBER."
-            echo "preview_deleted=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # Wait a moment to ensure previewEnv update is processed
+          sleep 3
 
-          echo "Found preview deployment: $PREVIEW_ID"
-
-          # Dokploy doesn't have a redeploy API for previews (see Issue #1365)
-          # So we delete it - the next push will recreate it with correct previewEnv
-          echo "Deleting preview so next push will create it with correct CONVEX_URL..."
-
-          DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.delete" \
-            -H "x-api-key: $DOKPLOY_API_TOKEN" \
+          # Trigger deploy via webhook endpoint
+          # This simulates a GitHub push event to trigger preview creation/update
+          echo "Calling webhook endpoint..."
+          WEBHOOK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "$DOKPLOY_BASE_URL/api/deploy/$REFRESH_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"json\": {
-                \"previewDeploymentId\": \"$PREVIEW_ID\"
+              \"ref\": \"refs/heads/$PR_BRANCH\",
+              \"repository\": {
+                \"full_name\": \"${{ github.repository }}\"
               }
             }")
 
-          HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -1)
-          echo "Delete response: HTTP $HTTP_CODE"
+          HTTP_CODE=$(echo "$WEBHOOK_RESPONSE" | tail -1)
+          BODY=$(echo "$WEBHOOK_RESPONSE" | head -n -1)
+
+          echo "Webhook response: HTTP $HTTP_CODE"
+          echo "$BODY"
 
           if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "Successfully deleted preview deployment"
-            echo "preview_deleted=true" >> $GITHUB_OUTPUT
+            echo "Successfully triggered preview deployment"
+            echo "preview_triggered=true" >> $GITHUB_OUTPUT
           else
-            echo "Warning: Could not delete preview (HTTP $HTTP_CODE)"
-            BODY=$(echo "$DELETE_RESPONSE" | head -n -1)
-            echo "$BODY"
-            echo "preview_deleted=false" >> $GITHUB_OUTPUT
+            echo "Webhook didn't work, trying application.redeploy API..."
+
+            # Alternative: try application.redeploy
+            REDEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "$DOKPLOY_BASE_URL/api/trpc/application.redeploy" \
+              -H "x-api-key: $DOKPLOY_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"json\": {
+                  \"applicationId\": \"$DOKPLOY_APP_ID\"
+                }
+              }")
+
+            HTTP_CODE2=$(echo "$REDEPLOY_RESPONSE" | tail -1)
+            echo "Redeploy response: HTTP $HTTP_CODE2"
+
+            if [ "$HTTP_CODE2" -eq 200 ]; then
+              echo "Triggered main app redeploy (may affect previews)"
+              echo "preview_triggered=maybe" >> $GITHUB_OUTPUT
+            else
+              echo "Could not trigger deploy. Preview may need manual intervention."
+              echo "preview_triggered=false" >> $GITHUB_OUTPUT
+            fi
           fi
 
   # Step 4: Comment on PR with all preview URLs
@@ -264,16 +282,21 @@ jobs:
             const previewName = '${{ needs.convex-preview.outputs.preview_name }}';
             const vercelUrl = '${{ needs.vercel-preview.outputs.preview_url }}' || 'N/A';
             const dokployStatus = '${{ needs.dokploy-preview.result }}';
-            const previewDeleted = '${{ needs.dokploy-preview.outputs.preview_deleted }}' === 'true';
+            const previewTriggered = '${{ needs.dokploy-preview.outputs.preview_triggered }}';
 
-            let dokployStatusText = dokployStatus === 'success' ? '✅ Configured' : '⏭️ Skipped/Failed';
+            let dokployStatusText = '⏭️ Skipped/Failed';
             let dokployNote = '';
 
-            if (previewDeleted) {
-              dokployStatusText = '🔄 Deleted (push again to recreate)';
-              dokployNote = `
-            > ⚠️ **Action Required**: The Dokploy preview was deleted because Convex URL changed.
-            > Push again to this PR to create a new preview with the correct \`CONVEX_URL\`.`;
+            if (dokployStatus === 'success') {
+              if (previewTriggered === 'true') {
+                dokployStatusText = '✅ Deployed with correct env';
+              } else if (previewTriggered === 'maybe') {
+                dokployStatusText = '🔄 Redeploying...';
+              } else {
+                dokployStatusText = '⚠️ May need manual redeploy';
+                dokployNote = `
+            > ⚠️ **Note**: Could not auto-trigger preview redeploy. If the voice agent has wrong CONVEX_URL, manually redeploy in Dokploy.`;
+              }
             }
 
             const body = `## 🚀 Preview Deployments
