@@ -21,6 +21,15 @@ dotenv.config({ path: '.env.local' });
 const CONVEX_URL = process.env.CONVEX_URL || 'https://beaming-giraffe-300.convex.site';
 const TOOL_CALL_API_KEY = 'tool-call-secret-key-2024';
 
+// Log configuration on startup
+console.log('[VoiceAgent] ========================================');
+console.log('[VoiceAgent] Voice Agent Starting');
+console.log('[VoiceAgent] CONVEX_URL:', CONVEX_URL);
+console.log('[VoiceAgent] LIVEKIT_URL:', process.env.LIVEKIT_URL || 'not set (using default)');
+console.log('[VoiceAgent] Environment:', CONVEX_URL.includes('beaming-giraffe-300') ? 'DEV' :
+  CONVEX_URL.includes('adorable-firefly-704') ? 'PROD' : 'PREVIEW');
+console.log('[VoiceAgent] ========================================');
+
 // Available tools on the backend
 type ToolName =
   | 'get_todays_tasks'
