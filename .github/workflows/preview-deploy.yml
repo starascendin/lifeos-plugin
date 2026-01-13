@@ -208,8 +208,9 @@ jobs:
             -H "x-api-key: $DOKPLOY_API_TOKEN" \
             -H "Content-Type: application/json")
 
-          # Extract preview deployment ID for this PR
+          # Extract preview deployment ID and appName for this PR
           PREVIEW_ID=$(echo "$APP_RESPONSE" | jq -r ".result.data.json.previewDeployments[] | select(.pullRequestNumber == \"$PR_NUMBER\") | .previewDeploymentId" 2>/dev/null || echo "")
+          PREVIEW_APP_NAME=$(echo "$APP_RESPONSE" | jq -r ".result.data.json.previewDeployments[] | select(.pullRequestNumber == \"$PR_NUMBER\") | .appName" 2>/dev/null || echo "")
 
           if [ -z "$PREVIEW_ID" ] || [ "$PREVIEW_ID" = "null" ]; then
             echo "No preview deployment found for PR #$PR_NUMBER yet. Dokploy may create it automatically."
@@ -218,11 +219,12 @@ jobs:
           fi
 
           echo "Found preview deployment: $PREVIEW_ID"
-          echo "Triggering redeploy..."
+          echo "Preview app name: $PREVIEW_APP_NAME"
+          echo "Triggering deploy..."
 
-          # Trigger redeploy of the preview
-          REDEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.redeploy" \
+          # Try previewDeployment.deploy endpoint (Dokploy's actual endpoint)
+          DEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.deploy" \
             -H "x-api-key: $DOKPLOY_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
@@ -231,15 +233,39 @@ jobs:
               }
             }")
 
-          HTTP_CODE=$(echo "$REDEPLOY_RESPONSE" | tail -1)
-          BODY=$(echo "$REDEPLOY_RESPONSE" | head -n -1)
+          HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -1)
+          BODY=$(echo "$DEPLOY_RESPONSE" | head -n -1)
+
+          echo "Deploy response: HTTP $HTTP_CODE"
+          echo "$BODY"
 
           if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "Successfully triggered redeploy of preview"
+            echo "Successfully triggered deploy of preview"
           else
-            echo "Warning: Failed to redeploy preview (HTTP $HTTP_CODE). This may be expected if Dokploy doesn't support this endpoint."
-            echo "$BODY"
-            # Don't fail the workflow - the preview might still work
+            echo "Trying alternative endpoint: previewDeployment.redeploy..."
+
+            # Try alternative endpoint
+            REDEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.redeploy" \
+              -H "x-api-key: $DOKPLOY_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"json\": {
+                  \"previewDeploymentId\": \"$PREVIEW_ID\"
+                }
+              }")
+
+            HTTP_CODE2=$(echo "$REDEPLOY_RESPONSE" | tail -1)
+            BODY2=$(echo "$REDEPLOY_RESPONSE" | head -n -1)
+
+            echo "Redeploy response: HTTP $HTTP_CODE2"
+            echo "$BODY2"
+
+            if [ "$HTTP_CODE2" -eq 200 ]; then
+              echo "Successfully triggered redeploy of preview"
+            else
+              echo "Warning: Could not trigger preview deploy. You may need to manually redeploy in Dokploy."
+            fi
           fi
 
   # Step 4: Comment on PR with all preview URLs
