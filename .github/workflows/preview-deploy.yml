@@ -123,11 +123,14 @@ jobs:
 
       - name: Build Project with Preview Convex URL
         env:
-          SKIP_CONVEX_DEPLOY: "1"
           VITE_CONVEX_URL: ${{ needs.convex-preview.outputs.convex_url }}
         run: |
           echo "Building with VITE_CONVEX_URL=$VITE_CONVEX_URL"
-          vercel build --token=${{ secrets.VERCEL_TOKEN }}
+          # Pass SKIP_CONVEX_DEPLOY to Vercel build environment to skip redundant Convex deploy
+          vercel build \
+            --build-env SKIP_CONVEX_DEPLOY=1 \
+            --build-env VITE_CONVEX_URL=$VITE_CONVEX_URL \
+            --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel Preview
         id: deploy
