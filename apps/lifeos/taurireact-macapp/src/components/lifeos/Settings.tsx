@@ -15,7 +15,7 @@ import { useApiKeys } from "@/lib/hooks/useApiKeys";
 import { useUser } from "@/lib/auth/platformClerk";
 import { api } from "@holaai/convex";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { Check, CheckCircle, Clock, Coins, Eye, EyeOff, ExternalLink, History, Infinity, Key, Loader2, Mic, Monitor, Moon, Send, Settings2, Sparkles, Sun, Trash2, XCircle } from "lucide-react";
+import { Check, CheckCircle, Clock, Coins, Database, Eye, EyeOff, ExternalLink, History, Infinity, Key, Loader2, Mic, Monitor, Moon, Send, Shield, Sparkles, Sun, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useConfig } from "@/lib/config";
 
@@ -27,9 +27,40 @@ export function LifeOSSettings() {
   );
 }
 
+// Helper to detect environment from Convex URL
+function getEnvironmentInfo(convexUrl: string | undefined): {
+  name: string;
+  badge: "default" | "secondary" | "destructive" | "outline";
+  description: string;
+} {
+  if (!convexUrl) {
+    return { name: "Unknown", badge: "destructive", description: "Not configured" };
+  }
+
+  // Extract deployment name from URL
+  // Format: https://<deployment-name>.convex.cloud
+  const match = convexUrl.match(/https:\/\/([^.]+)\.convex\.(cloud|site)/);
+  const deploymentName = match?.[1] || "";
+
+  // Known environments
+  if (deploymentName === "beaming-giraffe-300") {
+    return { name: "Development", badge: "secondary", description: "Dev environment" };
+  }
+  if (deploymentName === "adorable-firefly-704") {
+    return { name: "Production", badge: "default", description: "Production environment" };
+  }
+  if (deploymentName === "agreeable-ibex-949") {
+    return { name: "Production", badge: "default", description: "Production environment" };
+  }
+
+  // Preview deployment (random name)
+  return { name: "Preview", badge: "outline", description: `Preview: ${deploymentName}` };
+}
+
 function SettingsContent() {
   const { user } = useUser();
   const { theme, setTheme } = useTheme();
+  const { config } = useConfig();
   const currentUser = useQuery(api.common.users.currentUser);
   const [connectionStatus, setConnectionStatus] = useState<{
     loading: boolean;
@@ -38,6 +69,9 @@ function SettingsContent() {
   }>({ loading: false });
 
   const testConnection = useAction(api.common.dev.testConvexConnection);
+
+  const convexUrl = import.meta.env.VITE_CONVEX_URL;
+  const envInfo = getEnvironmentInfo(convexUrl);
 
   const handleTestConnection = async () => {
     setConnectionStatus({ loading: true });
@@ -58,7 +92,7 @@ function SettingsContent() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-8 p-6">
       {/* Page Header */}
       <div>
         <h1 className="font-bold text-3xl">Settings</h1>
@@ -67,265 +101,423 @@ function SettingsContent() {
         </p>
       </div>
 
-      {/* Profile Settings - Clerk User */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>
-            Your authentication profile from Clerk
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {user && (
-            <div className="flex items-center gap-4 mb-4">
-              {user.imageUrl && (
-                <img
-                  src={user.imageUrl}
-                  alt="Profile"
-                  className="h-16 w-16 rounded-full"
+      {/* Environment Banner */}
+      <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+        <Badge variant={envInfo.badge} className="text-sm px-3 py-1">
+          {envInfo.name}
+        </Badge>
+        <span className="text-sm text-muted-foreground">{envInfo.description}</span>
+      </div>
+
+      {/* ==================== CLERK SECTION ==================== */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold text-xl">Authentication (Clerk)</h2>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile</CardTitle>
+            <CardDescription>
+              Your authentication profile from Clerk
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {user && (
+              <div className="flex items-center gap-4 mb-4">
+                {user.imageUrl && (
+                  <img
+                    src={user.imageUrl}
+                    alt="Profile"
+                    className="h-16 w-16 rounded-full"
+                  />
+                )}
+                <div className="space-y-1">
+                  <p className="font-medium text-lg">{user.fullName || "Not set"}</p>
+                  <p className="text-muted-foreground text-sm">
+                    {user.primaryEmailAddress?.emailAddress || "No email"}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={user?.fullName || ""}
+                  disabled
+                  className="bg-muted"
                 />
-              )}
-              <div className="space-y-1">
-                <p className="font-medium text-lg">{user.fullName || "Not set"}</p>
-                <p className="text-muted-foreground text-sm">
-                  {user.primaryEmailAddress?.emailAddress || "No email"}
-                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  value={user?.primaryEmailAddress?.emailAddress || ""}
+                  disabled
+                  className="bg-muted"
+                />
               </div>
             </div>
-          )}
-          <div className="grid gap-4 md:grid-cols-2">
+            {user && (
+              <div className="pt-2">
+                <Badge variant="secondary">Clerk ID: {user.id}</Badge>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ==================== CONVEX SECTION ==================== */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Database className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold text-xl">Backend (Convex)</h2>
+        </div>
+
+        {/* Convex Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Connection</CardTitle>
+            <CardDescription>
+              Convex backend connection settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={user?.fullName || ""}
-                disabled
-                className="bg-muted"
-              />
+              <Label>Convex URL</Label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 block rounded bg-muted px-3 py-2 text-sm font-mono">
+                  {convexUrl || "Not configured"}
+                </code>
+                <Badge variant={envInfo.badge}>{envInfo.name}</Badge>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                value={user?.primaryEmailAddress?.emailAddress || ""}
-                disabled
-                className="bg-muted"
-              />
-            </div>
-          </div>
-          {user && (
-            <div className="pt-2">
-              <Badge variant="secondary">Clerk ID: {user.id}</Badge>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Convex User Record */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Convex User Record</CardTitle>
-          <CardDescription>
-            Your synced user data in Convex backend
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {currentUser === undefined ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading Convex user...
-            </div>
-          ) : currentUser === null ? (
-            <p className="text-muted-foreground">
-              No Convex user found (EnsureUser should create one)
-            </p>
-          ) : (
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="font-medium">Convex ID:</span>{" "}
-                <code className="rounded bg-muted px-2 py-1">{currentUser._id}</code>
-              </p>
-              <p>
-                <span className="font-medium">Token Identifier:</span>{" "}
-                <code className="rounded bg-muted px-2 py-1 text-xs">{currentUser.tokenIdentifier}</code>
-              </p>
-              <p>
-                <span className="font-medium">Email:</span>{" "}
-                {currentUser.email || "Not set"}
-              </p>
-              <p>
-                <span className="font-medium">Name:</span>{" "}
-                {currentUser.name || "Not set"}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* AI Credits & Usage */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            AI Credits & Usage
-          </CardTitle>
-          <CardDescription>
-            Monitor your AI credit balance and usage history
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AICreditsSection />
-        </CardContent>
-      </Card>
-
-      {/* Theme Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>
-            Customize how LifeOS looks on your device
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <Button
-              variant={theme === "light" ? "default" : "outline"}
-              onClick={() => setTheme("light")}
-              className="flex items-center gap-2"
-            >
-              <Sun className="h-4 w-4" />
-              Light
-            </Button>
-            <Button
-              variant={theme === "dark" ? "default" : "outline"}
-              onClick={() => setTheme("dark")}
-              className="flex items-center gap-2"
-            >
-              <Moon className="h-4 w-4" />
-              Dark
-            </Button>
-            <Button
-              variant={theme === "system" ? "default" : "outline"}
-              onClick={() => setTheme("system")}
-              className="flex items-center gap-2"
-            >
-              <Monitor className="h-4 w-4" />
-              System
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* API Keys Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
-            API Keys
-          </CardTitle>
-          <CardDescription>
-            Configure API keys for external services. Keys are stored securely
-            in your local app data.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ApiKeysSection />
-        </CardContent>
-      </Card>
-
-      {/* Environment Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5" />
-            Environment Configuration
-          </CardTitle>
-          <CardDescription>
-            Runtime configuration loaded from environment
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EnvironmentConfigSection />
-        </CardContent>
-      </Card>
-
-      {/* Convex Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Backend Configuration</CardTitle>
-          <CardDescription>
-            Convex backend connection settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Convex URL</Label>
-            <code className="block rounded bg-muted px-3 py-2 text-sm">
-              {import.meta.env.VITE_CONVEX_URL || "Not configured"}
-            </code>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Package:</span>
-            <Badge variant="secondary">@holaai/convex (workspace)</Badge>
-          </div>
-
-          {/* Connection Test */}
-          <div className="pt-4 border-t">
-            <Label className="mb-2 block">Connection Test</Label>
-            <div className="flex items-center gap-4">
-              <Button
-                onClick={handleTestConnection}
-                disabled={connectionStatus.loading}
-                variant="outline"
-                size="sm"
-              >
-                {connectionStatus.loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  "Test Connection"
-                )}
-              </Button>
-
-              {connectionStatus.success !== undefined && (
-                <div
-                  className={`flex items-center gap-2 text-sm ${
-                    connectionStatus.success ? "text-green-600" : "text-red-600"
-                  }`}
+            {/* Connection Test */}
+            <div className="pt-4 border-t">
+              <Label className="mb-2 block">Connection Test</Label>
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={handleTestConnection}
+                  disabled={connectionStatus.loading}
+                  variant="outline"
+                  size="sm"
                 >
-                  {connectionStatus.success ? (
-                    <CheckCircle className="h-4 w-4" />
+                  {connectionStatus.loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing...
+                    </>
                   ) : (
-                    <XCircle className="h-4 w-4" />
+                    "Test Connection"
                   )}
-                  <span>{connectionStatus.message}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                </Button>
 
-      {/* About */}
-      <Card>
-        <CardHeader>
-          <CardTitle>About LifeOS</CardTitle>
-          <CardDescription>Application information</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm">
-            <span className="font-medium">Version:</span> 0.1.0
+                {connectionStatus.success !== undefined && (
+                  <div
+                    className={`flex items-center gap-2 text-sm ${
+                      connectionStatus.success ? "text-green-600" : "text-red-600"
+                    }`}
+                  >
+                    {connectionStatus.success ? (
+                      <CheckCircle className="h-4 w-4" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    <span>{connectionStatus.message}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Convex User Record */}
+        <Card>
+          <CardHeader>
+            <CardTitle>User Record</CardTitle>
+            <CardDescription>
+              Your synced user data in Convex backend
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {currentUser === undefined ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading Convex user...
+              </div>
+            ) : currentUser === null ? (
+              <p className="text-muted-foreground">
+                No Convex user found (EnsureUser should create one)
+              </p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <p>
+                  <span className="font-medium">Convex ID:</span>{" "}
+                  <code className="rounded bg-muted px-2 py-1">{currentUser._id}</code>
+                </p>
+                <p>
+                  <span className="font-medium">Token Identifier:</span>{" "}
+                  <code className="rounded bg-muted px-2 py-1 text-xs">{currentUser.tokenIdentifier}</code>
+                </p>
+                <p>
+                  <span className="font-medium">Email:</span>{" "}
+                  {currentUser.email || "Not set"}
+                </p>
+                <p>
+                  <span className="font-medium">Name:</span>{" "}
+                  {currentUser.name || "Not set"}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ==================== LIVEKIT SECTION ==================== */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Mic className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold text-xl">Voice Agent (LiveKit)</h2>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>LiveKit Configuration</CardTitle>
+            <CardDescription>
+              Voice AI agent connection settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LiveKitConfigSection />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ==================== OTHER SETTINGS ==================== */}
+      <section className="space-y-4">
+        <h2 className="font-semibold text-xl">Other Settings</h2>
+
+        {/* AI Credits & Usage */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              AI Credits & Usage
+            </CardTitle>
+            <CardDescription>
+              Monitor your AI credit balance and usage history
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AICreditsSection />
+          </CardContent>
+        </Card>
+
+        {/* Theme Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>
+              Customize how LifeOS looks on your device
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              <Button
+                variant={theme === "light" ? "default" : "outline"}
+                onClick={() => setTheme("light")}
+                className="flex items-center gap-2"
+              >
+                <Sun className="h-4 w-4" />
+                Light
+              </Button>
+              <Button
+                variant={theme === "dark" ? "default" : "outline"}
+                onClick={() => setTheme("dark")}
+                className="flex items-center gap-2"
+              >
+                <Moon className="h-4 w-4" />
+                Dark
+              </Button>
+              <Button
+                variant={theme === "system" ? "default" : "outline"}
+                onClick={() => setTheme("system")}
+                className="flex items-center gap-2"
+              >
+                <Monitor className="h-4 w-4" />
+                System
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* API Keys Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              API Keys
+            </CardTitle>
+            <CardDescription>
+              Configure API keys for external services. Keys are stored securely
+              in your local app data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ApiKeysSection />
+          </CardContent>
+        </Card>
+
+        {/* About */}
+        <Card>
+          <CardHeader>
+            <CardTitle>About LifeOS</CardTitle>
+            <CardDescription>Application information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm">
+              <span className="font-medium">Version:</span> 0.1.0
+            </p>
+            <p className="text-sm">
+              <span className="font-medium">Runtime:</span>{" "}
+              <Badge variant="secondary">
+                {config?.runtime === "tauri" ? "Desktop (Tauri)" : "Web"}
+              </Badge>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              LifeOS is a personal productivity and life management application.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function LiveKitConfigSection() {
+  const { config, isLoading, error } = useConfig();
+  const convexUrl = import.meta.env.VITE_CONVEX_URL;
+  const envInfo = getEnvironmentInfo(convexUrl);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>Loading configuration...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 text-destructive">
+        <XCircle className="h-4 w-4" />
+        <span>{error}</span>
+      </div>
+    );
+  }
+
+  // Derive voice agent URL based on environment
+  const getVoiceAgentUrl = () => {
+    if (envInfo.name === "Development") {
+      return "wss://livekit-dev.rocketjump.tech";
+    }
+    if (envInfo.name === "Production") {
+      return "wss://livekit.rocketjump.tech";
+    }
+    // Preview - the voice agent URL is configured via Dokploy
+    return config?.livekit.server_url || "Preview (via Dokploy)";
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Status */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">Status</span>
+        <div className="flex items-center gap-2">
+          {config?.livekit.is_configured ? (
+            <>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-600">Configured</span>
+            </>
+          ) : (
+            <>
+              <XCircle className="h-4 w-4 text-amber-600" />
+              <span className="text-sm text-amber-600">Not Configured</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Configuration Details */}
+      <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-sm font-medium">LiveKit Server URL</span>
+          <code className="text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[250px]">
+            {config?.livekit.server_url || "Not set"}
+          </code>
+        </div>
+
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-sm font-medium">Voice Agent Backend</span>
+          <div className="flex items-center gap-2">
+            <code className="text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[200px]">
+              {convexUrl ? convexUrl.replace("https://", "").replace(".convex.cloud", "") : "Not set"}
+            </code>
+            <Badge variant={envInfo.badge} className="text-xs">
+              {envInfo.name}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-sm font-medium">API Key</span>
+          <span className="text-xs text-muted-foreground">
+            {config?.livekit.is_configured ? "••••••••" : "Not set"}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-sm font-medium">API Secret</span>
+          <span className="text-xs text-muted-foreground">
+            {config?.livekit.is_configured ? "••••••••" : "Not set"}
+          </span>
+        </div>
+      </div>
+
+      {/* Environment Info */}
+      <div className="rounded-lg border p-3 bg-muted/20">
+        <p className="text-sm text-muted-foreground">
+          {envInfo.name === "Preview" ? (
+            <>
+              <strong>Preview Mode:</strong> The voice agent is using a preview Convex backend.
+              This allows testing changes without affecting the production environment.
+            </>
+          ) : envInfo.name === "Development" ? (
+            <>
+              <strong>Development Mode:</strong> Connected to the dev Convex backend.
+              The voice agent shares this connection.
+            </>
+          ) : (
+            <>
+              <strong>Production Mode:</strong> Connected to the production Convex backend.
+            </>
+          )}
+        </p>
+      </div>
+
+      {!config?.livekit.is_configured && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950 p-3 text-sm text-amber-800 dark:text-amber-200">
+          <p>
+            To enable voice agent, set LiveKit environment variables in your
+            Convex dashboard.
           </p>
-          <p className="text-sm">
-            <span className="font-medium">Platform:</span> Tauri Desktop App
-          </p>
-          <p className="text-sm text-muted-foreground">
-            LifeOS is a personal productivity and life management application.
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }
@@ -470,119 +662,6 @@ function ApiKeysSection() {
           Open Full Disk Access Settings
         </Button>
       </div>
-    </div>
-  );
-}
-
-function EnvironmentConfigSection() {
-  const { config, isLoading, error } = useConfig();
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span>Loading configuration...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 text-destructive">
-        <XCircle className="h-4 w-4" />
-        <span>{error}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Runtime Badge */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">Runtime:</span>
-        <Badge variant={config?.runtime === "tauri" ? "default" : "secondary"}>
-          {config?.runtime === "tauri" ? "Desktop (Tauri)" : "Web"}
-        </Badge>
-      </div>
-
-      {/* LiveKit Voice Agent */}
-      <div className="space-y-3 pt-2 border-t">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Mic className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">LiveKit Voice Agent</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {config?.livekit.is_configured ? (
-              <>
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                <span className="text-xs text-green-600">Configured</span>
-              </>
-            ) : (
-              <>
-                <XCircle className="h-3 w-3 text-amber-600" />
-                <span className="text-xs text-amber-600">Not Configured</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2 text-sm rounded-lg border bg-muted/30 p-3">
-          <EnvVarRow
-            name="LIVEKIT_URL"
-            value={config?.livekit.server_url}
-            isSensitive={false}
-          />
-          <EnvVarRow
-            name="LIVEKIT_API_KEY"
-            value={config?.livekit.is_configured ? "••••••••" : undefined}
-            isSensitive={true}
-            isSet={config?.livekit.is_configured}
-          />
-          <EnvVarRow
-            name="LIVEKIT_API_SECRET"
-            value={config?.livekit.is_configured ? "••••••••" : undefined}
-            isSensitive={true}
-            isSet={config?.livekit.is_configured}
-          />
-        </div>
-
-        {!config?.livekit.is_configured && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950 p-3 text-sm text-amber-800 dark:text-amber-200">
-            <p>
-              To enable voice agent, set these environment variables in your
-              Convex dashboard.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function EnvVarRow({
-  name,
-  value,
-  isSensitive,
-  isSet,
-}: {
-  name: string;
-  value?: string;
-  isSensitive: boolean;
-  isSet?: boolean;
-}) {
-  const hasValue = isSensitive ? isSet : !!value;
-
-  return (
-    <div className="flex justify-between items-center gap-4">
-      <code className="text-xs font-mono text-muted-foreground">{name}</code>
-      {hasValue ? (
-        <code className="text-xs font-mono truncate max-w-[200px]">
-          {isSensitive ? "••••••••" : value}
-        </code>
-      ) : (
-        <span className="text-xs text-muted-foreground italic">Not set</span>
-      )}
     </div>
   );
 }
