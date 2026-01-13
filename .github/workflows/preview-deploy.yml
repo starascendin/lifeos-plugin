@@ -155,7 +155,8 @@ jobs:
   dokploy-preview:
     runs-on: ubuntu-latest
     needs: convex-preview
-    # Always update Dokploy previewEnv with the correct Convex URL
+    outputs:
+      preview_deleted: ${{ steps.delete_preview.outputs.preview_deleted }}
 
     steps:
       - name: Update Dokploy Preview Environment
@@ -195,7 +196,8 @@ jobs:
             exit 1
           fi
 
-      - name: Find and Redeploy Preview
+      - name: Delete Preview (will be recreated on next push)
+        id: delete_preview
         env:
           DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -208,23 +210,23 @@ jobs:
             -H "x-api-key: $DOKPLOY_API_TOKEN" \
             -H "Content-Type: application/json")
 
-          # Extract preview deployment ID and appName for this PR
+          # Extract preview deployment ID for this PR
           PREVIEW_ID=$(echo "$APP_RESPONSE" | jq -r ".result.data.json.previewDeployments[] | select(.pullRequestNumber == \"$PR_NUMBER\") | .previewDeploymentId" 2>/dev/null || echo "")
-          PREVIEW_APP_NAME=$(echo "$APP_RESPONSE" | jq -r ".result.data.json.previewDeployments[] | select(.pullRequestNumber == \"$PR_NUMBER\") | .appName" 2>/dev/null || echo "")
 
           if [ -z "$PREVIEW_ID" ] || [ "$PREVIEW_ID" = "null" ]; then
-            echo "No preview deployment found for PR #$PR_NUMBER yet. Dokploy may create it automatically."
-            echo "Preview will use the updated previewEnv when created."
+            echo "No preview deployment found for PR #$PR_NUMBER."
+            echo "preview_deleted=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           echo "Found preview deployment: $PREVIEW_ID"
-          echo "Preview app name: $PREVIEW_APP_NAME"
-          echo "Triggering deploy..."
 
-          # Try previewDeployment.deploy endpoint (Dokploy's actual endpoint)
-          DEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.deploy" \
+          # Dokploy doesn't have a redeploy API for previews (see Issue #1365)
+          # So we delete it - the next push will recreate it with correct previewEnv
+          echo "Deleting preview so next push will create it with correct CONVEX_URL..."
+
+          DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.delete" \
             -H "x-api-key: $DOKPLOY_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
@@ -233,39 +235,17 @@ jobs:
               }
             }")
 
-          HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -1)
-          BODY=$(echo "$DEPLOY_RESPONSE" | head -n -1)
-
-          echo "Deploy response: HTTP $HTTP_CODE"
-          echo "$BODY"
+          HTTP_CODE=$(echo "$DELETE_RESPONSE" | tail -1)
+          echo "Delete response: HTTP $HTTP_CODE"
 
           if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "Successfully triggered deploy of preview"
+            echo "Successfully deleted preview deployment"
+            echo "preview_deleted=true" >> $GITHUB_OUTPUT
           else
-            echo "Trying alternative endpoint: previewDeployment.redeploy..."
-
-            # Try alternative endpoint
-            REDEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              "$DOKPLOY_BASE_URL/api/trpc/previewDeployment.redeploy" \
-              -H "x-api-key: $DOKPLOY_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"json\": {
-                  \"previewDeploymentId\": \"$PREVIEW_ID\"
-                }
-              }")
-
-            HTTP_CODE2=$(echo "$REDEPLOY_RESPONSE" | tail -1)
-            BODY2=$(echo "$REDEPLOY_RESPONSE" | head -n -1)
-
-            echo "Redeploy response: HTTP $HTTP_CODE2"
-            echo "$BODY2"
-
-            if [ "$HTTP_CODE2" -eq 200 ]; then
-              echo "Successfully triggered redeploy of preview"
-            else
-              echo "Warning: Could not trigger preview deploy. You may need to manually redeploy in Dokploy."
-            fi
+            echo "Warning: Could not delete preview (HTTP $HTTP_CODE)"
+            BODY=$(echo "$DELETE_RESPONSE" | head -n -1)
+            echo "$BODY"
+            echo "preview_deleted=false" >> $GITHUB_OUTPUT
           fi
 
   # Step 4: Comment on PR with all preview URLs
@@ -284,6 +264,17 @@ jobs:
             const previewName = '${{ needs.convex-preview.outputs.preview_name }}';
             const vercelUrl = '${{ needs.vercel-preview.outputs.preview_url }}' || 'N/A';
             const dokployStatus = '${{ needs.dokploy-preview.result }}';
+            const previewDeleted = '${{ needs.dokploy-preview.outputs.preview_deleted }}' === 'true';
+
+            let dokployStatusText = dokployStatus === 'success' ? '✅ Configured' : '⏭️ Skipped/Failed';
+            let dokployNote = '';
+
+            if (previewDeleted) {
+              dokployStatusText = '🔄 Deleted (push again to recreate)';
+              dokployNote = `
+            > ⚠️ **Action Required**: The Dokploy preview was deleted because Convex URL changed.
+            > Push again to this PR to create a new preview with the correct \`CONVEX_URL\`.`;
+            }
 
             const body = `## 🚀 Preview Deployments
 
@@ -293,12 +284,13 @@ jobs:
             | **Convex Cloud** | ${convexUrl} | ✅ Ready |
             | **Convex Site** | ${convexSiteUrl} | ✅ Ready |
             | **Vercel Preview** | ${vercelUrl} | ${vercelUrl !== 'N/A' ? '✅ Deployed' : '⏭️ Skipped'} |
-            | **Dokploy Preview** | (auto-created by Dokploy) | ${dokployStatus === 'success' ? '✅ Configured' : '⏭️ Skipped/Failed'} |
+            | **Dokploy Preview** | (LiveKit Voice Agent) | ${dokployStatusText} |
 
             ### Configuration
             All preview services are configured to use the same Convex preview backend:
             - **VITE_CONVEX_URL**: \`${convexUrl}\`
             - **CONVEX_URL (LiveKit)**: \`${convexSiteUrl}\`
+            ${dokployNote}
 
             > Preview deployments are automatically coordinated via GitHub Actions.`;
 
