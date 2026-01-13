@@ -2,6 +2,14 @@ name: Preview Deployments
 
 # Unified preview deployment workflow for PRs
 # Handles: Convex Preview, Vercel Preview, Dokploy Preview
+#
+# Dokploy Strategy: Use label filtering to break the race condition
+# 1. This workflow runs first (Convex deploy, update Dokploy previewEnv)
+# 2. After updating previewEnv, we add the "deploy-preview" label to the PR
+# 3. Dokploy is configured to only create previews for PRs with this label
+# 4. Dokploy sees the label and creates preview with CORRECT previewEnv
+#
+# IMPORTANT: Configure Dokploy to require "deploy-preview" label for preview deployments
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -14,63 +22,13 @@ on:
 env:
   DOKPLOY_APP_ID: r92eMjky2Tf04b37F1cLg
   DOKPLOY_BASE_URL: https://app.dokploy.com
+  DOKPLOY_PREVIEW_LABEL: deploy-preview
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  # Step 0: Pre-set Dokploy previewEnv IMMEDIATELY (before Dokploy webhook fires)
-  # This runs fast and sets previewEnv so Dokploy preview uses correct env
-  dokploy-preset:
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository
-
-    steps:
-      - name: Pre-calculate Convex Preview URL
-        id: calc
-        run: |
-          # Calculate expected preview name from branch (same logic as convex-preview job)
-          BRANCH_NAME="${{ github.head_ref }}"
-          PREVIEW_NAME=$(echo "$BRANCH_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
-          PREVIEW_NAME="${PREVIEW_NAME:0:32}"
-
-          # Expected Convex site URL (may be overridden later if Convex generates different name)
-          EXPECTED_URL="https://${PREVIEW_NAME}.convex.site"
-          echo "Expected Convex URL: $EXPECTED_URL"
-          echo "expected_url=$EXPECTED_URL" >> $GITHUB_OUTPUT
-
-      - name: Pre-set Dokploy previewEnv (fast, before Dokploy webhook)
-        env:
-          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
-          EXPECTED_CONVEX_URL: ${{ steps.calc.outputs.expected_url }}
-        run: |
-          echo "Pre-setting Dokploy previewEnv with expected CONVEX_URL: $EXPECTED_CONVEX_URL"
-
-          PREVIEW_ENV="LIVEKIT_URL=wss://livekit-dev.rocketjump.tech
-          LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }}
-          LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          CONVEX_URL=$EXPECTED_CONVEX_URL"
-
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "$DOKPLOY_BASE_URL/api/trpc/application.update" \
-            -H "x-api-key: $DOKPLOY_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"json\": {
-                \"applicationId\": \"$DOKPLOY_APP_ID\",
-                \"previewEnv\": \"$(echo "$PREVIEW_ENV" | sed ':a;N;$!ba;s/\n/\\n/g')\"
-              }
-            }")
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "Successfully pre-set Dokploy previewEnv"
-          else
-            echo "Warning: Could not pre-set previewEnv (HTTP $HTTP_CODE)"
-          fi
-
   # Step 1: Deploy Convex Preview (all other services depend on this)
   convex-preview:
     runs-on: ubuntu-latest
@@ -202,12 +160,13 @@ jobs:
           echo "Vercel Preview URL: $PREVIEW_URL"
           echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
 
-  # Step 3: Update Dokploy Preview Environment (for LiveKit Voice Agent)
+  # Step 3: Update Dokploy Preview Environment and trigger via label
+  # Strategy: Update previewEnv first, then add label to trigger Dokploy preview creation
   dokploy-preview:
     runs-on: ubuntu-latest
     needs: convex-preview
     outputs:
-      preview_triggered: ${{ steps.trigger_preview.outputs.preview_triggered }}
+      label_added: ${{ steps.add_label.outputs.label_added }}
 
     steps:
       - name: Update Dokploy Preview Environment
@@ -247,75 +206,52 @@ jobs:
             exit 1
           fi
 
-      - name: Trigger Preview Deploy via Webhook
-        id: trigger_preview
-        env:
-          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BRANCH: ${{ github.head_ref }}
-        run: |
-          echo "Triggering Dokploy preview deployment..."
-          echo "PR #$PR_NUMBER, Branch: $PR_BRANCH"
+      - name: Add deploy-preview label to trigger Dokploy
+        id: add_label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = '${{ env.DOKPLOY_PREVIEW_LABEL }}';
+            const prNumber = context.issue.number;
 
-          # Get the application refresh token for webhook
-          APP_RESPONSE=$(curl -s -X GET \
-            "$DOKPLOY_BASE_URL/api/trpc/application.one?input=%7B%22json%22%3A%7B%22applicationId%22%3A%22$DOKPLOY_APP_ID%22%7D%7D" \
-            -H "x-api-key: $DOKPLOY_API_TOKEN" \
-            -H "Content-Type: application/json")
+            console.log(`Adding label "${label}" to PR #${prNumber} to trigger Dokploy preview`);
 
-          REFRESH_TOKEN=$(echo "$APP_RESPONSE" | jq -r '.result.data.json.refreshToken')
-          echo "Got refresh token: ${REFRESH_TOKEN:0:8}..."
-
-          # Wait a moment to ensure previewEnv update is processed
-          sleep 3
-
-          # Trigger deploy via webhook endpoint
-          # This simulates a GitHub push event to trigger preview creation/update
-          echo "Calling webhook endpoint..."
-          WEBHOOK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "$DOKPLOY_BASE_URL/api/deploy/$REFRESH_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"ref\": \"refs/heads/$PR_BRANCH\",
-              \"repository\": {
-                \"full_name\": \"${{ github.repository }}\"
-              }
-            }")
-
-          HTTP_CODE=$(echo "$WEBHOOK_RESPONSE" | tail -1)
-          BODY=$(echo "$WEBHOOK_RESPONSE" | head -n -1)
-
-          echo "Webhook response: HTTP $HTTP_CODE"
-          echo "$BODY"
-
-          if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "Successfully triggered preview deployment"
-            echo "preview_triggered=true" >> $GITHUB_OUTPUT
-          else
-            echo "Webhook didn't work, trying application.redeploy API..."
-
-            # Alternative: try application.redeploy
-            REDEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-              "$DOKPLOY_BASE_URL/api/trpc/application.redeploy" \
-              -H "x-api-key: $DOKPLOY_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"json\": {
-                  \"applicationId\": \"$DOKPLOY_APP_ID\"
+            try {
+              // First, ensure the label exists in the repo
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label
+                });
+              } catch (e) {
+                if (e.status === 404) {
+                  console.log(`Label "${label}" doesn't exist, creating it...`);
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: '0E8A16',
+                    description: 'Triggers Dokploy preview deployment'
+                  });
                 }
-              }")
+              }
 
-            HTTP_CODE2=$(echo "$REDEPLOY_RESPONSE" | tail -1)
-            echo "Redeploy response: HTTP $HTTP_CODE2"
+              // Add the label to the PR
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: [label]
+              });
 
-            if [ "$HTTP_CODE2" -eq 200 ]; then
-              echo "Triggered main app redeploy (may affect previews)"
-              echo "preview_triggered=maybe" >> $GITHUB_OUTPUT
-            else
-              echo "Could not trigger deploy. Preview may need manual intervention."
-              echo "preview_triggered=false" >> $GITHUB_OUTPUT
-            fi
-          fi
+              console.log(`Successfully added label "${label}" to PR #${prNumber}`);
+              core.setOutput('label_added', 'true');
+            } catch (error) {
+              console.error(`Failed to add label: ${error.message}`);
+              core.setOutput('label_added', 'false');
+              // Don't fail the job - Dokploy preview can still be manually triggered
+            }
 
   # Step 4: Comment on PR with all preview URLs
   comment:
@@ -333,20 +269,20 @@ jobs:
             const previewName = '${{ needs.convex-preview.outputs.preview_name }}';
             const vercelUrl = '${{ needs.vercel-preview.outputs.preview_url }}' || 'N/A';
             const dokployStatus = '${{ needs.dokploy-preview.result }}';
-            const previewTriggered = '${{ needs.dokploy-preview.outputs.preview_triggered }}';
+            const labelAdded = '${{ needs.dokploy-preview.outputs.label_added }}';
 
             let dokployStatusText = '⏭️ Skipped/Failed';
             let dokployNote = '';
 
             if (dokployStatus === 'success') {
-              if (previewTriggered === 'true') {
-                dokployStatusText = '✅ Deployed with correct env';
-              } else if (previewTriggered === 'maybe') {
-                dokployStatusText = '🔄 Redeploying...';
-              } else {
-                dokployStatusText = '⚠️ May need manual redeploy';
+              if (labelAdded === 'true') {
+                dokployStatusText = '✅ Label added, preview deploying';
                 dokployNote = `
-            > ⚠️ **Note**: Could not auto-trigger preview redeploy. If the voice agent has wrong CONVEX_URL, manually redeploy in Dokploy.`;
+            > ℹ️ The \`deploy-preview\` label was added. Dokploy will create/update the preview with the correct \`CONVEX_URL\`.`;
+              } else {
+                dokployStatusText = '⚠️ Label not added';
+                dokployNote = `
+            > ⚠️ **Note**: Could not add the deploy-preview label. You may need to manually add the label or redeploy in Dokploy.`;
               }
             }
 

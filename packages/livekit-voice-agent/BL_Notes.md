@@ -24,8 +24,25 @@ The workflow triggers on PRs that modify:
    - Deploys via Vercel CLI
 
 3. **Dokploy Preview** (LiveKit Voice Agent)
-   - Updates `previewEnv` with Convex preview URL
-   - Dokploy auto-creates the preview deployment
+   - GitHub Action updates `previewEnv` with correct Convex URL
+   - GitHub Action adds `deploy-preview` label to the PR
+   - Dokploy sees the label and creates preview with correct env
+
+### Dokploy Configuration (IMPORTANT)
+
+Dokploy must be configured to use **label filtering** for preview deployments.
+This breaks the race condition where Dokploy would create previews before GitHub Actions can set the correct `previewEnv`.
+
+**To configure in Dokploy UI:**
+1. Go to the application settings in Dokploy
+2. Navigate to Preview Deployments settings
+3. Add `deploy-preview` to the required labels list
+4. Ensure `autoDeploy` is enabled (already done via API)
+
+This ensures:
+- PR created → Dokploy sees no label → waits
+- GitHub Action runs → deploys Convex → updates previewEnv → adds label
+- Dokploy sees label → creates preview with CORRECT CONVEX_URL ✅
 
 ### Required GitHub Secrets
 
