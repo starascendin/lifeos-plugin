@@ -8,7 +8,10 @@ Dokploy preview deployments are automatically synced with Convex preview URLs vi
 See `.github/workflows/dokploy-preview-sync.yml` for details.
 
 The workflow:
-1. Waits for Vercel deployment to complete
-2. Extracts the Convex preview URL from Vercel deployment env vars
-3. Updates Dokploy's `previewEnv` with the correct Convex URL
+1. Deploys a Convex preview using `CONVEX_PREVIEW_DEPLOY_KEY`
+2. Gets the Convex preview URL from the deployment output
+3. Updates Dokploy's `previewEnv` with the Convex preview URL
 4. Comments on the PR with the configuration
+
+When a PR modifies `packages/livekit-voice-agent/**`, the workflow triggers and configures
+Dokploy previews to use the corresponding Convex preview backend.
