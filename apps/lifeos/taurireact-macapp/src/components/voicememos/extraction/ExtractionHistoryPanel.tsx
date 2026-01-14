@@ -1,10 +1,11 @@
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@holaai/convex";
 import { Id, Doc } from "@holaai/convex/convex/_generated/dataModel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,7 @@ import {
   Lightbulb,
   Clock,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useState, useEffect } from "react";
@@ -40,6 +42,25 @@ export function ExtractionHistoryPanel({
   });
 
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  const extractVoiceMemo = useAction(api.lifeos.voicememo_extraction.extractVoiceMemo);
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      await extractVoiceMemo({
+        voiceMemoId,
+        customPrompt: customPrompt.trim() || undefined,
+      });
+      setCustomPrompt("");
+    } catch (error) {
+      console.error("Failed to regenerate:", error);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   // Set default version when history loads
   useEffect(() => {
@@ -217,6 +238,42 @@ export function ExtractionHistoryPanel({
             <div className="pt-2 border-t">
               <p className="text-xs text-muted-foreground">
                 Model: {selectedExtraction.model}
+              </p>
+            </div>
+
+            {/* Regenerate Section */}
+            <div className="space-y-2 pt-3 border-t">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-blue-500" />
+                Regenerate with Instructions
+              </h4>
+              <Textarea
+                placeholder="Add custom instructions (e.g., 'Focus on technical details' or 'Extract meeting attendees')"
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                className="min-h-[80px] text-sm"
+                disabled={isRegenerating}
+              />
+              <Button
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                className="w-full"
+                size="sm"
+              >
+                {isRegenerating ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Regenerating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Regenerate Extraction
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Creates a new version with your custom instructions
               </p>
             </div>
           </div>
