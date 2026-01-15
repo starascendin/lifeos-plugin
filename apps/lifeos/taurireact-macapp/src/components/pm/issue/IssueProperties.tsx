@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   Circle,
   Flag,
@@ -39,8 +40,42 @@ interface IssuePropertiesProps {
   onStatusChange: (status: IssueStatus) => Promise<void>;
 }
 
+// Helper to format date range for cycles
+function formatDateRange(startDate: number, endDate: number): string {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const formatOptions: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  return `${start.toLocaleDateString(undefined, formatOptions)} - ${end.toLocaleDateString(undefined, formatOptions)}`;
+}
+
 export function IssueProperties({ issue, onUpdate, onStatusChange }: IssuePropertiesProps) {
   const { projects, cycles } = usePM();
+
+  // Filter cycles to show: current cycle, 1 previous, and 2 upcoming
+  const filteredCycles = useMemo(() => {
+    if (!cycles) return [];
+
+    // Separate cycles by status
+    const completed = cycles
+      .filter((c) => c.status === "completed")
+      .sort((a, b) => b.endDate - a.endDate); // Most recent first
+
+    const active = cycles.filter((c) => c.status === "active");
+
+    const upcoming = cycles
+      .filter((c) => c.status === "upcoming")
+      .sort((a, b) => a.startDate - b.startDate); // Earliest first
+
+    // Combine: 1 previous + current + 2 upcoming
+    const result = [
+      ...completed.slice(0, 1), // 1 most recent completed
+      ...active, // Current/active cycle(s)
+      ...upcoming.slice(0, 2), // 2 upcoming
+    ];
+
+    // Sort by start date for consistent display order
+    return result.sort((a, b) => a.startDate - b.startDate);
+  }, [cycles]);
 
   return (
     <div className="w-60 shrink-0 border-l border-border bg-muted/30 p-4">
@@ -121,14 +156,24 @@ export function IssueProperties({ issue, onUpdate, onStatusChange }: IssueProper
               onUpdate({ cycleId: value === "none" ? undefined : (value as Id<"lifeos_pmCycles">) })
             }
           >
-            <SelectTrigger className="h-8 w-32 border-none bg-transparent shadow-none text-sm">
+            <SelectTrigger className="h-8 w-40 border-none bg-transparent shadow-none text-sm">
               <SelectValue placeholder="No cycle" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No cycle</SelectItem>
-              {cycles?.map((cycle) => (
+              {filteredCycles.map((cycle) => (
                 <SelectItem key={cycle._id} value={cycle._id}>
-                  {cycle.name || `Cycle ${cycle.number}`}
+                  <div className="flex flex-col">
+                    <span className="flex items-center gap-1.5">
+                      {cycle.name || `Cycle ${cycle.number}`}
+                      {cycle.status === "active" && (
+                        <span className="text-[10px] font-medium text-green-500">(Current)</span>
+                      )}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatDateRange(cycle.startDate, cycle.endDate)}
+                    </span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
