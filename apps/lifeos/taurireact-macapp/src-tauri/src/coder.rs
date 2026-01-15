@@ -25,6 +25,13 @@ pub struct DelegateResult {
 }
 
 /// Internal struct for parsing `coder templates list -o json` output
+/// The actual JSON has a nested "Template" object
+#[derive(Debug, Deserialize)]
+struct CoderTemplateWrapper {
+    #[serde(rename = "Template")]
+    template: CoderTemplateJson,
+}
+
 #[derive(Debug, Deserialize)]
 struct CoderTemplateJson {
     name: String,
@@ -45,14 +52,18 @@ pub async fn get_coder_templates() -> Result<Vec<CoderTemplate>, String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let templates: Vec<CoderTemplateJson> = serde_json::from_str(&stdout)
+    let wrappers: Vec<CoderTemplateWrapper> = serde_json::from_str(&stdout)
         .map_err(|e| format!("Failed to parse coder templates output: {}", e))?;
 
-    Ok(templates
+    Ok(wrappers
         .into_iter()
-        .map(|t| CoderTemplate {
-            display_name: t.display_name.unwrap_or_else(|| t.name.clone()),
-            name: t.name,
+        .map(|w| CoderTemplate {
+            display_name: if w.template.display_name.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
+                w.template.name.clone()
+            } else {
+                w.template.display_name.unwrap()
+            },
+            name: w.template.name,
         })
         .collect())
 }
@@ -97,23 +108,24 @@ pub async fn get_coder_presets(template: String) -> Result<Vec<CoderPreset>, Str
 
 /// Delegate an issue to a Coder agent by creating a new task
 #[command]
+#[allow(non_snake_case)]
 pub async fn delegate_to_coder(
     template: String,
     preset: String,
-    issue_identifier: String,
-    issue_title: String,
-    issue_description: Option<String>,
-    issue_status: String,
-    issue_priority: String,
+    issueIdentifier: String,
+    issueTitle: String,
+    issueDescription: Option<String>,
+    issueStatus: String,
+    issuePriority: String,
 ) -> Result<DelegateResult, String> {
     // Format the task description
     let description = format!(
         "Issue: {} - {}\n\n{}\n\n---\nStatus: {}\nPriority: {}",
-        issue_identifier,
-        issue_title,
-        issue_description.unwrap_or_default(),
-        issue_status,
-        issue_priority
+        issueIdentifier,
+        issueTitle,
+        issueDescription.unwrap_or_default(),
+        issueStatus,
+        issuePriority
     );
 
     // Run: coder task create --template <template> --preset "<preset>" "<description>"

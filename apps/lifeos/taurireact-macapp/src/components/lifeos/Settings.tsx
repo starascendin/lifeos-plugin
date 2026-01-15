@@ -15,7 +15,8 @@ import { useApiKeys } from "@/lib/hooks/useApiKeys";
 import { useUser } from "@/lib/auth/platformClerk";
 import { api } from "@holaai/convex";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { Check, CheckCircle, Clock, Coins, Database, Eye, EyeOff, ExternalLink, History, Infinity, Key, Loader2, Mic, Monitor, Moon, Send, Shield, Sparkles, Sun, Trash2, XCircle } from "lucide-react";
+import { Bot, Check, CheckCircle, Clock, Coins, Database, Eye, EyeOff, ExternalLink, History, Infinity, Key, Loader2, Mic, Monitor, Moon, Send, Shield, Sparkles, Sun, Trash2, XCircle } from "lucide-react";
+import { CoderIntegrationSettings } from "@/components/pm/settings/CoderIntegrationSettings";
 import { useEffect, useState } from "react";
 import { useConfig } from "@/lib/config";
 
@@ -293,6 +294,27 @@ function SettingsContent() {
           </CardHeader>
           <CardContent>
             <LiveKitConfigSection />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ==================== INTEGRATIONS SECTION ==================== */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Bot className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold text-xl">Integrations</h2>
+        </div>
+
+        {/* Coder Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Coder Agent Delegation</CardTitle>
+            <CardDescription>
+              Connect your Coder account to delegate issues to AI coding agents
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CoderIntegrationSettings />
           </CardContent>
         </Card>
       </section>

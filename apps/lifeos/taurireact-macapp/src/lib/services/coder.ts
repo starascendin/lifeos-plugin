@@ -99,11 +99,11 @@ export async function delegateToCoder(
     return await invoke<DelegateResult>("delegate_to_coder", {
       template: params.template,
       preset: params.preset,
-      issue_identifier: params.issueIdentifier,
-      issue_title: params.issueTitle,
-      issue_description: params.issueDescription,
-      issue_status: params.issueStatus,
-      issue_priority: params.issuePriority,
+      issueIdentifier: params.issueIdentifier,
+      issueTitle: params.issueTitle,
+      issueDescription: params.issueDescription,
+      issueStatus: params.issueStatus,
+      issuePriority: params.issuePriority,
     });
   } catch (error) {
     console.error("Failed to delegate to Coder:", error);

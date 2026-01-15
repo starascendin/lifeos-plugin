@@ -332,4 +332,15 @@ export const pmTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_week", ["userId", "weekStartDate"]),
+
+  // ==================== CODER INTEGRATION ====================
+  // Per-user Coder.com API integration for delegating issues to AI agents
+  lifeos_coderIntegration: defineTable({
+    userId: v.id("users"),
+    coderUrl: v.string(), // e.g., "https://coder-production-coder2.rocketjump.tech"
+    coderApiToken: v.string(), // User's personal API token
+    coderUsername: v.optional(v.string()), // For display purposes
+    connectedAt: v.number(), // When the user connected
+    lastUsedAt: v.optional(v.number()), // Last time delegation was used
+  }).index("by_user", ["userId"]),
 };

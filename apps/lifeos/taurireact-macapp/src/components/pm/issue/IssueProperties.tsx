@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Circle,
   Flag,
@@ -7,6 +8,9 @@ import {
   FolderKanban,
   RefreshCw,
   Bot,
+  Loader2,
+  ExternalLink,
+  Settings,
 } from "lucide-react";
 import {
   Select,
@@ -17,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   PropertyRow,
   StatusSelect,
@@ -26,6 +31,21 @@ import {
 } from "../shared";
 import { usePM, IssueStatus, Priority } from "@/lib/contexts/PMContext";
 import type { Doc, Id } from "@holaai/convex";
+import { api } from "@holaai/convex";
+import { useQuery, useAction } from "convex/react";
+import { Link } from "react-router-dom";
+import {
+  isCoderAvailable,
+  getCoderTemplates,
+  getCoderPresets,
+  delegateToCoder,
+  type CoderTemplate,
+  type CoderPreset,
+} from "@/lib/services/coder";
+
+// Detect if running in Tauri or Web
+const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+const isWeb = !isTauri;
 
 interface IssuePropertiesProps {
   issue: Doc<"lifeos_pmIssues">;
@@ -39,10 +59,166 @@ interface IssuePropertiesProps {
     cycleId?: Id<"lifeos_pmCycles">;
   }) => Promise<void>;
   onStatusChange: (status: IssueStatus) => Promise<void>;
+  onDelegateSuccess?: () => Promise<void>;
 }
 
-export function IssueProperties({ issue, onUpdate, onStatusChange }: IssuePropertiesProps) {
+export function IssueProperties({ issue, onUpdate, onStatusChange, onDelegateSuccess }: IssuePropertiesProps) {
   const { projects, cycles } = usePM();
+
+  // Convex hooks for web mode
+  // Queries/mutations from pm_coder, actions from pm_coder_actions
+  const isCoderConnected = useQuery(api.lifeos.pm_coder.isConnected);
+  const listTemplatesAction = useAction(api.lifeos.pm_coder_actions.listTemplates);
+  const listPresetsAction = useAction(api.lifeos.pm_coder_actions.listPresets);
+  const createTaskAction = useAction(api.lifeos.pm_coder_actions.createTask);
+
+  // Coder delegation state
+  const [templates, setTemplates] = useState<CoderTemplate[]>([]);
+  const [presets, setPresets] = useState<CoderPreset[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [selectedPreset, setSelectedPreset] = useState<string>("");
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [isLoadingPresets, setIsLoadingPresets] = useState(false);
+  const [isDelegating, setIsDelegating] = useState(false);
+  const [delegateError, setDelegateError] = useState<string | null>(null);
+
+  // Determine if delegation UI should be shown
+  // - Tauri: always available (uses local CLI)
+  // - Web: only if user has Coder connected
+  const showDelegation = isTauri ? isCoderAvailable() : isCoderConnected === true;
+  const showConnectPrompt = isWeb && isCoderConnected === false;
+
+  // Load templates on mount - different source for Tauri vs Web
+  useEffect(() => {
+    if (!showDelegation || templates.length > 0) return;
+
+    setIsLoadingTemplates(true);
+
+    const loadTemplates = async () => {
+      try {
+        let loadedTemplates: CoderTemplate[];
+
+        if (isTauri) {
+          loadedTemplates = await getCoderTemplates();
+        } else {
+          // Web: use Convex action
+          loadedTemplates = await listTemplatesAction();
+        }
+
+        setTemplates(loadedTemplates);
+        if (loadedTemplates.length > 0) {
+          setSelectedTemplate(loadedTemplates[0].name);
+        }
+      } catch (e) {
+        console.error("Failed to load templates:", e);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+
+    loadTemplates();
+  }, [showDelegation, listTemplatesAction]);
+
+  // Load presets when template changes - different source for Tauri vs Web
+  useEffect(() => {
+    if (!selectedTemplate) return;
+
+    setIsLoadingPresets(true);
+    setSelectedPreset("");
+
+    const loadPresets = async () => {
+      try {
+        let loadedPresets: CoderPreset[];
+
+        if (isTauri) {
+          loadedPresets = await getCoderPresets(selectedTemplate);
+        } else {
+          // Web: use Convex action
+          const presetData = await listPresetsAction({ template: selectedTemplate });
+          // Map to CoderPreset format
+          loadedPresets = presetData.map((p: { name: string }) => ({
+            name: p.name,
+            template: selectedTemplate,
+          }));
+        }
+
+        setPresets(loadedPresets);
+        if (loadedPresets.length > 0) {
+          setSelectedPreset(loadedPresets[0].name);
+        }
+      } catch (e) {
+        console.error("Failed to load presets:", e);
+      } finally {
+        setIsLoadingPresets(false);
+      }
+    };
+
+    loadPresets();
+  }, [selectedTemplate, listPresetsAction]);
+
+  // Format issue details as a prompt for the Coder agent
+  const formatIssuePrompt = (): string => {
+    const parts = [
+      `Issue: ${issue.identifier} - ${issue.title}`,
+      `Status: ${issue.status}`,
+      `Priority: ${issue.priority}`,
+    ];
+
+    if (issue.description) {
+      parts.push(`\nDescription:\n${issue.description}`);
+    }
+
+    return parts.join("\n");
+  };
+
+  const handleDelegate = async () => {
+    if (!selectedTemplate || !selectedPreset) return;
+
+    setIsDelegating(true);
+    setDelegateError(null);
+
+    try {
+      if (isWeb) {
+        // Web: use Convex action
+        const result = await createTaskAction({
+          template: selectedTemplate,
+          preset: selectedPreset,
+          prompt: formatIssuePrompt(),
+        });
+
+        if (result.success) {
+          onDelegateSuccess?.();
+          // Open task URL in new tab
+          if (result.taskUrl) {
+            window.open(result.taskUrl, "_blank");
+          }
+        } else {
+          setDelegateError(result.error || "Failed to delegate");
+        }
+      } else {
+        // Tauri: use existing CLI delegation
+        const result = await delegateToCoder({
+          template: selectedTemplate,
+          preset: selectedPreset,
+          issueIdentifier: issue.identifier,
+          issueTitle: issue.title,
+          issueDescription: issue.description,
+          issueStatus: issue.status,
+          issuePriority: issue.priority,
+        });
+
+        if (result.success) {
+          onDelegateSuccess?.();
+        } else {
+          setDelegateError(result.error || "Failed to delegate");
+        }
+      }
+    } catch (e) {
+      setDelegateError(e instanceof Error ? e.message : "Failed to delegate");
+    } finally {
+      setIsDelegating(false);
+    }
+  };
 
   return (
     <div className="w-60 shrink-0 border-l border-border bg-muted/30 p-4">
@@ -150,23 +326,127 @@ export function IssueProperties({ issue, onUpdate, onStatusChange }: IssueProper
           />
         </div>
 
-        {/* Delegated Status */}
-        {issue.delegatedAt && (
+        {/* Coder Agent Delegation - Show for Tauri OR connected web users */}
+        {showDelegation && (
           <div className="pt-3 border-t border-border mt-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="flex items-center gap-1.5">
-                <Bot className="h-3 w-3" />
-                Delegated
-              </Badge>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <Bot className="h-4 w-4" />
+              <span>Delegate to Agent</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {new Date(issue.delegatedAt).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
+
+            {/* Show delegated badge if already delegated */}
+            {issue.delegatedAt && (
+              <div className="mb-2">
+                <Badge variant="secondary" className="flex items-center gap-1.5 w-fit">
+                  <Bot className="h-3 w-3" />
+                  Delegated
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(issue.delegatedAt).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            )}
+
+            {/* Template selector */}
+            <div className="space-y-2">
+              <Select
+                value={selectedTemplate}
+                onValueChange={setSelectedTemplate}
+                disabled={isLoadingTemplates || isDelegating}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  {isLoadingTemplates ? (
+                    <span className="flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </span>
+                  ) : (
+                    <SelectValue placeholder="Select template" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.name} value={t.name} className="text-xs">
+                      {t.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Preset selector */}
+              <Select
+                value={selectedPreset}
+                onValueChange={setSelectedPreset}
+                disabled={isLoadingPresets || !selectedTemplate || isDelegating}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  {isLoadingPresets ? (
+                    <span className="flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </span>
+                  ) : (
+                    <SelectValue placeholder="Select preset" />
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  {presets.map((p) => (
+                    <SelectItem key={p.name} value={p.name} className="text-xs">
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Error display */}
+              {delegateError && (
+                <p className="text-xs text-destructive">{delegateError}</p>
+              )}
+
+              {/* Delegate button */}
+              <Button
+                size="sm"
+                className="w-full h-8 text-xs"
+                onClick={handleDelegate}
+                disabled={isDelegating || !selectedTemplate || !selectedPreset}
+              >
+                {isDelegating ? (
+                  <>
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    Delegating...
+                  </>
+                ) : (
+                  <>
+                    <Bot className="mr-1 h-3 w-3" />
+                    {issue.delegatedAt ? "Delegate Again" : "Delegate"}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Prompt to connect Coder - Show for web users who haven't connected */}
+        {showConnectPrompt && (
+          <div className="pt-3 border-t border-border mt-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <Bot className="h-4 w-4" />
+              <span>Delegate to Agent</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Connect your Coder account to delegate issues to AI coding agents.
             </p>
+            <Button size="sm" variant="outline" className="w-full h-8 text-xs" asChild>
+              <Link to="/settings">
+                <Settings className="mr-1.5 h-3 w-3" />
+                Connect Coder
+              </Link>
+            </Button>
           </div>
         )}
       </div>
