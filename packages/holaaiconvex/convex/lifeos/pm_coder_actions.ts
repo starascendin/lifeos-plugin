@@ -91,28 +91,88 @@ export const listTemplates = action({
 
 /**
  * List presets for a template
- * Note: Presets are defined in template's main.tf, returning known presets for now
+ * Fetches presets from the Coder API via template version
  */
 export const listPresets = action({
   args: { template: v.string() },
-  handler: async (_, args): Promise<CoderPreset[]> => {
-    // Presets are defined in the template's Terraform config
-    // Return known presets for the testtaskdocker template
-    if (args.template === "testtaskdocker") {
-      return [
-        { name: "hola-monorepo" },
-        { name: "hola-monorepo (Sonnet)" },
-        { name: "mindworks-kortex-monorepo" },
-        { name: "mindworks-kortex (Sonnet)" },
-      ];
+  handler: async (ctx, args): Promise<CoderPreset[]> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
     }
 
-    return [{ name: "default" }];
+    // Get user from database
+    const user = await ctx.runQuery(
+      internal.common.users.getUserByTokenIdentifier,
+      { tokenIdentifier: identity.tokenIdentifier }
+    );
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get integration with full token
+    const integration = await ctx.runQuery(
+      internal.lifeos.pm_coder.getIntegrationInternal,
+      { userId: user._id as Id<"users"> }
+    );
+
+    if (!integration) {
+      throw new Error("Coder not connected");
+    }
+
+    // First get the template to find its active version ID
+    const templatesResponse = await fetch(
+      `${integration.coderUrl}/api/v2/templates`,
+      {
+        headers: { "Coder-Session-Token": integration.coderApiToken },
+      }
+    );
+
+    if (!templatesResponse.ok) {
+      throw new Error(`Failed to fetch templates: ${templatesResponse.status}`);
+    }
+
+    const templates = (await templatesResponse.json()) as Array<{
+      name: string;
+      active_version_id: string;
+    }>;
+
+    const selectedTemplate = templates.find((t) => t.name === args.template);
+    if (!selectedTemplate) {
+      return [{ name: "default" }];
+    }
+
+    // Now fetch presets for this template version
+    const presetsResponse = await fetch(
+      `${integration.coderUrl}/api/v2/templateversions/${selectedTemplate.active_version_id}/presets`,
+      {
+        headers: { "Coder-Session-Token": integration.coderApiToken },
+      }
+    );
+
+    if (!presetsResponse.ok) {
+      // Fallback to default if presets endpoint fails
+      return [{ name: "default" }];
+    }
+
+    const presets = (await presetsResponse.json()) as Array<{
+      id: string;
+      name: string;
+    }>;
+
+    if (presets.length === 0) {
+      return [{ name: "default" }];
+    }
+
+    return presets.map((p) => ({ name: p.name }));
   },
 });
 
 /**
  * Create a Coder task
+ *
+ * API endpoint: POST /api/v2/tasks/{user}
+ * See: https://coder.com/docs/reference/api/tasks
  */
 export const createTask = action({
   args: {
@@ -146,16 +206,63 @@ export const createTask = action({
     }
 
     try {
-      const response = await fetch(`${integration.coderUrl}/api/v2/tasks`, {
+      // First, we need to get the template version ID from the template name
+      const templatesResponse = await fetch(
+        `${integration.coderUrl}/api/v2/templates`,
+        {
+          headers: { "Coder-Session-Token": integration.coderApiToken },
+        }
+      );
+
+      if (!templatesResponse.ok) {
+        return {
+          success: false,
+          error: `Failed to fetch templates: ${templatesResponse.status}`,
+        };
+      }
+
+      const templates = (await templatesResponse.json()) as Array<{
+        name: string;
+        active_version_id: string;
+      }>;
+
+      const selectedTemplate = templates.find((t) => t.name === args.template);
+      if (!selectedTemplate) {
+        return {
+          success: false,
+          error: `Template '${args.template}' not found`,
+        };
+      }
+
+      // Get presets for the template version
+      const presetsResponse = await fetch(
+        `${integration.coderUrl}/api/v2/templateversions/${selectedTemplate.active_version_id}/presets`,
+        {
+          headers: { "Coder-Session-Token": integration.coderApiToken },
+        }
+      );
+
+      let presetId: string | undefined;
+      if (presetsResponse.ok) {
+        const presets = (await presetsResponse.json()) as Array<{
+          id: string;
+          name: string;
+        }>;
+        const selectedPreset = presets.find((p) => p.name === args.preset);
+        presetId = selectedPreset?.id;
+      }
+
+      // Create the task using POST /api/v2/tasks/me
+      const response = await fetch(`${integration.coderUrl}/api/v2/tasks/me`, {
         method: "POST",
         headers: {
           "Coder-Session-Token": integration.coderApiToken,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          template_name: args.template,
-          preset_name: args.preset,
-          prompt: args.prompt,
+          template_version_id: selectedTemplate.active_version_id,
+          template_version_preset_id: presetId,
+          input: args.prompt,
         }),
       });
 
