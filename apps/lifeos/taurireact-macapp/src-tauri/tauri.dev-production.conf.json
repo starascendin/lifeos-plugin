@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LifeOS Nexus",
+  "version": "0.1.0",
+  "identifier": "com.bryanliu.lifeos-nexus",
+  "build": {
+    "beforeDevCommand": "pnpm dev:production",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build:production",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "LifeOS Nexus",
+        "width": 420,
+        "height": 640,
+        "visible": false,
+        "skipTaskbar": true,
+        "decorations": true,
+        "resizable": true,
+        "center": true
+      },
+      {
+        "label": "lifeos",
+        "title": "LifeOS Nexus",
+        "width": 1200,
+        "height": 800,
+        "visible": false,
+        "skipTaskbar": false,
+        "decorations": true,
+        "resizable": true,
+        "center": true,
+        "url": "index.html#/lifeos",
+        "useHttpsScheme": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://clerk.rjlabs.dev https://*.clerk.accounts.dev https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com https://www.youtube.com https://api.groq.com wss://*.rocketjump.tech wss://livekit.rocketjump.tech ipc://localhost; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.rjlabs.dev https://*.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob: asset: https://asset.localhost; font-src 'self' data:; frame-src https://clerk.rjlabs.dev https://*.clerk.accounts.dev https://accounts.google.com https://*.ts.net; worker-src 'self' blob:; media-src 'self' asset: https://asset.localhost blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "app"],
+    "icon": [
+      "icons-production/32x32.png",
+      "icons-production/128x128.png",
+      "icons-production/128x128@2x.png",
+      "icons-production/icon.icns",
+      "icons-production/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "entitlements": "./entitlements.plist",
+      "infoPlist": "./Info.plist"
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["lifeos-nexus"]
+      }
+    }
+  }
+}

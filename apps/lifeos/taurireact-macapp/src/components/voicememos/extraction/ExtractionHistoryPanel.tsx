@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SentimentBadge, type Sentiment } from "./SentimentBadge";
+import { SystemPromptCollapsible } from "./SystemPromptSettings";
 import {
   History,
   X,
@@ -275,6 +276,11 @@ export function ExtractionHistoryPanel({
               <p className="text-xs text-muted-foreground">
                 Creates a new version with your custom instructions
               </p>
+            </div>
+
+            {/* System Prompt Settings */}
+            <div className="pt-3 border-t">
+              <SystemPromptCollapsible />
             </div>
           </div>
         )}

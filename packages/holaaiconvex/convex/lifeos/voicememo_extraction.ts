@@ -1,8 +1,22 @@
 import { v } from "convex/values";
 import { action, mutation, query, internalMutation } from "../_generated/server";
 import { api, internal } from "../_generated/api";
-import { requireUser } from "../_lib/auth";
+import { requireUser, getAuthUserId } from "../_lib/auth";
 import { Id, Doc } from "../_generated/dataModel";
+
+// ==================== CONSTANTS ====================
+
+export const DEFAULT_EXTRACTION_SYSTEM_PROMPT = `You are an AI assistant that analyzes voice memo transcripts and extracts structured insights.
+
+Analyze the provided transcript and extract:
+1. A brief summary (1-2 sentences capturing the main point)
+2. Relevant labels/tags (3-7 keywords that categorize the content)
+3. Action items (any tasks, to-dos, or follow-ups mentioned). Make sure to capture ALL action items from the transcript.
+4. Key points (main ideas or important information)
+5. Overall sentiment (positive, neutral, or negative tone)
+
+IMPORTANT: Return ONLY a raw JSON object with NO markdown formatting, NO code blocks, NO backticks, NO explanation. Just the JSON:
+{"summary":"string","labels":["string"],"actionItems":["string"],"keyPoints":["string"],"sentiment":"positive"|"neutral"|"negative"}`;
 
 // ==================== TYPES ====================
 
@@ -217,6 +231,96 @@ export const getMemoExtractionStatus = query({
   },
 });
 
+// ==================== SETTINGS ====================
+
+/**
+ * Get user's voice memo extraction settings
+ * Returns the custom system prompt if set, otherwise returns the default
+ * Returns null if user is not authenticated (to avoid throwing during initial load)
+ */
+export const getExtractionSettings = query({
+  args: {},
+  handler: async (ctx) => {
+    // Use getAuthUserId to avoid throwing when not authenticated
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      // Return default settings for unauthenticated users
+      return {
+        extractionSystemPrompt: DEFAULT_EXTRACTION_SYSTEM_PROMPT,
+        isCustom: false,
+        defaultPrompt: DEFAULT_EXTRACTION_SYSTEM_PROMPT,
+      };
+    }
+
+    const settings = await ctx.db
+      .query("life_voiceMemoSettings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
+    return {
+      extractionSystemPrompt: settings?.extractionSystemPrompt ?? DEFAULT_EXTRACTION_SYSTEM_PROMPT,
+      isCustom: !!settings?.extractionSystemPrompt,
+      defaultPrompt: DEFAULT_EXTRACTION_SYSTEM_PROMPT,
+    };
+  },
+});
+
+/**
+ * Update user's voice memo extraction settings
+ */
+export const updateExtractionSettings = mutation({
+  args: {
+    extractionSystemPrompt: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const existingSettings = await ctx.db
+      .query("life_voiceMemoSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    const now = Date.now();
+
+    if (existingSettings) {
+      await ctx.db.patch(existingSettings._id, {
+        extractionSystemPrompt: args.extractionSystemPrompt,
+        updatedAt: now,
+      });
+      return existingSettings._id;
+    } else {
+      return await ctx.db.insert("life_voiceMemoSettings", {
+        userId: user._id,
+        extractionSystemPrompt: args.extractionSystemPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
+ * Reset user's extraction settings to default
+ */
+export const resetExtractionSettings = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+
+    const settings = await ctx.db
+      .query("life_voiceMemoSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (settings) {
+      await ctx.db.patch(settings._id, {
+        extractionSystemPrompt: undefined,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
+
 // ==================== MUTATIONS ====================
 
 /**
@@ -370,18 +474,12 @@ export const runExtraction = action({
     });
 
     try {
-      // Build the prompt
-      const systemPrompt = `You are an AI assistant that analyzes voice memo transcripts and extracts structured insights.
-
-Analyze the provided transcript and extract:
-1. A brief summary (1-2 sentences capturing the main point)
-2. Relevant labels/tags (3-7 keywords that categorize the content)
-3. Action items (any tasks, to-dos, or follow-ups mentioned)
-4. Key points (main ideas or important information)
-5. Overall sentiment (positive, neutral, or negative tone)
-
-IMPORTANT: Return ONLY a raw JSON object with NO markdown formatting, NO code blocks, NO backticks, NO explanation. Just the JSON:
-{"summary":"string","labels":["string"],"actionItems":["string"],"keyPoints":["string"],"sentiment":"positive"|"neutral"|"negative"}`;
+      // Get user's custom system prompt (or default)
+      const settings = await ctx.runQuery(
+        api.lifeos.voicememo_extraction.getExtractionSettings,
+        {}
+      );
+      const systemPrompt = settings.extractionSystemPrompt;
 
       let userPrompt = `TRANSCRIPT:\n${memo.transcript}`;
 
@@ -402,6 +500,7 @@ IMPORTANT: Return ONLY a raw JSON object with NO markdown formatting, NO code bl
           ],
           responseFormat: "json",
           temperature: 0.3,
+          maxTokens: 16384, // Generous limit to avoid truncation
         },
         context: {
           feature: "voice_memo_extraction",

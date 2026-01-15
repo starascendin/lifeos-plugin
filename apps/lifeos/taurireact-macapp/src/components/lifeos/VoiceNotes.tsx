@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AppShell } from "./AppShell";
 import { VoiceMemosTab } from "../voicememos/VoiceMemosTab";
 import { EnhancedMemosTab } from "../voicememos/EnhancedMemosTab";
+import { SystemPromptDialog } from "../voicememos/extraction/SystemPromptSettings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mic, Sparkles } from "lucide-react";
 
@@ -20,6 +21,7 @@ export function LifeOSVoiceNotes() {
                 : "AI-enhanced voice memos with insights"}
             </p>
           </div>
+          {activeTab === "enhanced" && <SystemPromptDialog />}
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "source" | "enhanced")}>

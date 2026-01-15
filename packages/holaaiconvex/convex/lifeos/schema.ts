@@ -311,4 +311,16 @@ export const lifeosTables = {
     .index("by_user_voiceMemo", ["userId", "voiceMemoId"])
     .index("by_user_created", ["userId", "createdAt"])
     .index("by_user_status", ["userId", "status"]),
+
+  // ==================== VOICE MEMO USER SETTINGS ====================
+  life_voiceMemoSettings: defineTable({
+    // User who owns these settings
+    userId: v.id("users"),
+    // Custom system prompt for voice memo extraction
+    // If not set, the default system prompt will be used
+    extractionSystemPrompt: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 };
