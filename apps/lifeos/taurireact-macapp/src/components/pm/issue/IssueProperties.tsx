@@ -6,6 +6,7 @@ import {
   Tag,
   FolderKanban,
   RefreshCw,
+  Bot,
 } from "lucide-react";
 import {
   Select,
@@ -15,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   PropertyRow,
   StatusSelect,
@@ -147,6 +149,26 @@ export function IssueProperties({ issue, onUpdate, onStatusChange }: IssueProper
             projectId={issue.projectId}
           />
         </div>
+
+        {/* Delegated Status */}
+        {issue.delegatedAt && (
+          <div className="pt-3 border-t border-border mt-3">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="flex items-center gap-1.5">
+                <Bot className="h-3 w-3" />
+                Delegated
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Date(issue.delegatedAt).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

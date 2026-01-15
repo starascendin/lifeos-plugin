@@ -2,6 +2,7 @@
 
 mod api_keys;
 mod app_category;
+mod coder;
 mod council_server;
 mod notes;
 mod screentime;
@@ -11,6 +12,7 @@ mod youtube;
 use api_keys::{
     delete_groq_api_key, get_groq_api_key, open_full_disk_access_settings, save_groq_api_key,
 };
+use coder::{delegate_to_coder, get_coder_presets, get_coder_templates};
 use council_server::{get_council_server_status, start_council_server, stop_council_server};
 use notes::{
     count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders,
@@ -303,6 +305,10 @@ pub fn run() {
             // Tray
             set_tray_title,
             clear_tray_title,
+            // Coder Agent Delegation
+            get_coder_templates,
+            get_coder_presets,
+            delegate_to_coder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

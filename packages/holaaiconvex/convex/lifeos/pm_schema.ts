@@ -168,6 +168,8 @@ export const pmTables = {
     labelIds: v.array(v.id("lifeos_pmLabels")),
     // Daily Agenda - Top priority flag for "Top 3" tasks
     isTopPriority: v.optional(v.boolean()),
+    // Coder Agent delegation
+    delegatedAt: v.optional(v.number()), // Timestamp when delegated to Coder agent
     // Dates
     dueDate: v.optional(v.number()),
     completedAt: v.optional(v.number()),

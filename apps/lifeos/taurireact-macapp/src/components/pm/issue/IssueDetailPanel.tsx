@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id } from "@holaai/convex";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Bot } from "lucide-react";
+import { isCoderAvailable } from "@/lib/services/coder";
+import { DelegateToAgentDialog } from "./DelegateToAgentDialog";
 import {
   Sheet,
   SheetContent,
@@ -29,6 +31,7 @@ export function IssueDetailPanel() {
   const { selectedIssueId, setSelectedIssueId, deleteIssue } = usePM();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDelegateDialog, setShowDelegateDialog] = useState(false);
 
   const issue = useQuery(
     api.lifeos.pm_issues.getIssue,
@@ -39,6 +42,7 @@ export function IssueDetailPanel() {
   const updateIssueStatus = useMutation(api.lifeos.pm_issues.updateIssueStatus);
   const moveIssueToProject = useMutation(api.lifeos.pm_issues.moveIssueToProject);
   const moveIssueToCycle = useMutation(api.lifeos.pm_issues.moveIssueToCycle);
+  const markIssueAsDelegated = useMutation(api.lifeos.pm_issues.markIssueAsDelegated);
 
   // Handle Escape key to close
   useEffect(() => {
@@ -121,6 +125,15 @@ export function IssueDetailPanel() {
     }
   };
 
+  const handleDelegationSuccess = async () => {
+    if (!selectedIssueId) return;
+    try {
+      await markIssueAsDelegated({ issueId: selectedIssueId });
+    } catch (error) {
+      console.error("Failed to mark issue as delegated:", error);
+    }
+  };
+
   return (
     <>
     <Sheet open={!!selectedIssueId} onOpenChange={(open) => !open && handleClose()}>
@@ -131,6 +144,19 @@ export function IssueDetailPanel() {
             Issue Details
           </SheetTitle>
           <div className="flex items-center gap-1">
+            {/* Delegate to Agent button - only show in Tauri */}
+            {isCoderAvailable() && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-blue-500"
+                onClick={() => setShowDelegateDialog(true)}
+                title="Delegate to Agent"
+              >
+                <Bot className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -203,6 +229,16 @@ export function IssueDetailPanel() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Delegate to Agent Dialog */}
+    {issue && (
+      <DelegateToAgentDialog
+        open={showDelegateDialog}
+        onOpenChange={setShowDelegateDialog}
+        issue={issue}
+        onSuccess={handleDelegationSuccess}
+      />
+    )}
     </>
   );
 }
