@@ -70,6 +70,8 @@ import type * as lifeos_llmcouncil from "../lifeos/llmcouncil.js";
 import type * as lifeos_llmcouncil_schema from "../lifeos/llmcouncil_schema.js";
 import type * as lifeos_pm_ai from "../lifeos/pm_ai.js";
 import type * as lifeos_pm_ai_internal from "../lifeos/pm_ai_internal.js";
+import type * as lifeos_pm_coder from "../lifeos/pm_coder.js";
+import type * as lifeos_pm_coder_actions from "../lifeos/pm_coder_actions.js";
 import type * as lifeos_pm_crons from "../lifeos/pm_crons.js";
 import type * as lifeos_pm_cycle_snapshots from "../lifeos/pm_cycle_snapshots.js";
 import type * as lifeos_pm_cycles from "../lifeos/pm_cycles.js";
@@ -159,6 +161,8 @@ declare const fullApi: ApiFromModules<{
   "lifeos/llmcouncil_schema": typeof lifeos_llmcouncil_schema;
   "lifeos/pm_ai": typeof lifeos_pm_ai;
   "lifeos/pm_ai_internal": typeof lifeos_pm_ai_internal;
+  "lifeos/pm_coder": typeof lifeos_pm_coder;
+  "lifeos/pm_coder_actions": typeof lifeos_pm_coder_actions;
   "lifeos/pm_crons": typeof lifeos_pm_crons;
   "lifeos/pm_cycle_snapshots": typeof lifeos_pm_cycle_snapshots;
   "lifeos/pm_cycles": typeof lifeos_pm_cycles;

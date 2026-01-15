@@ -168,6 +168,8 @@ export const pmTables = {
     labelIds: v.array(v.id("lifeos_pmLabels")),
     // Daily Agenda - Top priority flag for "Top 3" tasks
     isTopPriority: v.optional(v.boolean()),
+    // Coder Agent delegation
+    delegatedAt: v.optional(v.number()), // Timestamp when delegated to Coder agent
     // Dates
     dueDate: v.optional(v.number()),
     completedAt: v.optional(v.number()),
@@ -330,4 +332,15 @@ export const pmTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_week", ["userId", "weekStartDate"]),
+
+  // ==================== CODER INTEGRATION ====================
+  // Per-user Coder.com API integration for delegating issues to AI agents
+  lifeos_coderIntegration: defineTable({
+    userId: v.id("users"),
+    coderUrl: v.string(), // e.g., "https://coder-production-coder2.rocketjump.tech"
+    coderApiToken: v.string(), // User's personal API token
+    coderUsername: v.optional(v.string()), // For display purposes
+    connectedAt: v.number(), // When the user connected
+    lastUsedAt: v.optional(v.number()), // Last time delegation was used
+  }).index("by_user", ["userId"]),
 };

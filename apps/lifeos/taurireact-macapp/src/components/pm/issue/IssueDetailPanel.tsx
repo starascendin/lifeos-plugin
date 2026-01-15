@@ -39,6 +39,7 @@ export function IssueDetailPanel() {
   const updateIssueStatus = useMutation(api.lifeos.pm_issues.updateIssueStatus);
   const moveIssueToProject = useMutation(api.lifeos.pm_issues.moveIssueToProject);
   const moveIssueToCycle = useMutation(api.lifeos.pm_issues.moveIssueToCycle);
+  const markIssueAsDelegated = useMutation(api.lifeos.pm_issues.markIssueAsDelegated);
 
   // Handle Escape key to close
   useEffect(() => {
@@ -121,6 +122,15 @@ export function IssueDetailPanel() {
     }
   };
 
+  const handleDelegationSuccess = async () => {
+    if (!selectedIssueId) return;
+    try {
+      await markIssueAsDelegated({ issueId: selectedIssueId });
+    } catch (error) {
+      console.error("Failed to mark issue as delegated:", error);
+    }
+  };
+
   return (
     <>
     <Sheet open={!!selectedIssueId} onOpenChange={(open) => !open && handleClose()}>
@@ -176,6 +186,7 @@ export function IssueDetailPanel() {
               issue={issue}
               onUpdate={handleUpdate}
               onStatusChange={handleStatusChange}
+              onDelegateSuccess={handleDelegationSuccess}
             />
           </div>
         )}
@@ -203,6 +214,7 @@ export function IssueDetailPanel() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
     </>
   );
 }

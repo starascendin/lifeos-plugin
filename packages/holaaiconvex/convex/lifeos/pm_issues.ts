@@ -985,3 +985,29 @@ export const toggleTopPriority = mutation({
     return { issueId: args.issueId, isTopPriority: !issue.isTopPriority };
   },
 });
+
+/**
+ * Mark an issue as delegated to a Coder agent
+ * Sets the delegatedAt timestamp
+ */
+export const markIssueAsDelegated = mutation({
+  args: {
+    issueId: v.id("lifeos_pmIssues"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.userId !== user._id) {
+      throw new Error("Issue not found or access denied");
+    }
+
+    await ctx.db.patch(args.issueId, {
+      delegatedAt: now,
+      updatedAt: now,
+    });
+
+    return { issueId: args.issueId, delegatedAt: now };
+  },
+});
