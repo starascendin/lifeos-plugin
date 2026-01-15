@@ -155,16 +155,17 @@ export const listPresets = action({
       return [{ name: "default" }];
     }
 
+    // API returns Pascal case: ID, Name (not id, name)
     const presets = (await presetsResponse.json()) as Array<{
-      id: string;
-      name: string;
+      ID: string;
+      Name: string;
     }>;
 
     if (presets.length === 0) {
       return [{ name: "default" }];
     }
 
-    return presets.map((p) => ({ name: p.name }));
+    return presets.map((p) => ({ name: p.Name }));
   },
 });
 
@@ -244,12 +245,13 @@ export const createTask = action({
 
       let presetId: string | undefined;
       if (presetsResponse.ok) {
+        // API returns Pascal case: ID, Name (not id, name)
         const presets = (await presetsResponse.json()) as Array<{
-          id: string;
-          name: string;
+          ID: string;
+          Name: string;
         }>;
-        const selectedPreset = presets.find((p) => p.name === args.preset);
-        presetId = selectedPreset?.id;
+        const selectedPreset = presets.find((p) => p.Name === args.preset);
+        presetId = selectedPreset?.ID;
       }
 
       // Create the task using POST /api/v2/tasks/me
