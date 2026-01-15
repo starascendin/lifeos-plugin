@@ -5,8 +5,13 @@ import path from "path";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+// Use different ports for different modes to allow running DEV and PROD simultaneously
+// DEV mode: port 1420, Production mode: port 1430
+const getPort = (mode: string) => (mode === "production" ? 1430 : 1420);
+const getHmrPort = (mode: string) => (mode === "production" ? 1431 : 1421);
+
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ mode }) => ({
   plugins: [react()],
   // Expose additional env vars (e.g. E2E_TEST_USER_EMAIL) to the client.
   // Only enable test-user login UI in non-production modes.
@@ -24,14 +29,14 @@ export default defineConfig(async () => ({
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 1420,
+    port: getPort(mode),
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
           protocol: "ws",
           host,
-          port: 1421,
+          port: getHmrPort(mode),
         }
       : undefined,
     watch: {
