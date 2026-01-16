@@ -10,18 +10,18 @@ permissions:
 jobs:
   coder-task:
     runs-on: ubuntu-latest
-    # Trigger on PR comments starting with /coder
+    # Trigger on PR comments containing /coder
     if: |
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/coder')
+      contains(github.event.comment.body, '/coder')
 
     steps:
       - name: Extract prompt from comment
         id: extract
         run: |
           COMMENT='${{ github.event.comment.body }}'
-          # Remove /coder prefix and trim
-          PROMPT=$(echo "$COMMENT" | sed 's|^/coder[[:space:]]*||')
+          # Remove /coder and everything before it, then trim
+          PROMPT=$(echo "$COMMENT" | sed 's|.*/coder[[:space:]]*||')
           echo "prompt<<EOF" >> $GITHUB_OUTPUT
           echo "$PROMPT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
