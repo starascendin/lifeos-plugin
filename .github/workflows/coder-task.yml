@@ -10,141 +10,36 @@ permissions:
 jobs:
   coder-task:
     runs-on: ubuntu-latest
-    # Only trigger on PR comments containing @coder
+    # Trigger on PR comments starting with /coder
     if: |
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '@coder')
+      startsWith(github.event.comment.body, '/coder')
 
     steps:
       - name: Extract prompt from comment
         id: extract
         run: |
-          # Remove @coder mention and get the rest as prompt
-          COMMENT_BODY=$(cat <<'EOF'
-          ${{ github.event.comment.body }}
-          EOF
-          )
-          PROMPT=$(echo "$COMMENT_BODY" | sed 's/@coder//g' | xargs)
-          # Use delimiter for multiline output
-          echo "prompt<<PROMPT_EOF" >> $GITHUB_OUTPUT
+          COMMENT='${{ github.event.comment.body }}'
+          # Remove /coder prefix and trim
+          PROMPT=$(echo "$COMMENT" | sed 's|^/coder[[:space:]]*||')
+          echo "prompt<<EOF" >> $GITHUB_OUTPUT
           echo "$PROMPT" >> $GITHUB_OUTPUT
-          echo "PROMPT_EOF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Find existing task ID
-        id: find-task
-        uses: actions/github-script@v7
+      - name: Create Coder Task
+        uses: coder/create-task-action@v0
         with:
-          script: |
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
+          coder-url: ${{ secrets.CODER_URL }}
+          coder-token: ${{ secrets.CODER_TOKEN }}
+          coder-organization: "default"
+          coder-template-name: "testtaskdocker"
+          coder-template-preset: "hola-monorepo"
+          coder-task-name-prefix: "gh-pr"
+          coder-task-prompt: |
+            GitHub PR: ${{ github.event.issue.pull_request.html_url }}
 
-            // Look for hidden task ID in bot comments
-            for (const comment of comments.data) {
-              const match = comment.body.match(/<!-- coder-task-id: ([a-f0-9-]+) -->/);
-              if (match) {
-                return { taskId: match[1], found: true };
-              }
-            }
-            return { taskId: null, found: false };
-
-      - name: Create or continue task
-        id: coder
-        env:
-          CODER_URL: ${{ secrets.CODER_URL }}
-          CODER_TOKEN: ${{ secrets.CODER_TOKEN }}
-          TASK_ID: ${{ fromJSON(steps.find-task.outputs.result).taskId }}
-          FOUND: ${{ fromJSON(steps.find-task.outputs.result).found }}
-          PROMPT: ${{ steps.extract.outputs.prompt }}
-          PR_URL: ${{ github.event.issue.pull_request.html_url }}
-        run: |
-          if [ "$FOUND" = "true" ] && [ -n "$TASK_ID" ]; then
-            # Send to existing task
-            echo "Sending prompt to existing task: $TASK_ID"
-
-            # Escape prompt for JSON
-            ESCAPED_PROMPT=$(echo "$PROMPT" | jq -Rs '.')
-
-            RESPONSE=$(curl -s -X POST \
-              "$CODER_URL/api/v2/tasks/me/$TASK_ID/send" \
-              -H "Coder-Session-Token: $CODER_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{\"input\": $ESCAPED_PROMPT}")
-
-            echo "task_id=$TASK_ID" >> $GITHUB_OUTPUT
-            echo "created=false" >> $GITHUB_OUTPUT
-          else
-            # Create new task
-            echo "Creating new task..."
-
-            # Get template version ID
-            TEMPLATES=$(curl -s "$CODER_URL/api/v2/templates" \
-              -H "Coder-Session-Token: $CODER_TOKEN")
-
-            VERSION_ID=$(echo "$TEMPLATES" | jq -r '.[] | select(.name=="testtaskdocker") | .active_version_id')
-
-            if [ -z "$VERSION_ID" ] || [ "$VERSION_ID" = "null" ]; then
-              echo "Error: Could not find template 'testtaskdocker'"
-              exit 1
-            fi
-
-            # Get preset ID (optional - use hola-monorepo)
-            PRESETS=$(curl -s "$CODER_URL/api/v2/templateversions/$VERSION_ID/presets" \
-              -H "Coder-Session-Token: $CODER_TOKEN")
-
-            PRESET_ID=$(echo "$PRESETS" | jq -r '.[] | select(.Name=="hola-monorepo") | .ID')
-
-            # Create task with context about the PR
-            FULL_PROMPT="GitHub PR: $PR_URL
-
-$PROMPT"
-
-            # Escape for JSON
-            ESCAPED_FULL_PROMPT=$(echo "$FULL_PROMPT" | jq -Rs '.')
-
-            # Build request body
-            if [ -n "$PRESET_ID" ] && [ "$PRESET_ID" != "null" ]; then
-              REQUEST_BODY="{\"template_version_id\": \"$VERSION_ID\", \"template_version_preset_id\": \"$PRESET_ID\", \"input\": $ESCAPED_FULL_PROMPT}"
-            else
-              REQUEST_BODY="{\"template_version_id\": \"$VERSION_ID\", \"input\": $ESCAPED_FULL_PROMPT}"
-            fi
-
-            RESPONSE=$(curl -s -X POST \
-              "$CODER_URL/api/v2/tasks/me" \
-              -H "Coder-Session-Token: $CODER_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$REQUEST_BODY")
-
-            TASK_ID=$(echo "$RESPONSE" | jq -r '.id')
-
-            if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ]; then
-              echo "Error creating task. Response: $RESPONSE"
-              exit 1
-            fi
-
-            echo "task_id=$TASK_ID" >> $GITHUB_OUTPUT
-            echo "created=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Post comment with task info
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const taskId = '${{ steps.coder.outputs.task_id }}';
-            const created = '${{ steps.coder.outputs.created }}' === 'true';
-            const coderUrl = '${{ secrets.CODER_URL }}';
-
-            const taskUrl = `${coderUrl}/tasks`;
-
-            const body = created
-              ? `**Coder Task Created**\n\nI've started working on this. [View Task](${taskUrl})\n\n<!-- coder-task-id: ${taskId} -->`
-              : `**Sent to Coder Task**\n\nI've received your follow-up prompt and am continuing to work on it. [View Task](${taskUrl})\n\n<!-- coder-task-id: ${taskId} -->`;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
+            ${{ steps.extract.outputs.prompt }}
+          github-user-id: ${{ github.event.sender.id }}
+          github-issue-url: ${{ github.event.issue.html_url }}
+          github-token: ${{ github.token }}
+          comment-on-issue: true
