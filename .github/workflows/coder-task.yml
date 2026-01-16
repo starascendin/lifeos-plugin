@@ -27,19 +27,73 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Coder Task
-        uses: coder/create-task-action@v0
-        with:
-          coder-url: ${{ secrets.CODER_URL }}
-          coder-token: ${{ secrets.CODER_TOKEN }}
-          coder-organization: "default"
-          coder-template-name: "testtaskdocker"
-          coder-template-preset: "hola-monorepo"
-          coder-task-name-prefix: "gh-pr"
-          coder-task-prompt: |
-            GitHub PR: ${{ github.event.issue.pull_request.html_url }}
+        id: coder
+        env:
+          CODER_URL: ${{ secrets.CODER_URL }}
+          CODER_TOKEN: ${{ secrets.CODER_TOKEN }}
+          PROMPT: ${{ steps.extract.outputs.prompt }}
+          PR_URL: ${{ github.event.issue.pull_request.html_url }}
+        run: |
+          # Get template version ID
+          TEMPLATES=$(curl -s "$CODER_URL/api/v2/templates" \
+            -H "Coder-Session-Token: $CODER_TOKEN")
 
-            ${{ steps.extract.outputs.prompt }}
-          github-user-id: ${{ github.event.sender.id }}
-          github-issue-url: ${{ github.event.issue.html_url }}
-          github-token: ${{ github.token }}
-          comment-on-issue: true
+          VERSION_ID=$(echo "$TEMPLATES" | jq -r '.[] | select(.name=="testtaskdocker") | .active_version_id')
+
+          if [ -z "$VERSION_ID" ] || [ "$VERSION_ID" = "null" ]; then
+            echo "Error: Could not find template 'testtaskdocker'"
+            exit 1
+          fi
+
+          # Get preset ID
+          PRESETS=$(curl -s "$CODER_URL/api/v2/templateversions/$VERSION_ID/presets" \
+            -H "Coder-Session-Token: $CODER_TOKEN")
+
+          PRESET_ID=$(echo "$PRESETS" | jq -r '.[] | select(.Name=="hola-monorepo") | .ID')
+
+          # Build prompt
+          FULL_PROMPT="GitHub PR: $PR_URL
+
+          $PROMPT"
+
+          ESCAPED_PROMPT=$(echo "$FULL_PROMPT" | jq -Rs '.')
+
+          # Build request
+          if [ -n "$PRESET_ID" ] && [ "$PRESET_ID" != "null" ]; then
+            REQUEST_BODY="{\"template_version_id\": \"$VERSION_ID\", \"template_version_preset_id\": \"$PRESET_ID\", \"input\": $ESCAPED_PROMPT}"
+          else
+            REQUEST_BODY="{\"template_version_id\": \"$VERSION_ID\", \"input\": $ESCAPED_PROMPT}"
+          fi
+
+          # Create task
+          RESPONSE=$(curl -s -X POST \
+            "$CODER_URL/api/v2/tasks/me" \
+            -H "Coder-Session-Token: $CODER_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$REQUEST_BODY")
+
+          echo "Response: $RESPONSE"
+
+          TASK_ID=$(echo "$RESPONSE" | jq -r '.id')
+
+          if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ]; then
+            echo "Error creating task"
+            exit 1
+          fi
+
+          echo "task_id=$TASK_ID" >> $GITHUB_OUTPUT
+
+      - name: Post comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const taskId = '${{ steps.coder.outputs.task_id }}';
+            const coderUrl = '${{ secrets.CODER_URL }}';
+            const taskUrl = `${coderUrl}/tasks`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `**Coder Task Created**\n\nI've started working on this. [View Task](${taskUrl})\n\n<!-- coder-task-id: ${taskId} -->`
+            });
