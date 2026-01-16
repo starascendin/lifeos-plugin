@@ -54,15 +54,33 @@ export function CoderIntegrationSettings() {
       });
       setApiToken(""); // Clear the input on success
     } catch (e) {
-      setTestResult({
-        success: false,
-        message: e instanceof Error ? e.message : "Connection failed",
-      });
-      // If connection test fails, disconnect to clean up
-      try {
-        await disconnectCoder();
-      } catch {
-        // Ignore cleanup errors
+      const errorMessage = e instanceof Error ? e.message : "Connection failed";
+
+      // Only disconnect if it's an authentication error (invalid token)
+      // Keep the token saved for other errors (network issues, API changes, etc.)
+      const isAuthError = errorMessage.includes("401") ||
+                          errorMessage.toLowerCase().includes("invalid") ||
+                          errorMessage.toLowerCase().includes("expired") ||
+                          errorMessage.toLowerCase().includes("unauthorized");
+
+      if (isAuthError) {
+        setTestResult({
+          success: false,
+          message: "Invalid or expired token. Please check your API token.",
+        });
+        // Only disconnect for auth errors
+        try {
+          await disconnectCoder();
+        } catch {
+          // Ignore cleanup errors
+        }
+      } else {
+        // Token saved but test failed - keep the token, show warning
+        setTestResult({
+          success: false,
+          message: `Token saved, but connection test failed: ${errorMessage}. You can try delegating issues anyway.`,
+        });
+        setApiToken(""); // Clear the input since token was saved
       }
     } finally {
       setIsTesting(false);

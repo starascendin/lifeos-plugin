@@ -73,32 +73,6 @@ function formatDateRange(startDate: number, endDate: number): string {
 export function IssueProperties({ issue, onUpdate, onStatusChange, onDelegateSuccess }: IssuePropertiesProps) {
   const { projects, cycles } = usePM();
 
-  // Filter cycles to show: current cycle, 1 previous, and 2 upcoming
-  const filteredCycles = useMemo(() => {
-    if (!cycles) return [];
-
-    // Separate cycles by status
-    const completed = cycles
-      .filter((c) => c.status === "completed")
-      .sort((a, b) => b.endDate - a.endDate); // Most recent first
-
-    const active = cycles.filter((c) => c.status === "active");
-
-    const upcoming = cycles
-      .filter((c) => c.status === "upcoming")
-      .sort((a, b) => a.startDate - b.startDate); // Earliest first
-
-    // Combine: 1 previous + current + 2 upcoming
-    const result = [
-      ...completed.slice(0, 1), // 1 most recent completed
-      ...active, // Current/active cycle(s)
-      ...upcoming.slice(0, 2), // 2 upcoming
-    ];
-
-    // Sort by start date for consistent display order
-    return result.sort((a, b) => a.startDate - b.startDate);
-  }, [cycles]);
-
   // Convex hooks for web mode
   // Queries/mutations from pm_coder, actions from pm_coder_actions
   const isCoderConnected = useQuery(api.lifeos.pm_coder.isConnected);
@@ -121,6 +95,30 @@ export function IssueProperties({ issue, onUpdate, onStatusChange, onDelegateSuc
   // - Web: only if user has Coder connected
   const showDelegation = isTauri ? isCoderAvailable() : isCoderConnected === true;
   const showConnectPrompt = isWeb && isCoderConnected === false;
+
+  // Filter cycles to show: current (active), 1 previous (completed), 2 upcoming
+  // Also format date ranges for display
+  const filteredCycles = useMemo(() => {
+    if (!cycles) return [];
+
+    const activeCycles = cycles.filter((c) => c.status === "active");
+    const completedCycles = cycles
+      .filter((c) => c.status === "completed")
+      .sort((a, b) => b.endDate - a.endDate); // Most recent first
+    const upcomingCycles = cycles
+      .filter((c) => c.status === "upcoming")
+      .sort((a, b) => a.startDate - b.startDate); // Soonest first
+
+    // Take 1 previous (most recent completed), all active, and 2 upcoming
+    const selectedCycles = [
+      ...completedCycles.slice(0, 1),
+      ...activeCycles,
+      ...upcomingCycles.slice(0, 2),
+    ];
+
+    // Sort by start date for consistent display order
+    return selectedCycles.sort((a, b) => a.startDate - b.startDate);
+  }, [cycles]);
 
   // Load templates on mount - different source for Tauri vs Web
   useEffect(() => {
@@ -340,14 +338,16 @@ export function IssueProperties({ issue, onUpdate, onStatusChange, onDelegateSuc
               <SelectItem value="none">No cycle</SelectItem>
               {filteredCycles.map((cycle) => (
                 <SelectItem key={cycle._id} value={cycle._id}>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col gap-0.5">
                     <span className="flex items-center gap-1.5">
                       {cycle.name || `Cycle ${cycle.number}`}
                       {cycle.status === "active" && (
-                        <span className="text-[10px] font-medium text-green-500">(Current)</span>
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-primary/20 text-primary">
+                          Current
+                        </span>
                       )}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {formatDateRange(cycle.startDate, cycle.endDate)}
                     </span>
                   </div>
