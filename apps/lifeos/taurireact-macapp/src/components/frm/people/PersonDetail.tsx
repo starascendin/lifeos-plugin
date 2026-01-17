@@ -47,6 +47,7 @@ import {
 import type { Id } from "@holaai/convex";
 import { formatDistanceToNow, format } from "date-fns";
 import { EditPersonDialog } from "./EditPersonDialog";
+import { MemoDetailDialog } from "./MemoDetailDialog";
 
 interface PersonDetailProps {
   personId: Id<"lifeos_frmPeople">;
@@ -236,6 +237,9 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
 
   // State for viewing historical versions
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+
+  // State for memo detail dialog
+  const [selectedMemo, setSelectedMemo] = useState<NonNullable<NonNullable<typeof linkedMemos>[number]> | null>(null);
 
   // Get the profile to display (selected version or latest)
   const latestProfile = selectedPerson?.profile;
@@ -952,9 +956,10 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                     {linkedMemos.filter(Boolean).map((memo) => (
                       <div
                         key={memo!._id}
-                        className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 hover:bg-muted/80 transition-colors group"
+                        className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 hover:bg-muted/80 transition-colors group cursor-pointer"
+                        onClick={() => setSelectedMemo(memo!)}
                       >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors cursor-pointer">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                           <Play className="h-4 w-4 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -981,7 +986,8 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             if (confirm("Remove this memo from this person?")) {
                               unlinkMemoFromPerson({
                                 personId,
@@ -1328,6 +1334,13 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
         person={person}
+      />
+      <MemoDetailDialog
+        memo={selectedMemo}
+        open={selectedMemo !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedMemo(null);
+        }}
       />
     </div>
   );

@@ -5,7 +5,7 @@ import { requireUser } from "../_lib/auth";
 // ==================== QUERIES ====================
 
 /**
- * Get all memos linked to a person
+ * Get all memos linked to a person (with full details for dialog)
  */
 export const getMemosForPerson = query({
   args: {
@@ -22,23 +22,74 @@ export const getMemosForPerson = query({
       return [];
     }
 
-    // Get memo links
+    // Get memo links for this person
     const links = await ctx.db
       .query("lifeos_frmPersonMemos")
       .withIndex("by_person_created", (q) => q.eq("personId", args.personId))
       .order("desc")
       .take(limit);
 
+    // Get all links for this user (for linkedPeople resolution)
+    const allLinks = await ctx.db
+      .query("lifeos_frmPersonMemos")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Get all people for this user
+    const allPeople = await ctx.db
+      .query("lifeos_frmPeople")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    const peopleMap = new Map(allPeople.map((p) => [p._id, p]));
+
+    // Get all metadata for this user
+    const allMetadata = await ctx.db
+      .query("lifeos_frmMemoMetadata")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    const metadataMap = new Map(allMetadata.map((m) => [m.voiceMemoId, m]));
+
+    // Build memo -> linked people mapping
+    const memoLinksMap = new Map<string, Array<{ personId: string; personName: string; context?: string }>>();
+    for (const link of allLinks) {
+      const p = peopleMap.get(link.personId);
+      if (p) {
+        const memoId = link.voiceMemoId;
+        if (!memoLinksMap.has(memoId)) {
+          memoLinksMap.set(memoId, []);
+        }
+        memoLinksMap.get(memoId)!.push({
+          personId: link.personId,
+          personName: p.name,
+          context: link.context,
+        });
+      }
+    }
+
     // Get actual memos with their data
     const memos = await Promise.all(
       links.map(async (link) => {
         const memo = await ctx.db.get(link.voiceMemoId);
         if (!memo || memo.userId !== user._id) return null;
+
+        // Get audio URL
+        let audioUrl: string | undefined;
+        if (memo.storageId) {
+          audioUrl = await ctx.storage.getUrl(memo.storageId) ?? undefined;
+        }
+
+        // Get metadata
+        const metadata = metadataMap.get(memo._id);
+
         return {
           ...memo,
+          audioUrl,
           linkId: link._id,
           context: link.context,
           linkedAt: link.createdAt,
+          linkedPeople: memoLinksMap.get(memo._id) || [],
+          labels: metadata?.labels || [],
+          summary: metadata?.summary,
         };
       })
     );
