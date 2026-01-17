@@ -4,9 +4,8 @@ import { PeopleList } from "./people/PeopleList";
 import { PersonDetail } from "./people/PersonDetail";
 import { TimelineView } from "./timeline/TimelineView";
 import { Button } from "@/components/ui/button";
-import { Users, Clock, Plus } from "lucide-react";
-import { useState, useEffect } from "react";
-import { AddPersonDialog } from "./people/AddPersonDialog";
+import { Users, Clock } from "lucide-react";
+import { useEffect } from "react";
 import type { Id } from "@holaai/convex";
 
 type TabType = "people" | "timeline";
@@ -15,8 +14,6 @@ export function FRMTab() {
   const { tab, id } = useParams<{ tab?: string; id?: string }>();
   const navigate = useNavigate();
   const { selectedPersonId, setSelectedPersonId } = useFRM();
-
-  const [showAddPerson, setShowAddPerson] = useState(false);
 
   // Determine current tab from URL
   const currentTab: TabType = tab === "timeline" ? "timeline" : "people";
@@ -81,14 +78,7 @@ export function FRMTab() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {currentTab === "people" && !isPersonDetail && (
-            <Button onClick={() => setShowAddPerson(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Person
-            </Button>
-          )}
-        </div>
+{/* Actions removed - now in PeopleList header */}
       </div>
 
       {/* Content */}
@@ -101,16 +91,6 @@ export function FRMTab() {
         )}
         {currentTab === "timeline" && <TimelineView />}
       </div>
-
-      {/* Dialogs */}
-      <AddPersonDialog
-        open={showAddPerson}
-        onOpenChange={setShowAddPerson}
-        onPersonCreated={(id) => {
-          setShowAddPerson(false);
-          handlePersonSelect(id);
-        }}
-      />
     </div>
   );
 }

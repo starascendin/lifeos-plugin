@@ -90,6 +90,53 @@ export const frmTables = {
     .index("by_memo", ["voiceMemoId"])
     .index("by_person_created", ["personId", "createdAt"]),
 
+  // ==================== MEMO EXTRACTION HISTORY ====================
+  // Stores AI extraction history for voice memos (versioned)
+  lifeos_frmMemoExtractions: defineTable({
+    userId: v.id("users"),
+    voiceMemoId: v.id("life_voiceMemos"),
+    // Version tracking
+    version: v.number(),
+    isLatest: v.boolean(),
+    // AI-generated labels/tags
+    labels: v.array(v.string()),
+    // AI-generated summary
+    summary: v.optional(v.string()),
+    // Extracted people (snapshot at extraction time)
+    extractedPeople: v.array(
+      v.object({
+        name: v.string(),
+        context: v.optional(v.string()),
+        confidence: v.string(),
+        matched: v.boolean(), // Was matched to existing person
+        personId: v.optional(v.id("lifeos_frmPeople")), // If matched/created
+      })
+    ),
+    // Extraction metadata
+    extractedAt: v.number(),
+    model: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_memo", ["voiceMemoId"])
+    .index("by_memo_version", ["voiceMemoId", "version"])
+    .index("by_memo_latest", ["voiceMemoId", "isLatest"]),
+
+  // ==================== MEMO EXTRACTION METADATA (DEPRECATED) ====================
+  // Keeping for backward compatibility - will be migrated
+  lifeos_frmMemoMetadata: defineTable({
+    userId: v.id("users"),
+    voiceMemoId: v.id("life_voiceMemos"),
+    // AI-generated labels/tags
+    labels: v.array(v.string()),
+    // AI-generated summary
+    summary: v.optional(v.string()),
+    // Extraction metadata
+    extractedAt: v.number(),
+    model: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_memo", ["voiceMemoId"]),
+
   // ==================== AI RELATIONSHIP PROFILES ====================
   // Stores evolving AI-generated insights about a person
   lifeos_frmProfiles: defineTable({

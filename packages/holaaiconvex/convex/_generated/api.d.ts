@@ -55,6 +55,7 @@ import type * as lifeos_daily_fields from "../lifeos/daily_fields.js";
 import type * as lifeos_daily_fields_schema from "../lifeos/daily_fields_schema.js";
 import type * as lifeos_demo_agent from "../lifeos/demo_agent.js";
 import type * as lifeos_demo_agent_schema from "../lifeos/demo_agent_schema.js";
+import type * as lifeos_frm_extraction from "../lifeos/frm_extraction.js";
 import type * as lifeos_frm_files from "../lifeos/frm_files.js";
 import type * as lifeos_frm_memos from "../lifeos/frm_memos.js";
 import type * as lifeos_frm_people from "../lifeos/frm_people.js";
@@ -151,6 +152,7 @@ declare const fullApi: ApiFromModules<{
   "lifeos/daily_fields_schema": typeof lifeos_daily_fields_schema;
   "lifeos/demo_agent": typeof lifeos_demo_agent;
   "lifeos/demo_agent_schema": typeof lifeos_demo_agent_schema;
+  "lifeos/frm_extraction": typeof lifeos_frm_extraction;
   "lifeos/frm_files": typeof lifeos_frm_files;
   "lifeos/frm_memos": typeof lifeos_frm_memos;
   "lifeos/frm_people": typeof lifeos_frm_people;

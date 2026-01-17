@@ -234,3 +234,99 @@ export const unlinkMemoFromPerson = mutation({
     return link._id;
   },
 });
+
+/**
+ * Get all voice memos with their linked people and metadata (for timeline view)
+ */
+export const getAllMemosWithLinks = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const limit = args.limit ?? 100;
+
+    // Get all voice memos for this user, ordered by creation date
+    const memos = await ctx.db
+      .query("life_voiceMemos")
+      .withIndex("by_user_created", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(limit);
+
+    // Get all links for this user
+    const allLinks = await ctx.db
+      .query("lifeos_frmPersonMemos")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Get all people for this user (for name resolution)
+    const allPeople = await ctx.db
+      .query("lifeos_frmPeople")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Get all memo metadata for this user
+    const allMetadata = await ctx.db
+      .query("lifeos_frmMemoMetadata")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    const peopleMap = new Map(allPeople.map((p) => [p._id, p]));
+    const metadataMap = new Map(allMetadata.map((m) => [m.voiceMemoId, m]));
+
+    // Build memo -> linked people mapping
+    const memoLinksMap = new Map<string, Array<{ personId: string; personName: string; context?: string }>>();
+    for (const link of allLinks) {
+      const person = peopleMap.get(link.personId);
+      if (person) {
+        const memoId = link.voiceMemoId;
+        if (!memoLinksMap.has(memoId)) {
+          memoLinksMap.set(memoId, []);
+        }
+        memoLinksMap.get(memoId)!.push({
+          personId: link.personId,
+          personName: person.name,
+          context: link.context,
+        });
+      }
+    }
+
+    // Enrich memos with linked people and metadata
+    return memos.map((memo) => {
+      const metadata = metadataMap.get(memo._id);
+      return {
+        ...memo,
+        linkedPeople: memoLinksMap.get(memo._id) || [],
+        labels: metadata?.labels || [],
+        summary: metadata?.summary,
+      };
+    });
+  },
+});
+
+/**
+ * Get extraction history for a voice memo
+ */
+export const getMemoExtractionHistory = query({
+  args: {
+    voiceMemoId: v.id("life_voiceMemos"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Verify memo belongs to user
+    const memo = await ctx.db.get(args.voiceMemoId);
+    if (!memo || memo.userId !== user._id) {
+      return [];
+    }
+
+    // Get all extraction history entries for this memo, ordered by version desc
+    const history = await ctx.db
+      .query("lifeos_frmMemoExtractions")
+      .withIndex("by_memo", (q) => q.eq("voiceMemoId", args.voiceMemoId))
+      .collect();
+
+    // Sort by version descending (newest first)
+    return history.sort((a, b) => b.version - a.version);
+  },
+});
