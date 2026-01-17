@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowLeft,
   User,
   Edit,
@@ -30,11 +37,12 @@ import {
   Briefcase,
   Star,
   ChevronRight,
+  ChevronDown,
   Play,
   Square,
   Loader2,
   Sparkles,
-  RefreshCw,
+  History,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { formatDistanceToNow, format } from "date-fns";
@@ -57,12 +65,12 @@ const relationshipConfig: Record<
   other: { label: "OTHER", icon: User, color: "text-slate-500" },
 };
 
-interface IntelFile {
+interface UploadingFile {
   id: string;
   name: string;
   type: string;
   size: number;
-  file: File;
+  status: "uploading" | "done" | "error";
 }
 
 function getFileIcon(type: string) {
@@ -175,7 +183,7 @@ function SectionHeader({
 export function PersonDetail({ personId, onBack }: PersonDetailProps) {
   const { selectedPerson, isLoadingPerson } = useFRM();
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [intelFiles, setIntelFiles] = useState<IntelFile[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
   // Recording state
@@ -205,11 +213,36 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
   const unlinkMemoFromPerson = useMutation(api.lifeos.frm_memos.unlinkMemoFromPerson);
   const generateProfileAction = useAction(api.lifeos.frm_profiles.generateProfile);
 
+  // File upload mutations
+  const generateFileUploadUrl = useMutation(api.lifeos.frm_files.generateUploadUrl);
+  const createFile = useMutation(api.lifeos.frm_files.createFile);
+  const deleteFile = useMutation(api.lifeos.frm_files.deleteFile);
+
   // Query linked memos
   const linkedMemos = useQuery(api.lifeos.frm_memos.getMemosForPerson, {
     personId,
     limit: 10,
   });
+
+  // Query files for this person
+  const personFiles = useQuery(api.lifeos.frm_files.getFilesForPerson, {
+    personId,
+  });
+
+  // Query profile history
+  const profileHistory = useQuery(api.lifeos.frm_profiles.getProfileHistory, {
+    personId,
+  });
+
+  // State for viewing historical versions
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+
+  // Get the profile to display (selected version or latest)
+  const latestProfile = selectedPerson?.profile;
+  const selectedProfile = selectedVersionId
+    ? profileHistory?.find((p) => p._id === selectedVersionId)
+    : latestProfile;
+  const isViewingHistory = selectedVersionId !== null && selectedProfile !== latestProfile;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -366,41 +399,95 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
     transcribeMemoAction,
   ]);
 
-  const handleFileDrop = useCallback((e: React.DragEvent<HTMLElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
+  // Upload a single file
+  const uploadFile = useCallback(
+    async (file: File) => {
+      const fileId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    const files = Array.from(e.dataTransfer.files);
-    const newFiles: IntelFile[] = files.map((file) => ({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      file,
-    }));
+      // Add to uploading state
+      setUploadingFiles((prev) => [
+        ...prev,
+        {
+          id: fileId,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          status: "uploading",
+        },
+      ]);
 
-    setIntelFiles((prev) => [...prev, ...newFiles]);
-  }, []);
+      try {
+        // Get upload URL
+        const uploadUrl = await generateFileUploadUrl();
+
+        // Upload file
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.status}`);
+        }
+
+        const { storageId } = await response.json();
+
+        // Create file record
+        await createFile({
+          personId,
+          name: file.name,
+          mimeType: file.type,
+          size: file.size,
+          storageId,
+        });
+
+        // Remove from uploading state
+        setUploadingFiles((prev) => prev.filter((f) => f.id !== fileId));
+      } catch (err) {
+        console.error("File upload error:", err);
+        // Mark as error
+        setUploadingFiles((prev) =>
+          prev.map((f) => (f.id === fileId ? { ...f, status: "error" as const } : f))
+        );
+      }
+    },
+    [generateFileUploadUrl, createFile, personId]
+  );
+
+  const handleFileDrop = useCallback(
+    (e: React.DragEvent<HTMLElement>) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      files.forEach((file) => uploadFile(file));
+    },
+    [uploadFile]
+  );
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files ? Array.from(e.target.files) : [];
-      const newFiles: IntelFile[] = files.map((file) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        file,
-      }));
-
-      setIntelFiles((prev) => [...prev, ...newFiles]);
+      files.forEach((file) => uploadFile(file));
       e.target.value = "";
     },
-    []
+    [uploadFile]
   );
 
-  const handleRemoveFile = useCallback((id: string) => {
-    setIntelFiles((prev) => prev.filter((f) => f.id !== id));
+  const handleRemoveFile = useCallback(
+    async (fileId: string) => {
+      try {
+        await deleteFile({ fileId: fileId as Id<"lifeos_frmFiles"> });
+      } catch (err) {
+        console.error("Failed to delete file:", err);
+      }
+    },
+    [deleteFile]
+  );
+
+  const handleRemoveUploadingFile = useCallback((id: string) => {
+    setUploadingFiles((prev) => prev.filter((f) => f.id !== id));
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLElement>) => {
@@ -500,25 +587,81 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
             </Button>
           )}
           {person.memoCount > 0 && (
-            <Button
-              variant={profile ? "outline" : "default"}
-              size="sm"
-              onClick={handleGenerateProfile}
-              disabled={isProfileProcessing}
-              className="gap-2"
-            >
-              {isProfileProcessing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  {profile ? "Re-analyze" : "Analyze"}
-                </>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={profile ? "outline" : "default"}
+                size="sm"
+                onClick={handleGenerateProfile}
+                disabled={isProfileProcessing}
+                className="gap-2"
+              >
+                {isProfileProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    {profile ? "Re-analyze" : "Analyze"}
+                  </>
+                )}
+              </Button>
+              {profileHistory && profileHistory.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`gap-1 text-xs h-7 px-2 ${isViewingHistory ? "text-amber-600" : "text-muted-foreground"}`}
+                    >
+                      <History className="h-3 w-3" />
+                      v{selectedProfile?.version || profile?.version}
+                      {isViewingHistory && " (old)"}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                      Profile History
+                    </div>
+                    <DropdownMenuSeparator />
+                    {profileHistory.map((p, i) => (
+                      <DropdownMenuItem
+                        key={p._id}
+                        onClick={() => setSelectedVersionId(i === 0 ? null : p._id)}
+                        className={`text-xs ${
+                          (i === 0 && !selectedVersionId) || p._id === selectedVersionId
+                            ? "bg-accent"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>
+                            v{p.version}
+                            {i === 0 && " (latest)"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {formatDistanceToNow(new Date(p.createdAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                    {isViewingHistory && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setSelectedVersionId(null)}
+                          className="text-xs text-primary"
+                        >
+                          ← Back to latest
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-            </Button>
+            </div>
           )}
           <Button
             variant="outline"
@@ -622,19 +765,43 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
             {/* Main Content - 2 columns */}
             <div className="lg:col-span-2 space-y-6">
               {/* Subject Overview */}
-              {profile?.summary && (
+              {/* Viewing History Banner */}
+              {isViewingHistory && selectedProfile && (
+                <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2">
+                  <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                    <History className="h-4 w-4" />
+                    <span>
+                      Viewing v{selectedProfile.version} from{" "}
+                      {format(new Date(selectedProfile.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({selectedProfile.memosAnalyzed} memos analyzed)
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedVersionId(null)}
+                    className="text-xs h-7"
+                  >
+                    Back to latest
+                  </Button>
+                </div>
+              )}
+
+              {selectedProfile?.summary && (
                 <div className="rounded-xl border border-border bg-card p-5">
                   <SectionHeader
                     icon={Target}
                     title="Subject Overview"
                     classification="INTEL-001"
                   />
-                  <p className="text-sm leading-relaxed">{profile.summary}</p>
+                  <p className="text-sm leading-relaxed">{selectedProfile.summary}</p>
                 </div>
               )}
 
               {/* Behavioral Analysis */}
-              {profile?.communicationStyle && (
+              {selectedProfile?.communicationStyle && (
                 <div className="rounded-xl border border-border bg-card p-5">
                   <SectionHeader
                     icon={Brain}
@@ -642,15 +809,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                     classification="PSYCH-002"
                   />
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {profile.communicationStyle.preferredChannels &&
-                      profile.communicationStyle.preferredChannels.length >
+                    {selectedProfile.communicationStyle.preferredChannels &&
+                      selectedProfile.communicationStyle.preferredChannels.length >
                         0 && (
                         <div className="rounded-lg bg-muted/50 p-3">
                           <div className="text-xs font-medium text-muted-foreground mb-2">
                             PREFERRED CHANNELS
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {profile.communicationStyle.preferredChannels.map(
+                            {selectedProfile.communicationStyle.preferredChannels.map(
                               (channel, i) => (
                                 <Badge key={i} variant="secondary" className="text-xs">
                                   {channel}
@@ -660,33 +827,33 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                           </div>
                         </div>
                       )}
-                    {profile.communicationStyle.responsePatterns && (
+                    {selectedProfile.communicationStyle.responsePatterns && (
                       <div className="rounded-lg bg-muted/50 p-3">
                         <div className="text-xs font-medium text-muted-foreground mb-2">
                           RESPONSE PATTERN
                         </div>
                         <p className="text-sm">
-                          {profile.communicationStyle.responsePatterns}
+                          {selectedProfile.communicationStyle.responsePatterns}
                         </p>
                       </div>
                     )}
-                    {profile.communicationStyle.conflictApproach && (
+                    {selectedProfile.communicationStyle.conflictApproach && (
                       <div className="rounded-lg bg-muted/50 p-3">
                         <div className="text-xs font-medium text-muted-foreground mb-2">
                           CONFLICT APPROACH
                         </div>
                         <p className="text-sm">
-                          {profile.communicationStyle.conflictApproach}
+                          {selectedProfile.communicationStyle.conflictApproach}
                         </p>
                       </div>
                     )}
-                    {profile.communicationStyle.expressionStyle && (
+                    {selectedProfile.communicationStyle.expressionStyle && (
                       <div className="rounded-lg bg-muted/50 p-3">
                         <div className="text-xs font-medium text-muted-foreground mb-2">
                           EXPRESSION STYLE
                         </div>
                         <p className="text-sm">
-                          {profile.communicationStyle.expressionStyle}
+                          {selectedProfile.communicationStyle.expressionStyle}
                         </p>
                       </div>
                     )}
@@ -851,7 +1018,7 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
             {/* Sidebar - 1 column */}
             <div className="space-y-6">
               {/* Personality Profile */}
-              {profile?.personality && (
+              {selectedProfile?.personality && (
                 <div className="rounded-xl border border-border bg-card p-5">
                   <SectionHeader
                     icon={Shield}
@@ -859,14 +1026,14 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                     classification="PSYCH-003"
                   />
                   <div className="space-y-4">
-                    {profile.personality.coreValues &&
-                      profile.personality.coreValues.length > 0 && (
+                    {selectedProfile.personality.coreValues &&
+                      selectedProfile.personality.coreValues.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-muted-foreground mb-2">
                             CORE VALUES
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {profile.personality.coreValues.map((value, i) => (
+                            {selectedProfile.personality.coreValues.map((value, i) => (
                               <Badge
                                 key={i}
                                 className="bg-primary/10 text-primary border-primary/20"
@@ -877,14 +1044,14 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                           </div>
                         </div>
                       )}
-                    {profile.personality.interests &&
-                      profile.personality.interests.length > 0 && (
+                    {selectedProfile.personality.interests &&
+                      selectedProfile.personality.interests.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-muted-foreground mb-2">
                             INTERESTS
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {profile.personality.interests.map((interest, i) => (
+                            {selectedProfile.personality.interests.map((interest, i) => (
                               <Badge key={i} variant="secondary" className="text-xs">
                                 {interest}
                               </Badge>
@@ -892,15 +1059,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                           </div>
                         </div>
                       )}
-                    {profile.personality.strengths &&
-                      profile.personality.strengths.length > 0 && (
+                    {selectedProfile.personality.strengths &&
+                      selectedProfile.personality.strengths.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-green-600 mb-2 flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3" />
                             STRENGTHS
                           </div>
                           <ul className="text-sm space-y-1">
-                            {profile.personality.strengths.map((s, i) => (
+                            {selectedProfile.personality.strengths.map((s, i) => (
                               <li key={i} className="flex items-start gap-2 text-xs">
                                 <span className="text-green-500 mt-0.5">+</span>
                                 {s}
@@ -909,15 +1076,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                           </ul>
                         </div>
                       )}
-                    {profile.personality.frictionPoints &&
-                      profile.personality.frictionPoints.length > 0 && (
+                    {selectedProfile.personality.frictionPoints &&
+                      selectedProfile.personality.frictionPoints.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-amber-600 mb-2 flex items-center gap-1">
                             <AlertTriangle className="h-3 w-3" />
                             FRICTION POINTS
                           </div>
                           <ul className="text-sm space-y-1">
-                            {profile.personality.frictionPoints.map((f, i) => (
+                            {selectedProfile.personality.frictionPoints.map((f, i) => (
                               <li key={i} className="flex items-start gap-2 text-xs">
                                 <span className="text-amber-500 mt-0.5">!</span>
                                 {f}
@@ -931,7 +1098,7 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
               )}
 
               {/* Operational Intel (Tips) */}
-              {profile?.tips && (
+              {selectedProfile?.tips && (
                 <div className="rounded-xl border border-border bg-card p-5">
                   <SectionHeader
                     icon={Lightbulb}
@@ -939,13 +1106,13 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                     classification="OPS-004"
                   />
                   <div className="space-y-4">
-                    {profile.tips.doList && profile.tips.doList.length > 0 && (
+                    {selectedProfile.tips.doList && selectedProfile.tips.doList.length > 0 && (
                       <div>
                         <div className="text-xs font-medium text-green-600 mb-2">
                           DO
                         </div>
                         <ul className="text-xs space-y-1.5">
-                          {profile.tips.doList.map((item, i) => (
+                          {selectedProfile.tips.doList.map((item, i) => (
                             <li key={i} className="flex items-start gap-2">
                               <CheckCircle2 className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
                               {item}
@@ -954,14 +1121,14 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                         </ul>
                       </div>
                     )}
-                    {profile.tips.avoidList &&
-                      profile.tips.avoidList.length > 0 && (
+                    {selectedProfile.tips.avoidList &&
+                      selectedProfile.tips.avoidList.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-red-600 mb-2">
                             AVOID
                           </div>
                           <ul className="text-xs space-y-1.5">
-                            {profile.tips.avoidList.map((item, i) => (
+                            {selectedProfile.tips.avoidList.map((item, i) => (
                               <li key={i} className="flex items-start gap-2">
                                 <X className="h-3 w-3 text-red-500 mt-0.5 flex-shrink-0" />
                                 {item}
@@ -970,14 +1137,14 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                           </ul>
                         </div>
                       )}
-                    {profile.tips.conversationStarters &&
-                      profile.tips.conversationStarters.length > 0 && (
+                    {selectedProfile.tips.conversationStarters &&
+                      selectedProfile.tips.conversationStarters.length > 0 && (
                         <div>
                           <div className="text-xs font-medium text-muted-foreground mb-2">
                             CONVERSATION STARTERS
                           </div>
                           <ul className="text-xs space-y-1.5">
-                            {profile.tips.conversationStarters.map((item, i) => (
+                            {selectedProfile.tips.conversationStarters.map((item, i) => (
                               <li key={i} className="flex items-start gap-2">
                                 <ChevronRight className="h-3 w-3 text-primary mt-0.5 flex-shrink-0" />
                                 {item}
@@ -1051,23 +1218,73 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                   </div>
                 </div>
 
-                {intelFiles.length > 0 && (
+                {/* Uploading files */}
+                {uploadingFiles.length > 0 && (
                   <div className="mt-3 space-y-2">
-                    {intelFiles.map((file) => (
+                    {uploadingFiles.map((file) => (
                       <div
                         key={file.id}
                         className="flex items-center gap-2 rounded-lg bg-muted/50 p-2 text-xs"
                       >
-                        {getFileIcon(file.type)}
+                        {file.status === "uploading" ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        ) : file.status === "error" ? (
+                          <AlertTriangle className="h-4 w-4 text-destructive" />
+                        ) : (
+                          getFileIcon(file.type)
+                        )}
                         <span className="flex-1 truncate">{file.name}</span>
+                        <span className="text-muted-foreground">
+                          {file.status === "uploading"
+                            ? "Uploading..."
+                            : file.status === "error"
+                              ? "Failed"
+                              : formatFileSize(file.size)}
+                        </span>
+                        {file.status === "error" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleRemoveUploadingFile(file.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Uploaded files from database */}
+                {personFiles && personFiles.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {personFiles.map((file) => (
+                      <div
+                        key={file._id}
+                        className="flex items-center gap-2 rounded-lg bg-muted/50 p-2 text-xs group"
+                      >
+                        {getFileIcon(file.mimeType)}
+                        {file.url ? (
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 truncate hover:text-primary hover:underline"
+                          >
+                            {file.name}
+                          </a>
+                        ) : (
+                          <span className="flex-1 truncate">{file.name}</span>
+                        )}
                         <span className="text-muted-foreground">
                           {formatFileSize(file.size)}
                         </span>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
-                          onClick={() => handleRemoveFile(file.id)}
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleRemoveFile(file._id)}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -1096,7 +1313,7 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Profile</span>
                     <span className="font-mono capitalize">
-                      {profile?.confidence || "Pending"}
+                      {selectedProfile?.confidence || "Pending"}
                     </span>
                   </div>
                 </div>

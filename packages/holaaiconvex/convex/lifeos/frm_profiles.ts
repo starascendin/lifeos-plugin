@@ -143,6 +143,33 @@ export const getProfileStatus = query({
   },
 });
 
+/**
+ * Get all profile versions for a person (for history view)
+ */
+export const getProfileHistory = query({
+  args: {
+    personId: v.id("lifeos_frmPeople"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Verify person belongs to user
+    const person = await ctx.db.get(args.personId);
+    if (!person || person.userId !== user._id) {
+      return [];
+    }
+
+    // Get all profiles ordered by version descending
+    const profiles = await ctx.db
+      .query("lifeos_frmProfiles")
+      .withIndex("by_person_version", (q) => q.eq("personId", args.personId))
+      .order("desc")
+      .collect();
+
+    return profiles;
+  },
+});
+
 // ==================== MUTATIONS ====================
 
 /**
@@ -185,13 +212,15 @@ export const createPendingProfile = mutation({
 
     const nextVersion = existingProfiles.length + 1;
 
-    // Create pending profile
+    // Create pending profile with memo IDs for version tracking
+    const memoIds = links.map(l => l.voiceMemoId);
     const profileId = await ctx.db.insert("lifeos_frmProfiles", {
       userId: user._id,
       personId: args.personId,
       version: nextVersion,
       confidence,
       memosAnalyzed: links.length,
+      memoIdsAnalyzed: memoIds,
       model: "google/gemini-2.5-flash",
       status: "pending",
       createdAt: now,

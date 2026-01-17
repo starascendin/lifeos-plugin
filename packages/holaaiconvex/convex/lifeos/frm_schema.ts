@@ -101,6 +101,8 @@ export const frmTables = {
     confidence: profileConfidenceValidator,
     // Number of memos analyzed for this profile
     memosAnalyzed: v.number(),
+    // Track which specific memos were analyzed for this version
+    memoIdsAnalyzed: v.optional(v.array(v.id("life_voiceMemos"))),
     // AI model used
     model: v.string(),
 
@@ -150,6 +152,24 @@ export const frmTables = {
     .index("by_person", ["personId"])
     .index("by_person_version", ["personId", "version"])
     .index("by_user_status", ["userId", "status"]),
+
+  // ==================== PERSON FILES ====================
+  // Files uploaded as intel for a person
+  lifeos_frmFiles: defineTable({
+    userId: v.id("users"),
+    personId: v.id("lifeos_frmPeople"),
+    // File info
+    name: v.string(),
+    mimeType: v.string(),
+    size: v.number(),
+    // Convex storage reference
+    storageId: v.id("_storage"),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_person", ["personId"])
+    .index("by_person_created", ["personId", "createdAt"]),
 
   // ==================== TIMELINE ENTRIES ====================
   // Denormalized view for the Timeline tab (faster queries)
