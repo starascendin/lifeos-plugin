@@ -24,10 +24,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Clock,
   Cpu,
   FileAudio,
   Globe,
   Headphones,
+  Heart,
   Kanban,
   Mic,
   Network,
@@ -119,6 +121,15 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
       },
       { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
       { name: "Habits", href: "/lifeos/habits", icon: Target },
+      {
+        name: "FRM",
+        href: "/lifeos/frm",
+        icon: Heart,
+        children: [
+          { name: "People", href: "/lifeos/frm/people", icon: Users },
+          { name: "Timeline", href: "/lifeos/frm/timeline", icon: Clock },
+        ],
+      },
       {
         name: "3D Views",
         href: "/lifeos/atlas",

@@ -5,6 +5,7 @@ import { calendarTables } from "./calendar_schema";
 import { chatnexusTables } from "./chatnexus_schema";
 import { dailyFieldsTables } from "./daily_fields_schema";
 import { demoAgentTables } from "./demo_agent_schema";
+import { frmTables } from "./frm_schema";
 import { habitsTables } from "./habits_schema";
 import { initiativesTables } from "./initiatives_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
@@ -29,6 +30,8 @@ export const lifeosTables = {
   ...dailyFieldsTables,
   // Demo Agent tables
   ...demoAgentTables,
+  // FRM (Friend Relationship Management) tables
+  ...frmTables,
   // Habit Tracker tables
   ...habitsTables,
   // Yearly Initiatives tables
