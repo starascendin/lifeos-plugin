@@ -26,6 +26,7 @@ import { LifeOSAgenda } from "./components/lifeos/Agenda";
 import { LifeOSAtlas } from "./components/lifeos/Atlas";
 import { LifeOSInitiatives } from "./components/lifeos/Initiatives";
 import { LifeOSFRM } from "./components/lifeos/FRM";
+import { LifeOSClientProjects } from "./components/lifeos/ClientProjects";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -107,6 +108,8 @@ export default function LifeOSApp() {
                   <Route path="pm/:view" element={<LifeOSPM />} />
                   <Route path="pm/:view/:id" element={<LifeOSPM />} />
                   <Route path="pm-ai" element={<LifeOSPMAI />} />
+                  <Route path="client-projects" element={<LifeOSClientProjects />} />
+                  <Route path="client-projects/:view" element={<LifeOSClientProjects />} />
                   <Route path="habits" element={<LifeOSHabits />} />
                   <Route path="frm" element={<LifeOSFRM />} />
                   <Route path="frm/:tab" element={<LifeOSFRM />} />

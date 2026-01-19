@@ -19,6 +19,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Bot,
   Box,
+  Briefcase,
   Calendar,
   ChevronDown,
   ChevronLeft,
@@ -120,6 +121,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
         ],
       },
       { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
+      { name: "Client Projects", href: "/lifeos/client-projects", icon: Briefcase },
       { name: "Habits", href: "/lifeos/habits", icon: Target },
       {
         name: "FRM",
