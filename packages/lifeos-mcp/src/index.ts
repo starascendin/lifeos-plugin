@@ -268,6 +268,285 @@ const TOOLS: Tool[] = [
       required: ["noteId", "tags"],
     },
   },
+
+  // FRM (Friend Relationship Management) Tools
+  {
+    name: "get_people",
+    description:
+      "Get all contacts/people with optional filters. Use this to list all your contacts.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        relationshipType: {
+          type: "string",
+          enum: ["family", "friend", "colleague", "acquaintance", "mentor", "other"],
+          description: "Filter by relationship type",
+        },
+        includeArchived: {
+          type: "boolean",
+          description: "Include archived people (default: false)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 100)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_person",
+    description:
+      "Get a single person's details with their AI-generated profile including communication style, personality insights, and relationship tips.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        personId: {
+          type: "string",
+          description: "The person's ID (required)",
+        },
+      },
+      required: ["personId"],
+    },
+  },
+  {
+    name: "search_people",
+    description: "Search contacts by name using full-text search.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Search terms to find in names (required)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 20)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_memos_for_person",
+    description:
+      "Get all voice memos linked to a specific person. Shows the transcripts and context for each memo.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        personId: {
+          type: "string",
+          description: "The person's ID (required)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50)",
+        },
+      },
+      required: ["personId"],
+    },
+  },
+  {
+    name: "get_person_timeline",
+    description:
+      "Get interaction timeline for a person or all people. Shows voice memos and notes chronologically.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        personId: {
+          type: "string",
+          description: "Filter to specific person (omit for all)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50)",
+        },
+      },
+    },
+  },
+  {
+    name: "create_person",
+    description: "Create a new contact/person.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        name: {
+          type: "string",
+          description: "The person's name (required)",
+        },
+        nickname: {
+          type: "string",
+          description: "Nickname or alias (optional)",
+        },
+        relationshipType: {
+          type: "string",
+          enum: ["family", "friend", "colleague", "acquaintance", "mentor", "other"],
+          description: "Relationship type (optional)",
+        },
+        avatarEmoji: {
+          type: "string",
+          description: "Emoji to represent this person (optional)",
+        },
+        notes: {
+          type: "string",
+          description: "User notes about this person (optional)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "update_person",
+    description: "Update a contact's details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        personId: {
+          type: "string",
+          description: "The person's ID (required)",
+        },
+        name: {
+          type: "string",
+          description: "Updated name (optional)",
+        },
+        nickname: {
+          type: "string",
+          description: "Updated nickname (optional)",
+        },
+        relationshipType: {
+          type: "string",
+          enum: ["family", "friend", "colleague", "acquaintance", "mentor", "other"],
+          description: "Updated relationship type (optional)",
+        },
+        email: {
+          type: "string",
+          description: "Email address (optional)",
+        },
+        phone: {
+          type: "string",
+          description: "Phone number (optional)",
+        },
+        notes: {
+          type: "string",
+          description: "Updated notes (optional)",
+        },
+      },
+      required: ["personId"],
+    },
+  },
+  {
+    name: "link_memo_to_person",
+    description: "Link a voice memo to a person.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        personId: {
+          type: "string",
+          description: "The person's ID (required)",
+        },
+        voiceMemoId: {
+          type: "string",
+          description: "The voice memo's ID (required)",
+        },
+        context: {
+          type: "string",
+          description: "Context for the link, e.g., 'Phone call', 'Coffee meetup' (optional)",
+        },
+      },
+      required: ["personId", "voiceMemoId"],
+    },
+  },
+
+  // Client Management Tools
+  {
+    name: "get_clients",
+    description:
+      "Get all clients for consulting/freelance work with optional status filter.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        status: {
+          type: "string",
+          enum: ["active", "archived"],
+          description: "Filter by status (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_client",
+    description:
+      "Get a single client's details with project statistics.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        clientId: {
+          type: "string",
+          description: "The client's ID (required)",
+        },
+      },
+      required: ["clientId"],
+    },
+  },
+  {
+    name: "get_projects_for_client",
+    description:
+      "Get all projects associated with a client, including completion stats.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        clientId: {
+          type: "string",
+          description: "The client's ID (required)",
+        },
+      },
+      required: ["clientId"],
+    },
+  },
+  {
+    name: "create_client",
+    description: "Create a new client for consulting/freelance work.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        name: {
+          type: "string",
+          description: "The client's name (required)",
+        },
+        description: {
+          type: "string",
+          description: "Description of the client (optional)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "update_client",
+    description: "Update a client's details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        clientId: {
+          type: "string",
+          description: "The client's ID (required)",
+        },
+        name: {
+          type: "string",
+          description: "Updated name (optional)",
+        },
+        description: {
+          type: "string",
+          description: "Updated description (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["active", "archived"],
+          description: "Updated status (optional)",
+        },
+      },
+      required: ["clientId"],
+    },
+  },
 ];
 
 // Configuration

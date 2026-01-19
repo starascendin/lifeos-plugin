@@ -5,7 +5,7 @@
       "args": ["tsx", "packages/lifeos-mcp/src/index.ts"],
       "env": {
         "CONVEX_URL": "https://beaming-giraffe-300.convex.cloud",
-        "LIFEOS_USER_ID": "YOUR_USER_ID_HERE"
+        "LIFEOS_USER_ID": "j9743f41z9e999ym1xvn1v013s7wqfq8"
       }
     }
   }

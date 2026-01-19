@@ -123,6 +123,109 @@ export const TOOL_DEFINITIONS = {
       cycleId: "optional - cycle ID (defaults to active cycle)",
     },
   },
+  // FRM (Friend Relationship Management) tools
+  get_people: {
+    description: "Get all contacts/people with optional filters",
+    params: {
+      relationshipType:
+        "optional - filter by type (family, friend, colleague, acquaintance, mentor, other)",
+      includeArchived: "optional - include archived people (default false)",
+      limit: "optional - max results (default 100)",
+    },
+  },
+  get_person: {
+    description: "Get a single person's details with their AI-generated profile",
+    params: {
+      personId: "required - the person's ID",
+    },
+  },
+  search_people: {
+    description: "Search contacts by name using full-text search",
+    params: {
+      query: "required - search terms to find in names",
+      limit: "optional - max results (default 20)",
+    },
+  },
+  get_memos_for_person: {
+    description: "Get all voice memos linked to a specific person",
+    params: {
+      personId: "required - the person's ID",
+      limit: "optional - max results (default 50)",
+    },
+  },
+  get_person_timeline: {
+    description: "Get interaction timeline for a person or all people",
+    params: {
+      personId: "optional - filter to specific person (omit for all)",
+      limit: "optional - max results (default 50)",
+    },
+  },
+  create_person: {
+    description: "Create a new contact/person",
+    params: {
+      name: "required - the person's name",
+      nickname: "optional - nickname or alias",
+      relationshipType:
+        "optional - family, friend, colleague, acquaintance, mentor, other",
+      avatarEmoji: "optional - emoji to represent this person",
+      notes: "optional - user notes about this person",
+    },
+  },
+  update_person: {
+    description: "Update a contact's details",
+    params: {
+      personId: "required - the person's ID",
+      name: "optional - updated name",
+      nickname: "optional - updated nickname",
+      relationshipType: "optional - updated relationship type",
+      email: "optional - email address",
+      phone: "optional - phone number",
+      notes: "optional - updated notes",
+    },
+  },
+  link_memo_to_person: {
+    description: "Link a voice memo to a person",
+    params: {
+      personId: "required - the person's ID",
+      voiceMemoId: "required - the voice memo's ID",
+      context: "optional - context for the link (e.g., 'Phone call', 'Coffee meetup')",
+    },
+  },
+  // Client Management tools
+  get_clients: {
+    description: "Get all clients with optional status filter",
+    params: {
+      status: "optional - filter by status (active, archived)",
+    },
+  },
+  get_client: {
+    description: "Get a single client's details with project stats",
+    params: {
+      clientId: "required - the client's ID",
+    },
+  },
+  get_projects_for_client: {
+    description: "Get all projects associated with a client",
+    params: {
+      clientId: "required - the client's ID",
+    },
+  },
+  create_client: {
+    description: "Create a new client",
+    params: {
+      name: "required - the client's name",
+      description: "optional - description of the client",
+    },
+  },
+  update_client: {
+    description: "Update a client's details",
+    params: {
+      clientId: "required - the client's ID",
+      name: "optional - updated name",
+      description: "optional - updated description",
+      status: "optional - active or archived",
+    },
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOL_DEFINITIONS;
@@ -1696,6 +1799,805 @@ export const assignIssueToCycleInternal = internalMutation({
         issueCount: newIssueCount,
       },
       confirmationMessage,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== FRM (FRIEND RELATIONSHIP MANAGEMENT) TOOLS ====================
+
+/**
+ * Get all people/contacts for a user
+ * Returns list of contacts with optional filtering
+ */
+export const getPeopleInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    relationshipType: v.optional(v.string()),
+    includeArchived: v.optional(v.boolean()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 100;
+    const includeArchived = args.includeArchived ?? false;
+
+    let people = await ctx.db
+      .query("lifeos_frmPeople")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(limit);
+
+    // Filter by archived status
+    if (!includeArchived) {
+      people = people.filter((p) => !p.archivedAt);
+    }
+
+    // Filter by relationship type
+    if (args.relationshipType) {
+      people = people.filter((p) => p.relationshipType === args.relationshipType);
+    }
+
+    // Sort by last interaction (most recent first), then by name
+    people.sort((a, b) => {
+      if (a.lastInteractionAt && b.lastInteractionAt) {
+        return b.lastInteractionAt - a.lastInteractionAt;
+      }
+      if (a.lastInteractionAt) return -1;
+      if (b.lastInteractionAt) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Build simplified response
+    const contacts = people.map((person) => ({
+      id: person._id,
+      name: person.name,
+      nickname: person.nickname,
+      relationshipType: person.relationshipType,
+      avatarEmoji: person.avatarEmoji,
+      memoCount: person.memoCount,
+      lastInteractionAt: person.lastInteractionAt
+        ? new Date(person.lastInteractionAt).toISOString()
+        : null,
+      isArchived: !!person.archivedAt,
+    }));
+
+    return {
+      people: contacts,
+      count: contacts.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single person with their AI profile
+ */
+export const getPersonInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    personId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const personId = args.personId as Id<"lifeos_frmPeople">;
+
+    const person = await ctx.db.get(personId);
+    if (!person || person.userId !== userId) {
+      return {
+        success: false,
+        error: "Person not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get the latest completed profile
+    const profiles = await ctx.db
+      .query("lifeos_frmProfiles")
+      .withIndex("by_person_version", (q) => q.eq("personId", personId))
+      .order("desc")
+      .take(1);
+
+    const latestProfile =
+      profiles.length > 0 && profiles[0].status === "completed"
+        ? profiles[0]
+        : null;
+
+    return {
+      success: true,
+      person: {
+        id: person._id,
+        name: person.name,
+        nickname: person.nickname,
+        relationshipType: person.relationshipType,
+        email: person.email,
+        phone: person.phone,
+        avatarEmoji: person.avatarEmoji,
+        color: person.color,
+        notes: person.notes,
+        memoCount: person.memoCount,
+        lastInteractionAt: person.lastInteractionAt
+          ? new Date(person.lastInteractionAt).toISOString()
+          : null,
+        isArchived: !!person.archivedAt,
+        createdAt: new Date(person.createdAt).toISOString(),
+      },
+      profile: latestProfile
+        ? {
+            confidence: latestProfile.confidence,
+            memosAnalyzed: latestProfile.memosAnalyzed,
+            communicationStyle: latestProfile.communicationStyle,
+            personality: latestProfile.personality,
+            tips: latestProfile.tips,
+            summary: latestProfile.summary,
+            updatedAt: new Date(latestProfile.updatedAt).toISOString(),
+          }
+        : null,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Search people by name
+ */
+export const searchPeopleInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 20;
+
+    if (!args.query.trim()) {
+      return {
+        people: [],
+        query: args.query,
+        count: 0,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const results = await ctx.db
+      .query("lifeos_frmPeople")
+      .withSearchIndex("search_name", (q) =>
+        q.search("name", args.query).eq("userId", userId)
+      )
+      .take(limit);
+
+    // Filter out archived
+    const filteredResults = results.filter((p) => !p.archivedAt);
+
+    const people = filteredResults.map((person) => ({
+      id: person._id,
+      name: person.name,
+      nickname: person.nickname,
+      relationshipType: person.relationshipType,
+      avatarEmoji: person.avatarEmoji,
+      memoCount: person.memoCount,
+    }));
+
+    return {
+      people,
+      query: args.query,
+      count: people.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get memos linked to a person
+ */
+export const getMemosForPersonInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    personId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const personId = args.personId as Id<"lifeos_frmPeople">;
+    const limit = args.limit ?? 50;
+
+    // Verify person belongs to user
+    const person = await ctx.db.get(personId);
+    if (!person || person.userId !== userId) {
+      return {
+        success: false,
+        error: "Person not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get memo links for this person
+    const links = await ctx.db
+      .query("lifeos_frmPersonMemos")
+      .withIndex("by_person_created", (q) => q.eq("personId", personId))
+      .order("desc")
+      .take(limit);
+
+    // Get actual memos with their data
+    const memos = await Promise.all(
+      links.map(async (link) => {
+        const memo = await ctx.db.get(link.voiceMemoId);
+        if (!memo || memo.userId !== userId) return null;
+
+        return {
+          id: memo._id,
+          name: memo.name,
+          transcript: memo.transcript,
+          duration: memo.duration,
+          context: link.context,
+          linkedAt: new Date(link.createdAt).toISOString(),
+          createdAt: new Date(memo.clientCreatedAt).toISOString(),
+        };
+      })
+    );
+
+    const validMemos = memos.filter(Boolean);
+
+    return {
+      success: true,
+      personName: person.name,
+      memos: validMemos,
+      count: validMemos.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get timeline entries for a person or all people
+ */
+export const getPersonTimelineInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    personId: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 50;
+
+    let entries;
+    if (args.personId) {
+      const personId = args.personId as Id<"lifeos_frmPeople">;
+
+      // Verify person belongs to user
+      const person = await ctx.db.get(personId);
+      if (!person || person.userId !== userId) {
+        return {
+          success: false,
+          error: "Person not found or access denied",
+          generatedAt: new Date().toISOString(),
+        };
+      }
+
+      entries = await ctx.db
+        .query("lifeos_frmTimeline")
+        .withIndex("by_person_interaction", (q) => q.eq("personId", personId))
+        .order("desc")
+        .take(limit);
+    } else {
+      entries = await ctx.db
+        .query("lifeos_frmTimeline")
+        .withIndex("by_user_interaction", (q) => q.eq("userId", userId))
+        .order("desc")
+        .take(limit);
+    }
+
+    const timeline = entries.map((entry) => ({
+      id: entry._id,
+      personId: entry.personId,
+      personName: entry.personName,
+      entryType: entry.entryType,
+      title: entry.title,
+      preview: entry.preview,
+      interactionAt: new Date(entry.interactionAt).toISOString(),
+    }));
+
+    return {
+      success: true,
+      timeline,
+      count: timeline.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a new person/contact
+ */
+export const createPersonInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    nickname: v.optional(v.string()),
+    relationshipType: v.optional(v.string()),
+    avatarEmoji: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    // Validate relationship type
+    const validTypes = ["family", "friend", "colleague", "acquaintance", "mentor", "other"];
+    const relationshipType = args.relationshipType && validTypes.includes(args.relationshipType)
+      ? (args.relationshipType as "family" | "friend" | "colleague" | "acquaintance" | "mentor" | "other")
+      : undefined;
+
+    const personId = await ctx.db.insert("lifeos_frmPeople", {
+      userId,
+      name: args.name.trim(),
+      nickname: args.nickname?.trim(),
+      relationshipType,
+      avatarEmoji: args.avatarEmoji,
+      notes: args.notes?.trim(),
+      memoCount: 0,
+      lastInteractionAt: undefined,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: undefined,
+    });
+
+    return {
+      success: true,
+      personId,
+      name: args.name.trim(),
+      confirmationMessage: `Created contact "${args.name.trim()}"${relationshipType ? ` (${relationshipType})` : ""}.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update a person/contact
+ */
+export const updatePersonInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    personId: v.string(),
+    name: v.optional(v.string()),
+    nickname: v.optional(v.string()),
+    relationshipType: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const personId = args.personId as Id<"lifeos_frmPeople">;
+
+    const person = await ctx.db.get(personId);
+    if (!person || person.userId !== userId) {
+      return {
+        success: false,
+        error: "Person not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Build updates object
+    const updates: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.name !== undefined) updates.name = args.name.trim();
+    if (args.nickname !== undefined) updates.nickname = args.nickname.trim();
+    if (args.email !== undefined) updates.email = args.email.trim();
+    if (args.phone !== undefined) updates.phone = args.phone.trim();
+    if (args.notes !== undefined) updates.notes = args.notes.trim();
+
+    // Validate and set relationship type
+    if (args.relationshipType !== undefined) {
+      const validTypes = ["family", "friend", "colleague", "acquaintance", "mentor", "other"];
+      if (validTypes.includes(args.relationshipType)) {
+        updates.relationshipType = args.relationshipType;
+      }
+    }
+
+    await ctx.db.patch(personId, updates);
+
+    return {
+      success: true,
+      personId,
+      confirmationMessage: `Updated contact "${args.name ?? person.name}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Link a voice memo to a person
+ */
+export const linkMemoToPersonInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    personId: v.string(),
+    voiceMemoId: v.string(),
+    context: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const personId = args.personId as Id<"lifeos_frmPeople">;
+    const voiceMemoId = args.voiceMemoId as Id<"life_voiceMemos">;
+    const now = Date.now();
+
+    // Verify person belongs to user
+    const person = await ctx.db.get(personId);
+    if (!person || person.userId !== userId) {
+      return {
+        success: false,
+        error: "Person not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Verify memo belongs to user
+    const memo = await ctx.db.get(voiceMemoId);
+    if (!memo || memo.userId !== userId) {
+      return {
+        success: false,
+        error: "Voice memo not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Check if already linked
+    const existingLink = await ctx.db
+      .query("lifeos_frmPersonMemos")
+      .withIndex("by_memo", (q) => q.eq("voiceMemoId", voiceMemoId))
+      .filter((q) => q.eq(q.field("personId"), personId))
+      .first();
+
+    if (existingLink) {
+      // Update context if provided
+      if (args.context !== undefined) {
+        await ctx.db.patch(existingLink._id, { context: args.context });
+      }
+      return {
+        success: true,
+        linkId: existingLink._id,
+        alreadyLinked: true,
+        confirmationMessage: `Memo "${memo.name}" is already linked to ${person.name}.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Create link
+    const linkId = await ctx.db.insert("lifeos_frmPersonMemos", {
+      userId,
+      personId,
+      voiceMemoId,
+      context: args.context,
+      createdAt: now,
+    });
+
+    // Create timeline entry
+    await ctx.db.insert("lifeos_frmTimeline", {
+      userId,
+      personId,
+      entryType: "voice_memo",
+      voiceMemoId,
+      personName: person.name,
+      title: memo.name,
+      preview: memo.transcript?.slice(0, 200),
+      interactionAt: memo.clientCreatedAt || memo.createdAt,
+      createdAt: now,
+    });
+
+    // Update person's memo count and last interaction
+    await ctx.db.patch(personId, {
+      memoCount: person.memoCount + 1,
+      lastInteractionAt: memo.clientCreatedAt || memo.createdAt,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      linkId,
+      alreadyLinked: false,
+      confirmationMessage: `Linked memo "${memo.name}" to ${person.name}.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== CLIENT MANAGEMENT TOOLS ====================
+
+/**
+ * Get all clients for a user
+ */
+export const getClientsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    let clients;
+    if (args.status === "active" || args.status === "archived") {
+      clients = await ctx.db
+        .query("lifeos_pmClients")
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", userId).eq("status", args.status as "active" | "archived")
+        )
+        .order("desc")
+        .collect();
+    } else {
+      clients = await ctx.db
+        .query("lifeos_pmClients")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc")
+        .collect();
+    }
+
+    const clientsWithInfo = clients.map((client) => ({
+      id: client._id,
+      name: client.name,
+      description: client.description,
+      status: client.status,
+      createdAt: new Date(client.createdAt).toISOString(),
+    }));
+
+    return {
+      clients: clientsWithInfo,
+      count: clientsWithInfo.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single client with project stats
+ */
+export const getClientInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    clientId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const clientId = args.clientId as Id<"lifeos_pmClients">;
+
+    const client = await ctx.db.get(clientId);
+    if (!client || client.userId !== userId) {
+      return {
+        success: false,
+        error: "Client not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get project stats
+    const projects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_client", (q) => q.eq("clientId", clientId))
+      .collect();
+
+    const projectCount = projects.length;
+    const activeProjectCount = projects.filter((p) => p.status === "in_progress").length;
+    const completedProjectCount = projects.filter((p) => p.status === "completed").length;
+
+    return {
+      success: true,
+      client: {
+        id: client._id,
+        name: client.name,
+        description: client.description,
+        status: client.status,
+        createdAt: new Date(client.createdAt).toISOString(),
+        updatedAt: new Date(client.updatedAt).toISOString(),
+      },
+      stats: {
+        projectCount,
+        activeProjectCount,
+        completedProjectCount,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get projects for a client
+ */
+export const getProjectsForClientInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    clientId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const clientId = args.clientId as Id<"lifeos_pmClients">;
+
+    // Verify client belongs to user
+    const client = await ctx.db.get(clientId);
+    if (!client || client.userId !== userId) {
+      return {
+        success: false,
+        error: "Client not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const projects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_client", (q) => q.eq("clientId", clientId))
+      .collect();
+
+    const projectsWithStats = projects.map((project) => ({
+      id: project._id,
+      key: project.key,
+      name: project.name,
+      description: project.description,
+      status: project.status,
+      health: project.health,
+      issueCount: project.issueCount,
+      completedIssueCount: project.completedIssueCount,
+      completionPercentage:
+        project.issueCount > 0
+          ? Math.round((project.completedIssueCount / project.issueCount) * 100)
+          : 0,
+    }));
+
+    return {
+      success: true,
+      clientName: client.name,
+      projects: projectsWithStats,
+      count: projectsWithStats.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a new client
+ */
+export const createClientInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    const clientId = await ctx.db.insert("lifeos_pmClients", {
+      userId,
+      name: args.name.trim(),
+      description: args.description?.trim(),
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      clientId,
+      name: args.name.trim(),
+      confirmationMessage: `Created client "${args.name.trim()}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update a client
+ */
+export const updateClientInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    clientId: v.string(),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const clientId = args.clientId as Id<"lifeos_pmClients">;
+
+    const client = await ctx.db.get(clientId);
+    if (!client || client.userId !== userId) {
+      return {
+        success: false,
+        error: "Client not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Build updates object
+    const updates: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.name !== undefined) updates.name = args.name.trim();
+    if (args.description !== undefined) {
+      updates.description = args.description.trim() || undefined;
+    }
+    if (args.status !== undefined) {
+      if (args.status === "active" || args.status === "archived") {
+        updates.status = args.status;
+      }
+    }
+
+    await ctx.db.patch(clientId, updates);
+
+    return {
+      success: true,
+      clientId,
+      confirmationMessage: `Updated client "${args.name ?? client.name}".`,
       generatedAt: new Date().toISOString(),
     };
   },

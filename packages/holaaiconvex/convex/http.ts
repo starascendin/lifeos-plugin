@@ -1241,6 +1241,21 @@ const AVAILABLE_TOOLS = [
   // Cycle Management tools
   "get_current_cycle",
   "assign_issue_to_cycle",
+  // FRM (Friend Relationship Management) tools
+  "get_people",
+  "get_person",
+  "search_people",
+  "get_memos_for_person",
+  "get_person_timeline",
+  "create_person",
+  "update_person",
+  "link_memo_to_person",
+  // Client Management tools
+  "get_clients",
+  "get_client",
+  "get_projects_for_client",
+  "create_client",
+  "update_client",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -1453,6 +1468,120 @@ http.route({
             userId: auth.userId,
             issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
             cycleId: params?.cycleId as string | undefined,
+          });
+          break;
+
+        // FRM (Friend Relationship Management) tools
+        case "get_people":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getPeopleInternal, {
+            userId: auth.userId,
+            relationshipType: params?.relationshipType as string | undefined,
+            includeArchived: params?.includeArchived as boolean | undefined,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "get_person":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getPersonInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string,
+          });
+          break;
+
+        case "search_people":
+          result = await ctx.runQuery(internal.lifeos.tool_call.searchPeopleInternal, {
+            userId: auth.userId,
+            query: params?.query as string,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "get_memos_for_person":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getMemosForPersonInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "get_person_timeline":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getPersonTimelineInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string | undefined,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "create_person":
+          result = await ctx.runMutation(internal.lifeos.tool_call.createPersonInternal, {
+            userId: auth.userId,
+            name: params?.name as string,
+            nickname: params?.nickname as string | undefined,
+            relationshipType: params?.relationshipType as string | undefined,
+            avatarEmoji: params?.avatarEmoji as string | undefined,
+            notes: params?.notes as string | undefined,
+          });
+          break;
+
+        case "update_person":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updatePersonInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string,
+            name: params?.name as string | undefined,
+            nickname: params?.nickname as string | undefined,
+            relationshipType: params?.relationshipType as string | undefined,
+            email: params?.email as string | undefined,
+            phone: params?.phone as string | undefined,
+            notes: params?.notes as string | undefined,
+          });
+          break;
+
+        case "link_memo_to_person":
+          result = await ctx.runMutation(internal.lifeos.tool_call.linkMemoToPersonInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string,
+            voiceMemoId: params?.voiceMemoId as string,
+            context: params?.context as string | undefined,
+          });
+          break;
+
+        // Client Management tools
+        case "get_clients":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getClientsInternal, {
+            userId: auth.userId,
+            status: params?.status as string | undefined,
+          });
+          break;
+
+        case "get_client":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getClientInternal, {
+            userId: auth.userId,
+            clientId: params?.clientId as string,
+          });
+          break;
+
+        case "get_projects_for_client":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getProjectsForClientInternal, {
+            userId: auth.userId,
+            clientId: params?.clientId as string,
+          });
+          break;
+
+        case "create_client":
+          result = await ctx.runMutation(internal.lifeos.tool_call.createClientInternal, {
+            userId: auth.userId,
+            name: params?.name as string,
+            description: params?.description as string | undefined,
+          });
+          break;
+
+        case "update_client":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updateClientInternal, {
+            userId: auth.userId,
+            clientId: params?.clientId as string,
+            name: params?.name as string | undefined,
+            description: params?.description as string | undefined,
+            status: params?.status as string | undefined,
           });
           break;
       }
