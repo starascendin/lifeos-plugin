@@ -23,6 +23,7 @@ export const getIssues = query({
   args: {
     projectId: v.optional(v.id("lifeos_pmProjects")),
     cycleId: v.optional(v.id("lifeos_pmCycles")),
+    phaseId: v.optional(v.id("lifeos_pmPhases")),
     status: v.optional(issueStatusValidator),
     priority: v.optional(priorityValidator),
     limit: v.optional(v.number()),
@@ -33,7 +34,12 @@ export const getIssues = query({
 
     let issues;
 
-    if (args.projectId && args.status) {
+    if (args.phaseId) {
+      issues = await ctx.db
+        .query("lifeos_pmIssues")
+        .withIndex("by_phase", (q) => q.eq("phaseId", args.phaseId))
+        .take(limit);
+    } else if (args.projectId && args.status) {
       issues = await ctx.db
         .query("lifeos_pmIssues")
         .withIndex("by_project_status", (q) =>
@@ -85,12 +91,19 @@ export const getIssuesByStatus = query({
   args: {
     projectId: v.optional(v.id("lifeos_pmProjects")),
     cycleId: v.optional(v.id("lifeos_pmCycles")),
+    phaseId: v.optional(v.id("lifeos_pmPhases")),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
     let issues;
-    if (args.projectId) {
+    if (args.phaseId) {
+      issues = await ctx.db
+        .query("lifeos_pmIssues")
+        .withIndex("by_phase", (q) => q.eq("phaseId", args.phaseId))
+        .collect();
+      issues = issues.filter((i) => i.userId === user._id);
+    } else if (args.projectId) {
       issues = await ctx.db
         .query("lifeos_pmIssues")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -216,9 +229,10 @@ export const getIssueWithRelations = query({
     }
 
     // Get related data
-    const [project, cycle, labels] = await Promise.all([
+    const [project, cycle, phase, labels] = await Promise.all([
       issue.projectId ? ctx.db.get(issue.projectId) : null,
       issue.cycleId ? ctx.db.get(issue.cycleId) : null,
+      issue.phaseId ? ctx.db.get(issue.phaseId) : null,
       Promise.all(issue.labelIds.map((id) => ctx.db.get(id))),
     ]);
 
@@ -232,6 +246,7 @@ export const getIssueWithRelations = query({
       ...issue,
       project,
       cycle,
+      phase,
       labels: labels.filter(Boolean),
       subIssueCount: subIssues.length,
       completedSubIssueCount: subIssues.filter((i) => i.status === "done")
@@ -249,6 +264,7 @@ export const createIssue = mutation({
   args: {
     projectId: v.optional(v.id("lifeos_pmProjects")),
     cycleId: v.optional(v.id("lifeos_pmCycles")),
+    phaseId: v.optional(v.id("lifeos_pmPhases")),
     parentId: v.optional(v.id("lifeos_pmIssues")),
     title: v.string(),
     description: v.optional(v.string()),
@@ -264,10 +280,22 @@ export const createIssue = mutation({
 
     let identifier: string;
     let number: number;
+    let projectId = args.projectId;
 
-    if (args.projectId) {
+    // If phaseId is provided, auto-link to phase's project if projectId not specified
+    if (args.phaseId) {
+      const phase = await ctx.db.get(args.phaseId);
+      if (!phase || phase.userId !== user._id) {
+        throw new Error("Phase not found or access denied");
+      }
+      if (!projectId) {
+        projectId = phase.projectId;
+      }
+    }
+
+    if (projectId) {
       // Get the project to generate identifier
-      const project = await ctx.db.get(args.projectId);
+      const project = await ctx.db.get(projectId);
       if (!project || project.userId !== user._id) {
         throw new Error("Project not found or access denied");
       }
@@ -276,7 +304,7 @@ export const createIssue = mutation({
       identifier = `${project.key}-${number}`;
 
       // Increment project's next issue number
-      await ctx.db.patch(args.projectId, {
+      await ctx.db.patch(projectId, {
         nextIssueNumber: number + 1,
         issueCount: project.issueCount + 1,
         updatedAt: now,
@@ -317,8 +345,9 @@ export const createIssue = mutation({
 
     const issueId = await ctx.db.insert("lifeos_pmIssues", {
       userId: user._id,
-      projectId: args.projectId,
+      projectId: projectId,
       cycleId: args.cycleId,
+      phaseId: args.phaseId,
       parentId: args.parentId,
       identifier,
       number,
@@ -350,6 +379,7 @@ export const updateIssue = mutation({
     estimate: v.optional(v.number()),
     labelIds: v.optional(v.array(v.id("lifeos_pmLabels"))),
     dueDate: v.optional(v.union(v.number(), v.null())),
+    phaseId: v.optional(v.union(v.id("lifeos_pmPhases"), v.null())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -358,6 +388,14 @@ export const updateIssue = mutation({
     const issue = await ctx.db.get(args.issueId);
     if (!issue || issue.userId !== user._id) {
       throw new Error("Issue not found or access denied");
+    }
+
+    // Verify phase belongs to user if provided
+    if (args.phaseId && args.phaseId !== null) {
+      const phase = await ctx.db.get(args.phaseId);
+      if (!phase || phase.userId !== user._id) {
+        throw new Error("Phase not found or access denied");
+      }
     }
 
     const updates: Partial<Doc<"lifeos_pmIssues">> = {
@@ -372,6 +410,10 @@ export const updateIssue = mutation({
     // Handle dueDate: null means clear, undefined means don't change
     if (args.dueDate !== undefined) {
       updates.dueDate = args.dueDate === null ? undefined : args.dueDate;
+    }
+    // Handle phaseId: null means unlink, undefined means don't change
+    if (args.phaseId !== undefined) {
+      updates.phaseId = args.phaseId === null ? undefined : args.phaseId;
     }
 
     await ctx.db.patch(args.issueId, updates);
@@ -613,6 +655,38 @@ export const moveIssueToCycle = mutation({
 
     await ctx.db.patch(args.issueId, {
       cycleId: args.cycleId,
+      updatedAt: now,
+    });
+  },
+});
+
+/**
+ * Assign issue to a phase
+ */
+export const moveIssueToPhase = mutation({
+  args: {
+    issueId: v.id("lifeos_pmIssues"),
+    phaseId: v.optional(v.id("lifeos_pmPhases")),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.userId !== user._id) {
+      throw new Error("Issue not found or access denied");
+    }
+
+    // Verify new phase belongs to user if provided
+    if (args.phaseId) {
+      const newPhase = await ctx.db.get(args.phaseId);
+      if (!newPhase || newPhase.userId !== user._id) {
+        throw new Error("Target phase not found or access denied");
+      }
+    }
+
+    await ctx.db.patch(args.issueId, {
+      phaseId: args.phaseId,
       updatedAt: now,
     });
   },

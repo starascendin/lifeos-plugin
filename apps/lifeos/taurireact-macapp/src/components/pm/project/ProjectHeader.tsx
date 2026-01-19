@@ -1,4 +1,4 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { InlineEditableText } from "../shared";
@@ -6,10 +6,11 @@ import type { Doc } from "@holaai/convex";
 
 interface ProjectHeaderProps {
   project: Doc<"lifeos_pmProjects">;
+  client?: Doc<"lifeos_pmClients"> | null;
   onUpdateName: (name: string) => Promise<void>;
 }
 
-export function ProjectHeader({ project, onUpdateName }: ProjectHeaderProps) {
+export function ProjectHeader({ project, client, onUpdateName }: ProjectHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -26,6 +27,15 @@ export function ProjectHeader({ project, onUpdateName }: ProjectHeaderProps) {
           Projects
         </Button>
         <span>/</span>
+        {client && (
+          <>
+            <span className="flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              {client.name}
+            </span>
+            <span>/</span>
+          </>
+        )}
         <span className="text-foreground">{project.name}</span>
       </div>
 
@@ -44,7 +54,18 @@ export function ProjectHeader({ project, onUpdateName }: ProjectHeaderProps) {
             className="text-2xl font-semibold"
             inputClassName="text-2xl font-semibold"
           />
-          <div className="text-sm text-muted-foreground">{project.key}</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{project.key}</span>
+            {client && (
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Building2 className="h-3 w-3" />
+                  {client.name}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

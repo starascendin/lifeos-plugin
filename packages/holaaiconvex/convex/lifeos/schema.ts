@@ -10,7 +10,6 @@ import { habitsTables } from "./habits_schema";
 import { initiativesTables } from "./initiatives_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
 import { pmTables } from "./pm_schema";
-import { projectsTables } from "./projects_schema";
 import { proxyCouncilTables } from "./proxy_council_schema";
 import { voiceAgentTables } from "./voiceagent_schema";
 
@@ -39,10 +38,8 @@ export const lifeosTables = {
   ...initiativesTables,
   // LLM Council tables
   ...llmcouncilTables,
-  // Project Management tables (Linear-like personal PM)
+  // Project Management tables (Linear-like personal PM, includes Clients, Phases, Notes)
   ...pmTables,
-  // Client Projects tables (Consulting/freelance project management)
-  ...projectsTables,
   // Proxy Council tables
   ...proxyCouncilTables,
   // Voice Agent tables

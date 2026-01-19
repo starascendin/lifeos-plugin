@@ -5,6 +5,7 @@ import {
   BarChart3,
   Flag,
   Activity,
+  Building2,
 } from "lucide-react";
 import {
   Select,
@@ -23,6 +24,7 @@ type ProjectHealth = "on_track" | "at_risk" | "off_track";
 
 interface ProjectPropertiesProps {
   project: Doc<"lifeos_pmProjects">;
+  client?: Doc<"lifeos_pmClients"> | null;
   onUpdate: (updates: {
     status?: ProjectStatus;
     health?: ProjectHealth;
@@ -51,7 +53,7 @@ const HEALTH_OPTIONS: {
   { value: "off_track", label: "Off Track", color: "text-red-500", bg: "bg-red-500" },
 ];
 
-export function ProjectProperties({ project, onUpdate }: ProjectPropertiesProps) {
+export function ProjectProperties({ project, client, onUpdate }: ProjectPropertiesProps) {
   const progress =
     project.issueCount > 0
       ? Math.round((project.completedIssueCount / project.issueCount) * 100)
@@ -64,6 +66,13 @@ export function ProjectProperties({ project, onUpdate }: ProjectPropertiesProps)
       <h3 className="mb-4 text-sm font-medium text-muted-foreground">Properties</h3>
 
       <div className="space-y-1">
+        {/* Client */}
+        <PropertyRow label="Client" icon={Building2}>
+          <span className="text-sm">
+            {client ? client.name : "No client"}
+          </span>
+        </PropertyRow>
+
         {/* Status */}
         <PropertyRow label="Status" icon={Circle}>
           <Select

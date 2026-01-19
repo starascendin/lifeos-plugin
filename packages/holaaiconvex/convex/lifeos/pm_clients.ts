@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { requireUser } from "../_lib/auth";
 import { Doc } from "../_generated/dataModel";
-import { clientStatusValidator } from "./projects_schema";
+import { clientStatusValidator } from "./pm_schema";
 
 // ==================== QUERIES ====================
 
@@ -18,7 +18,7 @@ export const getClients = query({
 
     if (args.status) {
       return await ctx.db
-        .query("lifeos_projClients")
+        .query("lifeos_pmClients")
         .withIndex("by_user_status", (q) =>
           q.eq("userId", user._id).eq("status", args.status!)
         )
@@ -27,7 +27,7 @@ export const getClients = query({
     }
 
     return await ctx.db
-      .query("lifeos_projClients")
+      .query("lifeos_pmClients")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .collect();
@@ -39,7 +39,7 @@ export const getClients = query({
  */
 export const getClient = query({
   args: {
-    clientId: v.id("lifeos_projClients"),
+    clientId: v.id("lifeos_pmClients"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -58,7 +58,7 @@ export const getClient = query({
  */
 export const getClientWithStats = query({
   args: {
-    clientId: v.id("lifeos_projClients"),
+    clientId: v.id("lifeos_pmClients"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -69,14 +69,15 @@ export const getClientWithStats = query({
     }
 
     const projects = await ctx.db
-      .query("lifeos_projProjects")
+      .query("lifeos_pmProjects")
       .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
       .collect();
 
     return {
       ...client,
       projectCount: projects.length,
-      activeProjectCount: projects.filter((p) => p.status === "active").length,
+      activeProjectCount: projects.filter((p) => p.status === "in_progress")
+        .length,
     };
   },
 });
@@ -95,7 +96,7 @@ export const createClient = mutation({
     const user = await requireUser(ctx);
     const now = Date.now();
 
-    const clientId = await ctx.db.insert("lifeos_projClients", {
+    const clientId = await ctx.db.insert("lifeos_pmClients", {
       userId: user._id,
       name: args.name,
       description: args.description,
@@ -113,7 +114,7 @@ export const createClient = mutation({
  */
 export const updateClient = mutation({
   args: {
-    clientId: v.id("lifeos_projClients"),
+    clientId: v.id("lifeos_pmClients"),
     name: v.optional(v.string()),
     description: v.optional(v.union(v.string(), v.null())),
     status: v.optional(clientStatusValidator),
@@ -127,7 +128,7 @@ export const updateClient = mutation({
       throw new Error("Client not found or access denied");
     }
 
-    const updates: Partial<Doc<"lifeos_projClients">> = {
+    const updates: Partial<Doc<"lifeos_pmClients">> = {
       updatedAt: now,
     };
 
@@ -144,11 +145,11 @@ export const updateClient = mutation({
 });
 
 /**
- * Delete a client (and all associated projects, phases, issues, notes)
+ * Delete a client (and unlink all associated projects)
  */
 export const deleteClient = mutation({
   args: {
-    clientId: v.id("lifeos_projClients"),
+    clientId: v.id("lifeos_pmClients"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -158,47 +159,22 @@ export const deleteClient = mutation({
       throw new Error("Client not found or access denied");
     }
 
-    // Get all projects for this client
+    // Unlink projects from client (don't delete them)
     const projects = await ctx.db
-      .query("lifeos_projProjects")
+      .query("lifeos_pmProjects")
       .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
       .collect();
 
-    // Delete each project and its children
     for (const project of projects) {
-      // Delete phases
-      const phases = await ctx.db
-        .query("lifeos_projPhases")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect();
-      for (const phase of phases) {
-        await ctx.db.delete(phase._id);
-      }
-
-      // Delete issues
-      const issues = await ctx.db
-        .query("lifeos_projIssues")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect();
-      for (const issue of issues) {
-        await ctx.db.delete(issue._id);
-      }
-
-      // Delete project notes
-      const projectNotes = await ctx.db
-        .query("lifeos_projNotes")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect();
-      for (const note of projectNotes) {
-        await ctx.db.delete(note._id);
-      }
-
-      await ctx.db.delete(project._id);
+      await ctx.db.patch(project._id, {
+        clientId: undefined,
+        updatedAt: Date.now(),
+      });
     }
 
     // Delete client-level notes
     const clientNotes = await ctx.db
-      .query("lifeos_projNotes")
+      .query("lifeos_pmNotes")
       .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
       .collect();
     for (const note of clientNotes) {

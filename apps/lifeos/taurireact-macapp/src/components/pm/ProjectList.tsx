@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "convex/react";
+import { api } from "@holaai/convex";
 import { usePM, ProjectStatus } from "@/lib/contexts/PMContext";
 import { cn } from "@/lib/utils";
-import { FolderKanban, MoreHorizontal, Archive, Trash2 } from "lucide-react";
+import { FolderKanban, MoreHorizontal, Archive, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,6 +33,10 @@ const HEALTH_CONFIG: Record<ProjectHealth, { label: string; color: string; bg: s
 export function ProjectList() {
   const navigate = useNavigate();
   const { projects, isLoadingProjects, archiveProject, setFilters } = usePM();
+  const clients = useQuery(api.lifeos.pm_clients.getClients, {});
+
+  // Create a map of client IDs to client names for quick lookup
+  const clientMap = new Map(clients?.map(c => [c._id, c.name]) ?? []);
 
   if (isLoadingProjects) {
     return (
@@ -57,8 +63,9 @@ export function ProjectList() {
   return (
     <div className="p-6">
       {/* Table Header */}
-      <div className="mb-2 grid grid-cols-[1fr,120px,120px,100px,100px,40px] gap-4 px-4 text-xs font-medium text-muted-foreground">
+      <div className="mb-2 grid grid-cols-[1fr,120px,120px,120px,100px,100px,40px] gap-4 px-4 text-xs font-medium text-muted-foreground">
         <div>Name</div>
+        <div>Client</div>
         <div>Status</div>
         <div>Health</div>
         <div>Progress</div>
@@ -77,11 +84,13 @@ export function ProjectList() {
               : 0;
           const healthConfig = HEALTH_CONFIG[project.health as ProjectHealth];
 
+          const clientName = project.clientId ? clientMap.get(project.clientId) : null;
+
           return (
             <div
               key={project._id}
               onClick={() => navigate(`/lifeos/pm/projects/${project._id}`)}
-              className="grid grid-cols-[1fr,120px,120px,100px,100px,40px] items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/50 cursor-pointer"
+              className="grid grid-cols-[1fr,120px,120px,120px,100px,100px,40px] items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/50 cursor-pointer"
             >
               {/* Name */}
               <div className="flex items-center gap-3">
@@ -97,6 +106,18 @@ export function ProjectList() {
                     {project.key}
                   </div>
                 </div>
+              </div>
+
+              {/* Client */}
+              <div className="text-sm text-muted-foreground">
+                {clientName ? (
+                  <span className="flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    <span className="truncate">{clientName}</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
               </div>
 
               {/* Status */}

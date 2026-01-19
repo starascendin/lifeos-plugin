@@ -19,27 +19,25 @@ import {
   FolderKanban,
   Plus,
   Building2,
-  FileText,
-  AlertCircle,
   LayoutList,
 } from "lucide-react";
 import { ProjectView } from "./ProjectView";
 
-type Client = Doc<"lifeos_projClients">;
-type Project = Doc<"lifeos_projProjects">;
+type Client = Doc<"lifeos_pmClients">;
+type Project = Doc<"lifeos_pmProjects">;
 
 export function ClientProjectsTab() {
-  const [selectedProject, setSelectedProject] = useState<Id<"lifeos_projProjects"> | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Id<"lifeos_pmProjects"> | null>(null);
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectClientId, setNewProjectClientId] = useState<Id<"lifeos_projClients"> | null>(null);
+  const [newProjectClientId, setNewProjectClientId] = useState<Id<"lifeos_pmClients"> | null>(null);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
-  const groupedData = useQuery(api.lifeos.proj_projects.getProjectsGroupedByClient);
-  const createClient = useMutation(api.lifeos.proj_clients.createClient);
-  const createProject = useMutation(api.lifeos.proj_projects.createProject);
+  const groupedData = useQuery(api.lifeos.pm_projects.getProjectsGroupedByClient, {});
+  const createClient = useMutation(api.lifeos.pm_clients.createClient);
+  const createProject = useMutation(api.lifeos.pm_projects.createProject);
 
   const toggleClient = (clientId: string) => {
     setExpandedClients((prev) => {
@@ -71,7 +69,7 @@ export function ClientProjectsTab() {
     setShowNewProjectDialog(false);
   };
 
-  const openNewProjectDialog = (clientId: Id<"lifeos_projClients"> | null = null) => {
+  const openNewProjectDialog = (clientId: Id<"lifeos_pmClients"> | null = null) => {
     setNewProjectClientId(clientId);
     setShowNewProjectDialog(true);
   };
@@ -83,6 +81,21 @@ export function ClientProjectsTab() {
       </div>
     );
   }
+
+  // Convert the new data structure to a list of groups for rendering
+  const groups: Array<{ client: Client | null; projects: Project[] }> = [
+    // Clients with their projects
+    ...groupedData.clients.map((clientWithProjects) => ({
+      client: clientWithProjects as Client,
+      projects: clientWithProjects.projects as Project[],
+    })),
+    // Standalone projects (no client)
+    ...(groupedData.standaloneProjects.length > 0
+      ? [{ client: null, projects: groupedData.standaloneProjects as Project[] }]
+      : []),
+  ];
+
+  const hasNoProjects = groups.length === 0 || groups.every(g => g.projects.length === 0);
 
   return (
     <div className="h-full flex">
@@ -114,14 +127,14 @@ export function ClientProjectsTab() {
 
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
-            {groupedData.length === 0 ? (
+            {hasNoProjects && groupedData.clients.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 <FolderKanban className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No projects yet</p>
                 <p className="text-xs mt-1">Create a client or project to get started</p>
               </div>
             ) : (
-              groupedData.map((group) => (
+              groups.map((group) => (
                 <ClientGroup
                   key={group.client?._id ?? "personal"}
                   client={group.client}
@@ -196,7 +209,7 @@ export function ClientProjectsTab() {
             />
             {newProjectClientId && (
               <p className="text-sm text-muted-foreground">
-                Creating under client: {groupedData.find(g => g.client?._id === newProjectClientId)?.client?.name}
+                Creating under client: {groupedData.clients.find(c => c._id === newProjectClientId)?.name}
               </p>
             )}
           </div>
@@ -219,8 +232,8 @@ interface ClientGroupProps {
   projects: Project[];
   isExpanded: boolean;
   onToggle: () => void;
-  selectedProjectId: Id<"lifeos_projProjects"> | null;
-  onSelectProject: (id: Id<"lifeos_projProjects">) => void;
+  selectedProjectId: Id<"lifeos_pmProjects"> | null;
+  onSelectProject: (id: Id<"lifeos_pmProjects">) => void;
   onAddProject: () => void;
 }
 
@@ -287,10 +300,11 @@ function ClientGroup({
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    active: "bg-green-500/20 text-green-600",
-    on_hold: "bg-yellow-500/20 text-yellow-600",
-    completed: "bg-blue-500/20 text-blue-600",
-    archived: "bg-gray-500/20 text-gray-600",
+    planned: "bg-gray-500/20 text-gray-600",
+    in_progress: "bg-blue-500/20 text-blue-600",
+    paused: "bg-yellow-500/20 text-yellow-600",
+    completed: "bg-green-500/20 text-green-600",
+    cancelled: "bg-red-500/20 text-red-600",
   };
 
   return (

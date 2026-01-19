@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { requireUser } from "../_lib/auth";
 import { Doc } from "../_generated/dataModel";
-import { phaseStatusValidator } from "./projects_schema";
+import { phaseStatusValidator } from "./pm_schema";
 
 // ==================== QUERIES ====================
 
@@ -11,7 +11,7 @@ import { phaseStatusValidator } from "./projects_schema";
  */
 export const getPhases = query({
   args: {
-    projectId: v.id("lifeos_projProjects"),
+    projectId: v.id("lifeos_pmProjects"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -23,7 +23,7 @@ export const getPhases = query({
     }
 
     return await ctx.db
-      .query("lifeos_projPhases")
+      .query("lifeos_pmPhases")
       .withIndex("by_project_order", (q) => q.eq("projectId", args.projectId))
       .collect();
   },
@@ -34,7 +34,7 @@ export const getPhases = query({
  */
 export const getPhase = query({
   args: {
-    phaseId: v.id("lifeos_projPhases"),
+    phaseId: v.id("lifeos_pmPhases"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -59,7 +59,7 @@ export const getPhase = query({
  */
 export const getPhaseWithStats = query({
   args: {
-    phaseId: v.id("lifeos_projPhases"),
+    phaseId: v.id("lifeos_pmPhases"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -71,13 +71,13 @@ export const getPhaseWithStats = query({
 
     // Count issues
     const issues = await ctx.db
-      .query("lifeos_projIssues")
+      .query("lifeos_pmIssues")
       .withIndex("by_phase", (q) => q.eq("phaseId", args.phaseId))
       .collect();
 
     // Count notes
     const notes = await ctx.db
-      .query("lifeos_projNotes")
+      .query("lifeos_pmNotes")
       .withIndex("by_phase", (q) => q.eq("phaseId", args.phaseId))
       .collect();
 
@@ -85,7 +85,7 @@ export const getPhaseWithStats = query({
       ...phase,
       issueCount: issues.length,
       openIssueCount: issues.filter(
-        (i) => i.status === "open" || i.status === "in_progress"
+        (i) => i.status === "todo" || i.status === "in_progress"
       ).length,
       noteCount: notes.length,
     };
@@ -99,7 +99,7 @@ export const getPhaseWithStats = query({
  */
 export const createPhase = mutation({
   args: {
-    projectId: v.id("lifeos_projProjects"),
+    projectId: v.id("lifeos_pmProjects"),
     name: v.string(),
     description: v.optional(v.string()),
     status: v.optional(phaseStatusValidator),
@@ -118,7 +118,7 @@ export const createPhase = mutation({
 
     // Get max order for existing phases
     const existingPhases = await ctx.db
-      .query("lifeos_projPhases")
+      .query("lifeos_pmPhases")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
 
@@ -127,7 +127,7 @@ export const createPhase = mutation({
         ? Math.max(...existingPhases.map((p) => p.order))
         : -1;
 
-    const phaseId = await ctx.db.insert("lifeos_projPhases", {
+    const phaseId = await ctx.db.insert("lifeos_pmPhases", {
       userId: user._id,
       projectId: args.projectId,
       name: args.name,
@@ -149,7 +149,7 @@ export const createPhase = mutation({
  */
 export const updatePhase = mutation({
   args: {
-    phaseId: v.id("lifeos_projPhases"),
+    phaseId: v.id("lifeos_pmPhases"),
     name: v.optional(v.string()),
     description: v.optional(v.union(v.string(), v.null())),
     status: v.optional(phaseStatusValidator),
@@ -165,7 +165,7 @@ export const updatePhase = mutation({
       throw new Error("Phase not found or access denied");
     }
 
-    const updates: Partial<Doc<"lifeos_projPhases">> = {
+    const updates: Partial<Doc<"lifeos_pmPhases">> = {
       updatedAt: now,
     };
 
@@ -192,8 +192,8 @@ export const updatePhase = mutation({
  */
 export const reorderPhases = mutation({
   args: {
-    projectId: v.id("lifeos_projProjects"),
-    phaseIds: v.array(v.id("lifeos_projPhases")),
+    projectId: v.id("lifeos_pmProjects"),
+    phaseIds: v.array(v.id("lifeos_pmPhases")),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -228,8 +228,7 @@ export const reorderPhases = mutation({
  */
 export const deletePhase = mutation({
   args: {
-    phaseId: v.id("lifeos_projPhases"),
-    deleteIssues: v.optional(v.boolean()), // If false, unlink issues from phase
+    phaseId: v.id("lifeos_pmPhases"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -239,29 +238,22 @@ export const deletePhase = mutation({
       throw new Error("Phase not found or access denied");
     }
 
-    // Handle issues
+    // Unlink issues from phase
     const issues = await ctx.db
-      .query("lifeos_projIssues")
+      .query("lifeos_pmIssues")
       .withIndex("by_phase", (q) => q.eq("phaseId", args.phaseId))
       .collect();
 
-    if (args.deleteIssues) {
-      for (const issue of issues) {
-        await ctx.db.delete(issue._id);
-      }
-    } else {
-      // Unlink issues from phase
-      for (const issue of issues) {
-        await ctx.db.patch(issue._id, {
-          phaseId: undefined,
-          updatedAt: Date.now(),
-        });
-      }
+    for (const issue of issues) {
+      await ctx.db.patch(issue._id, {
+        phaseId: undefined,
+        updatedAt: Date.now(),
+      });
     }
 
     // Delete phase notes
     const notes = await ctx.db
-      .query("lifeos_projNotes")
+      .query("lifeos_pmNotes")
       .withIndex("by_phase", (q) => q.eq("phaseId", args.phaseId))
       .collect();
     for (const note of notes) {

@@ -10,9 +10,9 @@ import { Doc } from "../_generated/dataModel";
  */
 export const getNotes = query({
   args: {
-    clientId: v.optional(v.id("lifeos_projClients")),
-    projectId: v.optional(v.id("lifeos_projProjects")),
-    phaseId: v.optional(v.id("lifeos_projPhases")),
+    clientId: v.optional(v.id("lifeos_pmClients")),
+    projectId: v.optional(v.id("lifeos_pmProjects")),
+    phaseId: v.optional(v.id("lifeos_pmPhases")),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -25,7 +25,7 @@ export const getNotes = query({
       }
 
       return await ctx.db
-        .query("lifeos_projNotes")
+        .query("lifeos_pmNotes")
         .withIndex("by_phase", (q) => q.eq("phaseId", args.phaseId))
         .order("desc")
         .collect();
@@ -39,7 +39,7 @@ export const getNotes = query({
       }
 
       return await ctx.db
-        .query("lifeos_projNotes")
+        .query("lifeos_pmNotes")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .order("desc")
         .collect();
@@ -53,7 +53,7 @@ export const getNotes = query({
       }
 
       return await ctx.db
-        .query("lifeos_projNotes")
+        .query("lifeos_pmNotes")
         .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
         .order("desc")
         .collect();
@@ -61,7 +61,7 @@ export const getNotes = query({
 
     // Get all notes for user
     return await ctx.db
-      .query("lifeos_projNotes")
+      .query("lifeos_pmNotes")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .collect();
@@ -73,7 +73,7 @@ export const getNotes = query({
  */
 export const getNote = query({
   args: {
-    noteId: v.id("lifeos_projNotes"),
+    noteId: v.id("lifeos_pmNotes"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -116,9 +116,9 @@ export const createNote = mutation({
   args: {
     title: v.string(),
     content: v.string(),
-    clientId: v.optional(v.id("lifeos_projClients")),
-    projectId: v.optional(v.id("lifeos_projProjects")),
-    phaseId: v.optional(v.id("lifeos_projPhases")),
+    clientId: v.optional(v.id("lifeos_pmClients")),
+    projectId: v.optional(v.id("lifeos_pmProjects")),
+    phaseId: v.optional(v.id("lifeos_pmPhases")),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -141,6 +141,7 @@ export const createNote = mutation({
     }
 
     // Verify phase belongs to user if provided
+    let projectId = args.projectId;
     if (args.phaseId) {
       const phase = await ctx.db.get(args.phaseId);
       if (!phase || phase.userId !== user._id) {
@@ -148,15 +149,15 @@ export const createNote = mutation({
       }
 
       // If phase is provided but project is not, auto-link to phase's project
-      if (!args.projectId) {
-        args.projectId = phase.projectId;
+      if (!projectId) {
+        projectId = phase.projectId;
       }
     }
 
-    const noteId = await ctx.db.insert("lifeos_projNotes", {
+    const noteId = await ctx.db.insert("lifeos_pmNotes", {
       userId: user._id,
       clientId: args.clientId,
-      projectId: args.projectId,
+      projectId: projectId,
       phaseId: args.phaseId,
       title: args.title,
       content: args.content,
@@ -173,12 +174,12 @@ export const createNote = mutation({
  */
 export const updateNote = mutation({
   args: {
-    noteId: v.id("lifeos_projNotes"),
+    noteId: v.id("lifeos_pmNotes"),
     title: v.optional(v.string()),
     content: v.optional(v.string()),
-    clientId: v.optional(v.union(v.id("lifeos_projClients"), v.null())),
-    projectId: v.optional(v.union(v.id("lifeos_projProjects"), v.null())),
-    phaseId: v.optional(v.union(v.id("lifeos_projPhases"), v.null())),
+    clientId: v.optional(v.union(v.id("lifeos_pmClients"), v.null())),
+    projectId: v.optional(v.union(v.id("lifeos_pmProjects"), v.null())),
+    phaseId: v.optional(v.union(v.id("lifeos_pmPhases"), v.null())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -209,7 +210,7 @@ export const updateNote = mutation({
       }
     }
 
-    const updates: Partial<Doc<"lifeos_projNotes">> = {
+    const updates: Partial<Doc<"lifeos_pmNotes">> = {
       updatedAt: now,
     };
 
@@ -235,7 +236,7 @@ export const updateNote = mutation({
  */
 export const deleteNote = mutation({
   args: {
-    noteId: v.id("lifeos_projNotes"),
+    noteId: v.id("lifeos_pmNotes"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);

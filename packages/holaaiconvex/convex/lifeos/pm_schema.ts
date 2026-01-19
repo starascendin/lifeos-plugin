@@ -79,6 +79,17 @@ export const pomodoroStatusValidator = v.union(
   v.literal("abandoned"),
 );
 
+export const clientStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("archived"),
+);
+
+export const phaseStatusValidator = v.union(
+  v.literal("not_started"),
+  v.literal("in_progress"),
+  v.literal("completed"),
+);
+
 // ==================== TABLE DEFINITIONS ====================
 
 export const pmTables = {
@@ -87,6 +98,8 @@ export const pmTables = {
     userId: v.id("users"),
     // Link to yearly initiative (optional)
     initiativeId: v.optional(v.id("lifeos_yearlyInitiatives")),
+    // Link to client (optional - for consulting/freelance projects)
+    clientId: v.optional(v.id("lifeos_pmClients")),
     // Project identification
     key: v.string(), // Short key like "PROJ", "LIFE" (auto-generated from name)
     name: v.string(),
@@ -116,7 +129,8 @@ export const pmTables = {
     .index("by_user_status", ["userId", "status"])
     .index("by_user_archived", ["userId", "archivedAt"])
     .index("by_key", ["userId", "key"])
-    .index("by_initiative", ["initiativeId"]),
+    .index("by_initiative", ["initiativeId"])
+    .index("by_client", ["clientId"]),
 
   // ==================== CYCLES/SPRINTS ====================
   lifeos_pmCycles: defineTable({
@@ -152,6 +166,7 @@ export const pmTables = {
     userId: v.id("users"),
     projectId: v.optional(v.id("lifeos_pmProjects")),
     cycleId: v.optional(v.id("lifeos_pmCycles")),
+    phaseId: v.optional(v.id("lifeos_pmPhases")), // Link to project phase
     parentId: v.optional(v.id("lifeos_pmIssues")), // For sub-issues
     // Issue identification
     identifier: v.string(), // e.g., "PROJ-123" (project key + number)
@@ -182,6 +197,7 @@ export const pmTables = {
     .index("by_user", ["userId"])
     .index("by_project", ["projectId"])
     .index("by_cycle", ["cycleId"])
+    .index("by_phase", ["phaseId"])
     .index("by_parent", ["parentId"])
     .index("by_status", ["userId", "status"])
     .index("by_project_status", ["projectId", "status"])
@@ -346,4 +362,52 @@ export const pmTables = {
     connectedAt: v.number(), // When the user connected
     lastUsedAt: v.optional(v.number()), // Last time delegation was used
   }).index("by_user", ["userId"]),
+
+  // ==================== CLIENTS ====================
+  // For consulting/freelance client management
+  lifeos_pmClients: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()), // Markdown supported
+    status: clientStatusValidator,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
+
+  // ==================== PROJECT PHASES ====================
+  // For tracking project phases/milestones
+  lifeos_pmPhases: defineTable({
+    userId: v.id("users"),
+    projectId: v.id("lifeos_pmProjects"),
+    name: v.string(),
+    description: v.optional(v.string()), // Markdown supported
+    order: v.number(), // For ordering phases
+    status: phaseStatusValidator,
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
+    .index("by_project_order", ["projectId", "order"]),
+
+  // ==================== PROJECT NOTES ====================
+  // Markdown notes attached to clients, projects, or phases
+  lifeos_pmNotes: defineTable({
+    userId: v.id("users"),
+    clientId: v.optional(v.id("lifeos_pmClients")),
+    projectId: v.optional(v.id("lifeos_pmProjects")),
+    phaseId: v.optional(v.id("lifeos_pmPhases")),
+    title: v.string(),
+    content: v.string(), // Markdown content
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_client", ["clientId"])
+    .index("by_project", ["projectId"])
+    .index("by_phase", ["phaseId"]),
 };

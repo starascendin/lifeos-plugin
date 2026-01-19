@@ -23,19 +23,26 @@ import {
   AlertCircle,
   Layers,
   Edit2,
-  Trash2,
   Check,
   X,
+  Building2,
 } from "lucide-react";
 
 interface ProjectViewProps {
-  projectId: Id<"lifeos_projProjects">;
+  projectId: Id<"lifeos_pmProjects">;
   onBack: () => void;
 }
 
 export function ProjectView({ projectId, onBack }: ProjectViewProps) {
   const [activeTab, setActiveTab] = useState("overview");
-  const project = useQuery(api.lifeos.proj_projects.getProjectWithStats, { projectId });
+  const project = useQuery(api.lifeos.pm_projects.getProject, { projectId });
+  const client = useQuery(
+    api.lifeos.pm_clients.getClient,
+    project?.clientId ? { clientId: project.clientId } : "skip"
+  );
+  const phases = useQuery(api.lifeos.pm_phases.getPhases, { projectId });
+  const notes = useQuery(api.lifeos.pm_notes.getNotes, { projectId });
+  const issues = useQuery(api.lifeos.pm_issues.getIssues, { projectId });
 
   if (!project) {
     return (
@@ -55,9 +62,18 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
           </Button>
           <div>
             <h1 className="text-xl font-semibold">{project.name}</h1>
-            {project.client && (
-              <p className="text-sm text-muted-foreground">{project.client.name}</p>
-            )}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{project.key}</span>
+              {client && (
+                <>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    {client.name}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -67,13 +83,13 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
         <TabsList className="mx-4 mt-2 justify-start">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="phases">
-            Phases ({project.phaseCount})
+            Phases ({phases?.length ?? 0})
           </TabsTrigger>
           <TabsTrigger value="issues">
-            Issues ({project.issueCount})
+            Issues ({issues?.length ?? 0})
           </TabsTrigger>
           <TabsTrigger value="notes">
-            Notes ({project.noteCount})
+            Notes ({notes?.length ?? 0})
           </TabsTrigger>
         </TabsList>
 
@@ -96,10 +112,14 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
   );
 }
 
-function ProjectOverview({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
+function ProjectOverview({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
   const [isEditing, setIsEditing] = useState(false);
-  const project = useQuery(api.lifeos.proj_projects.getProject, { projectId });
-  const updateProject = useMutation(api.lifeos.proj_projects.updateProject);
+  const project = useQuery(api.lifeos.pm_projects.getProject, { projectId });
+  const client = useQuery(
+    api.lifeos.pm_clients.getClient,
+    project?.clientId ? { clientId: project.clientId } : "skip"
+  );
+  const updateProject = useMutation(api.lifeos.pm_projects.updateProject);
   const [description, setDescription] = useState("");
 
   if (!project) return null;
@@ -107,7 +127,7 @@ function ProjectOverview({ projectId }: { projectId: Id<"lifeos_projProjects"> }
   const handleSave = async () => {
     await updateProject({
       projectId,
-      description: description || null,
+      description: description || undefined,
     });
     setIsEditing(false);
   };
@@ -119,57 +139,98 @@ function ProjectOverview({ projectId }: { projectId: Id<"lifeos_projProjects"> }
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-4 max-w-3xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">Project Description</h2>
-          {!isEditing && (
-            <Button variant="ghost" size="sm" onClick={startEditing}>
-              <Edit2 className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-          )}
+      <div className="space-y-6 max-w-3xl">
+        {/* Client Info Section */}
+        {client && (
+          <div className="border border-border rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-medium text-muted-foreground">Client</h2>
+            </div>
+            <h3 className="text-lg font-medium">{client.name}</h3>
+            {client.description && (
+              <div className="mt-2 text-sm text-muted-foreground">
+                <MarkdownRenderer content={client.description} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Project Status Info */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="border border-border rounded-lg p-3">
+            <p className="text-xs text-muted-foreground mb-1">Status</p>
+            <ProjectStatusBadge status={project.status} />
+          </div>
+          <div className="border border-border rounded-lg p-3">
+            <p className="text-xs text-muted-foreground mb-1">Health</p>
+            <HealthBadge health={project.health} />
+          </div>
+          <div className="border border-border rounded-lg p-3">
+            <p className="text-xs text-muted-foreground mb-1">Priority</p>
+            <PriorityBadge priority={project.priority} />
+          </div>
+          <div className="border border-border rounded-lg p-3">
+            <p className="text-xs text-muted-foreground mb-1">Progress</p>
+            <p className="text-sm font-medium">
+              {project.completedIssueCount}/{project.issueCount} issues
+            </p>
+          </div>
         </div>
 
-        {isEditing ? (
-          <div className="space-y-2">
-            <MarkdownEditor
-              value={description}
-              onChange={setDescription}
-              placeholder="Enter project description in markdown..."
-              minHeight="300px"
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSave}>
-                <Check className="h-4 w-4 mr-1" />
-                Save
+        {/* Project Description */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-medium">Description</h2>
+            {!isEditing && (
+              <Button variant="ghost" size="sm" onClick={startEditing}>
+                <Edit2 className="h-4 w-4 mr-1" />
+                Edit
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
-                <X className="h-4 w-4 mr-1" />
-                Cancel
-              </Button>
-            </div>
+            )}
           </div>
-        ) : project.description ? (
-          <MarkdownRenderer content={project.description} />
-        ) : (
-          <p className="text-muted-foreground text-sm italic">
-            No description. Click Edit to add one.
-          </p>
-        )}
+
+          {isEditing ? (
+            <div className="space-y-2">
+              <MarkdownEditor
+                value={description}
+                onChange={setDescription}
+                placeholder="Enter project description in markdown..."
+                minHeight="300px"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleSave}>
+                  <Check className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : project.description ? (
+            <MarkdownRenderer content={project.description} />
+          ) : (
+            <p className="text-muted-foreground text-sm italic">
+              No description. Click Edit to add one.
+            </p>
+          )}
+        </div>
       </div>
     </ScrollArea>
   );
 }
 
-function PhasesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
+function PhasesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
   const [showNewPhaseDialog, setShowNewPhaseDialog] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState("");
-  const [editingPhaseId, setEditingPhaseId] = useState<Id<"lifeos_projPhases"> | null>(null);
+  const [editingPhaseId, setEditingPhaseId] = useState<Id<"lifeos_pmPhases"> | null>(null);
   const [editingDescription, setEditingDescription] = useState("");
 
-  const phases = useQuery(api.lifeos.proj_phases.getPhases, { projectId });
-  const createPhase = useMutation(api.lifeos.proj_phases.createPhase);
-  const updatePhase = useMutation(api.lifeos.proj_phases.updatePhase);
+  const phases = useQuery(api.lifeos.pm_phases.getPhases, { projectId });
+  const createPhase = useMutation(api.lifeos.pm_phases.createPhase);
+  const updatePhase = useMutation(api.lifeos.pm_phases.updatePhase);
 
   const handleCreatePhase = async () => {
     if (!newPhaseName.trim()) return;
@@ -178,7 +239,7 @@ function PhasesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
     setShowNewPhaseDialog(false);
   };
 
-  const startEditingPhase = (phaseId: Id<"lifeos_projPhases">, description: string | undefined) => {
+  const startEditingPhase = (phaseId: Id<"lifeos_pmPhases">, description: string | undefined) => {
     setEditingPhaseId(phaseId);
     setEditingDescription(description ?? "");
   };
@@ -294,13 +355,13 @@ function PhasesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
   );
 }
 
-function IssuesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
+function IssuesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
   const [showNewIssueDialog, setShowNewIssueDialog] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
 
-  const issues = useQuery(api.lifeos.proj_issues.getIssues, { projectId });
-  const createIssue = useMutation(api.lifeos.proj_issues.createIssue);
-  const updateIssue = useMutation(api.lifeos.proj_issues.updateIssue);
+  const issues = useQuery(api.lifeos.pm_issues.getIssues, { projectId });
+  const createIssue = useMutation(api.lifeos.pm_issues.createIssue);
+  const updateIssueStatus = useMutation(api.lifeos.pm_issues.updateIssueStatus);
 
   const handleCreateIssue = async () => {
     if (!newIssueTitle.trim()) return;
@@ -309,9 +370,9 @@ function IssuesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
     setShowNewIssueDialog(false);
   };
 
-  const toggleIssueStatus = async (issueId: Id<"lifeos_projIssues">, currentStatus: string) => {
-    const newStatus = currentStatus === "done" ? "open" : "done";
-    await updateIssue({ issueId, status: newStatus as any });
+  const toggleIssueStatus = async (issueId: Id<"lifeos_pmIssues">, currentStatus: string) => {
+    const newStatus = currentStatus === "done" ? "todo" : "done";
+    await updateIssueStatus({ issueId, status: newStatus as any });
   };
 
   return (
@@ -352,6 +413,9 @@ function IssuesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
                 >
                   {issue.status === "done" && <Check className="h-3 w-3" />}
                 </button>
+                <span className="text-sm text-muted-foreground font-mono">
+                  {issue.identifier}
+                </span>
                 <span
                   className={cn(
                     "flex-1",
@@ -395,21 +459,21 @@ function IssuesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
   );
 }
 
-function NotesTab({ projectId }: { projectId: Id<"lifeos_projProjects"> }) {
+function NotesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
   const [showNewNoteDialog, setShowNewNoteDialog] = useState(false);
   const [newNoteTitle, setNewNoteTitle] = useState("");
   const [newNoteContent, setNewNoteContent] = useState("");
-  const [selectedNoteId, setSelectedNoteId] = useState<Id<"lifeos_projNotes"> | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<Id<"lifeos_pmNotes"> | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
-  const notes = useQuery(api.lifeos.proj_notes.getNotes, { projectId });
+  const notes = useQuery(api.lifeos.pm_notes.getNotes, { projectId });
   const selectedNote = useQuery(
-    api.lifeos.proj_notes.getNote,
+    api.lifeos.pm_notes.getNote,
     selectedNoteId ? { noteId: selectedNoteId } : "skip"
   );
-  const createNote = useMutation(api.lifeos.proj_notes.createNote);
-  const updateNote = useMutation(api.lifeos.proj_notes.updateNote);
+  const createNote = useMutation(api.lifeos.pm_notes.createNote);
+  const updateNote = useMutation(api.lifeos.pm_notes.updateNote);
 
   const handleCreateNote = async () => {
     if (!newNoteTitle.trim()) return;
@@ -589,6 +653,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function PriorityBadge({ priority }: { priority: string }) {
   const colors: Record<string, string> = {
+    none: "bg-gray-500/20 text-gray-600",
     low: "bg-gray-500/20 text-gray-600",
     medium: "bg-yellow-500/20 text-yellow-600",
     high: "bg-orange-500/20 text-orange-600",
@@ -603,6 +668,46 @@ function PriorityBadge({ priority }: { priority: string }) {
       )}
     >
       {priority}
+    </span>
+  );
+}
+
+function ProjectStatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    planned: "bg-gray-500/20 text-gray-600",
+    in_progress: "bg-blue-500/20 text-blue-600",
+    paused: "bg-yellow-500/20 text-yellow-600",
+    completed: "bg-green-500/20 text-green-600",
+    cancelled: "bg-red-500/20 text-red-600",
+  };
+
+  return (
+    <span
+      className={cn(
+        "px-1.5 py-0.5 rounded text-xs font-medium",
+        colors[status] ?? "bg-gray-500/20 text-gray-600"
+      )}
+    >
+      {status.replace("_", " ")}
+    </span>
+  );
+}
+
+function HealthBadge({ health }: { health: string }) {
+  const colors: Record<string, string> = {
+    on_track: "bg-green-500/20 text-green-600",
+    at_risk: "bg-yellow-500/20 text-yellow-600",
+    off_track: "bg-red-500/20 text-red-600",
+  };
+
+  return (
+    <span
+      className={cn(
+        "px-1.5 py-0.5 rounded text-xs font-medium",
+        colors[health] ?? "bg-gray-500/20 text-gray-600"
+      )}
+    >
+      {health.replace("_", " ")}
     </span>
   );
 }

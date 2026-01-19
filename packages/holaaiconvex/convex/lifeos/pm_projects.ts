@@ -141,6 +141,79 @@ export const getProjectsByInitiative = query({
 });
 
 /**
+ * Get projects linked to a client
+ */
+export const getProjectsByClient = query({
+  args: {
+    clientId: v.id("lifeos_pmClients"),
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Verify client belongs to user
+    const client = await ctx.db.get(args.clientId);
+    if (!client || client.userId !== user._id) {
+      return [];
+    }
+
+    let projects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .collect();
+
+    if (!args.includeArchived) {
+      projects = projects.filter((p) => !p.archivedAt);
+    }
+
+    return projects;
+  },
+});
+
+/**
+ * Get all projects grouped by client (for Client Projects view)
+ * Returns clients with their projects, plus standalone projects (no client)
+ */
+export const getProjectsGroupedByClient = query({
+  args: {
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Get all clients
+    const clients = await ctx.db
+      .query("lifeos_pmClients")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Get all projects
+    let projects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    if (!args.includeArchived) {
+      projects = projects.filter((p) => !p.archivedAt);
+    }
+
+    // Group projects by client
+    const clientsWithProjects = clients.map((client) => ({
+      ...client,
+      projects: projects.filter((p) => p.clientId === client._id),
+    }));
+
+    // Get standalone projects (no client)
+    const standaloneProjects = projects.filter((p) => !p.clientId);
+
+    return {
+      clients: clientsWithProjects,
+      standaloneProjects,
+    };
+  },
+});
+
+/**
  * Get project stats (with computed completion percentage)
  */
 export const getProjectStats = query({
@@ -184,6 +257,7 @@ export const createProject = mutation({
     startDate: v.optional(v.number()),
     targetDate: v.optional(v.number()),
     initiativeId: v.optional(v.id("lifeos_yearlyInitiatives")),
+    clientId: v.optional(v.id("lifeos_pmClients")),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -194,6 +268,14 @@ export const createProject = mutation({
       const initiative = await ctx.db.get(args.initiativeId);
       if (!initiative || initiative.userId !== user._id) {
         throw new Error("Initiative not found or access denied");
+      }
+    }
+
+    // Verify client belongs to user if provided
+    if (args.clientId) {
+      const client = await ctx.db.get(args.clientId);
+      if (!client || client.userId !== user._id) {
+        throw new Error("Client not found or access denied");
       }
     }
 
@@ -216,6 +298,7 @@ export const createProject = mutation({
     const projectId = await ctx.db.insert("lifeos_pmProjects", {
       userId: user._id,
       initiativeId: args.initiativeId,
+      clientId: args.clientId,
       key,
       name: args.name,
       description: args.description,
@@ -255,6 +338,7 @@ export const updateProject = mutation({
     initiativeId: v.optional(
       v.union(v.id("lifeos_yearlyInitiatives"), v.null()),
     ),
+    clientId: v.optional(v.union(v.id("lifeos_pmClients"), v.null())),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -270,6 +354,14 @@ export const updateProject = mutation({
       const initiative = await ctx.db.get(args.initiativeId);
       if (!initiative || initiative.userId !== user._id) {
         throw new Error("Initiative not found or access denied");
+      }
+    }
+
+    // Verify client belongs to user if provided
+    if (args.clientId && args.clientId !== null) {
+      const client = await ctx.db.get(args.clientId);
+      if (!client || client.userId !== user._id) {
+        throw new Error("Client not found or access denied");
       }
     }
 
@@ -301,6 +393,10 @@ export const updateProject = mutation({
     if (args.initiativeId !== undefined) {
       updates.initiativeId =
         args.initiativeId === null ? undefined : args.initiativeId;
+    }
+    // Handle client linking: null means unlink, undefined means don't change
+    if (args.clientId !== undefined) {
+      updates.clientId = args.clientId === null ? undefined : args.clientId;
     }
 
     await ctx.db.patch(args.projectId, updates);
@@ -353,7 +449,7 @@ export const unarchiveProject = mutation({
 });
 
 /**
- * Permanently delete a project and all its issues
+ * Permanently delete a project and all its issues, phases, notes, cycles, labels
  */
 export const deleteProject = mutation({
   args: {
@@ -395,6 +491,26 @@ export const deleteProject = mutation({
 
     for (const label of labels) {
       await ctx.db.delete(label._id);
+    }
+
+    // Delete all project phases
+    const phases = await ctx.db
+      .query("lifeos_pmPhases")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    for (const phase of phases) {
+      await ctx.db.delete(phase._id);
+    }
+
+    // Delete all project notes
+    const notes = await ctx.db
+      .query("lifeos_pmNotes")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    for (const note of notes) {
+      await ctx.db.delete(note._id);
     }
 
     // Delete the project

@@ -15,6 +15,10 @@ interface ProjectDetailViewProps {
 
 export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
   const project = useQuery(api.lifeos.pm_projects.getProject, { projectId });
+  const client = useQuery(
+    api.lifeos.pm_clients.getClient,
+    project?.clientId ? { clientId: project.clientId } : "skip"
+  );
   const issues = useQuery(api.lifeos.pm_issues.getIssues, { projectId });
   const updateProject = useMutation(api.lifeos.pm_projects.updateProject);
 
@@ -58,7 +62,7 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
           <PomodoroStatsMini />
         </div>
 
-        <ProjectHeader project={project} onUpdateName={handleUpdateName} />
+        <ProjectHeader project={project} client={client} onUpdateName={handleUpdateName} />
 
         {/* Issues List */}
         <div className="mt-6">
@@ -67,7 +71,7 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
       </div>
 
       {/* Properties Sidebar */}
-      <ProjectProperties project={project} onUpdate={handleUpdateProperties} />
+      <ProjectProperties project={project} client={client} onUpdate={handleUpdateProperties} />
     </div>
   );
 }
