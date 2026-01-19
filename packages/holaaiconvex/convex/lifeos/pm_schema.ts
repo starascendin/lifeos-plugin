@@ -260,6 +260,9 @@ export const pmTables = {
   // ==================== USER SETTINGS ====================
   lifeos_pmUserSettings: defineTable({
     userId: v.id("users"),
+    // User's timezone (IANA format, e.g., "America/Denver")
+    // Used for calendar display, AI agent, voice memos, etc.
+    timezone: v.optional(v.string()),
     // Cycle settings (global)
     cycleSettings: v.optional(cycleSettingsValidator),
     // Timestamps

@@ -118,10 +118,10 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           { name: "All Issues", href: "/lifeos/pm", icon: ListTodo },
           { name: "Projects", href: "/lifeos/pm/projects", icon: FolderKanban },
           { name: "Cycles", href: "/lifeos/pm/cycles", icon: RefreshCw },
+          { name: "Clients", href: "/lifeos/pm/clients", icon: Briefcase },
         ],
       },
       { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
-      { name: "Client Projects", href: "/lifeos/client-projects", icon: Briefcase },
       { name: "Habits", href: "/lifeos/habits", icon: Target },
       {
         name: "FRM",

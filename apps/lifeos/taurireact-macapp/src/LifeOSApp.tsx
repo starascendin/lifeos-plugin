@@ -108,8 +108,8 @@ export default function LifeOSApp() {
                   <Route path="pm/:view" element={<LifeOSPM />} />
                   <Route path="pm/:view/:id" element={<LifeOSPM />} />
                   <Route path="pm-ai" element={<LifeOSPMAI />} />
-                  <Route path="client-projects" element={<LifeOSClientProjects />} />
-                  <Route path="client-projects/:view" element={<LifeOSClientProjects />} />
+                  <Route path="pm/clients" element={<LifeOSClientProjects />} />
+                  <Route path="pm/clients/:view" element={<LifeOSClientProjects />} />
                   <Route path="habits" element={<LifeOSHabits />} />
                   <Route path="frm" element={<LifeOSFRM />} />
                   <Route path="frm/:tab" element={<LifeOSFRM />} />

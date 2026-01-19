@@ -310,30 +310,38 @@ export const updateSyncStatus = internalMutation({
 
 /**
  * Get calendar events for a specific date
+ * @param date - The date in YYYY-MM-DD format (in user's local timezone)
+ * @param timezoneOffset - Minutes offset from UTC (from Date.getTimezoneOffset(), e.g., 420 for MST/UTC-7)
  */
 export const getEventsForDate = query({
   args: {
     date: v.string(), // YYYY-MM-DD
+    timezoneOffset: v.optional(v.number()), // Minutes offset from UTC (positive = west of UTC)
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    // Calculate day boundaries
-    const dayStart = new Date(args.date + "T00:00:00").getTime();
-    const dayEnd = new Date(args.date + "T23:59:59.999").getTime();
+    // Calculate day boundaries in user's local timezone
+    // If no offset provided, assume UTC (offset = 0)
+    const offsetMs = (args.timezoneOffset ?? 0) * 60 * 1000;
+
+    // Create UTC timestamps for the start and end of the day in user's local timezone
+    // e.g., for MST (offset=420), "2026-01-19" local = "2026-01-19T07:00:00Z" to "2026-01-20T06:59:59.999Z"
+    const dayStartUTC = new Date(args.date + "T00:00:00Z").getTime() + offsetMs;
+    const dayEndUTC = new Date(args.date + "T23:59:59.999Z").getTime() + offsetMs;
 
     // Get all events for this user that overlap with the day
     const events = await ctx.db
       .query("lifeos_calendarEvents")
       .withIndex("by_user_start_time", (q) =>
-        q.eq("userId", user._id).gte("startTime", dayStart - 86400000) // Include events that might span into this day
+        q.eq("userId", user._id).gte("startTime", dayStartUTC - 86400000) // Include events that might span into this day
       )
       .filter((q) =>
         q.and(
           q.neq(q.field("status"), "cancelled"),
           // Event overlaps with the day: starts before day end AND ends after day start
-          q.lt(q.field("startTime"), dayEnd),
-          q.gt(q.field("endTime"), dayStart)
+          q.lt(q.field("startTime"), dayEndUTC),
+          q.gt(q.field("endTime"), dayStartUTC)
         )
       )
       .collect();
@@ -345,39 +353,47 @@ export const getEventsForDate = query({
 
 /**
  * Get calendar events for a date range (for weekly view)
+ * @param startDate - Start date in YYYY-MM-DD format (in user's local timezone)
+ * @param endDate - End date in YYYY-MM-DD format (in user's local timezone)
+ * @param timezoneOffset - Minutes offset from UTC (from Date.getTimezoneOffset(), e.g., 420 for MST/UTC-7)
  */
 export const getEventsForDateRange = query({
   args: {
     startDate: v.string(), // YYYY-MM-DD
     endDate: v.string(), // YYYY-MM-DD
+    timezoneOffset: v.optional(v.number()), // Minutes offset from UTC (positive = west of UTC)
   },
   handler: async (ctx, args): Promise<Record<string, Doc<"lifeos_calendarEvents">[]>> => {
     const user = await requireUser(ctx);
 
-    const rangeStart = new Date(args.startDate + "T00:00:00").getTime();
-    const rangeEnd = new Date(args.endDate + "T23:59:59.999").getTime();
+    // Calculate range boundaries in user's local timezone
+    const offsetMs = (args.timezoneOffset ?? 0) * 60 * 1000;
+    const rangeStartUTC = new Date(args.startDate + "T00:00:00Z").getTime() + offsetMs;
+    const rangeEndUTC = new Date(args.endDate + "T23:59:59.999Z").getTime() + offsetMs;
 
     const events = await ctx.db
       .query("lifeos_calendarEvents")
       .withIndex("by_user_start_time", (q) =>
-        q.eq("userId", user._id).gte("startTime", rangeStart - 86400000)
+        q.eq("userId", user._id).gte("startTime", rangeStartUTC - 86400000)
       )
       .filter((q) =>
         q.and(
           q.neq(q.field("status"), "cancelled"),
-          q.lt(q.field("startTime"), rangeEnd),
-          q.gt(q.field("endTime"), rangeStart)
+          q.lt(q.field("startTime"), rangeEndUTC),
+          q.gt(q.field("endTime"), rangeStartUTC)
         )
       )
       .collect();
 
-    // Group events by date
+    // Group events by date in user's local timezone
     const eventsByDate: Record<string, Doc<"lifeos_calendarEvents">[]> = {};
 
     for (const event of events) {
-      // Get the date key for this event (based on start time)
-      const eventDate = new Date(event.startTime);
-      const dateKey = eventDate.toISOString().split("T")[0];
+      // Convert event start time to user's local date
+      // Subtract offset to convert from UTC to local time for date calculation
+      const localTimestamp = event.startTime - offsetMs;
+      const localDate = new Date(localTimestamp);
+      const dateKey = localDate.toISOString().split("T")[0];
 
       if (!eventsByDate[dateKey]) {
         eventsByDate[dateKey] = [];

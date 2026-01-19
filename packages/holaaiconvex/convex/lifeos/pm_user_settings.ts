@@ -29,6 +29,7 @@ export const getUserSettings = query({
  */
 export const updateUserSettings = mutation({
   args: {
+    timezone: v.optional(v.string()),
     cycleSettings: v.optional(cycleSettingsValidator),
   },
   handler: async (ctx, args) => {
@@ -41,17 +42,30 @@ export const updateUserSettings = mutation({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
+    // Build update object with only provided fields
+    const updateData: {
+      timezone?: string;
+      cycleSettings?: typeof args.cycleSettings;
+      updatedAt: number;
+      createdAt?: number;
+    } = { updatedAt: now };
+
+    if (args.timezone !== undefined) {
+      updateData.timezone = args.timezone;
+    }
+    if (args.cycleSettings !== undefined) {
+      updateData.cycleSettings = args.cycleSettings;
+    }
+
     if (existingSettings) {
       // Update existing settings
-      await ctx.db.patch(existingSettings._id, {
-        cycleSettings: args.cycleSettings,
-        updatedAt: now,
-      });
+      await ctx.db.patch(existingSettings._id, updateData);
       return existingSettings._id;
     } else {
       // Create new settings
       const settingsId = await ctx.db.insert("lifeos_pmUserSettings", {
         userId: user._id,
+        timezone: args.timezone,
         cycleSettings: args.cycleSettings,
         createdAt: now,
         updatedAt: now,

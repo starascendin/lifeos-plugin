@@ -279,8 +279,12 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Calendar events queries
+  // Get timezone offset for proper date boundaries (positive = west of UTC, e.g., 420 for MST)
+  const timezoneOffset = new Date().getTimezoneOffset();
+
   const todaysEvents = useQuery(api.lifeos.calendar.getEventsForDate, {
     date: dateString,
+    timezoneOffset,
   });
 
   const calendarSyncStatus = useQuery(api.lifeos.calendar.getSyncStatus, {});
@@ -289,7 +293,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const weeklyEvents = useQuery(
     api.lifeos.calendar.getEventsForDateRange,
     viewMode === "weekly"
-      ? { startDate: weekStartDate, endDate: weekEndDate }
+      ? { startDate: weekStartDate, endDate: weekEndDate, timezoneOffset }
       : "skip",
   );
 
