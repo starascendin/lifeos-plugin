@@ -1,3 +1,12 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "lifeos": {
+      "command": "npx",
+      "args": ["tsx", "packages/lifeos-mcp/src/index.ts"],
+      "env": {
+        "CONVEX_URL": "https://beaming-giraffe-300.convex.cloud",
+        "LIFEOS_USER_ID": "YOUR_USER_ID_HERE"
+      }
+    }
+  }
 }
