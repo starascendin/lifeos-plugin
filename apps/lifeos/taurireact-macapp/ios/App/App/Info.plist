@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>LifeOS Nexus</string>
+        <string>LifeOS Nexus Staging</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,10 +26,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.bryanliu.lifeosnexus</string>
+			<string>com.bryanliu.lifeosnexus.staging</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.bryanliu.lifeosnexus</string>
+				<string>com.bryanliu.lifeosnexus.staging</string>
 			</array>
 		</dict>
 	</array>

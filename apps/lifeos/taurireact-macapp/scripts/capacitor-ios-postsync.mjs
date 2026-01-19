@@ -2,7 +2,27 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(process.cwd());
-const APP_ID = "com.bryanliu.lifeosnexus";
+
+// Read current capacitor.config.ts to get appId and appName
+function getCapacitorConfig() {
+  const configPath = path.join(root, "capacitor.config.ts");
+  const content = fs.readFileSync(configPath, "utf8");
+
+  const appIdMatch = content.match(/appId:\s*["']([^"']+)["']/);
+  const appNameMatch = content.match(/appName:\s*["']([^"']+)["']/);
+
+  return {
+    appId: appIdMatch ? appIdMatch[1] : "com.bryanliu.lifeosnexus",
+    appName: appNameMatch ? appNameMatch[1] : "LifeOS Nexus",
+  };
+}
+
+const config = getCapacitorConfig();
+const APP_ID = config.appId;
+const APP_NAME = config.appName;
+const IS_STAGING = APP_ID.includes(".staging");
+
+console.log(`[postsync] Configuring iOS for: ${APP_NAME} (${APP_ID})`);
 
 function read(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -35,32 +55,75 @@ function ensureXcodeProjectIos17() {
 
   const prev = read(filePath);
   let next = prev;
-  next = next.replace(/IPHONEOS_DEPLOYMENT_TARGET = (\\d+\\.\\d+);/g, "IPHONEOS_DEPLOYMENT_TARGET = 17.0;");
+  next = next.replace(/IPHONEOS_DEPLOYMENT_TARGET = (\d+\.\d+);/g, "IPHONEOS_DEPLOYMENT_TARGET = 17.0;");
   writeIfChanged(filePath, next);
 }
 
-function ensureInfoPlistUrlScheme() {
-  const filePath = path.join(root, "ios", "App", "App", "Info.plist");
+function updateBundleIdentifier() {
+  const filePath = path.join(root, "ios", "App", "App.xcodeproj", "project.pbxproj");
   if (!fs.existsSync(filePath)) return;
 
   const prev = read(filePath);
-  if (prev.includes("<key>CFBundleURLTypes</key>")) {
-    // Normalize previous value (older app ids) to APP_ID.
-    let next = prev;
-    next = replaceAll(next, "com.bryanliu.lifeos_nexus", APP_ID);
-    writeIfChanged(filePath, next);
+  // Replace any existing bundle identifier with current one
+  let next = prev.replace(
+    /PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/g,
+    `PRODUCT_BUNDLE_IDENTIFIER = ${APP_ID};`
+  );
+  if (writeIfChanged(filePath, next)) {
+    console.log(`[postsync] Updated bundle identifier to: ${APP_ID}`);
+  }
+}
+
+function updateInfoPlist() {
+  const filePath = path.join(root, "ios", "App", "App", "Info.plist");
+  if (!fs.existsSync(filePath)) return;
+
+  let content = read(filePath);
+
+  // Update CFBundleDisplayName
+  content = content.replace(
+    /<key>CFBundleDisplayName<\/key>\s*<string>[^<]*<\/string>/,
+    `<key>CFBundleDisplayName</key>\n        <string>${APP_NAME}</string>`
+  );
+
+  // Update CFBundleURLName and CFBundleURLSchemes
+  content = content.replace(
+    /<key>CFBundleURLName<\/key>\s*<string>[^<]*<\/string>/,
+    `<key>CFBundleURLName</key>\n\t\t\t<string>${APP_ID}</string>`
+  );
+  content = content.replace(
+    /(<key>CFBundleURLSchemes<\/key>\s*<array>\s*)<string>[^<]*<\/string>/,
+    `$1<string>${APP_ID}</string>`
+  );
+
+  if (writeIfChanged(filePath, content)) {
+    console.log(`[postsync] Updated Info.plist with app name: ${APP_NAME}`);
+  }
+}
+
+function copyIcons() {
+  const iconSourceDir = IS_STAGING
+    ? path.join(root, "ios-icons-staging")
+    : path.join(root, "ios-icons-production");
+  const iconDestDir = path.join(root, "ios", "App", "App", "Assets.xcassets", "AppIcon.appiconset");
+
+  if (!fs.existsSync(iconSourceDir)) {
+    console.log(`[postsync] Warning: Icon source directory not found: ${iconSourceDir}`);
     return;
   }
 
-  const insert = `\n\t<key>CFBundleURLTypes</key>\n\t<array>\n\t\t<dict>\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t<string>${APP_ID}</string>\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>${APP_ID}</string>\n\t\t\t</array>\n\t\t</dict>\n\t</array>\n`;
-
-  const marker = "\n</dict>";
-  const idx = prev.lastIndexOf(marker);
-  if (idx === -1) return;
-  const next = prev.slice(0, idx) + insert + prev.slice(idx);
-  writeIfChanged(filePath, next);
+  // Copy all files from source to destination
+  const files = fs.readdirSync(iconSourceDir);
+  for (const file of files) {
+    const src = path.join(iconSourceDir, file);
+    const dest = path.join(iconDestDir, file);
+    fs.copyFileSync(src, dest);
+  }
+  console.log(`[postsync] Copied ${IS_STAGING ? "staging" : "production"} icons`);
 }
 
 ensureCapAppSpmIos17();
 ensureXcodeProjectIos17();
-ensureInfoPlistUrlScheme();
+updateBundleIdentifier();
+updateInfoPlist();
+copyIcons();

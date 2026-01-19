@@ -13,16 +13,16 @@ const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
 
 function getEnvironment(): "development" | "staging" | "production" {
-  // Detect based on Clerk publishable key prefix
+  // Detect based on Clerk publishable key prefix and Convex URL
+  if (clerkKey.startsWith("pk_live_")) {
+    return "production";
+  }
   if (clerkKey.startsWith("pk_test_")) {
-    // Check Convex URL for staging vs dev
-    if (convexUrl.includes("staging")) {
+    // Check Convex URL for staging (adorable-firefly-704) vs dev (keen-nightingale-310)
+    if (convexUrl.includes("adorable-firefly")) {
       return "staging";
     }
     return "development";
-  }
-  if (clerkKey.startsWith("pk_live_")) {
-    return "production";
   }
   return "development";
 }

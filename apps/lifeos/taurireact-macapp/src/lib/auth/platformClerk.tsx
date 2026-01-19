@@ -61,9 +61,11 @@ export function useUser(): UseUserReturn {
     ? ({
         id: userId ?? "user_capacitor",
         firstName: null,
-        fullName: null,
+        lastName: null,
+        fullName: userEmail ? userEmail.split("@")[0] : null, // Use email prefix as name
         imageUrl: "",
         emailAddresses: userEmail ? [{ emailAddress: userEmail }] : [],
+        primaryEmailAddress: userEmail ? { emailAddress: userEmail } : null,
       } as any)
     : null;
 
