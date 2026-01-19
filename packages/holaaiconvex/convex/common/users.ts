@@ -80,3 +80,30 @@ export const getUserByTokenIdentifier = internalQuery({
       .unique();
   },
 });
+
+/**
+ * Internal: Get user by email
+ * Used for admin/debug purposes to look up user IDs
+ */
+export const getUserByEmail = internalQuery({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .unique();
+  },
+});
+
+/**
+ * Internal: List all users (for debug)
+ */
+export const listAllUsers = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").take(10);
+    return users.map((u) => ({ _id: u._id, email: u.email, name: u.name }));
+  },
+});
