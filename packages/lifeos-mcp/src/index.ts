@@ -550,8 +550,9 @@ const TOOLS: Tool[] = [
 ];
 
 // Configuration
+// NOTE: HTTP routes are served from .convex.site, NOT .convex.cloud
 const CONVEX_URL =
-  process.env.CONVEX_URL || "https://exalted-shrimp-978.convex.cloud";
+  process.env.CONVEX_URL || "https://beaming-giraffe-300.convex.site";
 const API_KEY = process.env.LIFEOS_API_KEY || "tool-call-secret-key-2024";
 const USER_ID = process.env.LIFEOS_USER_ID;
 

@@ -1,11 +1,12 @@
 {
   "mcpServers": {
     "lifeos": {
-      "command": "npx",
-      "args": ["tsx", "packages/lifeos-mcp/src/index.ts"],
+      "command": "node",
+      "args": ["packages/lifeos-mcp/dist/index.js"],
       "env": {
-        "CONVEX_URL": "https://beaming-giraffe-300.convex.cloud",
-        "LIFEOS_USER_ID": "j9743f41z9e999ym1xvn1v013s7wqfq8"
+        "CONVEX_URL": "https://beaming-giraffe-300.convex.site",
+        "LIFEOS_USER_ID": "j9743f41z9e999ym1xvn1v013s7wqfq8",
+        "LIFEOS_API_KEY": "tool-call-secret-key-2024"
       }
     }
   }

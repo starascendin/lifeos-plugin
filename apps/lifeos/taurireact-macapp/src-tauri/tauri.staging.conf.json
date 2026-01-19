@@ -45,11 +45,11 @@
     "active": true,
     "targets": ["dmg", "app"],
     "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
+      "icons-staging/32x32.png",
+      "icons-staging/128x128.png",
+      "icons-staging/128x128@2x.png",
+      "icons-staging/icon.icns",
+      "icons-staging/icon.ico"
     ],
     "macOS": {
       "minimumSystemVersion": "10.15",
