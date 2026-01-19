@@ -4,7 +4,12 @@ const config: CapacitorConfig = {
   appId: "com.bryanliu.lifeosnexus",
   appName: "LifeOS Nexus",
   webDir: "dist",
-  bundledWebRuntime: false,
+  plugins: {
+    CapacitorUpdater: {
+      // For internal testing - auto update disabled, manual control
+      autoUpdate: false,
+    },
+  },
 };
 
 export default config;

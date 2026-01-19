@@ -182,38 +182,40 @@ export function MemoDetailDialog({ memo, open, onOpenChange }: MemoDetailDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-row items-center justify-between space-y-0 pb-2">
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5" />
-            {memo.name}
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-5xl h-[95vh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
+        <DialogHeader className="flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="truncate max-w-[200px] sm:max-w-none">{memo.name}</span>
           </DialogTitle>
           <Button
             variant="outline"
             size="sm"
             onClick={handleRegenerate}
             disabled={isRegenerating || !hasTranscript}
-            className="gap-2"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8"
           >
             {isRegenerating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Regenerating...
+                <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                <span className="hidden sm:inline">Regenerating...</span>
+                <span className="sm:hidden">...</span>
               </>
             ) : (
               <>
-                <RefreshCw className="h-4 w-4" />
-                Regenerate AI
+                <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Regenerate AI</span>
+                <span className="sm:hidden">Regenerate</span>
               </>
             )}
           </Button>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex gap-6">
+        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4 lg:gap-6">
           {/* Left Column - Memo Content */}
-          <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex-1 min-w-0 flex flex-col min-h-0">
             <ScrollArea className="flex-1">
-              <div className="space-y-4 pr-4">
+              <div className="space-y-4 pr-2 sm:pr-4">
                 {/* Audio Player */}
                 <div className="rounded-lg border bg-muted/30 p-4">
                   <div className="flex items-center gap-3">
@@ -268,14 +270,14 @@ export function MemoDetailDialog({ memo, open, onOpenChange }: MemoDetailDialogP
                     Transcript
                   </h4>
                   {hasTranscript ? (
-                    <div className="rounded-lg border bg-muted/30 p-4 max-h-[300px] overflow-y-auto">
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                    <div className="rounded-lg border bg-muted/30 p-3 sm:p-4 max-h-[150px] sm:max-h-[200px] lg:max-h-[300px] overflow-y-auto">
+                      <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">
                         {memo.transcript}
                       </p>
                     </div>
                   ) : (
-                    <div className="h-24 rounded-lg border bg-muted/30 flex items-center justify-center">
-                      <p className="text-sm text-muted-foreground italic">
+                    <div className="h-16 sm:h-24 rounded-lg border bg-muted/30 flex items-center justify-center">
+                      <p className="text-xs sm:text-sm text-muted-foreground italic">
                         No transcript available
                       </p>
                     </div>
@@ -286,21 +288,21 @@ export function MemoDetailDialog({ memo, open, onOpenChange }: MemoDetailDialogP
           </div>
 
           {/* Right Column - AI Extraction Results */}
-          <div className="w-[380px] shrink-0 flex flex-col border-l pl-6">
-            <Tabs defaultValue="current" className="flex-1 flex flex-col">
+          <div className="w-full lg:w-[380px] shrink-0 flex flex-col border-t lg:border-t-0 lg:border-l pt-4 lg:pt-0 lg:pl-6 min-h-0">
+            <Tabs defaultValue="current" className="flex-1 flex flex-col min-h-0">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="current" className="gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5" />
+                <TabsTrigger value="current" className="gap-1.5 text-xs sm:text-sm">
+                  <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   Current
                 </TabsTrigger>
-                <TabsTrigger value="history" className="gap-1.5">
-                  <History className="h-3.5 w-3.5" />
+                <TabsTrigger value="history" className="gap-1.5 text-xs sm:text-sm">
+                  <History className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   History
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="current" className="flex-1 mt-4">
-                <ScrollArea className="h-[calc(70vh-200px)]">
+              <TabsContent value="current" className="flex-1 mt-4 min-h-0">
+                <ScrollArea className="h-[200px] sm:h-[250px] lg:h-[calc(70vh-200px)]">
                   <div className="space-y-5 pr-4">
                     {/* Summary */}
                     {hasSummary && (
@@ -380,8 +382,8 @@ export function MemoDetailDialog({ memo, open, onOpenChange }: MemoDetailDialogP
                 </ScrollArea>
               </TabsContent>
 
-              <TabsContent value="history" className="flex-1 mt-4">
-                <ScrollArea className="h-[calc(70vh-200px)]">
+              <TabsContent value="history" className="flex-1 mt-4 min-h-0">
+                <ScrollArea className="h-[200px] sm:h-[250px] lg:h-[calc(70vh-200px)]">
                   <div className="space-y-3 pr-4">
                     {!hasHistory ? (
                       <p className="text-sm text-muted-foreground italic text-center py-8">

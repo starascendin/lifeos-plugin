@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import pkg from "./package.json";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -13,6 +14,12 @@ const getHmrPort = (mode: string) => (mode === "production" ? 1431 : 1421);
 // https://vite.dev/config/
 export default defineConfig(async ({ mode }) => ({
   plugins: [react()],
+
+  // Inject build-time version info
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
+  },
   // Expose additional env vars (e.g. E2E_TEST_USER_EMAIL) to the client.
   // Only enable test-user login UI in non-production modes.
   envPrefix: ["VITE_", "E2E_"],

@@ -43,6 +43,7 @@ import {
   Loader2,
   Sparkles,
   History,
+  Quote,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { formatDistanceToNow, format } from "date-fns";
@@ -179,6 +180,48 @@ function SectionHeader({
       )}
     </div>
   );
+}
+
+// Citation source type
+interface CitationSource {
+  type: "memo" | "file";
+  id: string;
+  name: string;
+  excerpt?: string;
+}
+
+// Citation badge component - shows which sources support an insight
+function CitationBadges({ sources }: { sources?: CitationSource[] }) {
+  if (!sources || sources.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {sources.map((source, i) => (
+        <span
+          key={`${source.id}-${i}`}
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-muted/80 text-muted-foreground hover:bg-muted cursor-help"
+          title={source.excerpt ? `"${source.excerpt}"` : source.name}
+        >
+          <Quote className="h-2.5 w-2.5" />
+          {source.type === "memo" ? "📝" : "📁"}
+          <span className="max-w-[80px] truncate">{source.name}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Find citations for a specific insight text
+function findCitationsForInsight(
+  citations: { insight: string; sources: CitationSource[] }[] | undefined,
+  insightText: string
+): CitationSource[] | undefined {
+  if (!citations) return undefined;
+  const match = citations.find(
+    (c) => c.insight.toLowerCase().includes(insightText.toLowerCase()) ||
+           insightText.toLowerCase().includes(c.insight.toLowerCase())
+  );
+  return match?.sources;
 }
 
 export function PersonDetail({ personId, onBack }: PersonDetailProps) {
@@ -558,56 +601,56 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Top Bar */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
+      <div className="flex items-center justify-between border-b border-border px-3 sm:px-4 py-2 sm:py-3">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-1 sm:gap-2 h-8">
           <ArrowLeft className="h-4 w-4" />
-          Back
+          <span className="hidden sm:inline">Back</span>
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {isRecording ? (
             <Button
               variant="destructive"
               size="sm"
               onClick={stopRecording}
-              className="gap-2 animate-pulse"
+              className="gap-1 sm:gap-2 animate-pulse h-8"
             >
-              <Square className="h-4 w-4" />
-              Stop ({formatRecordingTime(recordingDuration)})
+              <Square className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="font-mono text-xs sm:text-sm">{formatRecordingTime(recordingDuration)}</span>
             </Button>
           ) : isSaving ? (
-            <Button variant="secondary" size="sm" disabled className="gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
+            <Button variant="secondary" size="sm" disabled className="gap-1 sm:gap-2 h-8">
+              <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+              <span className="hidden sm:inline">Saving...</span>
             </Button>
           ) : (
             <Button
               variant="default"
               size="sm"
               onClick={startRecording}
-              className="gap-2"
+              className="gap-1 sm:gap-2 h-8"
             >
-              <Mic className="h-4 w-4" />
-              Record Intel
+              <Mic className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Record</span>
             </Button>
           )}
           {person.memoCount > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Button
                 variant={profile ? "outline" : "default"}
                 size="sm"
                 onClick={handleGenerateProfile}
                 disabled={isProfileProcessing}
-                className="gap-2"
+                className="gap-1 sm:gap-2 h-8"
               >
                 {isProfileProcessing ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Analyzing...
+                    <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                    <span className="hidden sm:inline">Analyzing...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" />
-                    {profile ? "Re-analyze" : "Analyze"}
+                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">{profile ? "Re-analyze" : "Analyze"}</span>
                   </>
                 )}
               </Button>
@@ -617,11 +660,11 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={`gap-1 text-xs h-7 px-2 ${isViewingHistory ? "text-amber-600" : "text-muted-foreground"}`}
+                      className={`gap-1 text-xs h-7 px-1.5 sm:px-2 ${isViewingHistory ? "text-amber-600" : "text-muted-foreground"}`}
                     >
                       <History className="h-3 w-3" />
-                      v{selectedProfile?.version || profile?.version}
-                      {isViewingHistory && " (old)"}
+                      <span className="hidden sm:inline">v{selectedProfile?.version || profile?.version}</span>
+                      {isViewingHistory && <span className="hidden sm:inline"> (old)</span>}
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -671,6 +714,7 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
             variant="outline"
             size="sm"
             onClick={() => setShowEditDialog(true)}
+            className="h-8 w-8 sm:w-auto sm:px-3"
           >
             <Edit className="h-4 w-4" />
           </Button>
@@ -679,13 +723,13 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-6xl p-6">
+        <div className="mx-auto max-w-6xl p-4 sm:p-6">
           {/* Masthead */}
-          <div className="mb-8 flex items-start gap-6">
+          <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
             {/* Avatar */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <div
-                className="flex h-24 w-24 items-center justify-center rounded-2xl text-4xl shadow-lg ring-4 ring-background"
+                className="flex h-16 w-16 sm:h-24 sm:w-24 items-center justify-center rounded-xl sm:rounded-2xl text-2xl sm:text-4xl shadow-lg ring-2 sm:ring-4 ring-background"
                 style={{
                   backgroundColor: person.color
                     ? `${person.color}20`
@@ -693,20 +737,20 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                   color: person.color || "hsl(var(--muted-foreground))",
                 }}
               >
-                {person.avatarEmoji || <User className="h-12 w-12" />}
+                {person.avatarEmoji || <User className="h-8 w-8 sm:h-12 sm:w-12" />}
               </div>
               {/* Status indicator */}
               <div
-                className={`absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-background shadow ${contactStatus.color}`}
+                className={`absolute -bottom-1 -right-1 flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-background shadow ${contactStatus.color}`}
               >
-                <StatusIcon className="h-3.5 w-3.5" />
+                <StatusIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               </div>
             </div>
 
             {/* Subject Info */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold tracking-tight">
+            <div className="flex-1 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3">
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
                   {person.name}
                 </h1>
                 <Badge
@@ -719,16 +763,16 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
               </div>
 
               {person.nickname && (
-                <p className="mt-1 text-lg text-muted-foreground">
+                <p className="mt-1 text-sm sm:text-lg text-muted-foreground">
                   a.k.a. "{person.nickname}"
                 </p>
               )}
 
               {/* Quick Stats Strip */}
-              <div className="mt-4 flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Last Contact:</span>
+              <div className="mt-3 sm:mt-4 flex flex-wrap justify-center sm:justify-start items-center gap-3 sm:gap-6 text-xs sm:text-sm">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground hidden sm:inline">Last Contact:</span>
                   <span className="font-medium">
                     {person.lastInteractionAt
                       ? formatDistanceToNow(new Date(person.lastInteractionAt), {
@@ -737,14 +781,13 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                       : "Never"}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                   <span className="font-medium">{person.memoCount}</span>
-                  <span className="text-muted-foreground">intel entries</span>
+                  <span className="text-muted-foreground hidden sm:inline">intel entries</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Status:</span>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                   <span className={`font-medium ${contactStatus.color}`}>
                     {contactStatus.label}
                   </span>
@@ -752,7 +795,7 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
               </div>
 
               {/* Profile Completeness */}
-              <div className="mt-4 max-w-md">
+              <div className="mt-3 sm:mt-4 max-w-xs sm:max-w-md mx-auto sm:mx-0">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-muted-foreground">
                     Profile Completeness
@@ -801,6 +844,12 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                     classification="INTEL-001"
                   />
                   <p className="text-sm leading-relaxed">{selectedProfile.summary}</p>
+                  {selectedProfile.citations?.summary && selectedProfile.citations.summary.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <div className="text-[10px] text-muted-foreground mb-1.5 uppercase tracking-wide">Sources</div>
+                      <CitationBadges sources={selectedProfile.citations.summary as CitationSource[]} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -829,6 +878,12 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                               )
                             )}
                           </div>
+                          <CitationBadges
+                            sources={findCitationsForInsight(
+                              selectedProfile.citations?.communicationStyle as { insight: string; sources: CitationSource[] }[] | undefined,
+                              selectedProfile.communicationStyle.preferredChannels.join(" ")
+                            )}
+                          />
                         </div>
                       )}
                     {selectedProfile.communicationStyle.responsePatterns && (
@@ -839,6 +894,12 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                         <p className="text-sm">
                           {selectedProfile.communicationStyle.responsePatterns}
                         </p>
+                        <CitationBadges
+                          sources={findCitationsForInsight(
+                            selectedProfile.citations?.communicationStyle as { insight: string; sources: CitationSource[] }[] | undefined,
+                            selectedProfile.communicationStyle.responsePatterns
+                          )}
+                        />
                       </div>
                     )}
                     {selectedProfile.communicationStyle.conflictApproach && (
@@ -849,6 +910,12 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                         <p className="text-sm">
                           {selectedProfile.communicationStyle.conflictApproach}
                         </p>
+                        <CitationBadges
+                          sources={findCitationsForInsight(
+                            selectedProfile.citations?.communicationStyle as { insight: string; sources: CitationSource[] }[] | undefined,
+                            selectedProfile.communicationStyle.conflictApproach
+                          )}
+                        />
                       </div>
                     )}
                     {selectedProfile.communicationStyle.expressionStyle && (
@@ -859,6 +926,12 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                         <p className="text-sm">
                           {selectedProfile.communicationStyle.expressionStyle}
                         </p>
+                        <CitationBadges
+                          sources={findCitationsForInsight(
+                            selectedProfile.citations?.communicationStyle as { insight: string; sources: CitationSource[] }[] | undefined,
+                            selectedProfile.communicationStyle.expressionStyle
+                          )}
+                        />
                       </div>
                     )}
                   </div>
@@ -1048,6 +1121,12 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                               </Badge>
                             ))}
                           </div>
+                          <CitationBadges
+                            sources={findCitationsForInsight(
+                              selectedProfile.citations?.personality as { insight: string; sources: CitationSource[] }[] | undefined,
+                              selectedProfile.personality.coreValues.join(" ")
+                            )}
+                          />
                         </div>
                       )}
                     {selectedProfile.personality.interests &&
@@ -1063,6 +1142,12 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                               </Badge>
                             ))}
                           </div>
+                          <CitationBadges
+                            sources={findCitationsForInsight(
+                              selectedProfile.citations?.personality as { insight: string; sources: CitationSource[] }[] | undefined,
+                              selectedProfile.personality.interests.join(" ")
+                            )}
+                          />
                         </div>
                       )}
                     {selectedProfile.personality.strengths &&
@@ -1076,7 +1161,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                             {selectedProfile.personality.strengths.map((s, i) => (
                               <li key={i} className="flex items-start gap-2 text-xs">
                                 <span className="text-green-500 mt-0.5">+</span>
-                                {s}
+                                <span className="flex-1">
+                                  {s}
+                                  <CitationBadges
+                                    sources={findCitationsForInsight(
+                                      selectedProfile.citations?.personality as { insight: string; sources: CitationSource[] }[] | undefined,
+                                      s
+                                    )}
+                                  />
+                                </span>
                               </li>
                             ))}
                           </ul>
@@ -1093,7 +1186,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                             {selectedProfile.personality.frictionPoints.map((f, i) => (
                               <li key={i} className="flex items-start gap-2 text-xs">
                                 <span className="text-amber-500 mt-0.5">!</span>
-                                {f}
+                                <span className="flex-1">
+                                  {f}
+                                  <CitationBadges
+                                    sources={findCitationsForInsight(
+                                      selectedProfile.citations?.personality as { insight: string; sources: CitationSource[] }[] | undefined,
+                                      f
+                                    )}
+                                  />
+                                </span>
                               </li>
                             ))}
                           </ul>
@@ -1121,7 +1222,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                           {selectedProfile.tips.doList.map((item, i) => (
                             <li key={i} className="flex items-start gap-2">
                               <CheckCircle2 className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
-                              {item}
+                              <span className="flex-1">
+                                {item}
+                                <CitationBadges
+                                  sources={findCitationsForInsight(
+                                    selectedProfile.citations?.tips as { insight: string; sources: CitationSource[] }[] | undefined,
+                                    item
+                                  )}
+                                />
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -1137,7 +1246,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                             {selectedProfile.tips.avoidList.map((item, i) => (
                               <li key={i} className="flex items-start gap-2">
                                 <X className="h-3 w-3 text-red-500 mt-0.5 flex-shrink-0" />
-                                {item}
+                                <span className="flex-1">
+                                  {item}
+                                  <CitationBadges
+                                    sources={findCitationsForInsight(
+                                      selectedProfile.citations?.tips as { insight: string; sources: CitationSource[] }[] | undefined,
+                                      item
+                                    )}
+                                  />
+                                </span>
                               </li>
                             ))}
                           </ul>
@@ -1153,7 +1270,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                             {selectedProfile.tips.conversationStarters.map((item, i) => (
                               <li key={i} className="flex items-start gap-2">
                                 <ChevronRight className="h-3 w-3 text-primary mt-0.5 flex-shrink-0" />
-                                {item}
+                                <span className="flex-1">
+                                  {item}
+                                  <CitationBadges
+                                    sources={findCitationsForInsight(
+                                      selectedProfile.citations?.tips as { insight: string; sources: CitationSource[] }[] | undefined,
+                                      item
+                                    )}
+                                  />
+                                </span>
                               </li>
                             ))}
                           </ul>

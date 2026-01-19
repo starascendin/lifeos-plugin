@@ -6,11 +6,15 @@ import { Doc, Id } from "../_generated/dataModel";
 
 // ==================== SYSTEM PROMPT ====================
 
-const PROFILE_EXTRACTION_PROMPT = `You are an expert relationship analyst building a psychological profile of a person based on voice memo transcripts.
+const PROFILE_EXTRACTION_PROMPT = `You are an expert relationship analyst building a psychological profile of a person based on voice memo transcripts and intel files.
 
-Analyze ALL provided transcripts and extract comprehensive insights about this person. Think like a CIA analyst building a dossier - look for patterns across multiple interactions.
+Analyze ALL provided sources (voice memos and uploaded files) and extract comprehensive insights about this person. Think like a CIA analyst building a dossier - look for patterns across multiple interactions.
 
-From the transcripts, extract:
+SOURCES are labeled as:
+- MEMO-1, MEMO-2, etc. for voice memos
+- FILE-1, FILE-2, etc. for uploaded intel files
+
+From the sources, extract:
 
 1. **Communication Style**
    - preferredChannels: How they prefer to communicate (text, call, in-person, email)
@@ -34,11 +38,12 @@ From the transcripts, extract:
 4. **Summary**: A 2-3 sentence executive summary of who this person is and how to interact with them effectively.
 
 IMPORTANT RULES:
-- Only include insights you can actually infer from the transcripts
+- Only include insights you can actually infer from the sources
 - If there isn't enough information for a field, omit it or return an empty array
 - Be specific and actionable, not generic
-- Look for patterns across multiple transcripts
+- Look for patterns across multiple sources
 - Consider context mentioned about interactions (phone calls, meetups, etc.)
+- CITE YOUR SOURCES for each insight using the source labels (MEMO-1, FILE-2, etc.)
 
 Return ONLY a raw JSON object with NO markdown formatting, NO code blocks, NO backticks:
 {
@@ -61,10 +66,35 @@ Return ONLY a raw JSON object with NO markdown formatting, NO code blocks, NO ba
     "conversationStarters": ["string"],
     "giftIdeas": ["string"]
   },
-  "summary": "string"
+  "summary": "string",
+  "citations": {
+    "communicationStyle": [
+      {"insight": "The actual insight text from above", "sources": ["MEMO-1", "FILE-2"], "excerpts": ["relevant quote from source"]}
+    ],
+    "personality": [
+      {"insight": "The actual insight text", "sources": ["MEMO-2"], "excerpts": ["supporting quote"]}
+    ],
+    "tips": [
+      {"insight": "The tip text", "sources": ["MEMO-1", "MEMO-3"], "excerpts": ["supporting evidence"]}
+    ],
+    "summary": ["MEMO-1", "MEMO-2", "FILE-1"]
+  }
 }`;
 
 // ==================== TYPES ====================
+
+interface CitationFromAI {
+  insight: string;
+  sources: string[]; // e.g., ["MEMO-1", "FILE-2"]
+  excerpts?: string[];
+}
+
+interface CitationsFromAI {
+  communicationStyle?: CitationFromAI[];
+  personality?: CitationFromAI[];
+  tips?: CitationFromAI[];
+  summary?: string[]; // Just source labels for summary
+}
 
 interface ProfileExtractionResult {
   communicationStyle?: {
@@ -87,6 +117,15 @@ interface ProfileExtractionResult {
     giftIdeas?: string[];
   };
   summary?: string;
+  citations?: CitationsFromAI;
+}
+
+// Source mapping for converting AI labels to actual IDs
+interface SourceMapping {
+  label: string; // e.g., "MEMO-1"
+  type: "memo" | "file";
+  id: string;
+  name: string;
 }
 
 // ==================== QUERIES ====================
@@ -231,6 +270,20 @@ export const createPendingProfile = mutation({
   },
 });
 
+// Validator for citation source
+const citationSourceValidator = v.object({
+  type: v.union(v.literal("memo"), v.literal("file")),
+  id: v.string(),
+  name: v.string(),
+  excerpt: v.optional(v.string()),
+});
+
+// Validator for citation entry
+const citationEntryValidator = v.object({
+  insight: v.string(),
+  sources: v.array(citationSourceValidator),
+});
+
 /**
  * Internal mutation to update profile with extraction results
  */
@@ -268,6 +321,15 @@ export const updateProfileInternal = internalMutation({
       })
     ),
     summary: v.optional(v.string()),
+    citations: v.optional(
+      v.object({
+        communicationStyle: v.optional(v.array(citationEntryValidator)),
+        personality: v.optional(v.array(citationEntryValidator)),
+        tips: v.optional(v.array(citationEntryValidator)),
+        summary: v.optional(v.array(citationSourceValidator)),
+      })
+    ),
+    fileIdsAnalyzed: v.optional(v.array(v.id("lifeos_frmFiles"))),
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -288,6 +350,12 @@ export const updateProfileInternal = internalMutation({
     if (args.summary !== undefined) {
       updates.summary = args.summary;
     }
+    if (args.citations !== undefined) {
+      updates.citations = args.citations;
+    }
+    if (args.fileIdsAnalyzed !== undefined) {
+      updates.fileIdsAnalyzed = args.fileIdsAnalyzed;
+    }
     if (args.error !== undefined) {
       updates.error = args.error;
     }
@@ -297,6 +365,66 @@ export const updateProfileInternal = internalMutation({
 });
 
 // ==================== ACTIONS ====================
+
+/**
+ * Helper function to transform AI citations to schema format
+ */
+function transformCitations(
+  aiCitations: CitationsFromAI | undefined,
+  sourceMapping: SourceMapping[]
+): Doc<"lifeos_frmProfiles">["citations"] | undefined {
+  if (!aiCitations) return undefined;
+
+  const getSourceFromLabel = (label: string) => {
+    const mapping = sourceMapping.find((m) => m.label === label);
+    if (!mapping) return null;
+    return {
+      type: mapping.type as "memo" | "file",
+      id: mapping.id,
+      name: mapping.name,
+    };
+  };
+
+  const transformCitationArray = (citations: CitationFromAI[] | undefined) => {
+    if (!citations) return undefined;
+    return citations
+      .map((c) => ({
+        insight: c.insight,
+        sources: c.sources
+          .map((label) => {
+            const source = getSourceFromLabel(label);
+            if (!source) return null;
+            // Find the excerpt for this source if available
+            const excerptIndex = c.sources.indexOf(label);
+            const excerpt = c.excerpts?.[excerptIndex];
+            return {
+              ...source,
+              excerpt,
+            };
+          })
+          .filter((s): s is NonNullable<typeof s> => s !== null),
+      }))
+      .filter((c) => c.sources.length > 0);
+  };
+
+  const transformSummaryCitations = (sources: string[] | undefined) => {
+    if (!sources) return undefined;
+    return sources
+      .map((label) => {
+        const source = getSourceFromLabel(label);
+        if (!source) return null;
+        return source;
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+  };
+
+  return {
+    communicationStyle: transformCitationArray(aiCitations.communicationStyle),
+    personality: transformCitationArray(aiCitations.personality),
+    tips: transformCitationArray(aiCitations.tips),
+    summary: transformSummaryCitations(aiCitations.summary),
+  };
+}
 
 /**
  * Run AI profile extraction for a person
@@ -338,6 +466,11 @@ export const runProfileExtraction = action({
         limit: 100, // Get all memos
       });
 
+      // Get all files for this person
+      const files = await ctx.runQuery(api.lifeos.frm_files.getFilesForPerson, {
+        personId: profileRecord.personId,
+      });
+
       // Filter to only memos with transcripts
       type LinkedMemo = NonNullable<typeof linkedMemos[number]>;
       console.log(`[FRM Profile] Found ${linkedMemos.length} linked memos`);
@@ -347,35 +480,96 @@ export const runProfileExtraction = action({
       );
 
       console.log(`[FRM Profile] ${memosWithTranscripts.length} memos have transcripts`);
+      console.log(`[FRM Profile] Found ${files.length} intel files`);
 
-      if (memosWithTranscripts.length === 0) {
-        // Log which memos don't have transcripts for debugging
+      // Check if we have any sources at all
+      if (memosWithTranscripts.length === 0 && files.length === 0) {
         linkedMemos.forEach((memo, i) => {
           if (memo) {
             console.log(`[FRM Profile] Memo ${i}: transcript=${memo.transcript ? 'yes' : 'no'}, status=${memo.transcriptionStatus || 'unknown'}`);
           }
         });
-        throw new Error("No transcribed voice memos found. Please wait for transcription to complete, then try again.");
+        throw new Error("No transcribed voice memos or intel files found. Please add some data first.");
       }
 
-      // Build the context for AI
+      // Build source mapping for citations
+      const sourceMapping: SourceMapping[] = [];
+
+      // Build the context for AI - Voice Memos
       const transcriptSections = memosWithTranscripts.map((memo: LinkedMemo, i: number) => {
+        const label = `MEMO-${i + 1}`;
+        sourceMapping.push({
+          label,
+          type: "memo",
+          id: memo._id,
+          name: memo.name,
+        });
+
         const date = new Date(memo.clientCreatedAt || memo.createdAt).toLocaleDateString();
         const context = memo.context ? ` (Context: ${memo.context})` : "";
-        return `--- Memo ${i + 1} [${date}]${context} ---\n${memo.transcript}`;
+        return `--- ${label}: "${memo.name}" [${date}]${context} ---\n${memo.transcript}`;
       });
 
-      const userPrompt = `SUBJECT: ${person.name}${person.nickname ? ` (aka "${person.nickname}")` : ""}
+      // Build the context for AI - Intel Files (text-based files only for now)
+      const textFileTypes = ["text/plain", "text/markdown", "application/json"];
+      const textFiles = files.filter((f) => textFileTypes.some((t) => f.mimeType.startsWith(t)));
+
+      const fileSections: string[] = [];
+      for (let i = 0; i < textFiles.length; i++) {
+        const file = textFiles[i];
+        const label = `FILE-${i + 1}`;
+        sourceMapping.push({
+          label,
+          type: "file",
+          id: file._id,
+          name: file.name,
+        });
+
+        // Try to fetch file content
+        if (file.url) {
+          try {
+            const response = await fetch(file.url);
+            if (response.ok) {
+              const content = await response.text();
+              // Limit content to prevent huge prompts
+              const truncatedContent = content.length > 10000
+                ? content.substring(0, 10000) + "\n... [truncated]"
+                : content;
+              fileSections.push(`--- ${label}: "${file.name}" ---\n${truncatedContent}`);
+            }
+          } catch (e) {
+            console.log(`[FRM Profile] Failed to fetch file ${file.name}:`, e);
+          }
+        }
+      }
+
+      // Build the full user prompt
+      let userPrompt = `SUBJECT: ${person.name}${person.nickname ? ` (aka "${person.nickname}")` : ""}
 ${person.relationshipType ? `Relationship: ${person.relationshipType}` : ""}
 ${person.notes ? `Background Notes: ${person.notes}` : ""}
 
-TOTAL VOICE MEMOS: ${memosWithTranscripts.length}
+=== SOURCES ===
+`;
 
-${transcriptSections.join("\n\n")}`;
+      if (memosWithTranscripts.length > 0) {
+        userPrompt += `
+== VOICE MEMOS (${memosWithTranscripts.length} total) ==
+
+${transcriptSections.join("\n\n")}
+`;
+      }
+
+      if (fileSections.length > 0) {
+        userPrompt += `
+== INTEL FILES (${fileSections.length} total) ==
+
+${fileSections.join("\n\n")}
+`;
+      }
 
       // Call AI via the metered executeAICall
       const model = "google/gemini-2.5-flash";
-      console.log(`[FRM Profile] Calling AI with ${memosWithTranscripts.length} transcripts, total chars: ${userPrompt.length}`);
+      console.log(`[FRM Profile] Calling AI with ${memosWithTranscripts.length} transcripts, ${fileSections.length} files, total chars: ${userPrompt.length}`);
 
       const result = await ctx.runAction(internal.common.ai.executeAICall, {
         request: {
@@ -412,6 +606,17 @@ ${transcriptSections.join("\n\n")}`;
         throw new Error(`Failed to parse AI response as JSON: ${result.content.substring(0, 200)}`);
       }
 
+      // Debug: Log what AI returned for citations
+      console.log(`[FRM Profile] AI returned citations:`, JSON.stringify(parsed.citations, null, 2));
+      console.log(`[FRM Profile] Source mapping:`, JSON.stringify(sourceMapping, null, 2));
+
+      // Transform AI citations to schema format
+      const transformedCitations = transformCitations(parsed.citations, sourceMapping);
+      console.log(`[FRM Profile] Transformed citations:`, JSON.stringify(transformedCitations, null, 2));
+
+      // Get file IDs for tracking
+      const fileIdsAnalyzed = textFiles.map((f) => f._id) as Id<"lifeos_frmFiles">[];
+
       // Update profile with results
       await ctx.runMutation(internal.lifeos.frm_profiles.updateProfileInternal, {
         profileId: args.profileId,
@@ -420,6 +625,8 @@ ${transcriptSections.join("\n\n")}`;
         personality: parsed.personality,
         tips: parsed.tips,
         summary: parsed.summary,
+        citations: transformedCitations,
+        fileIdsAnalyzed: fileIdsAnalyzed.length > 0 ? fileIdsAnalyzed : undefined,
       });
 
       // Create a timeline entry for the profile update

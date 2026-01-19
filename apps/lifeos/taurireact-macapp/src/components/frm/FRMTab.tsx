@@ -51,9 +51,9 @@ export function FRMTab() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold">Relationships</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <h1 className="text-lg sm:text-xl font-semibold">Relationships</h1>
 
           {/* Tab Switcher */}
           <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
@@ -61,24 +61,22 @@ export function FRMTab() {
               variant={currentTab === "people" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => handleTabChange("people")}
-              className="gap-2"
+              className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8"
             >
               <Users className="h-4 w-4" />
-              People
+              <span className="hidden xs:inline">People</span>
             </Button>
             <Button
               variant={currentTab === "timeline" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => handleTabChange("timeline")}
-              className="gap-2"
+              className="gap-1.5 sm:gap-2 text-xs sm:text-sm h-8"
             >
               <Clock className="h-4 w-4" />
-              Timeline
+              <span className="hidden xs:inline">Timeline</span>
             </Button>
           </div>
         </div>
-
-{/* Actions removed - now in PeopleList header */}
       </div>
 
       {/* Content */}

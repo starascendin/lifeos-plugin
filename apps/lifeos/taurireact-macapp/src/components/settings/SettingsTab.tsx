@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "../../lib/contexts/ThemeContext";
 import { useApiKeys } from "../../lib/hooks/useApiKeys";
+import { isCapacitor } from "../../lib/platform";
+import {
+  downloadAndApplyUpdate,
+  getCurrentBundle,
+  listBundles,
+  resetToBuiltin,
+} from "../../lib/capacitorUpdater";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
@@ -142,6 +149,9 @@ export function SettingsTab() {
 
         {/* API Keys */}
         <ApiKeysSection />
+
+        {/* OTA Updates - always show for internal testing */}
+        <OTAUpdateSection />
 
         {/* App Info */}
         <div className="space-y-4">
@@ -304,6 +314,118 @@ function ApiKeysSection() {
         >
           ↗ Open Full Disk Access Settings
         </button>
+      </div>
+    </div>
+  );
+}
+
+function OTAUpdateSection() {
+  const [updateUrl, setUpdateUrl] = useState("http://10.0.0.144:8888/ota-update.zip");
+  const [version, setVersion] = useState("1.0.1");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [currentBundle, setCurrentBundle] = useState<any>(null);
+  const [bundles, setBundles] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadBundleInfo();
+  }, []);
+
+  const loadBundleInfo = async () => {
+    const current = await getCurrentBundle();
+    const allBundles = await listBundles();
+    setCurrentBundle(current);
+    setBundles(allBundles);
+  };
+
+  const handleUpdate = async () => {
+    if (!updateUrl.trim() || !version.trim()) return;
+    setIsUpdating(true);
+    setStatus("Downloading...");
+    try {
+      await downloadAndApplyUpdate(updateUrl.trim(), version.trim());
+      // App will reload, so this won't show
+      setStatus("Update applied!");
+    } catch (error: any) {
+      setStatus(`Error: ${error.message}`);
+      setIsUpdating(false);
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      setStatus("Resetting...");
+      await resetToBuiltin();
+      setStatus("Reset complete. App will reload.");
+    } catch (error: any) {
+      setStatus(`Error: ${error.message}`);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-medium text-[var(--text-primary)]">
+        OTA Updates (Dev)
+      </h2>
+
+      {/* Current Bundle Info */}
+      <div className="bg-[var(--bg-secondary)] rounded-lg p-3 space-y-2">
+        <div className="text-xs text-[var(--text-secondary)]">Current Bundle</div>
+        <div className="text-sm text-[var(--text-primary)] font-mono">
+          {currentBundle?.bundle?.version || "builtin"}
+        </div>
+        {bundles.length > 0 && (
+          <div className="text-xs text-[var(--text-secondary)]">
+            Downloaded bundles: {bundles.length}
+          </div>
+        )}
+      </div>
+
+      {/* Update Form */}
+      <div className="bg-[var(--bg-secondary)] rounded-lg p-3 space-y-3">
+        <div>
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Update URL</div>
+          <input
+            type="text"
+            value={updateUrl}
+            onChange={(e) => setUpdateUrl(e.target.value)}
+            placeholder="http://..."
+            className="w-full px-3 py-2 text-sm rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--app-border)] focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+          />
+        </div>
+
+        <div>
+          <div className="text-xs text-[var(--text-secondary)] mb-1">Version</div>
+          <input
+            type="text"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            placeholder="1.0.1"
+            className="w-full px-3 py-2 text-sm rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--app-border)] focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleUpdate}
+            disabled={isUpdating || !updateUrl.trim()}
+            className="flex-1 px-3 py-2 text-sm font-medium rounded-md bg-[var(--app-accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpdating ? "Updating..." : "Download & Apply Update"}
+          </button>
+          <button
+            onClick={handleReset}
+            className="px-3 py-2 text-sm font-medium rounded-md bg-red-500/20 text-red-400 hover:bg-red-500/30"
+          >
+            Reset
+          </button>
+        </div>
+
+        {status && (
+          <div className={`text-xs ${status.startsWith("Error") ? "text-red-400" : "text-green-400"}`}>
+            {status}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import {
   Loader2,
   ChevronRight,
   X,
+  MessageSquare,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { AddPersonDialog } from "./AddPersonDialog";
@@ -59,6 +60,7 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
   } = useFRM();
 
   const [showAddPersonDialog, setShowAddPersonDialog] = useState(false);
+  const [showMobileMemosPanel, setShowMobileMemosPanel] = useState(false);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -337,12 +339,12 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
       {/* Left Panel - People List */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header with Search and Record */}
-        <div className="border-b border-border px-4 py-3">
+        <div className="border-b border-border px-3 sm:px-4 py-2 sm:py-3">
           <div className="flex items-center gap-2">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search people..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9"
@@ -351,8 +353,8 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
 
             {/* Recording UI */}
             {isRecording ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md">
                   <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
                   <span className="text-xs font-mono tabular-nums text-red-600 dark:text-red-400">
                     {formatDuration(duration)}
@@ -365,7 +367,7 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
                   className="h-8 gap-1"
                 >
                   <Square className="h-3 w-3" />
-                  Stop
+                  <span className="hidden sm:inline">Stop</span>
                 </Button>
                 <Button
                   onClick={handleCancel}
@@ -377,10 +379,10 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
                 </Button>
               </div>
             ) : (
-              <>
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Button onClick={handleRecordClick} size="sm" className="h-8 gap-1.5">
                   <Mic className="h-3.5 w-3.5" />
-                  Record
+                  <span className="hidden sm:inline">Record</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -389,9 +391,19 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
                   className="h-8 gap-1.5"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Add
+                  <span className="hidden sm:inline">Add</span>
                 </Button>
-              </>
+                {/* Mobile: Show memos panel toggle */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMobileMemosPanel(true)}
+                  className="h-8 gap-1.5 lg:hidden"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Memos</span>
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -475,10 +487,40 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
         </ScrollArea>
       </div>
 
-      {/* Right Panel - Voice Memos */}
-      <div className="w-80 shrink-0">
+      {/* Right Panel - Voice Memos (desktop only) */}
+      <div className="hidden lg:block w-80 shrink-0">
         <VoiceMemosPanel processingMemo={processingMemo} />
       </div>
+
+      {/* Mobile Memos Panel (as a slide-over) */}
+      {showMobileMemosPanel && (
+        <div className="lg:hidden fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowMobileMemosPanel(false)}
+          />
+          {/* Panel */}
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-sm bg-background shadow-xl animate-in slide-in-from-right">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="font-medium flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Voice Memos
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowMobileMemosPanel(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="h-[calc(100%-57px)]">
+              <VoiceMemosPanel processingMemo={processingMemo} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dialogs */}
       <AddPersonDialog

@@ -187,6 +187,71 @@ export const frmTables = {
     // === Summary ===
     summary: v.optional(v.string()),
 
+    // === Citations ===
+    // Track which sources support each insight
+    citations: v.optional(
+      v.object({
+        // Each category maps insight text to source references
+        communicationStyle: v.optional(
+          v.array(
+            v.object({
+              insight: v.string(), // The specific insight text
+              sources: v.array(
+                v.object({
+                  type: v.union(v.literal("memo"), v.literal("file")),
+                  id: v.string(), // memo ID or file ID
+                  name: v.string(), // memo name or file name for display
+                  excerpt: v.optional(v.string()), // relevant text excerpt
+                })
+              ),
+            })
+          )
+        ),
+        personality: v.optional(
+          v.array(
+            v.object({
+              insight: v.string(),
+              sources: v.array(
+                v.object({
+                  type: v.union(v.literal("memo"), v.literal("file")),
+                  id: v.string(),
+                  name: v.string(),
+                  excerpt: v.optional(v.string()),
+                })
+              ),
+            })
+          )
+        ),
+        tips: v.optional(
+          v.array(
+            v.object({
+              insight: v.string(),
+              sources: v.array(
+                v.object({
+                  type: v.union(v.literal("memo"), v.literal("file")),
+                  id: v.string(),
+                  name: v.string(),
+                  excerpt: v.optional(v.string()),
+                })
+              ),
+            })
+          )
+        ),
+        summary: v.optional(
+          v.array(
+            v.object({
+              type: v.union(v.literal("memo"), v.literal("file")),
+              id: v.string(),
+              name: v.string(),
+              excerpt: v.optional(v.string()),
+            })
+          )
+        ),
+      })
+    ),
+    // Track which files were analyzed for this version
+    fileIdsAnalyzed: v.optional(v.array(v.id("lifeos_frmFiles"))),
+
     // Processing status
     status: profileStatusValidator,
     error: v.optional(v.string()),

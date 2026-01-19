@@ -34,7 +34,7 @@ function AppShellContent({ children }: AppShellProps) {
         {/* Mobile Sidebar */}
         <div
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out md:hidden",
+            "fixed inset-y-0 left-0 z-50 w-64 overflow-hidden transform transition-transform duration-300 ease-in-out md:hidden",
             isMobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >

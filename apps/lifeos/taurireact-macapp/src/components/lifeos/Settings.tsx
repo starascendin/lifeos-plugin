@@ -19,6 +19,12 @@ import { Bot, Check, CheckCircle, Clock, Coins, Database, Eye, EyeOff, ExternalL
 import { CoderIntegrationSettings } from "@/components/pm/settings/CoderIntegrationSettings";
 import { useEffect, useState } from "react";
 import { useConfig } from "@/lib/config";
+import {
+  downloadAndApplyUpdate,
+  getCurrentBundle,
+  listBundles,
+  resetToBuiltin,
+} from "@/lib/capacitorUpdater";
 
 export function LifeOSSettings() {
   return (
@@ -391,6 +397,22 @@ function SettingsContent() {
           </CardHeader>
           <CardContent>
             <ApiKeysSection />
+          </CardContent>
+        </Card>
+
+        {/* OTA Updates - for internal testing */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              OTA Updates (Dev)
+            </CardTitle>
+            <CardDescription>
+              Download and apply over-the-air updates for testing
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <OTAUpdateSection />
           </CardContent>
         </Card>
 
@@ -931,6 +953,129 @@ function AICreditsSection() {
               </table>
             </div>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OTAUpdateSection() {
+  const [updateUrl, setUpdateUrl] = useState("http://10.0.0.144:8888/ota-update.zip");
+  const [version, setVersion] = useState("1.0.1");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [currentBundle, setCurrentBundle] = useState<any>(null);
+  const [bundles, setBundles] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadBundleInfo();
+  }, []);
+
+  const loadBundleInfo = async () => {
+    const current = await getCurrentBundle();
+    const allBundles = await listBundles();
+    setCurrentBundle(current);
+    setBundles(allBundles);
+  };
+
+  const handleUpdate = async () => {
+    if (!updateUrl.trim() || !version.trim()) return;
+    setIsUpdating(true);
+    setStatus("Downloading...");
+    try {
+      await downloadAndApplyUpdate(updateUrl.trim(), version.trim());
+      setStatus("Update applied!");
+    } catch (error: any) {
+      setStatus(`Error: ${error.message}`);
+      setIsUpdating(false);
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      setStatus("Resetting...");
+      await resetToBuiltin();
+      setStatus("Reset complete. App will reload.");
+    } catch (error: any) {
+      setStatus(`Error: ${error.message}`);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Version Info */}
+      <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium">App Version</span>
+          <Badge variant="outline">{__APP_VERSION__}</Badge>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium">Build Time</span>
+          <span className="text-xs text-muted-foreground font-mono">
+            {new Date(__BUILD_TIMESTAMP__).toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium">Bundle Version</span>
+          <Badge variant="secondary">
+            {currentBundle?.bundle?.version || "builtin"}
+          </Badge>
+        </div>
+        {bundles.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Downloaded bundles: {bundles.length}
+          </p>
+        )}
+      </div>
+
+      {/* Update Form */}
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="ota-url">Update URL</Label>
+          <Input
+            id="ota-url"
+            type="text"
+            value={updateUrl}
+            onChange={(e) => setUpdateUrl(e.target.value)}
+            placeholder="http://..."
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="ota-version">Version</Label>
+          <Input
+            id="ota-version"
+            type="text"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            placeholder="1.0.1"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            onClick={handleUpdate}
+            disabled={isUpdating || !updateUrl.trim()}
+            className="flex-1"
+          >
+            {isUpdating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              "Download & Apply Update"
+            )}
+          </Button>
+          <Button variant="destructive" onClick={handleReset}>
+            Reset
+          </Button>
+        </div>
+
+        {status && (
+          <p className={`text-sm ${status.startsWith("Error") ? "text-destructive" : "text-green-600"}`}>
+            {status}
+          </p>
         )}
       </div>
     </div>

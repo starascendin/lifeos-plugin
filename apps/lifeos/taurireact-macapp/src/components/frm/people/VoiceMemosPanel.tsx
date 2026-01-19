@@ -236,9 +236,9 @@ export function VoiceMemosPanel({ processingMemo }: VoiceMemosPanelProps) {
 
   return (
     <>
-      <div className="flex flex-col h-full border-l">
-        {/* Header */}
-        <div className="px-4 py-3 border-b">
+      <div className="flex flex-col h-full lg:border-l">
+        {/* Header - hidden on mobile when in slide-over (parent provides it) */}
+        <div className="hidden lg:block px-4 py-3 border-b">
           <h3 className="font-medium flex items-center gap-2">
             <Mic className="h-4 w-4" />
             Voice Memos

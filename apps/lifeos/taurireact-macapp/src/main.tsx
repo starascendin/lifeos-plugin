@@ -12,6 +12,7 @@ import App from "./App";
 import LifeOSApp from "./LifeOSApp";
 import { ConfigProvider } from "./lib/config";
 import { isCapacitor, isTauri } from "./lib/platform";
+import { initUpdater } from "./lib/capacitorUpdater";
 import "./App.css";
 import {
   CapacitorAuthProvider,
@@ -32,6 +33,11 @@ if (!import.meta.env.VITE_CONVEX_URL) {
 }
 
 async function initializeApp() {
+  // Initialize Capacitor OTA updater if running in Capacitor
+  if (isCapacitor) {
+    await initUpdater();
+  }
+
   let clerkInstance = undefined;
 
   // Only use tauri-plugin-clerk when running in Tauri
