@@ -6,10 +6,18 @@ import pkg from "./package.json";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
-// Use different ports for different modes to allow running DEV and PROD simultaneously
-// DEV mode: port 1420, Production mode: port 1430
-const getPort = (mode: string) => (mode === "production" ? 1430 : 1420);
-const getHmrPort = (mode: string) => (mode === "production" ? 1431 : 1421);
+// Use different ports for different modes to allow running DEV, STAGING and PROD simultaneously
+// DEV mode: port 1420, Staging mode: port 1440, Production mode: port 1430
+const getPort = (mode: string) => {
+  if (mode === "production") return 1430;
+  if (mode === "staging") return 1440;
+  return 1420;
+};
+const getHmrPort = (mode: string) => {
+  if (mode === "production") return 1431;
+  if (mode === "staging") return 1441;
+  return 1421;
+};
 
 // https://vite.dev/config/
 export default defineConfig(async ({ mode }) => ({
