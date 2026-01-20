@@ -41,7 +41,10 @@
     "ota:bundle:prod": "pnpm build:production && node ./scripts/create-ota-bundle.mjs",
     "ota:upload:dev": "node ./scripts/upload-ota-to-convex.mjs dev",
     "ota:upload:staging": "node ./scripts/upload-ota-to-convex.mjs staging",
-    "ota:upload:prod": "node ./scripts/upload-ota-to-convex.mjs prod"
+    "ota:upload:prod": "node ./scripts/upload-ota-to-convex.mjs prod",
+    "ota:release:dev": "node ./scripts/ota-release.mjs dev",
+    "ota:release:staging": "node ./scripts/ota-release.mjs staging",
+    "ota:release:prod": "node ./scripts/ota-release.mjs prod"
   },
   "dependencies": {
     "@capacitor/app": "^8.0.0",
