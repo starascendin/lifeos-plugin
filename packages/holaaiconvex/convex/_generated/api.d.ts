@@ -74,6 +74,8 @@ import type * as lifeos_livekit from "../lifeos/livekit.js";
 import type * as lifeos_livekit_config from "../lifeos/livekit_config.js";
 import type * as lifeos_llmcouncil from "../lifeos/llmcouncil.js";
 import type * as lifeos_llmcouncil_schema from "../lifeos/llmcouncil_schema.js";
+import type * as lifeos_ota from "../lifeos/ota.js";
+import type * as lifeos_ota_schema from "../lifeos/ota_schema.js";
 import type * as lifeos_pm_ai from "../lifeos/pm_ai.js";
 import type * as lifeos_pm_ai_internal from "../lifeos/pm_ai_internal.js";
 import type * as lifeos_pm_clients from "../lifeos/pm_clients.js";
@@ -174,6 +176,8 @@ declare const fullApi: ApiFromModules<{
   "lifeos/livekit_config": typeof lifeos_livekit_config;
   "lifeos/llmcouncil": typeof lifeos_llmcouncil;
   "lifeos/llmcouncil_schema": typeof lifeos_llmcouncil_schema;
+  "lifeos/ota": typeof lifeos_ota;
+  "lifeos/ota_schema": typeof lifeos_ota_schema;
   "lifeos/pm_ai": typeof lifeos_pm_ai;
   "lifeos/pm_ai_internal": typeof lifeos_pm_ai_internal;
   "lifeos/pm_clients": typeof lifeos_pm_clients;

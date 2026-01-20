@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id } from "@holaai/convex";
@@ -6,14 +7,53 @@ import { ProjectProperties } from "./ProjectProperties";
 import { ProjectIssuesList } from "./ProjectIssuesList";
 import { ProjectStatus, Priority } from "@/lib/contexts/PMContext";
 import { PomodoroWidget, PomodoroStatsMini } from "../pomodoro";
+import { TiptapEditor } from "@/components/shared/TiptapEditor";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FileText, Circle, Activity, Flag, Target, Calendar, BarChart3 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { DatePickerInput } from "../shared";
 
 type ProjectHealth = "on_track" | "at_risk" | "off_track";
+
+const STATUS_OPTIONS: { value: ProjectStatus; label: string; color: string }[] = [
+  { value: "planned", label: "Planned", color: "bg-gray-500" },
+  { value: "in_progress", label: "In Progress", color: "bg-blue-500" },
+  { value: "paused", label: "Paused", color: "bg-yellow-500" },
+  { value: "completed", label: "Completed", color: "bg-green-500" },
+  { value: "cancelled", label: "Cancelled", color: "bg-red-500" },
+];
+
+const HEALTH_OPTIONS: { value: ProjectHealth; label: string; color: string }[] = [
+  { value: "on_track", label: "On Track", color: "bg-green-500" },
+  { value: "at_risk", label: "At Risk", color: "bg-yellow-500" },
+  { value: "off_track", label: "Off Track", color: "bg-red-500" },
+];
+
+const PRIORITY_OPTIONS: { value: Priority; label: string; color: string }[] = [
+  { value: "none", label: "None", color: "text-gray-400" },
+  { value: "low", label: "Low", color: "text-gray-500" },
+  { value: "medium", label: "Medium", color: "text-yellow-500" },
+  { value: "high", label: "High", color: "text-orange-500" },
+  { value: "urgent", label: "Urgent", color: "text-red-500" },
+];
 
 interface ProjectDetailViewProps {
   projectId: Id<"lifeos_pmProjects">;
 }
 
 export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
+  const [description, setDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef<string>("");
+
   const project = useQuery(api.lifeos.pm_projects.getProject, { projectId });
   const client = useQuery(
     api.lifeos.pm_clients.getClient,
@@ -21,6 +61,45 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
   );
   const issues = useQuery(api.lifeos.pm_issues.getIssues, { projectId });
   const updateProject = useMutation(api.lifeos.pm_projects.updateProject);
+
+  // Sync local description with project data
+  useEffect(() => {
+    if (project?.description !== undefined && lastSavedRef.current !== project.description) {
+      setDescription(project.description ?? "");
+      lastSavedRef.current = project.description ?? "";
+    }
+  }, [project?.description]);
+
+  // Debounced auto-save for description
+  useEffect(() => {
+    // Don't save if description matches what's already saved
+    if (description === lastSavedRef.current) return;
+
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Set new timeout for 3 seconds
+    saveTimeoutRef.current = setTimeout(async () => {
+      setIsSaving(true);
+      try {
+        await updateProject({
+          projectId,
+          description: description || undefined,
+        });
+        lastSavedRef.current = description;
+      } finally {
+        setIsSaving(false);
+      }
+    }, 3000);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [description, projectId, updateProject]);
 
   if (project === undefined) {
     return (
@@ -64,9 +143,171 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
 
         <ProjectHeader project={project} client={client} onUpdateName={handleUpdateName} />
 
-        {/* Issues List */}
-        <div className="mt-6">
-          <ProjectIssuesList projectId={projectId} issues={issues} />
+        {/* Project Overview Section */}
+        <div className="mt-8 space-y-6">
+          {/* Project Details Card */}
+          <div className="rounded-lg border border-border bg-card p-5">
+            <h3 className="text-sm font-medium text-muted-foreground mb-4">Project Details</h3>
+
+            {/* Properties Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* Status */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Circle className="h-3 w-3" />
+                  Status
+                </label>
+                <Select
+                  value={project.status}
+                  onValueChange={(value) => handleUpdateProperties({ status: value as ProjectStatus })}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue>
+                      <span className="flex items-center gap-2">
+                        <span className={cn("h-2 w-2 rounded-full", STATUS_OPTIONS.find(s => s.value === project.status)?.color)} />
+                        {STATUS_OPTIONS.find(s => s.value === project.status)?.label}
+                      </span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn("h-2 w-2 rounded-full", option.color)} />
+                          {option.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Health */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Activity className="h-3 w-3" />
+                  Health
+                </label>
+                <Select
+                  value={project.health}
+                  onValueChange={(value) => handleUpdateProperties({ health: value as ProjectHealth })}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue>
+                      <span className="flex items-center gap-2">
+                        <span className={cn("h-2 w-2 rounded-full", HEALTH_OPTIONS.find(h => h.value === project.health)?.color)} />
+                        {HEALTH_OPTIONS.find(h => h.value === project.health)?.label}
+                      </span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HEALTH_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn("h-2 w-2 rounded-full", option.color)} />
+                          {option.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Flag className="h-3 w-3" />
+                  Priority
+                </label>
+                <Select
+                  value={project.priority}
+                  onValueChange={(value) => handleUpdateProperties({ priority: value as Priority })}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue>
+                      {PRIORITY_OPTIONS.find(p => p.value === project.priority)?.label}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <span className={option.color}>{option.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Start Date */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Calendar className="h-3 w-3" />
+                  Start Date
+                </label>
+                <DatePickerInput
+                  value={project.startDate}
+                  onChange={(startDate) => handleUpdateProperties({ startDate })}
+                  placeholder="Set start"
+                />
+              </div>
+
+              {/* Target Date */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Target className="h-3 w-3" />
+                  Target Date
+                </label>
+                <DatePickerInput
+                  value={project.targetDate}
+                  onChange={(targetDate) => handleUpdateProperties({ targetDate })}
+                  placeholder="Set target"
+                />
+              </div>
+
+              {/* Progress */}
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <BarChart3 className="h-3 w-3" />
+                  Progress
+                </label>
+                <div className="h-9 flex flex-col justify-center">
+                  <div className="flex items-center gap-2">
+                    <Progress
+                      value={project.issueCount > 0 ? (project.completedIssueCount / project.issueCount) * 100 : 0}
+                      className="h-2 flex-1"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {project.completedIssueCount}/{project.issueCount}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="rounded-lg border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Description
+              </h3>
+              {isSaving && (
+                <span className="text-xs text-muted-foreground">Saving...</span>
+              )}
+            </div>
+
+            <TiptapEditor
+              content={description}
+              onChange={setDescription}
+              placeholder="Add a description... (type **bold**, *italic*, - [ ] for checkboxes)"
+            />
+          </div>
+
+          {/* Issues List */}
+          <div>
+            <ProjectIssuesList projectId={projectId} issues={issues} />
+          </div>
         </div>
       </div>
 

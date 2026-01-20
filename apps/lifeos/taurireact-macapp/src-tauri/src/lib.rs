@@ -81,12 +81,16 @@ pub fn run() {
             // Create menu items for tray context menu
             // Shortcuts differ by build mode:
             // - Production: Ctrl+1/2
-            // - Dev/Staging: Ctrl+Shift+1/2 (to avoid conflicts with production app)
+            // - Staging: Ctrl+Shift+1/2
+            // - Dev: Ctrl+Shift+3/4 (to avoid conflicts with staging)
             let is_production = option_env!("TAURI_BUILD_MODE") == Some("production");
+            let is_staging = app.config().identifier.contains("staging");
             let (shortcut_hint_1, shortcut_hint_2) = if is_production {
                 ("⌃1", "⌃2")
-            } else {
+            } else if is_staging {
                 ("⌃⇧1", "⌃⇧2")
+            } else {
+                ("⌃⇧3", "⌃⇧4")
             };
 
             let sync_jobs = MenuItem::with_id(
@@ -139,14 +143,16 @@ pub fn run() {
                 .build(app)?;
 
             // Register global keyboard shortcuts
-            // Production: Ctrl+1/2, Dev/Staging: Ctrl+Shift+1/2
-            let modifiers = if is_production {
-                Some(Modifiers::CONTROL)
+            // Production: Ctrl+1/2, Staging: Ctrl+Shift+1/2, Dev: Ctrl+Shift+3/4
+            let (modifiers, key_1, key_2) = if is_production {
+                (Some(Modifiers::CONTROL), Code::Digit1, Code::Digit2)
+            } else if is_staging {
+                (Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit1, Code::Digit2)
             } else {
-                Some(Modifiers::CONTROL | Modifiers::SHIFT)
+                (Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit3, Code::Digit4)
             };
-            let shortcut_1 = Shortcut::new(modifiers, Code::Digit1);
-            let shortcut_2 = Shortcut::new(modifiers, Code::Digit2);
+            let shortcut_1 = Shortcut::new(modifiers, key_1);
+            let shortcut_2 = Shortcut::new(modifiers, key_2);
 
             let app_handle = app.handle().clone();
             app.handle().plugin(

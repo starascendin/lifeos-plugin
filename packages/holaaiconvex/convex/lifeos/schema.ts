@@ -9,6 +9,7 @@ import { frmTables } from "./frm_schema";
 import { habitsTables } from "./habits_schema";
 import { initiativesTables } from "./initiatives_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
+import { otaTables } from "./ota_schema";
 import { pmTables } from "./pm_schema";
 import { proxyCouncilTables } from "./proxy_council_schema";
 import { voiceAgentTables } from "./voiceagent_schema";
@@ -38,6 +39,8 @@ export const lifeosTables = {
   ...initiativesTables,
   // LLM Council tables
   ...llmcouncilTables,
+  // OTA Update tables
+  ...otaTables,
   // Project Management tables (Linear-like personal PM, includes Clients, Phases, Notes)
   ...pmTables,
   // Proxy Council tables

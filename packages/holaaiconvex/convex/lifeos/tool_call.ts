@@ -233,6 +233,39 @@ export type ToolName = keyof typeof TOOL_DEFINITIONS;
 // Priority order for sorting
 const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
 
+/**
+ * Convert HTML (from Tiptap editor) to plain text for AI agents
+ * Strips tags, converts common elements to readable text
+ */
+function htmlToPlainText(html: string | undefined): string | undefined {
+  if (!html) return undefined;
+
+  return html
+    // Convert line breaks and block elements to newlines
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    // Convert list items to bullets
+    .replace(/<li[^>]*>/gi, '• ')
+    // Convert task list items
+    .replace(/<li[^>]*data-checked="true"[^>]*>/gi, '☑ ')
+    .replace(/<li[^>]*data-checked="false"[^>]*>/gi, '☐ ')
+    // Strip all remaining HTML tags
+    .replace(/<[^>]+>/g, '')
+    // Decode common HTML entities
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    // Clean up whitespace
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // ==================== TOOL 1: GET TODAY'S TASKS ====================
 
 /**
@@ -369,7 +402,7 @@ export const getProjectsInternal = internalQuery({
         id: project._id,
         key: project.key,
         name: project.name,
-        description: project.description,
+        description: htmlToPlainText(project.description),
         status: project.status,
         health: project.health,
         priority: project.priority,
@@ -513,7 +546,7 @@ export const getTasksInternal = internalQuery({
         id: issue._id,
         identifier: issue.identifier,
         title: issue.title,
-        description: issue.description,
+        description: htmlToPlainText(issue.description),
         status: issue.status,
         priority: issue.priority,
         projectId: issue.projectId,
@@ -2379,7 +2412,7 @@ export const getClientsInternal = internalQuery({
     const clientsWithInfo = clients.map((client) => ({
       id: client._id,
       name: client.name,
-      description: client.description,
+      description: htmlToPlainText(client.description),
       status: client.status,
       createdAt: new Date(client.createdAt).toISOString(),
     }));
@@ -2428,7 +2461,7 @@ export const getClientInternal = internalQuery({
       client: {
         id: client._id,
         name: client.name,
-        description: client.description,
+        description: htmlToPlainText(client.description),
         status: client.status,
         createdAt: new Date(client.createdAt).toISOString(),
         updatedAt: new Date(client.updatedAt).toISOString(),
@@ -2474,7 +2507,7 @@ export const getProjectsForClientInternal = internalQuery({
       id: project._id,
       key: project.key,
       name: project.name,
-      description: project.description,
+      description: htmlToPlainText(project.description),
       status: project.status,
       health: project.health,
       issueCount: project.issueCount,

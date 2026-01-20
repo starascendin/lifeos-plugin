@@ -1,0 +1,52 @@
+{
+  "name": "HolaAI Convexo Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+
+  // Mount the repo (this happens automatically, but being explicit)
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspace",
+
+  // Named volume for Claude credentials - persists across container rebuilds
+  "mounts": [
+    "source=claude-credentials-${localEnv:USER},target=/home/vscode/.claude-shared,type=volume"
+  ],
+
+  // Run as non-root user
+  "remoteUser": "vscode",
+
+  // Environment variables
+  "containerEnv": {
+    "SHELL": "/bin/bash"
+  },
+
+  // Features to install
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  // Port forwarding for local dev servers
+  "forwardPorts": [3000, 5173, 8080],
+
+  // Post-create command - runs once when container is created
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  // Post-start command - runs every time container starts
+  "postStartCommand": "bash .devcontainer/restore-claude-auth.sh",
+
+  // VS Code customizations (optional, for VS Code users)
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}

@@ -195,8 +195,8 @@ function ProjectOverview({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) 
               <MarkdownEditor
                 value={description}
                 onChange={setDescription}
-                placeholder="Enter project description in markdown..."
-                minHeight="300px"
+                placeholder="Add a description... (supports markdown: **bold**, - [ ] checkboxes, etc.)"
+                minHeight="150px"
               />
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleSave}>
@@ -565,8 +565,8 @@ function NotesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
                   <MarkdownEditor
                     value={editingContent}
                     onChange={setEditingContent}
-                    placeholder="Write your notes in markdown..."
-                    minHeight="400px"
+                    placeholder="Write your notes... (supports markdown)"
+                    minHeight="300px"
                   />
                   <div className="flex gap-2">
                     <Button size="sm" onClick={saveNote}>
@@ -614,8 +614,8 @@ function NotesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
             <MarkdownEditor
               value={newNoteContent}
               onChange={setNewNoteContent}
-              placeholder="Paste markdown content here..."
-              minHeight="300px"
+              placeholder="Note content... (supports markdown)"
+              minHeight="200px"
             />
           </div>
           <DialogFooter>
