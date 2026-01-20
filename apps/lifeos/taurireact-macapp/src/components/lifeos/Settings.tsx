@@ -424,7 +424,10 @@ function SettingsContent() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm">
-              <span className="font-medium">Version:</span> 0.1.0
+              <span className="font-medium">Version:</span> {__APP_VERSION__}
+            </p>
+            <p className="text-sm text-green-500 font-medium">
+              OTA Update v1.0.2 - Test successful!
             </p>
             <p className="text-sm">
               <span className="font-medium">Runtime:</span>{" "}
@@ -960,12 +963,16 @@ function AICreditsSection() {
 }
 
 function OTAUpdateSection() {
-  const [updateUrl, setUpdateUrl] = useState("http://10.0.0.144:8888/ota-update.zip");
-  const [version, setVersion] = useState("1.0.1");
+  const [isChecking, setIsChecking] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [currentBundle, setCurrentBundle] = useState<any>(null);
   const [bundles, setBundles] = useState<any[]>([]);
+  const [availableUpdate, setAvailableUpdate] = useState<{
+    version: string;
+    bundleUrl: string;
+    fileSize?: number;
+  } | null>(null);
 
   useEffect(() => {
     loadBundleInfo();
@@ -978,13 +985,64 @@ function OTAUpdateSection() {
     setBundles(allBundles);
   };
 
-  const handleUpdate = async () => {
-    if (!updateUrl.trim() || !version.trim()) return;
-    setIsUpdating(true);
-    setStatus("Downloading...");
+  const handleCheckForUpdates = async () => {
+    setIsChecking(true);
+    setStatus("Checking for updates...");
     try {
-      await downloadAndApplyUpdate(updateUrl.trim(), version.trim());
-      setStatus("Update applied!");
+      const convexUrl = import.meta.env.VITE_CONVEX_URL;
+      if (!convexUrl) {
+        setStatus("Error: VITE_CONVEX_URL not configured");
+        setIsChecking(false);
+        return;
+      }
+
+      const response = await fetch(`${convexUrl}/api/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: "lifeos/ota:getLatestUpdate",
+          args: {},
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to check: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const latestUpdate = data.value;
+
+      if (!latestUpdate) {
+        setStatus("No updates available");
+        setAvailableUpdate(null);
+      } else {
+        setAvailableUpdate({
+          version: latestUpdate.version,
+          bundleUrl: latestUpdate.bundleUrl,
+          fileSize: latestUpdate.fileSize,
+        });
+        const currentVersion = currentBundle?.bundle?.version || "builtin";
+        if (latestUpdate.version === currentVersion) {
+          setStatus(`Already on latest version (${latestUpdate.version})`);
+        } else {
+          setStatus(`Update available: v${latestUpdate.version}`);
+        }
+      }
+    } catch (error: any) {
+      setStatus(`Error: ${error.message}`);
+      setAvailableUpdate(null);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!availableUpdate) return;
+    setIsUpdating(true);
+    setStatus(`Downloading v${availableUpdate.version}...`);
+    try {
+      await downloadAndApplyUpdate(availableUpdate.bundleUrl, availableUpdate.version);
+      setStatus("Update applied! App will reload.");
     } catch (error: any) {
       setStatus(`Error: ${error.message}`);
       setIsUpdating(false);
@@ -993,13 +1051,15 @@ function OTAUpdateSection() {
 
   const handleReset = async () => {
     try {
-      setStatus("Resetting...");
+      setStatus("Resetting to builtin...");
       await resetToBuiltin();
       setStatus("Reset complete. App will reload.");
     } catch (error: any) {
       setStatus(`Error: ${error.message}`);
     }
   };
+
+  const convexUrl = import.meta.env.VITE_CONVEX_URL;
 
   return (
     <div className="space-y-4">
@@ -1021,6 +1081,12 @@ function OTAUpdateSection() {
             {currentBundle?.bundle?.version || "builtin"}
           </Badge>
         </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium">Update Server</span>
+          <code className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
+            {convexUrl ? convexUrl.replace("https://", "").replace(".convex.cloud", "") : "Not set"}
+          </code>
+        </div>
         {bundles.length > 0 && (
           <p className="text-xs text-muted-foreground">
             Downloaded bundles: {bundles.length}
@@ -1028,34 +1094,42 @@ function OTAUpdateSection() {
         )}
       </div>
 
-      {/* Update Form */}
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <Label htmlFor="ota-url">Update URL</Label>
-          <Input
-            id="ota-url"
-            type="text"
-            value={updateUrl}
-            onChange={(e) => setUpdateUrl(e.target.value)}
-            placeholder="http://..."
-          />
+      {/* Available Update Info */}
+      {availableUpdate && (
+        <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950 p-4 space-y-2">
+          <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+            <Sparkles className="h-4 w-4" />
+            <span className="font-medium">Update Available: v{availableUpdate.version}</span>
+          </div>
+          {availableUpdate.fileSize && (
+            <p className="text-xs text-green-700 dark:text-green-300">
+              Size: {(availableUpdate.fileSize / 1024 / 1024).toFixed(2)} MB
+            </p>
+          )}
         </div>
+      )}
 
-        <div className="space-y-2">
-          <Label htmlFor="ota-version">Version</Label>
-          <Input
-            id="ota-version"
-            type="text"
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
-            placeholder="1.0.1"
-          />
-        </div>
-
-        <div className="flex gap-2">
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button
+          onClick={handleCheckForUpdates}
+          disabled={isChecking || isUpdating}
+          variant="outline"
+          className="flex-1"
+        >
+          {isChecking ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Checking...
+            </>
+          ) : (
+            "Check for Updates"
+          )}
+        </Button>
+        {availableUpdate && (
           <Button
-            onClick={handleUpdate}
-            disabled={isUpdating || !updateUrl.trim()}
+            onClick={handleApplyUpdate}
+            disabled={isUpdating}
             className="flex-1"
           >
             {isUpdating ? (
@@ -1064,20 +1138,20 @@ function OTAUpdateSection() {
                 Updating...
               </>
             ) : (
-              "Download & Apply Update"
+              `Apply v${availableUpdate.version}`
             )}
           </Button>
-          <Button variant="destructive" onClick={handleReset}>
-            Reset
-          </Button>
-        </div>
-
-        {status && (
-          <p className={`text-sm ${status.startsWith("Error") ? "text-destructive" : "text-green-600"}`}>
-            {status}
-          </p>
         )}
+        <Button variant="destructive" onClick={handleReset} disabled={isUpdating}>
+          Reset
+        </Button>
       </div>
+
+      {status && (
+        <p className={`text-sm ${status.startsWith("Error") ? "text-destructive" : "text-green-600"}`}>
+          {status}
+        </p>
+      )}
     </div>
   );
 }

@@ -11,6 +11,13 @@ mkdir -p "$HOME/.local/bin"
 # Fix ownership of shared volume (in case it was created by root)
 sudo chown -R vscode:vscode /home/vscode/.claude-shared 2>/dev/null || true
 
+# Fix ownership of node_modules volume
+sudo chown -R vscode:vscode /workspace/node_modules 2>/dev/null || true
+
+# Install pnpm globally
+echo "Installing pnpm..."
+npm install -g pnpm@9
+
 # Install Claude Code CLI
 echo "Installing Claude Code CLI..."
 npm install -g @anthropic-ai/claude-code
@@ -48,17 +55,21 @@ if [ ! -f "$HOME/.local/bin/claude-real" ]; then
   ln -sf "$CLAUDE_BIN" "$HOME/.local/bin/claude-real"
 fi
 
-# Create save-claude-auth script
-cat > "$HOME/save-claude-auth.sh" << 'SAVE_EOF'
+# Create save-claude-auth script (also saves gh and ssh)
+cat > "$HOME/save-auth.sh" << 'SAVE_EOF'
 #!/bin/bash
 set -euo pipefail
 
-echo "Saving Claude credentials to shared volume..."
+echo "Saving credentials to shared volume..."
 
 sudo chown -R vscode:vscode /home/vscode/.claude-shared 2>/dev/null || true
 mkdir -p /home/vscode/.claude-shared/auth
+mkdir -p /home/vscode/.claude-shared/ssh
+mkdir -p /home/vscode/.claude-shared/gh
 
-# Save OAuth credentials
+# === Claude credentials ===
+echo ""
+echo "=== Claude ==="
 if [ -f "$HOME/.claude/.credentials.json" ]; then
   cp -p "$HOME/.claude/.credentials.json" /home/vscode/.claude-shared/auth/credentials.json
   echo "✓ Saved: ~/.claude/.credentials.json"
@@ -66,34 +77,63 @@ else
   echo "✗ Missing: ~/.claude/.credentials.json (run 'claude login' first)"
 fi
 
-# Save user config (MCP servers, settings)
 if [ -f "$HOME/.claude.json" ]; then
   cp -p "$HOME/.claude.json" /home/vscode/.claude-shared/auth/claude.json
   echo "✓ Saved: ~/.claude.json"
-else
-  echo "- Skipped: ~/.claude.json (not found, ok if you only use OAuth)"
 fi
 
-# Save settings.json if it exists
 if [ -f "$HOME/.claude/settings.json" ]; then
   cp -p "$HOME/.claude/settings.json" /home/vscode/.claude-shared/auth/settings.json
   echo "✓ Saved: ~/.claude/settings.json"
 fi
 
+# === SSH keys ===
 echo ""
-echo "Claude auth saved to: /home/vscode/.claude-shared/auth/"
-ls -la /home/vscode/.claude-shared/auth/
+echo "=== SSH ==="
+if [ -d "$HOME/.ssh" ]; then
+  cp -rp "$HOME/.ssh/"* /home/vscode/.claude-shared/ssh/ 2>/dev/null || true
+  echo "✓ Saved: ~/.ssh/* (keys and config)"
+else
+  echo "✗ Missing: ~/.ssh directory"
+fi
+
+# === GitHub CLI auth ===
+echo ""
+echo "=== GitHub CLI ==="
+if [ -d "$HOME/.config/gh" ]; then
+  cp -rp "$HOME/.config/gh/"* /home/vscode/.claude-shared/gh/ 2>/dev/null || true
+  echo "✓ Saved: ~/.config/gh/* (gh auth)"
+else
+  echo "✗ Missing: ~/.config/gh (run 'gh auth login' first)"
+fi
+
+# === Git config ===
+echo ""
+echo "=== Git config ==="
+if [ -f "$HOME/.gitconfig" ]; then
+  cp -p "$HOME/.gitconfig" /home/vscode/.claude-shared/auth/gitconfig
+  echo "✓ Saved: ~/.gitconfig"
+fi
+
+echo ""
+echo "All credentials saved to: /home/vscode/.claude-shared/"
+ls -la /home/vscode/.claude-shared/
 SAVE_EOF
+
+chmod +x "$HOME/save-auth.sh"
+
+# Keep backward-compatible alias
+ln -sf "$HOME/save-auth.sh" "$HOME/save-claude-auth.sh"
 
 chmod +x "$HOME/save-claude-auth.sh"
 
 # Restore any existing credentials
 bash /workspace/.devcontainer/restore-claude-auth.sh
 
-# Install project dependencies
+# Install project dependencies (non-interactive)
 echo "Installing project dependencies..."
 cd /workspace
-pnpm install || echo "pnpm install skipped (may need env setup)"
+CI=true pnpm install --frozen-lockfile || CI=true pnpm install || echo "pnpm install skipped (may need env setup)"
 
 echo ""
 echo "=== Setup complete ==="

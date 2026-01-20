@@ -16,8 +16,6 @@
  *   prod:    https://agreeable-ibex-949.convex.cloud
  */
 
-import { ConvexHttpClient } from "convex/browser";
-import { api } from "@holaai/convex";
 import { readFileSync, statSync, existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -31,6 +29,31 @@ const CONVEX_URLS = {
   staging: "https://adorable-firefly-704.convex.cloud",
   prod: "https://agreeable-ibex-949.convex.cloud",
 };
+
+/**
+ * Call a Convex mutation via HTTP API
+ */
+async function callMutation(convexUrl, functionPath, args = {}) {
+  const response = await fetch(`${convexUrl}/api/mutation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      path: functionPath,
+      args,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Convex mutation failed: ${response.status} ${text}`);
+  }
+
+  const data = await response.json();
+  if (data.status === "error") {
+    throw new Error(`Convex error: ${data.errorMessage}`);
+  }
+  return data.value;
+}
 
 async function uploadOTA() {
   // Parse arguments
@@ -54,7 +77,6 @@ async function uploadOTA() {
   }
 
   const convexUrl = CONVEX_URLS[env];
-  const client = new ConvexHttpClient(convexUrl);
 
   // Find the zip file
   const bundlesDir = path.join(rootDir, "ota-bundles");
@@ -81,7 +103,7 @@ async function uploadOTA() {
   try {
     // Step 1: Get upload URL from Convex
     console.log("1. Getting upload URL...");
-    const uploadUrl = await client.mutation(api.lifeos.ota.generateUploadUrl);
+    const uploadUrl = await callMutation(convexUrl, "lifeos/ota:generateUploadUrl");
 
     // Step 2: Upload the file
     console.log("2. Uploading bundle...");
@@ -100,7 +122,7 @@ async function uploadOTA() {
 
     // Step 3: Create the update record
     console.log("3. Creating update record...");
-    const result = await client.mutation(api.lifeos.ota.createUpdate, {
+    const result = await callMutation(convexUrl, "lifeos/ota:createUpdate", {
       version,
       bundleStorageId: storageId,
       fileSize,

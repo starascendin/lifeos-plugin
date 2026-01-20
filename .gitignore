@@ -159,3 +159,20 @@ vite.config.ts.timestamp-*
 
 # Capacitor OTA bundles
 **/ota-bundles/
+
+# pnpm store (can be very large)
+.pnpm-store/
+
+# Build artifacts
+**/target/
+**/build/
+ios/App/build/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+packages/beeperdb/data/

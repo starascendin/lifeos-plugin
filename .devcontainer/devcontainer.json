@@ -9,9 +9,10 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
   "workspaceFolder": "/workspace",
 
-  // Named volume for Claude credentials - persists across container rebuilds
+  // Named volumes for credentials and node_modules (separate from host)
   "mounts": [
-    "source=claude-credentials-${localEnv:USER},target=/home/vscode/.claude-shared,type=volume"
+    "source=claude-credentials-${localEnv:USER},target=/home/vscode/.claude-shared,type=volume",
+    "source=holaai-node-modules,target=/workspace/node_modules,type=volume"
   ],
 
   // Run as non-root user

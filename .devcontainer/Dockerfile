@@ -9,9 +9,6 @@ RUN apt-get update && apt-get install -y \
     fzf \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pnpm globally
-RUN npm install -g pnpm@9
-
 # Create the claude-shared directory with correct ownership
 RUN mkdir -p /home/vscode/.claude-shared/auth \
     && chown -R vscode:vscode /home/vscode/.claude-shared
