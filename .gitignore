@@ -156,3 +156,6 @@ vite.config.ts.timestamp-*
 
 
 .zip
+
+# Capacitor OTA bundles
+**/ota-bundles/
