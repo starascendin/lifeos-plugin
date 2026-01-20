@@ -21,7 +21,7 @@
     "noFallthroughCasesInSwitch": true,
 
     /* Node types for workspace dependencies */
-    "types": ["node", "@react-three/fiber"],
+    "types": ["node"],
 
     /* Path aliases */
     "baseUrl": ".",

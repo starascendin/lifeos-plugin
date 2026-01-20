@@ -9,10 +9,19 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
   "workspaceFolder": "/workspace",
 
-  // Named volumes for credentials and node_modules (separate from host)
+  // Named volumes - credentials + ALL node_modules (isolated from host)
+  // Regenerate with: .devcontainer/generate-mounts.sh
   "mounts": [
     "source=claude-credentials-${localEnv:USER},target=/home/vscode/.claude-shared,type=volume",
-    "source=holaai-node-modules,target=/workspace/node_modules,type=volume"
+    "source=holaai-convexo-monorepo-pnpm-store,target=/workspace/.pnpm-store,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-root,target=/workspace/node_modules,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-apps-lifeos-taurireact-macapp,target=/workspace/apps/lifeos/taurireact-macapp/node_modules,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-apps-lifeos-taurireact-macapp-plugins-capacitor-clerk-native,target=/workspace/apps/lifeos/taurireact-macapp/plugins/capacitor-clerk-native/node_modules,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-packages-beeperdb,target=/workspace/packages/beeperdb/node_modules,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-packages-chrome_exts-inspiration_ext,target=/workspace/packages/chrome_exts/inspiration_ext/node_modules,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-packages-holaaiconvex,target=/workspace/packages/holaaiconvex/node_modules,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-packages-lifeos-mcp,target=/workspace/packages/lifeos-mcp/node_modules,type=volume",
+    "source=holaai-convexo-monorepo-node-modules-packages-livekit-voice-agent,target=/workspace/packages/livekit-voice-agent/node_modules,type=volume"
   ],
 
   // Run as non-root user

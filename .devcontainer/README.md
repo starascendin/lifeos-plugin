@@ -23,6 +23,8 @@ This devcontainer is configured for running Claude Code CLI in autonomous (yolo)
 └─────────────────────────────────────────────────────────┘
 ```
 
+This devcontainer also isolates `/workspace/.pnpm-store` and all `node_modules` via Docker volumes so Linux installs can’t corrupt macOS installs in the bind-mounted repo.
+
 ## Quick Start
 
 ### 1. Open in Devcontainer
