@@ -1,0 +1,16 @@
+{
+  "name": "claudecode-noncode-agent-docker",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "docker build -t claude-agent -f Dockerfile.claude-agent .",
+    "agent": "bun agent.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
