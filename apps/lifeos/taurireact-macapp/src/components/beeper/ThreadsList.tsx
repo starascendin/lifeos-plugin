@@ -88,10 +88,11 @@ export function ThreadsList({
               key={`${message.thread_name}-${message.timestamp_readable}-${index}`}
               className="p-3 hover:bg-muted/50 cursor-pointer"
               onClick={() => {
-                // Find and select the thread
-                if (message.thread_name) {
+                // Find and select the thread using thread_id for unique identification
+                if (message.thread_id) {
                   const thread: BeeperThread = {
-                    name: message.thread_name,
+                    thread_id: message.thread_id,
+                    name: message.thread_name || "Unknown",
                     thread_type: "dm",
                     participant_count: 2,
                     message_count: 0,

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 // Types matching the Rust structs
 
 export interface BeeperThread {
+  thread_id: string;
   name: string;
   thread_type: string; // "dm" | "group"
   participant_count: number;
@@ -11,6 +12,7 @@ export interface BeeperThread {
 }
 
 export interface BeeperMessage {
+  thread_id?: string;
   thread_name?: string;
   sender: string;
   text: string;
@@ -108,6 +110,26 @@ export async function getBeeperConversation(
     });
   } catch (error) {
     console.error("Failed to get Beeper conversation:", error);
+    return [];
+  }
+}
+
+/**
+ * Get conversation messages for a specific thread by thread ID (preferred)
+ * This avoids issues with duplicate thread names like "WhatsApp private chat"
+ */
+export async function getBeeperConversationById(
+  threadId: string,
+  limit?: number
+): Promise<BeeperMessage[]> {
+  if (!isTauri) return [];
+  try {
+    return await invoke<BeeperMessage[]>("get_beeper_conversation_by_id", {
+      threadId,
+      limit,
+    });
+  } catch (error) {
+    console.error("Failed to get Beeper conversation by ID:", error);
     return [];
   }
 }

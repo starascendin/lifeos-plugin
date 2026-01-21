@@ -15,7 +15,8 @@ use api_keys::{
 };
 use beeper::{
     check_beeper_available, check_beeper_database_exists, get_beeper_conversation,
-    get_beeper_messages, get_beeper_threads, search_beeper_messages, sync_beeper_database,
+    get_beeper_conversation_by_id, get_beeper_messages, get_beeper_threads,
+    search_beeper_messages, sync_beeper_database,
 };
 use coder::{delegate_to_coder, get_coder_presets, get_coder_templates};
 use council_server::{get_council_server_status, start_council_server, stop_council_server};
@@ -326,6 +327,7 @@ pub fn run() {
             sync_beeper_database,
             get_beeper_threads,
             get_beeper_conversation,
+            get_beeper_conversation_by_id,
             get_beeper_messages,
             search_beeper_messages,
         ])

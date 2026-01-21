@@ -6,6 +6,7 @@ use tauri::command;
 /// Represents a Beeper thread/conversation
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BeeperThread {
+    pub thread_id: String,
     pub name: String,
     #[serde(rename = "type")]
     pub thread_type: String,
@@ -17,6 +18,8 @@ pub struct BeeperThread {
 /// Represents a Beeper message
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BeeperMessage {
+    #[serde(default)]
+    pub thread_id: Option<String>,
     #[serde(default)]
     pub thread_name: Option<String>,
     pub sender: String,
@@ -217,6 +220,41 @@ pub async fn get_beeper_conversation(
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("bun query.ts convo failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Parse JSON output
+    let messages: Vec<BeeperMessage> = serde_json::from_str(&stdout)
+        .map_err(|e| format!("Failed to parse conversation JSON: {}", e))?;
+
+    Ok(messages)
+}
+
+/// Get conversation/messages for a specific thread by thread ID (preferred)
+#[command]
+pub async fn get_beeper_conversation_by_id(
+    thread_id: String,
+    limit: Option<i32>,
+) -> Result<Vec<BeeperMessage>, String> {
+    let beeperdb_path = get_beeperdb_path();
+
+    // Build the command: bun query.ts convo-id "<thread_id>" [limit]
+    let mut cmd = Command::new("bun");
+    cmd.arg("query.ts").arg("convo-id").arg(&thread_id);
+
+    if let Some(l) = limit {
+        cmd.arg(l.to_string());
+    }
+
+    let output = cmd
+        .current_dir(&beeperdb_path)
+        .output()
+        .map_err(|e| format!("Failed to run bun query.ts convo-id: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("bun query.ts convo-id failed: {}", stderr));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import {
   getBeeperThreads,
-  getBeeperConversation,
+  getBeeperConversationById,
   searchBeeperMessages,
   checkBeeperDatabaseExists,
   type BeeperThread,
@@ -85,7 +85,9 @@ export function BeeperProvider({ children }: { children: React.ReactNode }) {
 
       setIsLoadingConversation(true);
       try {
-        const messages = await getBeeperConversation(thread.name);
+        // Use thread_id instead of name to avoid issues with duplicate names
+        // like "WhatsApp private chat" which is shared by many DM threads
+        const messages = await getBeeperConversationById(thread.thread_id);
         setConversation(messages);
       } catch (error) {
         console.error("Failed to load conversation:", error);

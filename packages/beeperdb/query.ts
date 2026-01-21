@@ -33,7 +33,7 @@ export async function getThreads(search?: string) {
     ? `WHERE LOWER(name) LIKE '%${search.toLowerCase()}%'`
     : '';
   return query(`
-    SELECT name, type, participant_count, message_count, last_message_at
+    SELECT thread_id, name, type, participant_count, message_count, last_message_at
     FROM thread_summaries ${where}
     ORDER BY last_message_at DESC LIMIT 30
   `);
@@ -53,7 +53,7 @@ export async function getMessages(nameOrThread: string, limit = 50) {
 
 export async function searchText(text: string, limit = 30) {
   return query(`
-    SELECT thread_name, sender, text, timestamp_readable
+    SELECT thread_id, thread_name, sender, text, timestamp_readable
     FROM conversations
     WHERE LOWER(text) LIKE '%${text.toLowerCase()}%'
     ORDER BY timestamp DESC
@@ -71,6 +71,16 @@ export async function getConversation(threadName: string, limit = 100) {
   `);
 }
 
+export async function getConversationById(threadId: string, limit = 100) {
+  return query(`
+    SELECT sender, text, timestamp_readable
+    FROM conversations
+    WHERE thread_id = '${threadId}'
+    ORDER BY timestamp ASC
+    LIMIT ${limit}
+  `);
+}
+
 // ============================================================================
 // CLI
 // ============================================================================
@@ -82,10 +92,11 @@ async function main() {
     console.log(`
 Usage:
   bun query.ts contacts [search]     - List contacts
-  bun query.ts threads [search]      - List threads
+  bun query.ts threads [search]      - List threads (includes thread_id)
   bun query.ts messages <name>       - Get messages by contact/thread name
   bun query.ts search <text>         - Search message text
   bun query.ts convo <thread_name>   - Get full conversation by exact thread name
+  bun query.ts convo-id <thread_id>  - Get full conversation by thread ID (preferred)
     `);
     return;
   }
@@ -110,6 +121,10 @@ Usage:
     case 'convo':
       if (!args[0]) { console.error('Need thread name'); return; }
       result = await getConversation(args[0]);
+      break;
+    case 'convo-id':
+      if (!args[0]) { console.error('Need thread_id'); return; }
+      result = await getConversationById(args[0], parseInt(args[1]) || 100);
       break;
     default:
       console.error(`Unknown command: ${cmd}`);
