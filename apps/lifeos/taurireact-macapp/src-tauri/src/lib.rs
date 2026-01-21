@@ -2,6 +2,7 @@
 
 mod api_keys;
 mod app_category;
+mod beeper;
 mod coder;
 mod council_server;
 mod notes;
@@ -11,6 +12,10 @@ mod youtube;
 
 use api_keys::{
     delete_groq_api_key, get_groq_api_key, open_full_disk_access_settings, save_groq_api_key,
+};
+use beeper::{
+    check_beeper_available, check_beeper_database_exists, get_beeper_conversation,
+    get_beeper_messages, get_beeper_threads, search_beeper_messages, sync_beeper_database,
 };
 use coder::{delegate_to_coder, get_coder_presets, get_coder_templates};
 use council_server::{get_council_server_status, start_council_server, stop_council_server};
@@ -315,6 +320,14 @@ pub fn run() {
             get_coder_templates,
             get_coder_presets,
             delegate_to_coder,
+            // Beeper Integration
+            check_beeper_available,
+            check_beeper_database_exists,
+            sync_beeper_database,
+            get_beeper_threads,
+            get_beeper_conversation,
+            get_beeper_messages,
+            search_beeper_messages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

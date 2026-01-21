@@ -8,11 +8,12 @@ import { TranscriptView } from "./youtube/TranscriptView";
 import { ScreenTimeDashboard } from "./screentime/ScreenTimeDashboard";
 import { NotesTab } from "./notes/NotesTab";
 import { VoiceMemosTab } from "./voicememos/VoiceMemosTab";
+import { BeeperSyncTab } from "./beeper/BeeperSyncTab";
 import { SettingsTab } from "./settings/SettingsTab";
 // Council tab hidden for now
 // import { CouncilServerTab } from "./council/CouncilServerTab";
 
-type Tab = "youtube" | "screentime" | "notes" | "voicememos" | "council" | "settings";
+type Tab = "youtube" | "screentime" | "notes" | "voicememos" | "beeper" | "council" | "settings";
 
 export function MainContent() {
   const [activeTab, setActiveTab] = useState<Tab>("youtube");
@@ -59,6 +60,9 @@ export function MainContent() {
     }
     if (activeTab === "voicememos") {
       return "Voice Memos";
+    }
+    if (activeTab === "beeper") {
+      return "Beeper";
     }
     // Council tab hidden for now
     // if (activeTab === "council") {
@@ -144,6 +148,16 @@ export function MainContent() {
         >
           Voice
         </button>
+        <button
+          onClick={() => setActiveTab("beeper")}
+          className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
+            activeTab === "beeper"
+              ? "text-[var(--accent)] border-b-2 border-[var(--accent)]"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          Beeper
+        </button>
         {/* Council tab hidden for now
         <button
           onClick={() => setActiveTab("council")}
@@ -174,7 +188,9 @@ export function MainContent() {
           <SettingsTab />
         ) : /* activeTab === "council" ? (
           <CouncilServerTab />
-        ) : */ activeTab === "voicememos" ? (
+        ) : */ activeTab === "beeper" ? (
+          <BeeperSyncTab />
+        ) : activeTab === "voicememos" ? (
           <VoiceMemosTab />
         ) : activeTab === "notes" ? (
           <NotesTab />

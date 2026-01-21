@@ -177,6 +177,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
         ],
       },
+      { name: "Beeper", href: "/lifeos/beeper", icon: MessageSquare },
       { name: "Settings", href: "/lifeos/settings", icon: Settings },
       {
         name: "Logout",
