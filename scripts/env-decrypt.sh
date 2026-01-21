@@ -56,16 +56,16 @@ decrypt_env_files() {
         # Check if decrypted file is newer than encrypted
         if [ -f "$decrypted_file" ] && [ "$decrypted_file" -nt "$encrypted_file" ]; then
             echo "  [SKIP] $relative_decrypted (newer than encrypted)"
-            ((SKIPPED++))
+            SKIPPED=$((SKIPPED + 1))
             continue
         fi
 
         if age --decrypt -i "$AGE_KEY_FILE" -o "$decrypted_file" "$encrypted_file" 2>/dev/null; then
             echo "  [OK]   $relative_decrypted"
-            ((DECRYPTED++))
+            DECRYPTED=$((DECRYPTED + 1))
         else
             echo "  [FAIL] $relative_decrypted (decryption failed)"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     done
 }

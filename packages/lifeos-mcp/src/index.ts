@@ -6,12 +6,18 @@
  * Exposes LifeOS Project Management tools via Model Context Protocol.
  * Calls the Convex HTTP /tool-call endpoint.
  *
- * Environment variables:
- * - CONVEX_URL: Convex deployment URL (e.g., https://your-deployment.convex.cloud)
- * - LIFEOS_API_KEY: API key for authentication (or use LIFEOS_USER_ID with built-in key)
- * - LIFEOS_USER_ID: User ID for API key auth
+ * CLI flags (take precedence over env vars):
+ *   --url, -u       Convex deployment URL (e.g., https://your-deployment.convex.site)
+ *   --user-id, -i   User ID for API authentication
+ *   --api-key, -k   API key for authentication
+ *
+ * Environment variables (fallback):
+ *   CONVEX_URL      Convex deployment URL
+ *   LIFEOS_USER_ID  User ID for API key auth
+ *   LIFEOS_API_KEY  API key for authentication
  */
 
+import { Command } from "commander";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -19,6 +25,20 @@ import {
   ListToolsRequestSchema,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+
+// Parse CLI arguments
+const program = new Command();
+
+program
+  .name("lifeos-mcp")
+  .description("MCP server for LifeOS Project Management")
+  .version("0.1.0")
+  .option("-u, --url <url>", "Convex deployment URL")
+  .option("-i, --user-id <id>", "User ID for API authentication")
+  .option("-k, --api-key <key>", "API key for authentication")
+  .parse();
+
+const options = program.opts();
 
 // Tool definitions matching the Convex tool-call endpoint
 const TOOLS: Tool[] = [
@@ -682,18 +702,27 @@ const TOOLS: Tool[] = [
   },
 ];
 
-// Configuration
+// Configuration: CLI flags take precedence over env vars
 // NOTE: HTTP routes are served from .convex.site, NOT .convex.cloud
-const CONVEX_URL =
-  process.env.CONVEX_URL || "https://beaming-giraffe-300.convex.site";
-const API_KEY = process.env.LIFEOS_API_KEY || "tool-call-secret-key-2024";
-const USER_ID = process.env.LIFEOS_USER_ID;
+const CONVEX_URL = options.url || process.env.CONVEX_URL;
+const API_KEY = options.apiKey || process.env.LIFEOS_API_KEY;
+const USER_ID = options.userId || process.env.LIFEOS_USER_ID;
 
-if (!USER_ID) {
-  console.error(
-    "Error: LIFEOS_USER_ID environment variable is required",
-  );
-  console.error("Set it to your Convex user ID to authenticate API calls.");
+// Validate required configuration
+const missingConfig: string[] = [];
+if (!CONVEX_URL) missingConfig.push("CONVEX_URL (--url or CONVEX_URL env)");
+if (!API_KEY) missingConfig.push("API_KEY (--api-key or LIFEOS_API_KEY env)");
+if (!USER_ID) missingConfig.push("USER_ID (--user-id or LIFEOS_USER_ID env)");
+
+if (missingConfig.length > 0) {
+  console.error("Error: Missing required configuration:");
+  missingConfig.forEach((c) => console.error(`  - ${c}`));
+  console.error("");
+  console.error("Example usage:");
+  console.error("  lifeos-mcp --url https://your-app.convex.site --user-id xxx --api-key yyy");
+  console.error("");
+  console.error("Or with environment variables:");
+  console.error("  CONVEX_URL=https://your-app.convex.site LIFEOS_USER_ID=xxx LIFEOS_API_KEY=yyy lifeos-mcp");
   process.exit(1);
 }
 

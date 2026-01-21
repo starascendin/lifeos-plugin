@@ -64,10 +64,10 @@ encrypt_env_files() {
 
         if age --encrypt -r "$PUBLIC_KEY" -o "$encrypted_path" "$env_file" 2>/dev/null; then
             echo "  [OK]   ${relative_path}.age"
-            ((ENCRYPTED++))
+            ENCRYPTED=$((ENCRYPTED + 1))
         else
             echo "  [FAIL] ${relative_path}.age (encryption failed)"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     done
 }

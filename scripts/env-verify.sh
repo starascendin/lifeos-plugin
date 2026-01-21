@@ -94,10 +94,10 @@ verify_env_files() {
 
         if age --decrypt -i "$AGE_KEY_FILE" -o "$tmp_path" "$age_file" 2>/dev/null; then
             echo "  [OK]   ${relative_age}.tmpdecrypted"
-            ((VERIFIED++))
+            VERIFIED=$((VERIFIED + 1))
         else
             echo "  [FAIL] $relative_age (decryption failed)"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     done
 }
