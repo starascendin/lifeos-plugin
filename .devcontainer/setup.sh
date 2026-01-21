@@ -125,6 +125,17 @@ if [ -f "$HOME/.gitconfig" ]; then
   echo "✓ Saved: ~/.gitconfig"
 fi
 
+# === Convex credentials ===
+echo ""
+echo "=== Convex ==="
+mkdir -p /home/vscode/.claude-shared/convex
+if [ -d "$HOME/.convex" ] && [ "$(ls -A "$HOME/.convex" 2>/dev/null)" ]; then
+  cp -rp "$HOME/.convex/"* /home/vscode/.claude-shared/convex/ 2>/dev/null || true
+  echo "✓ Saved: ~/.convex/* (convex auth)"
+else
+  echo "✗ Missing: ~/.convex (run 'npx convex dev --once' first)"
+fi
+
 echo ""
 echo "All credentials saved to: /home/vscode/.claude-shared/"
 ls -la /home/vscode/.claude-shared/

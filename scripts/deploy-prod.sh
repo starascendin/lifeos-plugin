@@ -2,6 +2,17 @@
 
 set -e
 
+# Parse arguments
+YES_FLAG=false
+for arg in "$@"; do
+    case $arg in
+        --yes|-y)
+            YES_FLAG=true
+            shift
+            ;;
+    esac
+done
+
 echo "Deploy to Production"
 echo "========================"
 echo "This will merge: dev -> staging -> main"
@@ -20,19 +31,24 @@ echo ""
 
 # Master confirmation - if yes, skip all individual prompts
 FORCE_ALL=false
-read -p "Force all steps without individual confirmations? (y/N): " force_confirm
-if [[ "$force_confirm" =~ ^[Yy]$ ]]; then
+if [[ "$YES_FLAG" == true ]]; then
     FORCE_ALL=true
-    echo "-> Will proceed with all steps automatically"
+    echo "-> --yes flag: Proceeding with all steps automatically"
 else
-    echo "-> Will prompt for each step"
-fi
+    read -p "Force all steps without individual confirmations? (y/N): " force_confirm
+    if [[ "$force_confirm" =~ ^[Yy]$ ]]; then
+        FORCE_ALL=true
+        echo "-> Will proceed with all steps automatically"
+    else
+        echo "-> Will prompt for each step"
+    fi
 
-echo ""
-read -p "Proceed with deploy? (y/N): " confirm
-if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 0
+    echo ""
+    read -p "Proceed with deploy? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 0
+    fi
 fi
 
 echo ""

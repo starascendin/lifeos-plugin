@@ -118,6 +118,10 @@ const TOOLS: Tool[] = [
           type: "string",
           description: "Assign to a specific cycle (optional)",
         },
+        phaseId: {
+          type: "string",
+          description: "Assign to a specific phase within the project (optional)",
+        },
       },
       required: ["title"],
     },
@@ -545,6 +549,135 @@ const TOOLS: Tool[] = [
         },
       },
       required: ["clientId"],
+    },
+  },
+
+  // Phase Management Tools
+  {
+    name: "get_phases",
+    description:
+      "Get all phases for a project with issue stats. Use this to see project breakdown by phases.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        projectId: {
+          type: "string",
+          description: "The project's ID (required)",
+        },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "get_phase",
+    description:
+      "Get a single phase with its issues. Use this to see phase details and issues assigned to it.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        phaseId: {
+          type: "string",
+          description: "The phase's ID (required)",
+        },
+      },
+      required: ["phaseId"],
+    },
+  },
+  {
+    name: "create_phase",
+    description:
+      "Create a new phase in a project. Use this to organize project work into distinct stages.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        projectId: {
+          type: "string",
+          description: "The project's ID (required)",
+        },
+        name: {
+          type: "string",
+          description: "The phase name (required)",
+        },
+        description: {
+          type: "string",
+          description: "Phase description, markdown supported (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["not_started", "in_progress", "completed"],
+          description: "Phase status (optional, default: not_started)",
+        },
+      },
+      required: ["projectId", "name"],
+    },
+  },
+  {
+    name: "update_phase",
+    description: "Update a phase's details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        phaseId: {
+          type: "string",
+          description: "The phase's ID (required)",
+        },
+        name: {
+          type: "string",
+          description: "Updated name (optional)",
+        },
+        description: {
+          type: "string",
+          description: "Updated description (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["not_started", "in_progress", "completed"],
+          description: "Updated status (optional)",
+        },
+        startDate: {
+          type: "string",
+          description: "Start date in ISO format (optional)",
+        },
+        endDate: {
+          type: "string",
+          description: "End date in ISO format (optional)",
+        },
+      },
+      required: ["phaseId"],
+    },
+  },
+  {
+    name: "delete_phase",
+    description:
+      "Delete a phase. Issues in the phase are unlinked (not deleted).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        phaseId: {
+          type: "string",
+          description: "The phase's ID (required)",
+        },
+      },
+      required: ["phaseId"],
+    },
+  },
+  {
+    name: "assign_issue_to_phase",
+    description:
+      "Assign an issue to a phase, or unassign by omitting phaseId.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        issueIdOrIdentifier: {
+          type: "string",
+          description: "Issue ID or identifier like PROJ-123 (required)",
+        },
+        phaseId: {
+          type: "string",
+          description: "Phase ID (optional - omit to unassign from current phase)",
+        },
+      },
+      required: ["issueIdOrIdentifier"],
     },
   },
 ];

@@ -23,6 +23,8 @@ export type ProjectStatus =
 
 export type CycleStatus = "upcoming" | "active" | "completed";
 
+export type PhaseStatus = "not_started" | "in_progress" | "completed";
+
 export type CycleDuration = "1_week" | "2_weeks";
 export type CycleStartDay = "sunday" | "monday";
 
@@ -237,4 +239,13 @@ export const PRIORITY_CONFIG: Record<
   medium: { label: "Medium", color: "text-yellow-500", icon: "!" },
   low: { label: "Low", color: "text-blue-500", icon: "↓" },
   none: { label: "No Priority", color: "text-gray-400", icon: "−" },
+};
+
+export const PHASE_STATUS_CONFIG: Record<
+  PhaseStatus,
+  { label: string; color: string; bgColor: string }
+> = {
+  not_started: { label: "Not Started", color: "text-gray-500", bgColor: "bg-gray-500/10" },
+  in_progress: { label: "In Progress", color: "text-blue-500", bgColor: "bg-blue-500/10" },
+  completed: { label: "Completed", color: "text-green-500", bgColor: "bg-green-500/10" },
 };

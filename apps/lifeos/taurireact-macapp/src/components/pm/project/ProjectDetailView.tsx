@@ -5,6 +5,7 @@ import type { Id } from "@holaai/convex";
 import { ProjectHeader } from "./ProjectHeader";
 import { ProjectProperties } from "./ProjectProperties";
 import { ProjectIssuesList } from "./ProjectIssuesList";
+import { PhasesSection } from "./PhasesSection";
 import { ProjectStatus, Priority } from "@/lib/contexts/PMContext";
 import { PomodoroWidget, PomodoroStatsMini } from "../pomodoro";
 import { TiptapEditor } from "@/components/shared/TiptapEditor";
@@ -304,7 +305,10 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
             />
           </div>
 
-          {/* Issues List */}
+          {/* Phases */}
+          <PhasesSection projectId={projectId} issues={issues} />
+
+          {/* Issues List (unassigned to phases) */}
           <div>
             <ProjectIssuesList projectId={projectId} issues={issues} />
           </div>

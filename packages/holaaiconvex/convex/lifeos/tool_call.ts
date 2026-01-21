@@ -102,6 +102,7 @@ export const TOOL_DEFINITIONS = {
       priority: "optional - urgent, high, medium, low, none",
       dueDate: "optional - ISO date string",
       cycleId: "optional - assign to specific cycle",
+      phaseId: "optional - assign to specific phase within the project",
     },
   },
   mark_issue_complete: {
@@ -224,6 +225,52 @@ export const TOOL_DEFINITIONS = {
       name: "optional - updated name",
       description: "optional - updated description",
       status: "optional - active or archived",
+    },
+  },
+  // Phase Management tools
+  get_phases: {
+    description: "Get all phases for a project with issue stats",
+    params: {
+      projectId: "required - the project's ID",
+    },
+  },
+  get_phase: {
+    description: "Get a single phase with its issues",
+    params: {
+      phaseId: "required - the phase's ID",
+    },
+  },
+  create_phase: {
+    description: "Create a new phase in a project",
+    params: {
+      projectId: "required - the project's ID",
+      name: "required - the phase name",
+      description: "optional - phase description (markdown supported)",
+      status: "optional - not_started, in_progress, or completed",
+    },
+  },
+  update_phase: {
+    description: "Update a phase's details",
+    params: {
+      phaseId: "required - the phase's ID",
+      name: "optional - updated name",
+      description: "optional - updated description",
+      status: "optional - not_started, in_progress, or completed",
+      startDate: "optional - ISO date string",
+      endDate: "optional - ISO date string",
+    },
+  },
+  delete_phase: {
+    description: "Delete a phase (issues are unlinked, not deleted)",
+    params: {
+      phaseId: "required - the phase's ID",
+    },
+  },
+  assign_issue_to_phase: {
+    description: "Assign an issue to a phase, or unassign by omitting phaseId",
+    params: {
+      issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
+      phaseId: "optional - phase ID (omit to unassign from current phase)",
     },
   },
 } as const;
@@ -1239,6 +1286,7 @@ export const createIssueInternal = internalMutation({
     priority: v.optional(v.string()),
     dueDate: v.optional(v.string()),
     cycleId: v.optional(v.string()),
+    phaseId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -1287,6 +1335,30 @@ export const createIssueInternal = internalMutation({
         }
       } catch {
         // Invalid cycle ID, ignore
+      }
+    }
+
+    // Resolve phase if provided
+    let phaseId: Id<"lifeos_pmPhases"> | undefined;
+    let phaseName: string | undefined;
+
+    if (args.phaseId) {
+      try {
+        const phase = await ctx.db.get(args.phaseId as Id<"lifeos_pmPhases">);
+        if (phase && phase.userId === userId) {
+          // Verify phase belongs to the same project
+          if (!projectId || phase.projectId === projectId) {
+            phaseId = phase._id;
+            phaseName = phase.name;
+            // If projectId wasn't provided but phase was, use the phase's project
+            if (!projectId) {
+              projectId = phase.projectId;
+              project = await ctx.db.get(projectId);
+            }
+          }
+        }
+      } catch {
+        // Invalid phase ID, ignore
       }
     }
 
@@ -1365,6 +1437,7 @@ export const createIssueInternal = internalMutation({
       userId,
       projectId,
       cycleId,
+      phaseId,
       parentId: undefined,
       identifier,
       number,
@@ -1384,6 +1457,9 @@ export const createIssueInternal = internalMutation({
     let confirmationMessage = `Created task ${identifier}: "${args.title}"`;
     if (project) {
       confirmationMessage += ` in project ${project.name}`;
+    }
+    if (phaseName) {
+      confirmationMessage += `, phase "${phaseName}"`;
     }
     if (priority !== "none") {
       confirmationMessage += ` with ${priority} priority`;
@@ -1428,6 +1504,8 @@ export const createIssueInternal = internalMutation({
         dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
         cycleId,
         cycleName,
+        phaseId,
+        phaseName,
       },
       suggestCycle,
       activeCycleName,
@@ -2631,6 +2709,530 @@ export const updateClientInternal = internalMutation({
       success: true,
       clientId,
       confirmationMessage: `Updated client "${args.name ?? client.name}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== PHASE MANAGEMENT TOOLS ====================
+
+/**
+ * Get all phases for a project with stats
+ */
+export const getPhasesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    projectId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const projectId = args.projectId as Id<"lifeos_pmProjects">;
+
+    // Verify project belongs to user
+    const project = await ctx.db.get(projectId);
+    if (!project || project.userId !== userId) {
+      return {
+        success: false,
+        error: "Project not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get all phases for the project ordered by order
+    const phases = await ctx.db
+      .query("lifeos_pmPhases")
+      .withIndex("by_project_order", (q) => q.eq("projectId", projectId))
+      .collect();
+
+    // Get stats for each phase
+    const phasesWithStats = await Promise.all(
+      phases.map(async (phase) => {
+        const issues = await ctx.db
+          .query("lifeos_pmIssues")
+          .withIndex("by_phase", (q) => q.eq("phaseId", phase._id))
+          .collect();
+
+        const totalIssues = issues.length;
+        const completedIssues = issues.filter((i) => i.status === "done").length;
+        const inProgressIssues = issues.filter(
+          (i) => i.status === "in_progress" || i.status === "in_review"
+        ).length;
+
+        return {
+          id: phase._id,
+          name: phase.name,
+          description: htmlToPlainText(phase.description),
+          order: phase.order,
+          status: phase.status,
+          startDate: phase.startDate
+            ? new Date(phase.startDate).toISOString()
+            : null,
+          endDate: phase.endDate
+            ? new Date(phase.endDate).toISOString()
+            : null,
+          stats: {
+            totalIssues,
+            completedIssues,
+            inProgressIssues,
+            completionPercent:
+              totalIssues > 0
+                ? Math.round((completedIssues / totalIssues) * 100)
+                : 0,
+          },
+        };
+      })
+    );
+
+    return {
+      success: true,
+      projectId,
+      projectName: project.name,
+      phases: phasesWithStats,
+      count: phasesWithStats.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single phase with its issues
+ */
+export const getPhaseInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    phaseId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const phaseId = args.phaseId as Id<"lifeos_pmPhases">;
+
+    const phase = await ctx.db.get(phaseId);
+    if (!phase || phase.userId !== userId) {
+      return {
+        success: false,
+        error: "Phase not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get project info
+    const project = await ctx.db.get(phase.projectId);
+
+    // Get issues in this phase
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_phase", (q) => q.eq("phaseId", phaseId))
+      .collect();
+
+    // Sort by priority then sortOrder
+    issues.sort((a, b) => {
+      const priorityDiff =
+        PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] -
+        PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER];
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.sortOrder - b.sortOrder;
+    });
+
+    const totalIssues = issues.length;
+    const completedIssues = issues.filter((i) => i.status === "done").length;
+
+    return {
+      success: true,
+      phase: {
+        id: phase._id,
+        name: phase.name,
+        description: htmlToPlainText(phase.description),
+        order: phase.order,
+        status: phase.status,
+        startDate: phase.startDate
+          ? new Date(phase.startDate).toISOString()
+          : null,
+        endDate: phase.endDate
+          ? new Date(phase.endDate).toISOString()
+          : null,
+        projectId: phase.projectId,
+        projectName: project?.name ?? "",
+        projectKey: project?.key ?? "",
+      },
+      issues: issues.map((issue) => ({
+        id: issue._id,
+        identifier: issue.identifier,
+        title: issue.title,
+        status: issue.status,
+        priority: issue.priority,
+        isTopPriority: issue.isTopPriority || false,
+        dueDate: issue.dueDate
+          ? new Date(issue.dueDate).toISOString()
+          : null,
+      })),
+      stats: {
+        totalIssues,
+        completedIssues,
+        completionPercent:
+          totalIssues > 0
+            ? Math.round((completedIssues / totalIssues) * 100)
+            : 0,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a new phase
+ */
+export const createPhaseInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    projectId: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const projectId = args.projectId as Id<"lifeos_pmProjects">;
+    const now = Date.now();
+
+    // Verify project belongs to user
+    const project = await ctx.db.get(projectId);
+    if (!project || project.userId !== userId) {
+      return {
+        success: false,
+        error: "Project not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get max order for existing phases
+    const existingPhases = await ctx.db
+      .query("lifeos_pmPhases")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+
+    const maxOrder =
+      existingPhases.length > 0
+        ? Math.max(...existingPhases.map((p) => p.order))
+        : -1;
+
+    // Validate status
+    type PhaseStatus = "not_started" | "in_progress" | "completed";
+    const validStatuses: PhaseStatus[] = ["not_started", "in_progress", "completed"];
+    const status: PhaseStatus =
+      args.status && validStatuses.includes(args.status as PhaseStatus)
+        ? (args.status as PhaseStatus)
+        : "not_started";
+
+    const phaseId = await ctx.db.insert("lifeos_pmPhases", {
+      userId,
+      projectId,
+      name: args.name.trim(),
+      description: args.description?.trim(),
+      order: maxOrder + 1,
+      status,
+      startDate: undefined,
+      endDate: undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      phaseId,
+      name: args.name.trim(),
+      projectName: project.name,
+      confirmationMessage: `Created phase "${args.name.trim()}" in project ${project.name}.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update a phase
+ */
+export const updatePhaseInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    phaseId: v.string(),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    status: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const phaseId = args.phaseId as Id<"lifeos_pmPhases">;
+
+    const phase = await ctx.db.get(phaseId);
+    if (!phase || phase.userId !== userId) {
+      return {
+        success: false,
+        error: "Phase not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Build updates object
+    const updates: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.name !== undefined) updates.name = args.name.trim();
+    if (args.description !== undefined) {
+      updates.description = args.description.trim() || undefined;
+    }
+
+    // Validate and set status
+    if (args.status !== undefined) {
+      const validStatuses = ["not_started", "in_progress", "completed"];
+      if (validStatuses.includes(args.status)) {
+        updates.status = args.status;
+      }
+    }
+
+    // Parse dates
+    if (args.startDate !== undefined) {
+      if (args.startDate) {
+        const parsed = new Date(args.startDate);
+        if (!isNaN(parsed.getTime())) {
+          updates.startDate = parsed.getTime();
+        }
+      } else {
+        updates.startDate = undefined;
+      }
+    }
+
+    if (args.endDate !== undefined) {
+      if (args.endDate) {
+        const parsed = new Date(args.endDate);
+        if (!isNaN(parsed.getTime())) {
+          updates.endDate = parsed.getTime();
+        }
+      } else {
+        updates.endDate = undefined;
+      }
+    }
+
+    await ctx.db.patch(phaseId, updates);
+
+    return {
+      success: true,
+      phaseId,
+      confirmationMessage: `Updated phase "${args.name ?? phase.name}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete a phase (unlinks issues)
+ */
+export const deletePhaseInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    phaseId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const phaseId = args.phaseId as Id<"lifeos_pmPhases">;
+
+    const phase = await ctx.db.get(phaseId);
+    if (!phase || phase.userId !== userId) {
+      return {
+        success: false,
+        error: "Phase not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const phaseName = phase.name;
+
+    // Unlink issues from phase
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_phase", (q) => q.eq("phaseId", phaseId))
+      .collect();
+
+    for (const issue of issues) {
+      await ctx.db.patch(issue._id, {
+        phaseId: undefined,
+        updatedAt: Date.now(),
+      });
+    }
+
+    // Delete phase notes
+    const notes = await ctx.db
+      .query("lifeos_pmNotes")
+      .withIndex("by_phase", (q) => q.eq("phaseId", phaseId))
+      .collect();
+    for (const note of notes) {
+      await ctx.db.delete(note._id);
+    }
+
+    // Delete the phase
+    await ctx.db.delete(phaseId);
+
+    return {
+      success: true,
+      phaseName,
+      unlinkedIssues: issues.length,
+      confirmationMessage: `Deleted phase "${phaseName}" and unlinked ${issues.length} issues.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Assign or unassign an issue to/from a phase
+ */
+export const assignIssueToPhaseInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    issueIdOrIdentifier: v.string(),
+    phaseId: v.optional(v.string()), // If not provided or empty, unassigns from phase
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    // Resolve the issue
+    const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
+    if (!issue) {
+      return {
+        success: false,
+        error: `I couldn't find a task "${args.issueIdOrIdentifier}". Please check the task identifier and try again.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Handle unassignment
+    if (!args.phaseId) {
+      if (!issue.phaseId) {
+        return {
+          success: false,
+          error: `Task ${issue.identifier} is not assigned to any phase.`,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+
+      const oldPhase = await ctx.db.get(issue.phaseId);
+      await ctx.db.patch(issue._id, {
+        phaseId: undefined,
+        updatedAt: now,
+      });
+
+      return {
+        success: true,
+        issue: {
+          id: issue._id,
+          identifier: issue.identifier,
+          title: issue.title,
+        },
+        confirmationMessage: `Removed ${issue.identifier}: "${issue.title}" from phase "${oldPhase?.name ?? "unknown"}".`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Resolve the phase
+    const phaseId = args.phaseId as Id<"lifeos_pmPhases">;
+    const phase = await ctx.db.get(phaseId);
+    if (!phase || phase.userId !== userId) {
+      return {
+        success: false,
+        error: "Phase not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Check if issue is in the same project as the phase
+    if (issue.projectId !== phase.projectId) {
+      return {
+        success: false,
+        error: "Issue must be in the same project as the phase",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Check if already in this phase
+    if (issue.phaseId === phaseId) {
+      return {
+        success: false,
+        error: `Task ${issue.identifier}: "${issue.title}" is already in phase "${phase.name}".`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Assign to phase
+    await ctx.db.patch(issue._id, {
+      phaseId,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      issue: {
+        id: issue._id,
+        identifier: issue.identifier,
+        title: issue.title,
+      },
+      phase: {
+        id: phase._id,
+        name: phase.name,
+      },
+      confirmationMessage: `Assigned ${issue.identifier}: "${issue.title}" to phase "${phase.name}".`,
       generatedAt: new Date().toISOString(),
     };
   },

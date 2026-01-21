@@ -88,5 +88,22 @@ else
   echo "- No git config saved (will use defaults)"
 fi
 
+# === Convex credentials ===
+echo ""
+echo "=== Convex ==="
+CONVEX_RESTORED=0
+
+mkdir -p "$HOME/.convex"
+
+if [ -d /home/vscode/.claude-shared/convex ] && [ "$(ls -A /home/vscode/.claude-shared/convex 2>/dev/null)" ]; then
+  cp -rp /home/vscode/.claude-shared/convex/* "$HOME/.convex/" 2>/dev/null || true
+  echo "✓ Restored: ~/.convex/* (convex auth)"
+  CONVEX_RESTORED=1
+fi
+
+if [ $CONVEX_RESTORED -eq 0 ]; then
+  echo "✗ No Convex credentials found. Run 'npx convex dev --once' then '~/save-auth.sh'"
+fi
+
 echo ""
 echo "Restore complete. Run '~/save-auth.sh' after setting up new credentials."

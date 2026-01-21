@@ -1256,6 +1256,13 @@ const AVAILABLE_TOOLS = [
   "get_projects_for_client",
   "create_client",
   "update_client",
+  // Phase Management tools
+  "get_phases",
+  "get_phase",
+  "create_phase",
+  "update_phase",
+  "delete_phase",
+  "assign_issue_to_phase",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -1446,6 +1453,7 @@ http.route({
             priority: params?.priority as string | undefined,
             dueDate: params?.dueDate as string | undefined,
             cycleId: params?.cycleId as string | undefined,
+            phaseId: params?.phaseId as string | undefined,
           });
           break;
 
@@ -1582,6 +1590,58 @@ http.route({
             name: params?.name as string | undefined,
             description: params?.description as string | undefined,
             status: params?.status as string | undefined,
+          });
+          break;
+
+        // Phase Management tools
+        case "get_phases":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getPhasesInternal, {
+            userId: auth.userId,
+            projectId: params?.projectId as string,
+          });
+          break;
+
+        case "get_phase":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getPhaseInternal, {
+            userId: auth.userId,
+            phaseId: params?.phaseId as string,
+          });
+          break;
+
+        case "create_phase":
+          result = await ctx.runMutation(internal.lifeos.tool_call.createPhaseInternal, {
+            userId: auth.userId,
+            projectId: params?.projectId as string,
+            name: params?.name as string,
+            description: params?.description as string | undefined,
+            status: params?.status as string | undefined,
+          });
+          break;
+
+        case "update_phase":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updatePhaseInternal, {
+            userId: auth.userId,
+            phaseId: params?.phaseId as string,
+            name: params?.name as string | undefined,
+            description: params?.description as string | undefined,
+            status: params?.status as string | undefined,
+            startDate: params?.startDate as string | undefined,
+            endDate: params?.endDate as string | undefined,
+          });
+          break;
+
+        case "delete_phase":
+          result = await ctx.runMutation(internal.lifeos.tool_call.deletePhaseInternal, {
+            userId: auth.userId,
+            phaseId: params?.phaseId as string,
+          });
+          break;
+
+        case "assign_issue_to_phase":
+          result = await ctx.runMutation(internal.lifeos.tool_call.assignIssueToPhaseInternal, {
+            userId: auth.userId,
+            issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
+            phaseId: params?.phaseId as string | undefined,
           });
           break;
       }

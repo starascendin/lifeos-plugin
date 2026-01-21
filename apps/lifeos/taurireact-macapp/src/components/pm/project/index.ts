@@ -4,3 +4,6 @@ export { ProjectProperties } from "./ProjectProperties";
 export { ProjectIssuesList } from "./ProjectIssuesList";
 export { ProjectIssueRow } from "./ProjectIssueRow";
 export { QuickAddIssueRow } from "./QuickAddIssueRow";
+export { PhasesSection } from "./PhasesSection";
+export { PhaseCard } from "./PhaseCard";
+export { PhaseIssuesList } from "./PhaseIssuesList";
