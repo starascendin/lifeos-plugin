@@ -45,16 +45,17 @@ CREATE OR REPLACE TABLE threads AS
 SELECT
     t.threadID AS thread_id,
     COALESCE(
-        t.title,
-        -- For DMs, try to get contact name
-        (SELECT COALESCE(wc.full_name, wc.push_name, wc.redacted_phone)
-         FROM src.whatsapp_contacts wc
-         WHERE t.threadID LIKE '%' || REPLACE(wc.their_jid, '@s.whatsapp.net', '') || '%'
-         LIMIT 1),
-        -- Fallback to first non-self participant
+        -- Use title only if it's not the generic "WhatsApp private chat"
+        CASE WHEN t.title IS NOT NULL AND t.title != 'WhatsApp private chat' THEN t.title END,
+        -- For DMs, get the non-self participant's name (this has contact name or phone)
         (SELECT p.full_name
          FROM src.participants p
          WHERE p.threadID = t.threadID AND p.is_self = 0
+         LIMIT 1),
+        -- Fallback to whatsapp_contacts lookup
+        (SELECT COALESCE(wc.full_name, wc.push_name, wc.redacted_phone)
+         FROM src.whatsapp_contacts wc
+         WHERE t.threadID LIKE '%' || REPLACE(wc.their_jid, '@s.whatsapp.net', '') || '%'
          LIMIT 1),
         'Unknown'
     ) AS name,
