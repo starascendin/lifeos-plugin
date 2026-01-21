@@ -6,6 +6,8 @@
     "clone:all": "bash ./beeperdb.sh clone-all",
     "export": "bash ./beeperdb.sh export",
     "sync": "bash ./beeperdb.sh sync",
-    "latest50": "bash ./beeperdb.sh latest50"
+    "latest50": "bash ./beeperdb.sh latest50",
+    "clean": "bash ./beeperdb.sh clean",
+    "q": "bun query.ts"
   }
 }

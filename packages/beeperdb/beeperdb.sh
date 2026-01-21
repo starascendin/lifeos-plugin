@@ -67,12 +67,20 @@ Commands:
       --limit <n>       Max rows (default: 50)
       --include-hidden  Include rows where type='HIDDEN'
 
+  clean
+    Build a clean DuckDB database with AI-friendly views from export.sqlite.
+    Creates views: contacts, threads, messages, conversations, thread_summaries.
+
+    Flags:
+      --data-dir <dir>  Data dir containing export.sqlite (default: ./data)
+
 Examples:
   ./beeperdb.sh clone
   ./beeperdb.sh clone-all
   ./beeperdb.sh export
   ./beeperdb.sh sync
   ./beeperdb.sh latest50 --limit 10
+  ./beeperdb.sh clean
 USAGE
 }
 
@@ -606,6 +614,43 @@ beeperdb_cmd_latest50() {
   beeperdb_latest_whatsapp_messages_json "$db_path" "$limit" "$include_hidden"
 }
 
+beeperdb_cmd_clean() {
+  local data_dir="$(beeperdb_default_data_dir)"
+  local script_dir="$(beeperdb_script_dir)"
+
+  while (( $# )); do
+    case "$1" in
+      --data-dir) data_dir="$2"; shift 2 ;;
+      -h|--help) beeperdb_usage; return 0 ;;
+      *) echo "Unknown flag: $1" >&2; return 2 ;;
+    esac
+  done
+
+  beeperdb_require_cmd duckdb
+
+  local export_db="$data_dir/export.sqlite"
+  local clean_db="$data_dir/clean.duckdb"
+  local clean_sql="$script_dir/clean.sql"
+
+  if [[ ! -f "$export_db" ]]; then
+    echo "Missing $export_db (run ./beeperdb.sh sync first)" >&2
+    return 1
+  fi
+
+  if [[ ! -f "$clean_sql" ]]; then
+    echo "Missing $clean_sql" >&2
+    return 1
+  fi
+
+  rm -f "$clean_db"
+  echo "Building clean.duckdb from export.sqlite..." >&2
+
+  # Run from data dir so relative paths in SQL work
+  (cd "$data_dir" && duckdb clean.duckdb < "$clean_sql")
+
+  echo "Created -> $clean_db" >&2
+}
+
 # If sourced, don't run the CLI.
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
   return 0
@@ -619,6 +664,7 @@ case "$cmd" in
   export) beeperdb_cmd_export "$@" ;;
   sync) beeperdb_cmd_sync "$@" ;;
   latest50) beeperdb_cmd_latest50 "$@" ;;
+  clean) beeperdb_cmd_clean "$@" ;;
   -h|--help|help|"") beeperdb_usage ;;
   *) echo "Unknown command: $cmd" >&2; beeperdb_usage; exit 2 ;;
 esac

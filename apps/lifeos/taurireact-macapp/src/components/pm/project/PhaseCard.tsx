@@ -187,11 +187,75 @@ export function PhaseCard({ phase, issues, onAddIssue }: PhaseCardProps) {
                     )}
                   </>
                 ) : (
-                  <div
-                    className="prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground cursor-pointer hover:bg-muted/30 rounded-md p-2 -m-2"
-                    onClick={() => setIsEditing(true)}
-                    dangerouslySetInnerHTML={{ __html: description }}
-                  />
+                  <>
+                    <div
+                      className="phase-description prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground cursor-pointer hover:bg-muted/30 rounded-md p-2 -m-2"
+                      onClick={() => setIsEditing(true)}
+                      dangerouslySetInnerHTML={{ __html: description }}
+                    />
+                    <style>{`
+                      .phase-description ul[data-type="taskList"] {
+                        list-style: none;
+                        padding: 0;
+                        margin: 0;
+                      }
+                      .phase-description ul[data-type="taskList"] li {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        margin: 0.25rem 0;
+                      }
+                      .phase-description ul[data-type="taskList"] li > label {
+                        flex-shrink: 0;
+                        display: flex;
+                        align-items: center;
+                        user-select: none;
+                        margin: 0;
+                        padding: 0;
+                        height: 1.25rem;
+                      }
+                      .phase-description ul[data-type="taskList"] li > label input[type="checkbox"] {
+                        appearance: none;
+                        width: 1rem;
+                        height: 1rem;
+                        border: 1.5px solid hsl(var(--muted-foreground) / 0.5);
+                        border-radius: 0.25rem;
+                        margin: 0;
+                        cursor: pointer;
+                        position: relative;
+                        flex-shrink: 0;
+                      }
+                      .phase-description ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+                        background-color: hsl(var(--primary));
+                        border-color: hsl(var(--primary));
+                      }
+                      .phase-description ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+                        content: '';
+                        position: absolute;
+                        left: 4px;
+                        top: 1px;
+                        width: 4px;
+                        height: 8px;
+                        border: solid hsl(var(--primary-foreground));
+                        border-width: 0 2px 2px 0;
+                        transform: rotate(45deg);
+                      }
+                      .phase-description ul[data-type="taskList"] li > div {
+                        flex: 1;
+                        min-width: 0;
+                        display: flex;
+                        align-items: center;
+                      }
+                      .phase-description ul[data-type="taskList"] li > div > p {
+                        margin: 0;
+                        line-height: 1.25rem;
+                      }
+                      .phase-description ul[data-type="taskList"] li[data-checked="true"] > div > p {
+                        text-decoration: line-through;
+                        color: hsl(var(--muted-foreground));
+                      }
+                    `}</style>
+                  </>
                 )}
               </div>
             )}
