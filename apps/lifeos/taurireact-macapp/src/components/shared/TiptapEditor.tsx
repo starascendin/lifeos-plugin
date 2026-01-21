@@ -14,6 +14,7 @@ interface TiptapEditorProps {
   placeholder?: string;
   className?: string;
   editable?: boolean;
+  onBlur?: () => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export function TiptapEditor({
   placeholder = "Start typing...",
   className,
   editable = true,
+  onBlur,
 }: TiptapEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -64,6 +66,9 @@ export function TiptapEditor({
     editable,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
+    },
+    onBlur: () => {
+      onBlur?.();
     },
     editorProps: {
       attributes: {
@@ -128,12 +133,15 @@ export function TiptapEditor({
         }
         .tiptap-editor .ProseMirror ul[data-type="taskList"] li {
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           gap: 0.5rem;
         }
         .tiptap-editor .ProseMirror ul[data-type="taskList"] li > label {
           flex-shrink: 0;
           user-select: none;
+          display: flex;
+          align-items: center;
+          height: 1.5rem;
         }
         .tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
           appearance: none;
@@ -141,9 +149,17 @@ export function TiptapEditor({
           height: 1rem;
           border: 1.5px solid hsl(var(--muted-foreground) / 0.5);
           border-radius: 0.25rem;
-          margin-top: 0.25rem;
+          margin: 0;
           cursor: pointer;
           position: relative;
+        }
+        .tiptap-editor .ProseMirror ul[data-type="taskList"] li > div {
+          display: flex;
+          align-items: center;
+        }
+        .tiptap-editor .ProseMirror ul[data-type="taskList"] li > div > p {
+          margin: 0;
+          line-height: 1.5rem;
         }
         .tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
           background-color: hsl(var(--primary));

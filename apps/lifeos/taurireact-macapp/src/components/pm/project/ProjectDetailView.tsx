@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id } from "@holaai/convex";
@@ -8,7 +7,7 @@ import { ProjectIssuesList } from "./ProjectIssuesList";
 import { PhasesSection } from "./PhasesSection";
 import { ProjectStatus, Priority } from "@/lib/contexts/PMContext";
 import { PomodoroWidget, PomodoroStatsMini } from "../pomodoro";
-import { TiptapEditor } from "@/components/shared/TiptapEditor";
+import { DescriptionEditor } from "@/components/shared/DescriptionEditor";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -50,11 +49,6 @@ interface ProjectDetailViewProps {
 }
 
 export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
-  const [description, setDescription] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSavedRef = useRef<string>("");
-
   const project = useQuery(api.lifeos.pm_projects.getProject, { projectId });
   const client = useQuery(
     api.lifeos.pm_clients.getClient,
@@ -63,44 +57,12 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
   const issues = useQuery(api.lifeos.pm_issues.getIssues, { projectId });
   const updateProject = useMutation(api.lifeos.pm_projects.updateProject);
 
-  // Sync local description with project data
-  useEffect(() => {
-    if (project?.description !== undefined && lastSavedRef.current !== project.description) {
-      setDescription(project.description ?? "");
-      lastSavedRef.current = project.description ?? "";
-    }
-  }, [project?.description]);
-
-  // Debounced auto-save for description
-  useEffect(() => {
-    // Don't save if description matches what's already saved
-    if (description === lastSavedRef.current) return;
-
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Set new timeout for 3 seconds
-    saveTimeoutRef.current = setTimeout(async () => {
-      setIsSaving(true);
-      try {
-        await updateProject({
-          projectId,
-          description: description || undefined,
-        });
-        lastSavedRef.current = description;
-      } finally {
-        setIsSaving(false);
-      }
-    }, 3000);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [description, projectId, updateProject]);
+  const handleSaveDescription = async (value: string) => {
+    await updateProject({
+      projectId,
+      description: value || undefined,
+    });
+  };
 
   if (project === undefined) {
     return (
@@ -288,19 +250,14 @@ export function ProjectDetailView({ projectId }: ProjectDetailViewProps) {
 
           {/* Description */}
           <div className="rounded-lg border border-border bg-card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                Description
-              </h3>
-              {isSaving && (
-                <span className="text-xs text-muted-foreground">Saving...</span>
-              )}
-            </div>
+            <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              Description
+            </h3>
 
-            <TiptapEditor
-              content={description}
-              onChange={setDescription}
+            <DescriptionEditor
+              value={project.description ?? ""}
+              onSave={handleSaveDescription}
               placeholder="Add a description... (type **bold**, *italic*, - [ ] for checkboxes)"
             />
           </div>

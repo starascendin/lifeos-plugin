@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useState } from "react";
+import { useMutation } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Doc, Id } from "@holaai/convex";
 import {
@@ -7,7 +7,6 @@ import {
   ChevronRight,
   MoreHorizontal,
   Trash2,
-  Edit2,
   Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,11 +27,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
-import { TiptapEditor } from "@/components/shared/TiptapEditor";
+import { DescriptionEditor } from "@/components/shared/DescriptionEditor";
 import { PhaseStatusSelect } from "../shared";
 import { PhaseIssuesList } from "./PhaseIssuesList";
 import { PHASE_STATUS_CONFIG, PhaseStatus } from "@/lib/contexts/PMContext";
-import { cn } from "@/lib/utils";
 
 interface PhaseCardProps {
   phase: Doc<"lifeos_pmPhases">;
@@ -42,12 +40,7 @@ interface PhaseCardProps {
 
 export function PhaseCard({ phase, issues, onAddIssue }: PhaseCardProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [description, setDescription] = useState(phase.description ?? "");
-  const [isSaving, setIsSaving] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSavedRef = useRef<string>(phase.description ?? "");
 
   const updatePhase = useMutation(api.lifeos.pm_phases.updatePhase);
   const deletePhase = useMutation(api.lifeos.pm_phases.deletePhase);
@@ -57,42 +50,12 @@ export function PhaseCard({ phase, issues, onAddIssue }: PhaseCardProps) {
   const completedIssues = issues.filter((i) => i.status === "done").length;
   const progressPercent = totalIssues > 0 ? (completedIssues / totalIssues) * 100 : 0;
 
-  // Sync description when phase changes
-  useEffect(() => {
-    if (phase.description !== undefined && lastSavedRef.current !== phase.description) {
-      setDescription(phase.description ?? "");
-      lastSavedRef.current = phase.description ?? "";
-    }
-  }, [phase.description]);
-
-  // Debounced auto-save for description
-  useEffect(() => {
-    if (!isEditing) return;
-    if (description === lastSavedRef.current) return;
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      setIsSaving(true);
-      try {
-        await updatePhase({
-          phaseId: phase._id,
-          description: description || undefined,
-        });
-        lastSavedRef.current = description;
-      } finally {
-        setIsSaving(false);
-      }
-    }, 2000);
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [description, isEditing, phase._id, updatePhase]);
+  const handleSaveDescription = async (value: string) => {
+    await updatePhase({
+      phaseId: phase._id,
+      description: value || undefined,
+    });
+  };
 
   const handleStatusChange = async (status: PhaseStatus) => {
     await updatePhase({ phaseId: phase._id, status });
@@ -102,8 +65,6 @@ export function PhaseCard({ phase, issues, onAddIssue }: PhaseCardProps) {
     await deletePhase({ phaseId: phase._id });
     setShowDeleteDialog(false);
   };
-
-  const statusConfig = PHASE_STATUS_CONFIG[phase.status as PhaseStatus];
 
   return (
     <>
@@ -152,10 +113,6 @@ export function PhaseCard({ phase, issues, onAddIssue }: PhaseCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditing(!isEditing)}>
-                <Edit2 className="h-4 w-4 mr-2" />
-                {isEditing ? "Done editing" : "Edit description"}
-              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setShowDeleteDialog(true)}
                 className="text-destructive"
@@ -171,94 +128,11 @@ export function PhaseCard({ phase, issues, onAddIssue }: PhaseCardProps) {
         {isExpanded && (
           <div className="px-4 py-3 space-y-4">
             {/* Description */}
-            {(isEditing || description) && (
-              <div className="relative">
-                {isEditing ? (
-                  <>
-                    <TiptapEditor
-                      content={description}
-                      onChange={setDescription}
-                      placeholder="Add phase description, goals, or notes..."
-                    />
-                    {isSaving && (
-                      <span className="absolute top-0 right-0 text-xs text-muted-foreground">
-                        Saving...
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className="phase-description prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground cursor-pointer hover:bg-muted/30 rounded-md p-2 -m-2"
-                      onClick={() => setIsEditing(true)}
-                      dangerouslySetInnerHTML={{ __html: description }}
-                    />
-                    <style>{`
-                      .phase-description ul[data-type="taskList"] {
-                        list-style: none;
-                        padding: 0;
-                        margin: 0;
-                      }
-                      .phase-description ul[data-type="taskList"] li {
-                        display: flex;
-                        align-items: center;
-                        gap: 0.5rem;
-                        margin: 0.25rem 0;
-                      }
-                      .phase-description ul[data-type="taskList"] li > label {
-                        flex-shrink: 0;
-                        display: flex;
-                        align-items: center;
-                        user-select: none;
-                        margin: 0;
-                        padding: 0;
-                        height: 1.25rem;
-                      }
-                      .phase-description ul[data-type="taskList"] li > label input[type="checkbox"] {
-                        appearance: none;
-                        width: 1rem;
-                        height: 1rem;
-                        border: 1.5px solid hsl(var(--muted-foreground) / 0.5);
-                        border-radius: 0.25rem;
-                        margin: 0;
-                        cursor: pointer;
-                        position: relative;
-                        flex-shrink: 0;
-                      }
-                      .phase-description ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
-                        background-color: hsl(var(--primary));
-                        border-color: hsl(var(--primary));
-                      }
-                      .phase-description ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
-                        content: '';
-                        position: absolute;
-                        left: 4px;
-                        top: 1px;
-                        width: 4px;
-                        height: 8px;
-                        border: solid hsl(var(--primary-foreground));
-                        border-width: 0 2px 2px 0;
-                        transform: rotate(45deg);
-                      }
-                      .phase-description ul[data-type="taskList"] li > div {
-                        flex: 1;
-                        min-width: 0;
-                        display: flex;
-                        align-items: center;
-                      }
-                      .phase-description ul[data-type="taskList"] li > div > p {
-                        margin: 0;
-                        line-height: 1.25rem;
-                      }
-                      .phase-description ul[data-type="taskList"] li[data-checked="true"] > div > p {
-                        text-decoration: line-through;
-                        color: hsl(var(--muted-foreground));
-                      }
-                    `}</style>
-                  </>
-                )}
-              </div>
-            )}
+            <DescriptionEditor
+              value={phase.description ?? ""}
+              onSave={handleSaveDescription}
+              placeholder="Add phase description, goals, or notes..."
+            />
 
             {/* Issues */}
             <PhaseIssuesList
