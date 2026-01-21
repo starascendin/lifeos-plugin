@@ -1063,13 +1063,6 @@ function OTAUpdateSection() {
 
   return (
     <div className="space-y-4">
-      {/* OTA Test Banner */}
-      <div className="rounded-lg border border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950 p-3">
-        <p className="text-sm font-medium text-blue-800 dark:text-blue-200 text-center">
-          OTA Update Test - v1.0.3
-        </p>
-      </div>
-
       {/* Version Info */}
       <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
         <div className="flex justify-between items-center">
