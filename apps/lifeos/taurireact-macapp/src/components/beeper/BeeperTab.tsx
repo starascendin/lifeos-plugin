@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useBeeper } from "@/lib/contexts/BeeperContext";
 import { ThreadsList } from "./ThreadsList";
 import { ConversationView } from "./ConversationView";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, X, MessageCircle, AlertCircle } from "lucide-react";
+import { Search, X, MessageCircle, AlertCircle, RefreshCw, Clock } from "lucide-react";
+
+// Auto-refresh interval in milliseconds (3 minutes)
+const AUTO_REFRESH_INTERVAL = 3 * 60 * 1000;
 
 export function BeeperTab() {
   const {
@@ -23,6 +26,57 @@ export function BeeperTab() {
   } = useBeeper();
 
   const [searchInput, setSearchInput] = useState("");
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const [nextRefreshIn, setNextRefreshIn] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Timer refs
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastRefreshTimeRef = useRef<Date | null>(null);
+
+  // Keep ref in sync
+  useEffect(() => {
+    lastRefreshTimeRef.current = lastRefreshTime;
+  }, [lastRefreshTime]);
+
+  // Manual refresh handler
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await checkDatabase();
+      await loadThreads();
+      const now = new Date();
+      setLastRefreshTime(now);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [checkDatabase, loadThreads]);
+
+  // Calculate time until next refresh
+  const calculateNextRefreshIn = useCallback(() => {
+    if (!lastRefreshTimeRef.current) return null;
+    const elapsed = Date.now() - lastRefreshTimeRef.current.getTime();
+    const remaining = AUTO_REFRESH_INTERVAL - elapsed;
+    return Math.max(0, Math.ceil(remaining / 1000));
+  }, []);
+
+  // Format time ago
+  const formatTimeAgo = (date: Date): string => {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  };
+
+  // Format countdown
+  const formatCountdown = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   // Check database and load threads on mount
   useEffect(() => {
@@ -32,12 +86,58 @@ export function BeeperTab() {
     init();
   }, [checkDatabase]);
 
-  // Load threads when database is synced
+  // Load threads when database is synced (initial load)
   useEffect(() => {
     if (hasDatabaseSynced) {
       loadThreads();
+      setLastRefreshTime(new Date());
     }
   }, [hasDatabaseSynced, loadThreads]);
+
+  // Auto-refresh timer setup
+  useEffect(() => {
+    if (!hasDatabaseSynced) {
+      return;
+    }
+
+    // Auto-refresh function
+    const performAutoRefresh = async () => {
+      const now = Date.now();
+      const lastRefresh = lastRefreshTimeRef.current?.getTime() || 0;
+
+      // Only refresh if enough time has passed
+      if (now - lastRefresh >= AUTO_REFRESH_INTERVAL) {
+        setIsRefreshing(true);
+        try {
+          await checkDatabase();
+          await loadThreads();
+          setLastRefreshTime(new Date());
+        } finally {
+          setIsRefreshing(false);
+        }
+      }
+    };
+
+    // Set up auto-refresh interval
+    autoRefreshTimerRef.current = setInterval(performAutoRefresh, AUTO_REFRESH_INTERVAL);
+
+    // Countdown timer - update every second
+    countdownTimerRef.current = setInterval(() => {
+      setNextRefreshIn(calculateNextRefreshIn());
+    }, 1000);
+
+    // Initial countdown
+    setNextRefreshIn(calculateNextRefreshIn());
+
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current);
+      }
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
+    };
+  }, [hasDatabaseSynced, checkDatabase, loadThreads, calculateNextRefreshIn]);
 
   // Handle search submit
   const handleSearch = () => {
@@ -100,9 +200,37 @@ export function BeeperTab() {
     <div className="h-full flex flex-col">
       {/* Header with search */}
       <div className="border-b p-4 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">Beeper Messages</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-muted-foreground" />
+            <h1 className="text-lg font-semibold">Beeper Messages</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Refresh status */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {lastRefreshTime && (
+                <span title={lastRefreshTime.toLocaleString()}>
+                  Updated {formatTimeAgo(lastRefreshTime)}
+                </span>
+              )}
+              {nextRefreshIn !== null && nextRefreshIn > 0 && !isRefreshing && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatCountdown(nextRefreshIn)}
+                </span>
+              )}
+            </div>
+            {/* Refresh button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing || isLoadingThreads}
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2 mt-3">
           <div className="relative flex-1">

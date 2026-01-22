@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   checkBeeperAvailable,
   checkBeeperDatabaseExists,
@@ -8,6 +8,12 @@ import {
   type BeeperSyncProgress,
   initialSyncProgress,
 } from "../../lib/services/beeper";
+
+// Auto-sync interval in milliseconds (10 minutes)
+const AUTO_SYNC_INTERVAL = 10 * 60 * 1000;
+
+// Storage key for last sync timestamp
+const LAST_SYNC_KEY = "beeper_last_sync_timestamp";
 
 export function BeeperSyncTab() {
   // Availability state
@@ -22,9 +28,31 @@ export function BeeperSyncTab() {
   const [syncProgress, setSyncProgress] =
     useState<BeeperSyncProgress>(initialSyncProgress);
 
+  // Last sync timestamp
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(() => {
+    const stored = localStorage.getItem(LAST_SYNC_KEY);
+    return stored ? new Date(stored) : null;
+  });
+
+  // Auto-sync enabled state
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+
+  // Countdown to next sync
+  const [nextSyncIn, setNextSyncIn] = useState<number | null>(null);
+
   // Threads preview
   const [threads, setThreads] = useState<BeeperThread[]>([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(false);
+
+  // Timer refs
+  const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSyncTimeRef = useRef<Date | null>(lastSyncTime);
+
+  // Keep ref in sync
+  useEffect(() => {
+    lastSyncTimeRef.current = lastSyncTime;
+  }, [lastSyncTime]);
 
   // Check availability on mount
   useEffect(() => {
@@ -58,32 +86,41 @@ export function BeeperSyncTab() {
     }
   }, []);
 
-  // Handle sync
-  const handleSync = async () => {
-    setSyncProgress({
-      status: "checking",
-      currentStep: "Checking Beeper availability...",
-    });
+  // Handle sync (can be called manually or by auto-sync)
+  const handleSync = useCallback(async (isAutoSync = false) => {
+    // Don't show checking status for auto-sync to be less intrusive
+    if (!isAutoSync) {
+      setSyncProgress({
+        status: "checking",
+        currentStep: "Checking Beeper availability...",
+      });
+    }
 
     const available = await checkBeeperAvailable();
     if (!available) {
-      setSyncProgress({
-        status: "error",
-        currentStep: "",
-        error:
-          "Beeper not found. Make sure BeeperTexts is installed at ~/Library/Application Support/BeeperTexts",
-      });
+      if (!isAutoSync) {
+        setSyncProgress({
+          status: "error",
+          currentStep: "",
+          error:
+            "Beeper not found. Make sure BeeperTexts is installed at ~/Library/Application Support/BeeperTexts",
+        });
+      }
       return;
     }
 
     setSyncProgress({
       status: "syncing",
-      currentStep: "Syncing Beeper database...",
+      currentStep: isAutoSync ? "Auto-syncing Beeper database..." : "Syncing Beeper database...",
     });
 
     const result = await syncBeeperDatabase();
 
     if (result.success) {
+      const now = new Date();
+      setLastSyncTime(now);
+      localStorage.setItem(LAST_SYNC_KEY, now.toISOString());
+
       setSyncProgress({
         status: "complete",
         currentStep: result.message || "Sync complete!",
@@ -98,6 +135,90 @@ export function BeeperSyncTab() {
         error: result.error || "Unknown error",
       });
     }
+  }, [loadThreads]);
+
+  // Calculate time until next sync
+  const calculateNextSyncIn = useCallback(() => {
+    if (!lastSyncTimeRef.current || !autoSyncEnabled) return null;
+    const elapsed = Date.now() - lastSyncTimeRef.current.getTime();
+    const remaining = AUTO_SYNC_INTERVAL - elapsed;
+    return Math.max(0, Math.ceil(remaining / 1000));
+  }, [autoSyncEnabled]);
+
+  // Auto-sync timer setup
+  useEffect(() => {
+    if (!autoSyncEnabled || !isBeeperAvailable) {
+      // Clear timers when disabled
+      if (autoSyncTimerRef.current) {
+        clearInterval(autoSyncTimerRef.current);
+        autoSyncTimerRef.current = null;
+      }
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      setNextSyncIn(null);
+      return;
+    }
+
+    // Auto-sync function
+    const performAutoSync = async () => {
+      const now = Date.now();
+      const lastSync = lastSyncTimeRef.current?.getTime() || 0;
+
+      // Only sync if enough time has passed
+      if (now - lastSync >= AUTO_SYNC_INTERVAL) {
+        await handleSync(true);
+      }
+    };
+
+    // Run auto-sync check immediately if we haven't synced yet or enough time passed
+    const timeSinceLastSync = lastSyncTimeRef.current
+      ? Date.now() - lastSyncTimeRef.current.getTime()
+      : Infinity;
+
+    if (timeSinceLastSync >= AUTO_SYNC_INTERVAL) {
+      performAutoSync();
+    }
+
+    // Set up auto-sync interval
+    autoSyncTimerRef.current = setInterval(performAutoSync, AUTO_SYNC_INTERVAL);
+
+    // Countdown timer - update every second
+    countdownTimerRef.current = setInterval(() => {
+      setNextSyncIn(calculateNextSyncIn());
+    }, 1000);
+
+    // Initial countdown
+    setNextSyncIn(calculateNextSyncIn());
+
+    return () => {
+      if (autoSyncTimerRef.current) {
+        clearInterval(autoSyncTimerRef.current);
+      }
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
+    };
+  }, [autoSyncEnabled, isBeeperAvailable, handleSync, calculateNextSyncIn]);
+
+  // Format time ago
+  const formatTimeAgo = (date: Date): string => {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  // Format countdown
+  const formatCountdown = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   // Format timestamp for display
@@ -129,6 +250,8 @@ export function BeeperSyncTab() {
     }
   };
 
+  const isSyncing = syncProgress.status === "syncing" || syncProgress.status === "checking";
+
   return (
     <div className="space-y-4 overflow-y-auto h-full">
       {/* Sync Button Section */}
@@ -141,28 +264,51 @@ export function BeeperSyncTab() {
             </p>
           </div>
           <button
-            onClick={handleSync}
-            disabled={
-              syncProgress.status === "syncing" ||
-              syncProgress.status === "checking"
-            }
+            onClick={() => handleSync(false)}
+            disabled={isSyncing}
             className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-              syncProgress.status === "syncing" ||
-              syncProgress.status === "checking"
+              isSyncing
                 ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed"
                 : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
             }`}
           >
-            {syncProgress.status === "syncing" ||
-            syncProgress.status === "checking"
-              ? "Syncing..."
-              : "Sync Now"}
+            {isSyncing ? "Syncing..." : "Sync Now"}
           </button>
+        </div>
+
+        {/* Auto-sync toggle and status */}
+        <div className="flex items-center justify-between py-2 border-t border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoSyncEnabled}
+                onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+                className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
+              />
+              <span className="text-sm">Auto-sync every 10 min</span>
+            </label>
+          </div>
+          <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
+            {lastSyncTime && (
+              <span title={lastSyncTime.toLocaleString()}>
+                Last sync: {formatTimeAgo(lastSyncTime)}
+              </span>
+            )}
+            {autoSyncEnabled && nextSyncIn !== null && nextSyncIn > 0 && !isSyncing && (
+              <span className="flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Next: {formatCountdown(nextSyncIn)}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Progress/Status */}
         {syncProgress.status !== "idle" && (
-          <div className="mt-3">
+          <div className="mt-3 pt-3 border-t border-[var(--border)]">
             {syncProgress.status === "checking" ||
             syncProgress.status === "syncing" ? (
               <div className="flex items-center gap-2 text-sm">
