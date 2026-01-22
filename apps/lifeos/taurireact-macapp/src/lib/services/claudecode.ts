@@ -129,6 +129,29 @@ export async function stopContainer(env: Environment): Promise<void> {
 }
 
 /**
+ * Create a new Claude agent container
+ */
+export async function createContainer(
+  env: Environment,
+  mcpConfigPath: string
+): Promise<void> {
+  if (!isTauri) {
+    throw new Error("Not running in Tauri");
+  }
+  await invoke<void>("create_container", { env, mcpConfigPath });
+}
+
+/**
+ * Remove a Claude agent container
+ */
+export async function removeContainer(env: Environment): Promise<void> {
+  if (!isTauri) {
+    throw new Error("Not running in Tauri");
+  }
+  await invoke<void>("remove_container", { env });
+}
+
+/**
  * Execute a Claude prompt in the Docker container
  * @param sessionId - Optional session ID to continue a conversation
  */

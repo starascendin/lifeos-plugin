@@ -108,6 +108,90 @@ pub async fn stop_container(env: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Create a new Claude agent container
+#[command]
+pub async fn create_container(env: String, mcp_config_path: String) -> Result<(), String> {
+    let container_name = format!("claude-agent-{}", env);
+    let sessions_volume = format!("claude-sessions-{}", env);
+
+    // Check if container already exists
+    let check = Command::new("docker")
+        .args([
+            "ps",
+            "-a",
+            "--filter",
+            &format!("name={}", container_name),
+            "--format",
+            "{{.Names}}",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to check container: {}", e))?;
+
+    let existing = String::from_utf8_lossy(&check.stdout).trim().to_string();
+    if !existing.is_empty() {
+        return Err(format!(
+            "Container {} already exists. Remove it first or start it.",
+            container_name
+        ));
+    }
+
+    // Verify MCP config file exists
+    if !std::path::Path::new(&mcp_config_path).exists() {
+        return Err(format!("MCP config file not found: {}", mcp_config_path));
+    }
+
+    // Create the container with all necessary volume mounts
+    let output = Command::new("docker")
+        .args([
+            "run",
+            "-d",
+            "--name",
+            &container_name,
+            "-v",
+            "claude-credentials:/home/node/.claude",
+            "-v",
+            "claude-config:/home/node/.config",
+            "-v",
+            &format!("{}:/home/node/.claude/projects", sessions_volume),
+            "-v",
+            &format!("{}:/home/node/.mcp.json:ro", mcp_config_path),
+            "claude-agent",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to create container: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to create container: {}", stderr));
+    }
+
+    Ok(())
+}
+
+/// Remove a Claude agent container
+#[command]
+pub async fn remove_container(env: String) -> Result<(), String> {
+    let container_name = format!("claude-agent-{}", env);
+
+    // Stop first if running
+    let _ = Command::new("docker")
+        .args(["stop", &container_name])
+        .output();
+
+    // Remove the container
+    let output = Command::new("docker")
+        .args(["rm", "-f", &container_name])
+        .output()
+        .map_err(|e| format!("Failed to remove container: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to remove container: {}", stderr));
+    }
+
+    Ok(())
+}
+
 /// Execute a Claude prompt in the Docker container
 #[command]
 pub async fn execute_claude_prompt(

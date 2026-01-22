@@ -20,8 +20,9 @@ use beeper::{
     search_beeper_messages, sync_beeper_database,
 };
 use claudecode::{
-    check_docker_available, create_claude_session, delete_claude_session, execute_claude_prompt,
-    get_container_status, list_claude_sessions, start_container, stop_container,
+    check_docker_available, create_claude_session, create_container, delete_claude_session,
+    execute_claude_prompt, get_container_status, list_claude_sessions, remove_container,
+    start_container, stop_container,
 };
 use coder::{delegate_to_coder, get_coder_presets, get_coder_templates};
 use council_server::{get_council_server_status, start_council_server, stop_council_server};
@@ -90,18 +91,17 @@ pub fn run() {
         .plugin(tauri_plugin_macos_permissions::init())
         .setup(|app| {
             // Create menu items for tray context menu
-            // Shortcuts differ by build mode:
-            // - Production: Ctrl+1/2
-            // - Staging: Ctrl+Shift+1/2
-            // - Dev: Ctrl+Shift+3/4 (to avoid conflicts with staging)
-            let is_production = option_env!("TAURI_BUILD_MODE") == Some("production");
-            let is_staging = app.config().identifier.contains("staging");
-            let (shortcut_hint_1, shortcut_hint_2) = if is_production {
-                ("⌃1", "⌃2")
-            } else if is_staging {
-                ("⌃⇧1", "⌃⇧2")
-            } else {
+            // Shortcuts differ by build mode (detected via app identifier):
+            // - Production (com.bryanliu.lifeos-nexus): Ctrl+Shift+1/2
+            // - Staging (com.bryanliu.lifeos-nexus-staging): Ctrl+Shift+1/2
+            // - Dev (com.bryanliu.lifeos-nexus-dev): Ctrl+Shift+3/4 (to avoid conflicts)
+            let identifier = &app.config().identifier;
+            let is_dev = identifier.contains("-dev");
+            let (shortcut_hint_1, shortcut_hint_2) = if is_dev {
                 ("⌃⇧3", "⌃⇧4")
+            } else {
+                // Production and Staging both use Ctrl+Shift+1/2
+                ("⌃⇧1", "⌃⇧2")
             };
 
             let sync_jobs = MenuItem::with_id(
@@ -154,13 +154,12 @@ pub fn run() {
                 .build(app)?;
 
             // Register global keyboard shortcuts
-            // Production: Ctrl+1/2, Staging: Ctrl+Shift+1/2, Dev: Ctrl+Shift+3/4
-            let (modifiers, key_1, key_2) = if is_production {
-                (Some(Modifiers::CONTROL), Code::Digit1, Code::Digit2)
-            } else if is_staging {
-                (Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit1, Code::Digit2)
-            } else {
+            // Production & Staging: Ctrl+Shift+1/2, Dev: Ctrl+Shift+3/4
+            let (modifiers, key_1, key_2) = if is_dev {
                 (Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit3, Code::Digit4)
+            } else {
+                // Production and Staging both use Ctrl+Shift+1/2
+                (Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit1, Code::Digit2)
             };
             let shortcut_1 = Shortcut::new(modifiers, key_1);
             let shortcut_2 = Shortcut::new(modifiers, key_2);
@@ -340,6 +339,8 @@ pub fn run() {
             get_container_status,
             start_container,
             stop_container,
+            create_container,
+            remove_container,
             execute_claude_prompt,
             create_claude_session,
             list_claude_sessions,

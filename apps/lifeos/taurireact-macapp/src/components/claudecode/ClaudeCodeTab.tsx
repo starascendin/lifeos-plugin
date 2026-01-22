@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useClaudeCode } from "@/lib/contexts/ClaudeCodeContext";
 import { PromptInput } from "./PromptInput";
 import { ResultDisplay } from "./ResultDisplay";
@@ -12,8 +12,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Terminal,
   AlertCircle,
@@ -24,11 +40,22 @@ import {
   Trash2,
   Container,
   MessageSquare,
+  Plus,
+  MoreVertical,
+  Server,
+  Cloud,
 } from "lucide-react";
 import type { Environment } from "@/lib/services/claudecode";
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+
+// Default MCP config path - relative to monorepo
+const DEFAULT_MCP_CONFIG_PATH =
+  "/Users/bryanliu/Sync/00.Projects/holaai-convexo-monorepo/packages/claudecode-noncode-agent-docker/.mcp.json";
+
+// Host types for future cloud support
+type HostType = "local" | "cloud";
 
 export function ClaudeCodeTab() {
   const {
@@ -41,6 +68,8 @@ export function ClaudeCodeTab() {
     isCheckingDocker,
     isStartingContainer,
     isStoppingContainer,
+    isCreatingContainer,
+    isRemovingContainer,
     activeThreadId,
     threads,
     setEnvironment,
@@ -48,11 +77,23 @@ export function ClaudeCodeTab() {
     refreshContainerStatus,
     startContainerAction,
     stopContainerAction,
+    createContainerAction,
+    removeContainerAction,
     execute,
     clearResults,
     clearError,
     getActiveThreadResults,
   } = useClaudeCode();
+
+  // Host selection (local vs cloud - cloud to be implemented later)
+  const [hostType] = useState<HostType>("local");
+
+  // Create container dialog
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [mcpConfigPath, setMcpConfigPath] = useState(DEFAULT_MCP_CONFIG_PATH);
+
+  // Remove container confirmation
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   // Get results for active thread only
   const activeResults = getActiveThreadResults();
@@ -67,6 +108,16 @@ export function ClaudeCodeTab() {
       return () => clearInterval(interval);
     }
   }, [isExecuting, refreshContainerStatus]);
+
+  const handleCreateContainer = async () => {
+    await createContainerAction(mcpConfigPath);
+    setShowCreateDialog(false);
+  };
+
+  const handleRemoveContainer = async () => {
+    await removeContainerAction();
+    setShowRemoveConfirm(false);
+  };
 
   // Not available in web mode
   if (!isTauri) {
@@ -147,16 +198,31 @@ export function ClaudeCodeTab() {
             </div>
 
             <div className="flex items-center gap-4 shrink-0">
+              {/* Host indicator */}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {hostType === "local" ? (
+                  <>
+                    <Server className="w-3.5 h-3.5" />
+                    <span>Local</span>
+                  </>
+                ) : (
+                  <>
+                    <Cloud className="w-3.5 h-3.5" />
+                    <span>Cloud</span>
+                  </>
+                )}
+              </div>
+
               {/* Environment selector */}
               <div className="flex items-center gap-2">
                 <Label htmlFor="env-select" className="text-sm">
-                  Environment:
+                  Env:
                 </Label>
                 <Select
                   value={environment}
                   onValueChange={(v) => setEnvironment(v as Environment)}
                 >
-                  <SelectTrigger id="env-select" className="w-28">
+                  <SelectTrigger id="env-select" className="w-24">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -170,7 +236,7 @@ export function ClaudeCodeTab() {
               {/* JSON Debug toggle */}
               <div className="flex items-center gap-2">
                 <Label htmlFor="json-toggle" className="text-sm">
-                  JSON Debug:
+                  JSON:
                 </Label>
                 <Switch
                   id="json-toggle"
@@ -186,7 +252,6 @@ export function ClaudeCodeTab() {
             <div className="flex items-center gap-2">
               <Container className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm">
-                Container:{" "}
                 <span className="font-mono text-xs">
                   {containerStatus?.name || `claude-agent-${environment}`}
                 </span>
@@ -209,6 +274,29 @@ export function ClaudeCodeTab() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Create container button - when container doesn't exist */}
+              {!containerStatus?.exists && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => setShowCreateDialog(true)}
+                  disabled={isCreatingContainer}
+                >
+                  {isCreatingContainer ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3 h-3 mr-1" />
+                      Create
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Start button - when container exists but stopped */}
               {containerStatus?.exists && !containerStatus.running && (
                 <Button
                   size="sm"
@@ -230,6 +318,7 @@ export function ClaudeCodeTab() {
                 </Button>
               )}
 
+              {/* Stop button - when container is running */}
               {containerStatus?.running && (
                 <Button
                   size="sm"
@@ -251,6 +340,7 @@ export function ClaudeCodeTab() {
                 </Button>
               )}
 
+              {/* Refresh button */}
               <Button
                 size="sm"
                 variant="ghost"
@@ -260,16 +350,41 @@ export function ClaudeCodeTab() {
                 <RefreshCw className="w-3 h-3" />
               </Button>
 
-              {activeResults.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={clearResults}
-                  title="Clear conversation history"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              )}
+              {/* More options dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost">
+                    <MoreVertical className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {activeResults.length > 0 && (
+                    <>
+                      <DropdownMenuItem onClick={clearResults}>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Clear History
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  {containerStatus?.exists && (
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => setShowRemoveConfirm(true)}
+                      disabled={containerStatus.running || isRemovingContainer}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove Container
+                    </DropdownMenuItem>
+                  )}
+                  {!containerStatus?.exists && (
+                    <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Container
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -278,10 +393,7 @@ export function ClaudeCodeTab() {
             <div className="mt-2 flex items-center gap-2 p-2 bg-red-500/10 rounded-lg text-red-600 text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span className="flex-1">{error}</span>
-              <button
-                onClick={clearError}
-                className="text-xs hover:underline"
-              >
+              <button onClick={clearError} className="text-xs hover:underline">
                 Dismiss
               </button>
             </div>
@@ -298,10 +410,12 @@ export function ClaudeCodeTab() {
               <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
               <h3 className="text-lg font-medium mb-2">No Conversation Selected</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Select a conversation from the sidebar or start a new one to begin chatting with Claude.
+                Select a conversation from the sidebar or start a new one to
+                begin chatting with Claude.
               </p>
               <p className="text-xs text-muted-foreground">
-                Tip: Type a message below to automatically create a new conversation.
+                Tip: Type a message below to automatically create a new
+                conversation.
               </p>
             </div>
           </div>
@@ -325,11 +439,93 @@ export function ClaudeCodeTab() {
 
         {!containerStatus?.exists && (
           <div className="px-4 pb-4 text-center text-sm text-muted-foreground">
-            Container <code className="font-mono">claude-agent-{environment}</code>{" "}
-            not found. Please create it first using Docker.
+            Container{" "}
+            <code className="font-mono">claude-agent-{environment}</code> not
+            found. Click "Create" to set it up.
           </div>
         )}
       </div>
+
+      {/* Create Container Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Container</DialogTitle>
+            <DialogDescription>
+              Create a new Claude agent container for the {environment}{" "}
+              environment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="mcp-path">MCP Config Path</Label>
+              <Input
+                id="mcp-path"
+                value={mcpConfigPath}
+                onChange={(e) => setMcpConfigPath(e.target.value)}
+                placeholder="/path/to/.mcp.json"
+              />
+              <p className="text-xs text-muted-foreground">
+                Path to the .mcp.json configuration file
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateContainer}
+              disabled={isCreatingContainer || !mcpConfigPath}
+            >
+              {isCreatingContainer ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Container"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Container Confirmation Dialog */}
+      <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Container</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove the container{" "}
+              <code className="font-mono">claude-agent-{environment}</code>?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRemoveConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemoveContainer}
+              disabled={isRemovingContainer}
+            >
+              {isRemovingContainer ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove Container"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

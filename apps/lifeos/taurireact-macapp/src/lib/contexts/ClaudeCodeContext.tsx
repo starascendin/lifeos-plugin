@@ -10,6 +10,8 @@ import {
   getContainerStatus,
   startContainer,
   stopContainer,
+  createContainer,
+  removeContainer,
   executePrompt,
   createSession,
   listSessions,
@@ -47,6 +49,8 @@ interface ClaudeCodeContextValue {
   isCheckingDocker: boolean;
   isStartingContainer: boolean;
   isStoppingContainer: boolean;
+  isCreatingContainer: boolean;
+  isRemovingContainer: boolean;
 
   // Thread state
   activeThreadId: string | null;
@@ -59,6 +63,8 @@ interface ClaudeCodeContextValue {
   refreshContainerStatus: () => Promise<void>;
   startContainerAction: () => Promise<void>;
   stopContainerAction: () => Promise<void>;
+  createContainerAction: (mcpConfigPath: string) => Promise<void>;
+  removeContainerAction: () => Promise<void>;
   execute: (prompt: string) => Promise<ClaudeCodeResult>;
   clearResults: () => void;
   clearError: () => void;
@@ -172,6 +178,8 @@ export function ClaudeCodeProvider({
   const [isCheckingDocker, setIsCheckingDocker] = useState(false);
   const [isStartingContainer, setIsStartingContainer] = useState(false);
   const [isStoppingContainer, setIsStoppingContainer] = useState(false);
+  const [isCreatingContainer, setIsCreatingContainer] = useState(false);
+  const [isRemovingContainer, setIsRemovingContainer] = useState(false);
 
   // Thread state
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -302,6 +310,35 @@ export function ClaudeCodeProvider({
       setError(`Failed to stop container: ${err}`);
     } finally {
       setIsStoppingContainer(false);
+    }
+  }, [environment, refreshContainerStatus]);
+
+  const createContainerAction = useCallback(
+    async (mcpConfigPath: string) => {
+      setIsCreatingContainer(true);
+      setError(null);
+      try {
+        await createContainer(environment, mcpConfigPath);
+        await refreshContainerStatus();
+      } catch (err) {
+        setError(`Failed to create container: ${err}`);
+      } finally {
+        setIsCreatingContainer(false);
+      }
+    },
+    [environment, refreshContainerStatus]
+  );
+
+  const removeContainerAction = useCallback(async () => {
+    setIsRemovingContainer(true);
+    setError(null);
+    try {
+      await removeContainer(environment);
+      await refreshContainerStatus();
+    } catch (err) {
+      setError(`Failed to remove container: ${err}`);
+    } finally {
+      setIsRemovingContainer(false);
     }
   }, [environment, refreshContainerStatus]);
 
@@ -468,6 +505,8 @@ export function ClaudeCodeProvider({
     isCheckingDocker,
     isStartingContainer,
     isStoppingContainer,
+    isCreatingContainer,
+    isRemovingContainer,
 
     // Thread state
     activeThreadId,
@@ -480,6 +519,8 @@ export function ClaudeCodeProvider({
     refreshContainerStatus,
     startContainerAction,
     stopContainerAction,
+    createContainerAction,
+    removeContainerAction,
     execute,
     clearResults,
     clearError,

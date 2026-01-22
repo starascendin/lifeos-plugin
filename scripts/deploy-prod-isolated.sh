@@ -111,9 +111,17 @@ echo "Pushed to origin/main"
 echo "staging -> main complete"
 
 echo ""
+echo "Updating local staging and main branches..."
+# Update local branches to match origin (fast-forward only)
+# Using -C to run in original repo, not the worktree
+git -C "$REPO_ROOT" branch -f staging origin/staging 2>/dev/null && echo "  ✓ staging updated" || echo "  ✗ staging update failed (may have local changes)"
+git -C "$REPO_ROOT" branch -f main origin/main 2>/dev/null && echo "  ✓ main updated" || echo "  ✗ main update failed (may have local changes)"
+
+echo ""
 echo "Deploy complete! All branches pushed."
 echo "   dev -> staging -> main"
 echo ""
 echo "Your main worktree at $REPO_ROOT was not modified."
+echo "Local staging and main branches have been updated to match origin."
 
 exit 0
