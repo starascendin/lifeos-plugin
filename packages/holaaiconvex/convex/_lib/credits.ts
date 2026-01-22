@@ -6,7 +6,7 @@ import { internal } from "../_generated/api";
  * Centralized Credit/Metering System
  *
  * All AI features should use this module to check and deduct credits.
- * Developers (bsliu17@gmail.com, bryanshliu@gmail.com) have unlimited access.
+ * Developers (bsliu17@gmail.com, bryanshliu@gmail.com, bryan@rocketjump.tech) have unlimited access.
  * Other users start with 0 credits and must request access.
  */
 
@@ -58,6 +58,7 @@ export const FEATURE_COSTS: Record<MeteringFeature, number> = {
 export const UNLIMITED_ACCESS_EMAILS = [
   "bsliu17@gmail.com",
   "bryanshliu@gmail.com",
+  "bryan@rocketjump.tech",
 ];
 
 /**

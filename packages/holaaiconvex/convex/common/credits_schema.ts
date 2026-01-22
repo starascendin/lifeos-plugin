@@ -5,7 +5,7 @@ import { v } from "convex/values";
  * Credit System Tables
  *
  * Provides usage metering and access control for AI features across all apps.
- * - Developers (bsliu17@gmail.com, bryanshliu@gmail.com) have unlimited access
+ * - Developers (bsliu17@gmail.com, bryanshliu@gmail.com, bryan@rocketjump.tech) have unlimited access
  * - Other users start with 0 credits and must request access
  */
 

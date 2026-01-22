@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.bryanliu.lifeosnexus.staging",
-  appName: "LifeOS Nexus Staging",
+  appId: "com.bryanliu.lifeosnexus",
+  appName: "LifeOS Nexus",
   webDir: "dist",
   plugins: {
     CapacitorUpdater: {
