@@ -50,6 +50,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         status: {
           type: "string",
           enum: ["planned", "in_progress", "paused", "completed", "cancelled"],
@@ -69,6 +73,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         projectId: {
           type: "string",
           description: "Filter by project ID",
@@ -103,7 +111,12 @@ const TOOLS: Tool[] = [
       "Get today's tasks including tasks due today and top priority items. Best for daily planning.",
     inputSchema: {
       type: "object" as const,
-      properties: {},
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
     },
   },
   {
@@ -113,6 +126,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         title: {
           type: "string",
           description: "The task title (required)",
@@ -153,6 +170,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         issueIdOrIdentifier: {
           type: "string",
           description: "Issue ID or identifier like PROJ-123 (required)",
@@ -169,7 +190,12 @@ const TOOLS: Tool[] = [
       "Get the currently active cycle/sprint with progress stats and top priority issues.",
     inputSchema: {
       type: "object" as const,
-      properties: {},
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
     },
   },
   {
@@ -179,6 +205,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         issueIdOrIdentifier: {
           type: "string",
           description: "Issue ID or identifier like PROJ-123 (required)",
@@ -200,6 +230,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         date: {
           type: "string",
           description: "Specific date in ISO format (optional, default: today)",
@@ -214,6 +248,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         startDate: {
           type: "string",
           description: "Start date in ISO format (optional, default: today)",
@@ -229,6 +267,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         query: {
           type: "string",
           description: "Search terms to find in notes (required)",
@@ -247,6 +289,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         limit: {
           type: "number",
           description: "Number of notes to return (default 5, max 20)",
@@ -260,6 +306,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         content: {
           type: "string",
           description: "The note content (required)",
@@ -279,6 +329,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         noteId: {
           type: "string",
           description: "The note ID (required)",
@@ -301,6 +355,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         relationshipType: {
           type: "string",
           enum: ["family", "friend", "colleague", "acquaintance", "mentor", "other"],
@@ -324,6 +382,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         personId: {
           type: "string",
           description: "The person's ID (required)",
@@ -338,6 +400,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         query: {
           type: "string",
           description: "Search terms to find in names (required)",
@@ -357,6 +423,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         personId: {
           type: "string",
           description: "The person's ID (required)",
@@ -376,6 +446,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         personId: {
           type: "string",
           description: "Filter to specific person (omit for all)",
@@ -393,6 +467,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         name: {
           type: "string",
           description: "The person's name (required)",
@@ -424,6 +502,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         personId: {
           type: "string",
           description: "The person's ID (required)",
@@ -463,6 +545,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         personId: {
           type: "string",
           description: "The person's ID (required)",
@@ -488,6 +574,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         status: {
           type: "string",
           enum: ["active", "archived"],
@@ -503,6 +593,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         clientId: {
           type: "string",
           description: "The client's ID (required)",
@@ -518,6 +612,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         clientId: {
           type: "string",
           description: "The client's ID (required)",
@@ -532,6 +630,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         name: {
           type: "string",
           description: "The client's name (required)",
@@ -550,6 +652,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         clientId: {
           type: "string",
           description: "The client's ID (required)",
@@ -580,6 +686,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         projectId: {
           type: "string",
           description: "The project's ID (required)",
@@ -595,6 +705,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         phaseId: {
           type: "string",
           description: "The phase's ID (required)",
@@ -610,6 +724,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         projectId: {
           type: "string",
           description: "The project's ID (required)",
@@ -637,6 +755,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         phaseId: {
           type: "string",
           description: "The phase's ID (required)",
@@ -673,6 +795,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         phaseId: {
           type: "string",
           description: "The phase's ID (required)",
@@ -688,6 +814,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object" as const,
       properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
         issueIdOrIdentifier: {
           type: "string",
           description: "Issue ID or identifier like PROJ-123 (required)",
@@ -735,6 +865,10 @@ async function callConvexTool(
 ): Promise<unknown> {
   const url = `${CONVEX_URL}/tool-call`;
 
+  // Extract userId from params if provided, otherwise use default
+  const { userId: overrideUserId, ...toolParams } = params;
+  const effectiveUserId = (overrideUserId as string) || USER_ID;
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -743,8 +877,8 @@ async function callConvexTool(
     },
     body: JSON.stringify({
       tool,
-      userId: USER_ID,
-      params,
+      userId: effectiveUserId,
+      params: toolParams,
     }),
   });
 
