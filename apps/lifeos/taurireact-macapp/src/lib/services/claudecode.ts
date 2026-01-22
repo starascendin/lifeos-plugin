@@ -17,6 +17,16 @@ export interface ClaudeCodeResult {
 
 export type Environment = "dev" | "staging" | "prod";
 
+// Conversation thread information
+export interface ConversationThread {
+  id: string;
+  environment: Environment;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+  messageCount: number;
+}
+
 // MCP Tools available in the Claude agent containers
 export interface MCPTool {
   name: string;
@@ -120,11 +130,13 @@ export async function stopContainer(env: Environment): Promise<void> {
 
 /**
  * Execute a Claude prompt in the Docker container
+ * @param sessionId - Optional session ID to continue a conversation
  */
 export async function executePrompt(
   env: Environment,
   prompt: string,
-  jsonOutput: boolean = false
+  jsonOutput: boolean = false,
+  sessionId?: string
 ): Promise<ClaudeCodeResult> {
   if (!isTauri) {
     return { success: false, error: "Not running in Tauri" };
@@ -134,10 +146,75 @@ export async function executePrompt(
       env,
       prompt,
       jsonOutput,
+      sessionId: sessionId || null,
     });
   } catch (error) {
     console.error("Failed to execute Claude prompt:", error);
     return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Create a new Claude session
+ * @returns The session ID
+ */
+export async function createSession(env: Environment): Promise<string | null> {
+  if (!isTauri) {
+    return null;
+  }
+  try {
+    return await invoke<string>("create_claude_session", { env });
+  } catch (error) {
+    console.error("Failed to create Claude session:", error);
+    return null;
+  }
+}
+
+interface RawConversationThread {
+  id: string;
+  environment: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * List all Claude sessions in the container
+ */
+export async function listSessions(env: Environment): Promise<ConversationThread[]> {
+  if (!isTauri) {
+    return [];
+  }
+  try {
+    const raw = await invoke<RawConversationThread[]>("list_claude_sessions", { env });
+    // Convert timestamps to Date objects
+    return raw.map(thread => ({
+      id: thread.id,
+      environment: thread.environment as Environment,
+      title: thread.title,
+      createdAt: new Date(parseInt(thread.created_at) * 1000 || Date.now()),
+      updatedAt: new Date(parseInt(thread.updated_at) * 1000 || Date.now()),
+      messageCount: 0, // Will be populated from localStorage
+    }));
+  } catch (error) {
+    console.error("Failed to list Claude sessions:", error);
+    return [];
+  }
+}
+
+/**
+ * Delete a Claude session
+ */
+export async function deleteSession(env: Environment, sessionId: string): Promise<boolean> {
+  if (!isTauri) {
+    return false;
+  }
+  try {
+    await invoke<void>("delete_claude_session", { env, sessionId });
+    return true;
+  } catch (error) {
+    console.error("Failed to delete Claude session:", error);
+    return false;
   }
 }
 

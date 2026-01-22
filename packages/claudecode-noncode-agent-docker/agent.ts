@@ -14,12 +14,18 @@ Usage:
   bun agent.ts rm <name>                            Remove a container
   bun agent.ts list                                 List all claude-agent containers
   bun agent.ts login <name>                         Login to Claude in container
+  bun agent.ts sessions <name>                      List sessions in a container
 
 Examples:
   bun agent.ts run prod "List my projects" --mcp ./configs/prod.mcp.json
   bun agent.ts run staging "Get my tasks" --mcp ./configs/staging.mcp.json
   bun agent.ts start dev --mcp ./.mcp.json
   bun agent.ts list
+  bun agent.ts sessions dev
+
+Session persistence:
+  Sessions are stored in Docker volumes (claude-sessions-{name}) and persist across
+  container restarts. Use --resume <session-id> to continue a previous conversation.
 `);
   process.exit(1);
 }
@@ -47,6 +53,8 @@ async function containerRunning(name: string): Promise<boolean> {
 async function startContainer(name: string, mcpPath: string) {
   const containerName = `claude-agent-${name}`;
   const absoluteMcpPath = Bun.resolveSync(mcpPath, process.cwd());
+  // Per-environment session volume for conversation persistence
+  const sessionsVolume = `claude-sessions-${name}`;
 
   if (await containerRunning(containerName)) {
     console.log(`Container ${containerName} already running`);
@@ -60,7 +68,14 @@ async function startContainer(name: string, mcpPath: string) {
   }
 
   console.log(`Creating container ${containerName} with MCP: ${mcpPath}`);
-  await $`docker run -d --name ${containerName} -v claude-credentials:/home/node/.claude -v claude-config:/home/node/.config -v ${absoluteMcpPath}:/home/node/.mcp.json:ro claude-agent`;
+  console.log(`Session volume: ${sessionsVolume} (for conversation persistence)`);
+
+  // Create container with:
+  // - claude-credentials: shared Claude authentication
+  // - claude-config: shared Claude config
+  // - claude-sessions-{name}: per-environment session storage for conversation threads
+  // - MCP config file
+  await $`docker run -d --name ${containerName} -v claude-credentials:/home/node/.claude -v claude-config:/home/node/.config -v ${sessionsVolume}:/home/node/.claude/projects -v ${absoluteMcpPath}:/home/node/.mcp.json:ro claude-agent`;
 }
 
 async function runPrompt(name: string, prompt: string, mcpPath: string) {
@@ -119,6 +134,15 @@ async function main() {
       const name = args[1];
       if (!name) usage();
       await $`docker exec -it claude-agent-${name} claude login`;
+      break;
+    }
+
+    case "sessions": {
+      const name = args[1];
+      if (!name) usage();
+      const containerName = `claude-agent-${name}`;
+      console.log(`Sessions in ${containerName}:`);
+      await $`docker exec ${containerName} sh -c "find /home/node/.claude/projects -name '*.jsonl' -type f 2>/dev/null | while read f; do echo \"$(basename $f .jsonl) - $(stat -c '%Y' $f | xargs -I {} date -d @{} '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' $f 2>/dev/null)\"; done"`;
       break;
     }
 

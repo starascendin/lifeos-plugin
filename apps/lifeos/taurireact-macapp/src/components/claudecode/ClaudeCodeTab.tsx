@@ -3,6 +3,7 @@ import { useClaudeCode } from "@/lib/contexts/ClaudeCodeContext";
 import { PromptInput } from "./PromptInput";
 import { ResultDisplay } from "./ResultDisplay";
 import { MCPToolsList } from "./MCPToolsList";
+import { ThreadSidebar } from "./ThreadSidebar";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -22,6 +23,7 @@ import {
   RefreshCw,
   Trash2,
   Container,
+  MessageSquare,
 } from "lucide-react";
 import type { Environment } from "@/lib/services/claudecode";
 
@@ -33,13 +35,14 @@ export function ClaudeCodeTab() {
     environment,
     containerStatus,
     isExecuting,
-    results,
     jsonDebugMode,
     error,
     isDockerAvailable,
     isCheckingDocker,
     isStartingContainer,
     isStoppingContainer,
+    activeThreadId,
+    threads,
     setEnvironment,
     setJsonDebugMode,
     refreshContainerStatus,
@@ -48,7 +51,14 @@ export function ClaudeCodeTab() {
     execute,
     clearResults,
     clearError,
+    getActiveThreadResults,
   } = useClaudeCode();
+
+  // Get results for active thread only
+  const activeResults = getActiveThreadResults();
+
+  // Get active thread info
+  const activeThread = threads.find((t) => t.id === activeThreadId);
 
   // Refresh container status periodically when executing
   useEffect(() => {
@@ -114,183 +124,212 @@ export function ClaudeCodeTab() {
     containerStatus?.running && !isExecuting && !isStartingContainer;
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="border-b p-4 flex-shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-muted-foreground" />
-            <h1 className="text-lg font-semibold">ClaudeCode</h1>
-          </div>
+    <div className="h-full flex">
+      {/* Thread Sidebar */}
+      <ThreadSidebar />
 
-          <div className="flex items-center gap-4">
-            {/* Environment selector */}
-            <div className="flex items-center gap-2">
-              <Label htmlFor="env-select" className="text-sm">
-                Environment:
-              </Label>
-              <Select
-                value={environment}
-                onValueChange={(v) => setEnvironment(v as Environment)}
-              >
-                <SelectTrigger id="env-select" className="w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dev">dev</SelectItem>
-                  <SelectItem value="staging">staging</SelectItem>
-                  <SelectItem value="prod">prod</SelectItem>
-                </SelectContent>
-              </Select>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="border-b p-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Terminal className="w-5 h-5 text-muted-foreground shrink-0" />
+              <h1 className="text-lg font-semibold shrink-0">ClaudeCode</h1>
+              {activeThread && (
+                <>
+                  <span className="text-muted-foreground">/</span>
+                  <span className="text-sm text-muted-foreground truncate">
+                    {activeThread.title}
+                  </span>
+                </>
+              )}
             </div>
 
-            {/* JSON Debug toggle */}
-            <div className="flex items-center gap-2">
-              <Label htmlFor="json-toggle" className="text-sm">
-                JSON Debug:
-              </Label>
-              <Switch
-                id="json-toggle"
-                checked={jsonDebugMode}
-                onCheckedChange={setJsonDebugMode}
-              />
+            <div className="flex items-center gap-4 shrink-0">
+              {/* Environment selector */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor="env-select" className="text-sm">
+                  Environment:
+                </Label>
+                <Select
+                  value={environment}
+                  onValueChange={(v) => setEnvironment(v as Environment)}
+                >
+                  <SelectTrigger id="env-select" className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dev">dev</SelectItem>
+                    <SelectItem value="staging">staging</SelectItem>
+                    <SelectItem value="prod">prod</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* JSON Debug toggle */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor="json-toggle" className="text-sm">
+                  JSON Debug:
+                </Label>
+                <Switch
+                  id="json-toggle"
+                  checked={jsonDebugMode}
+                  onCheckedChange={setJsonDebugMode}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Container status bar */}
-        <div className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2">
-          <div className="flex items-center gap-2">
-            <Container className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm">
-              Container:{" "}
-              <span className="font-mono text-xs">
-                {containerStatus?.name || `claude-agent-${environment}`}
-              </span>
-            </span>
-            {containerStatus?.exists ? (
-              containerStatus.running ? (
-                <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-600">
-                  Running
+          {/* Container status bar */}
+          <div className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2">
+              <Container className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm">
+                Container:{" "}
+                <span className="font-mono text-xs">
+                  {containerStatus?.name || `claude-agent-${environment}`}
                 </span>
+              </span>
+              {containerStatus?.exists ? (
+                containerStatus.running ? (
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-600">
+                    Running
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-600">
+                    Stopped
+                  </span>
+                )
               ) : (
-                <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-600">
-                  Stopped
+                <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-600">
+                  Not Found
                 </span>
-              )
-            ) : (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-600">
-                Not Found
-              </span>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className="flex items-center gap-2">
-            {containerStatus?.exists && !containerStatus.running && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={startContainerAction}
-                disabled={isStartingContainer}
-              >
-                {isStartingContainer ? (
-                  <>
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3 h-3 mr-1" />
-                    Start
-                  </>
-                )}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {containerStatus?.exists && !containerStatus.running && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={startContainerAction}
+                  disabled={isStartingContainer}
+                >
+                  {isStartingContainer ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3 h-3 mr-1" />
+                      Start
+                    </>
+                  )}
+                </Button>
+              )}
 
-            {containerStatus?.running && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={stopContainerAction}
-                disabled={isStoppingContainer || isExecuting}
-              >
-                {isStoppingContainer ? (
-                  <>
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    Stopping...
-                  </>
-                ) : (
-                  <>
-                    <Square className="w-3 h-3 mr-1" />
-                    Stop
-                  </>
-                )}
-              </Button>
-            )}
+              {containerStatus?.running && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={stopContainerAction}
+                  disabled={isStoppingContainer || isExecuting}
+                >
+                  {isStoppingContainer ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Stopping...
+                    </>
+                  ) : (
+                    <>
+                      <Square className="w-3 h-3 mr-1" />
+                      Stop
+                    </>
+                  )}
+                </Button>
+              )}
 
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={refreshContainerStatus}
-              title="Refresh status"
-            >
-              <RefreshCw className="w-3 h-3" />
-            </Button>
-
-            {results.length > 0 && (
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={clearResults}
-                title="Clear history"
+                onClick={refreshContainerStatus}
+                title="Refresh status"
               >
-                <Trash2 className="w-3 h-3" />
+                <RefreshCw className="w-3 h-3" />
               </Button>
-            )}
+
+              {activeResults.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={clearResults}
+                  title="Clear conversation history"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* Error message */}
+          {error && (
+            <div className="mt-2 flex items-center gap-2 p-2 bg-red-500/10 rounded-lg text-red-600 text-sm">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1">{error}</span>
+              <button
+                onClick={clearError}
+                className="text-xs hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Error message */}
-        {error && (
-          <div className="mt-2 flex items-center gap-2 p-2 bg-red-500/10 rounded-lg text-red-600 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1">{error}</span>
-            <button
-              onClick={clearError}
-              className="text-xs hover:underline"
-            >
-              Dismiss
-            </button>
+        {/* MCP Tools collapsible */}
+        <MCPToolsList />
+
+        {/* Results area - show only active thread results */}
+        {!activeThreadId && containerStatus?.running ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center max-w-sm p-8">
+              <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
+              <h3 className="text-lg font-medium mb-2">No Conversation Selected</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Select a conversation from the sidebar or start a new one to begin chatting with Claude.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Tip: Type a message below to automatically create a new conversation.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ResultDisplay results={activeResults} jsonDebugMode={jsonDebugMode} />
+        )}
+
+        {/* Prompt input */}
+        <PromptInput
+          onSubmit={execute}
+          isExecuting={isExecuting}
+          disabled={!canExecute}
+        />
+
+        {/* Help text when container not running */}
+        {!containerStatus?.running && containerStatus?.exists && (
+          <div className="px-4 pb-4 text-center text-sm text-muted-foreground">
+            Start the container to execute prompts
+          </div>
+        )}
+
+        {!containerStatus?.exists && (
+          <div className="px-4 pb-4 text-center text-sm text-muted-foreground">
+            Container <code className="font-mono">claude-agent-{environment}</code>{" "}
+            not found. Please create it first using Docker.
           </div>
         )}
       </div>
-
-      {/* MCP Tools collapsible */}
-      <MCPToolsList />
-
-      {/* Results area */}
-      <ResultDisplay results={results} jsonDebugMode={jsonDebugMode} />
-
-      {/* Prompt input */}
-      <PromptInput
-        onSubmit={execute}
-        isExecuting={isExecuting}
-        disabled={!canExecute}
-      />
-
-      {/* Help text when container not running */}
-      {!containerStatus?.running && containerStatus?.exists && (
-        <div className="px-4 pb-4 text-center text-sm text-muted-foreground">
-          Start the container to execute prompts
-        </div>
-      )}
-
-      {!containerStatus?.exists && (
-        <div className="px-4 pb-4 text-center text-sm text-muted-foreground">
-          Container <code className="font-mono">claude-agent-{environment}</code>{" "}
-          not found. Please create it first using Docker.
-        </div>
-      )}
     </div>
   );
 }

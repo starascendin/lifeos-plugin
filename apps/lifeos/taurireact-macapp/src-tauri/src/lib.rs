@@ -20,8 +20,8 @@ use beeper::{
     search_beeper_messages, sync_beeper_database,
 };
 use claudecode::{
-    check_docker_available, execute_claude_prompt, get_container_status, start_container,
-    stop_container,
+    check_docker_available, create_claude_session, delete_claude_session, execute_claude_prompt,
+    get_container_status, list_claude_sessions, start_container, stop_container,
 };
 use coder::{delegate_to_coder, get_coder_presets, get_coder_templates};
 use council_server::{get_council_server_status, start_council_server, stop_council_server};
@@ -341,6 +341,9 @@ pub fn run() {
             start_container,
             stop_container,
             execute_claude_prompt,
+            create_claude_session,
+            list_claude_sessions,
+            delete_claude_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use tauri::command;
+use uuid::Uuid;
 
 /// Container status information
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -8,6 +9,16 @@ pub struct ContainerStatus {
     pub exists: bool,
     pub running: bool,
     pub name: String,
+}
+
+/// Conversation thread information
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConversationThread {
+    pub id: String,
+    pub environment: String,
+    pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 /// Result from executing a Claude prompt
@@ -103,6 +114,7 @@ pub async fn execute_claude_prompt(
     env: String,
     prompt: String,
     json_output: bool,
+    session_id: Option<String>,
 ) -> Result<ClaudeCodeResult, String> {
     let container_name = format!("claude-agent-{}", env);
 
@@ -112,6 +124,12 @@ pub async fn execute_claude_prompt(
         "--dangerously-skip-permissions".to_string(),
         "--print".to_string(),
     ];
+
+    // Add session resumption if provided
+    if let Some(ref sid) = session_id {
+        claude_args.push("--resume".to_string());
+        claude_args.push(sid.clone());
+    }
 
     if json_output {
         claude_args.push("--output-format".to_string());
@@ -155,4 +173,124 @@ pub async fn execute_claude_prompt(
         error: if stderr.is_empty() { None } else { Some(stderr) },
         json_output: json_result,
     })
+}
+
+/// Create a new Claude session and return the session ID
+#[command]
+pub async fn create_claude_session(env: String) -> Result<String, String> {
+    // Generate a new UUID for the session
+    let session_id = Uuid::new_v4().to_string();
+    let container_name = format!("claude-agent-{}", env);
+
+    // Initialize the session by running a minimal prompt with --session-id
+    // This ensures the session file is created
+    let output = Command::new("docker")
+        .args([
+            "exec",
+            &container_name,
+            "claude",
+            "--dangerously-skip-permissions",
+            "--print",
+            "--session-id",
+            &session_id,
+            "-p",
+            "Hello, this is the start of a new conversation.",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to create session: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to create session: {}", stderr));
+    }
+
+    Ok(session_id)
+}
+
+/// List all Claude sessions in the container
+#[command]
+pub async fn list_claude_sessions(env: String) -> Result<Vec<ConversationThread>, String> {
+    let container_name = format!("claude-agent-{}", env);
+
+    // List session files in the Claude projects directory
+    // Sessions are stored as JSONL files in /home/node/.claude/projects/-home-node/
+    let output = Command::new("docker")
+        .args([
+            "exec",
+            &container_name,
+            "sh",
+            "-c",
+            "find /home/node/.claude/projects -name '*.jsonl' -type f 2>/dev/null | head -50",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to list sessions: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let mut threads = Vec::new();
+
+    for line in stdout.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        // Extract session ID from filename (e.g., /path/to/abc123.jsonl -> abc123)
+        if let Some(filename) = line.split('/').next_back() {
+            if let Some(session_id) = filename.strip_suffix(".jsonl") {
+                // Get file modification time
+                let stat_output = Command::new("docker")
+                    .args([
+                        "exec",
+                        &container_name,
+                        "stat",
+                        "-c",
+                        "%Y",
+                        line,
+                    ])
+                    .output();
+
+                let updated_at = stat_output
+                    .ok()
+                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    .unwrap_or_default();
+
+                threads.push(ConversationThread {
+                    id: session_id.to_string(),
+                    environment: env.clone(),
+                    title: format!("Thread {}", &session_id[..8.min(session_id.len())]),
+                    created_at: updated_at.clone(),
+                    updated_at,
+                });
+            }
+        }
+    }
+
+    Ok(threads)
+}
+
+/// Delete a Claude session from the container
+#[command]
+pub async fn delete_claude_session(env: String, session_id: String) -> Result<(), String> {
+    let container_name = format!("claude-agent-{}", env);
+
+    // Find and delete the session file
+    let output = Command::new("docker")
+        .args([
+            "exec",
+            &container_name,
+            "sh",
+            "-c",
+            &format!(
+                "find /home/node/.claude/projects -name '{}.jsonl' -type f -delete 2>/dev/null",
+                session_id
+            ),
+        ])
+        .output()
+        .map_err(|e| format!("Failed to delete session: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to delete session: {}", stderr));
+    }
+
+    Ok(())
 }
