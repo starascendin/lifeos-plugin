@@ -44,6 +44,7 @@ import {
   Settings,
   Sparkles,
   Target,
+  Terminal,
   User,
   UserCircle,
   Users,
@@ -178,6 +179,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
         ],
       },
       { name: "Beeper", href: "/lifeos/beeper", icon: MessageSquare },
+      { name: "ClaudeCode", href: "/lifeos/claudecode", icon: Terminal },
       { name: "Settings", href: "/lifeos/settings", icon: Settings },
       {
         name: "Logout",

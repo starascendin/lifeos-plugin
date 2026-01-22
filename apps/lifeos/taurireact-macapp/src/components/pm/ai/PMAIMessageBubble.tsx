@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Check, AlertCircle, Wrench } from "lucide-react";
+import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 
 export interface ToolCall {
   name: string;
@@ -39,9 +40,16 @@ export function PMAIMessageBubble({ message }: PMAIMessageBubbleProps) {
         )}
       >
         {/* Message content */}
-        <div className="whitespace-pre-wrap break-words text-sm">
-          {message.content}
-        </div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap break-words text-sm">
+            {message.content}
+          </div>
+        ) : (
+          <MarkdownRenderer
+            content={message.content}
+            className="text-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+          />
+        )}
 
         {/* Error indicator */}
         {message.error && (
