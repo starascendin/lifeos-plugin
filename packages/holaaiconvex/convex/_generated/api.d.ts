@@ -47,6 +47,8 @@ import type * as inspiration_tags from "../inspiration/tags.js";
 import type * as lifeos_agenda from "../lifeos/agenda.js";
 import type * as lifeos_avatar_schema from "../lifeos/avatar_schema.js";
 import type * as lifeos_avatar_stats from "../lifeos/avatar_stats.js";
+import type * as lifeos_beeper from "../lifeos/beeper.js";
+import type * as lifeos_beeper_schema from "../lifeos/beeper_schema.js";
 import type * as lifeos_calendar from "../lifeos/calendar.js";
 import type * as lifeos_calendar_schema from "../lifeos/calendar_schema.js";
 import type * as lifeos_chatnexus from "../lifeos/chatnexus.js";
@@ -149,6 +151,8 @@ declare const fullApi: ApiFromModules<{
   "lifeos/agenda": typeof lifeos_agenda;
   "lifeos/avatar_schema": typeof lifeos_avatar_schema;
   "lifeos/avatar_stats": typeof lifeos_avatar_stats;
+  "lifeos/beeper": typeof lifeos_beeper;
+  "lifeos/beeper_schema": typeof lifeos_beeper_schema;
   "lifeos/calendar": typeof lifeos_calendar;
   "lifeos/calendar_schema": typeof lifeos_calendar_schema;
   "lifeos/chatnexus": typeof lifeos_chatnexus;

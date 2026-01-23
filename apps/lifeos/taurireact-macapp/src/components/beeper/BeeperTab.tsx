@@ -1,10 +1,30 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useBeeper } from "@/lib/contexts/BeeperContext";
+import { useBeeperSync } from "@/lib/hooks/useBeeperSync";
+import { syncBeeperDatabase } from "@/lib/services/beeper";
 import { ThreadsList } from "./ThreadsList";
 import { ConversationView } from "./ConversationView";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, X, MessageCircle, AlertCircle, RefreshCw, Clock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Search,
+  X,
+  MessageCircle,
+  AlertCircle,
+  RefreshCw,
+  Clock,
+  Cloud,
+  CloudUpload,
+  Briefcase,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Auto-refresh interval in milliseconds (3 minutes)
 const AUTO_REFRESH_INTERVAL = 3 * 60 * 1000;
@@ -23,7 +43,16 @@ export function BeeperTab() {
     searchQuery,
     setSearchQuery,
     checkDatabase,
+    showBusinessOnly,
+    setShowBusinessOnly,
+    businessMarks,
   } = useBeeper();
+
+  // Sync hook
+  const { progress, isSyncing, syncAll, lastSyncResult } = useBeeperSync();
+
+  // Count business threads
+  const businessCount = businessMarks.size;
 
   const [searchInput, setSearchInput] = useState("");
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
@@ -40,14 +69,24 @@ export function BeeperTab() {
     lastRefreshTimeRef.current = lastRefreshTime;
   }, [lastRefreshTime]);
 
-  // Manual refresh handler
-  const handleRefresh = useCallback(async () => {
+  // Manual sync and refresh handler - actually syncs from Beeper source
+  const handleSyncAndRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await checkDatabase();
-      await loadThreads();
-      const now = new Date();
-      setLastRefreshTime(now);
+      // Actually sync from Beeper source (runs pnpm sync && pnpm clean)
+      const result = await syncBeeperDatabase();
+      if (result.success) {
+        // Then refresh UI from the updated database
+        await checkDatabase();
+        await loadThreads();
+        const now = new Date();
+        setLastRefreshTime(now);
+      } else {
+        console.error("Beeper sync failed:", result.error);
+        // Still try to refresh the UI even if sync failed
+        await checkDatabase();
+        await loadThreads();
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -204,8 +243,71 @@ export function BeeperTab() {
           <div className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-muted-foreground" />
             <h1 className="text-lg font-semibold">Beeper Messages</h1>
+            {businessCount > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
+                {businessCount} business
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Business filter toggle */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="business-filter"
+                      checked={showBusinessOnly}
+                      onCheckedChange={setShowBusinessOnly}
+                    />
+                    <Label
+                      htmlFor="business-filter"
+                      className="text-xs cursor-pointer flex items-center gap-1"
+                    >
+                      <Briefcase className="w-3 h-3" />
+                      Business
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Show only business-marked threads</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* Sync to Cloud button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={syncAll}
+                    disabled={isSyncing || businessCount === 0}
+                  >
+                    {isSyncing ? (
+                      <>
+                        <CloudUpload className="w-4 h-4 mr-1 animate-pulse" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <Cloud className="w-4 h-4 mr-1" />
+                        Sync to Cloud
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {businessCount === 0
+                      ? "Mark threads as business first"
+                      : `Sync ${businessCount} business thread(s) to Convex`}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             {/* Refresh status */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {lastRefreshTime && (
@@ -220,15 +322,15 @@ export function BeeperTab() {
                 </span>
               )}
             </div>
-            {/* Refresh button */}
+            {/* Sync button - actually syncs from Beeper source */}
             <Button
               variant="outline"
               size="sm"
-              onClick={handleRefresh}
+              onClick={handleSyncAndRefresh}
               disabled={isRefreshing || isLoadingThreads}
             >
               <RefreshCw className={`w-4 h-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
-              {isRefreshing ? "Refreshing..." : "Refresh"}
+              {isRefreshing ? "Syncing..." : "Sync"}
             </Button>
           </div>
         </div>
@@ -267,6 +369,43 @@ export function BeeperTab() {
             >
               Clear
             </button>
+          </div>
+        )}
+        {/* Sync progress */}
+        {isSyncing && (
+          <div className="mt-2 p-2 rounded bg-muted/50 text-sm">
+            <div className="flex items-center gap-2">
+              <CloudUpload className="w-4 h-4 animate-pulse text-blue-500" />
+              <span>{progress.currentStep || "Starting sync..."}</span>
+            </div>
+            {progress.threadsToSync > 0 && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Threads: {progress.threadsSynced}/{progress.threadsToSync}
+                {progress.messagesTotal > 0 &&
+                  ` | Messages: ${progress.messagesSynced}/${progress.messagesTotal}`}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Sync result */}
+        {lastSyncResult && !isSyncing && progress.status === "complete" && (
+          <div className="mt-2 p-2 rounded bg-green-500/10 text-sm text-green-600">
+            <div className="flex items-center gap-2">
+              <Cloud className="w-4 h-4" />
+              <span>
+                Synced {lastSyncResult.threadsInserted} new thread(s),{" "}
+                {lastSyncResult.messagesInserted} new message(s)
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Sync error */}
+        {progress.status === "error" && (
+          <div className="mt-2 p-2 rounded bg-red-500/10 text-sm text-red-600">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              <span>{progress.error || "Sync failed"}</span>
+            </div>
           </div>
         )}
       </div>

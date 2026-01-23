@@ -131,6 +131,7 @@ ORDER BY rm.threadID, rm.timestamp ASC;
 -- ============================================================================
 CREATE OR REPLACE TABLE conversations AS
 SELECT
+    message_id,
     thread_name,
     thread_type,
     thread_id,

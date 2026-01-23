@@ -1,7 +1,14 @@
 import { useBeeper } from "@/lib/contexts/BeeperContext";
 import type { BeeperThread, BeeperMessage } from "@/lib/services/beeper";
-import { Users, User, MessageSquare } from "lucide-react";
+import { Users, User, MessageSquare, Briefcase, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 interface ThreadsListProps {
   threads: BeeperThread[];
@@ -16,7 +23,7 @@ export function ThreadsList({
   isLoading,
   isSearchMode,
 }: ThreadsListProps) {
-  const { selectedThread, selectThread } = useBeeper();
+  const { selectedThread, selectThread, markAsBusiness, isThreadBusiness } = useBeeper();
 
   // Format timestamp for display
   const formatTimestamp = (timestamp: string) => {
@@ -137,55 +144,99 @@ export function ThreadsList({
     );
   }
 
+  // Handle business toggle
+  const handleToggleBusiness = (e: React.MouseEvent, thread: BeeperThread) => {
+    e.stopPropagation();
+    const isBusiness = isThreadBusiness(thread.thread_id);
+    markAsBusiness(thread.thread_id, !isBusiness);
+  };
+
   // Threads list
   return (
     <div className="h-full overflow-y-auto">
       <div className="divide-y">
-        {threads.map((thread) => (
-          <div
-            key={thread.name}
-            className={cn(
-              "p-3 hover:bg-muted/50 cursor-pointer transition-colors",
-              selectedThread?.name === thread.name && "bg-muted"
-            )}
-            onClick={() => selectThread(thread)}
-          >
-            <div className="flex items-start gap-3">
-              {/* Avatar */}
-              <div
-                className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                  thread.thread_type === "group"
-                    ? "bg-green-500/10 text-green-500"
-                    : "bg-blue-500/10 text-blue-500"
-                )}
-              >
-                {thread.thread_type === "group" ? (
-                  <Users className="w-5 h-5" />
-                ) : (
-                  <User className="w-5 h-5" />
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-sm truncate">
-                    {thread.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {formatTimestamp(thread.last_message_at)}
-                  </span>
+        {threads.map((thread) => {
+          const isBusiness = isThreadBusiness(thread.thread_id);
+          return (
+            <div
+              key={thread.thread_id}
+              className={cn(
+                "p-3 hover:bg-muted/50 cursor-pointer transition-colors group",
+                selectedThread?.thread_id === thread.thread_id && "bg-muted"
+              )}
+              onClick={() => selectThread(thread)}
+            >
+              <div className="flex items-start gap-3">
+                {/* Avatar */}
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative",
+                    thread.thread_type === "group"
+                      ? "bg-green-500/10 text-green-500"
+                      : "bg-blue-500/10 text-blue-500"
+                  )}
+                >
+                  {thread.thread_type === "group" ? (
+                    <Users className="w-5 h-5" />
+                  ) : (
+                    <User className="w-5 h-5" />
+                  )}
+                  {/* Business badge */}
+                  {isBusiness && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
+                      <Briefcase className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {thread.message_count.toLocaleString()} messages
-                  {thread.thread_type === "group" &&
-                    ` · ${thread.participant_count} members`}
-                </p>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-medium text-sm truncate">
+                        {thread.name}
+                      </span>
+                      {isBusiness && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 flex-shrink-0">
+                          Business
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">
+                        {formatTimestamp(thread.last_message_at)}
+                      </span>
+                      {/* Action menu */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => handleToggleBusiness(e, thread)}>
+                            <Briefcase className="w-4 h-4 mr-2" />
+                            {isBusiness ? "Unmark as Business" : "Mark as Business"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {thread.message_count.toLocaleString()} messages
+                    {thread.thread_type === "group" &&
+                      ` · ${thread.participant_count} members`}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -8,11 +8,13 @@ RUN apt-get update && apt-get install -y \
 # Install Claude Code
 RUN npm install -g @anthropic-ai/claude-code
 
-# Create directories
-RUN mkdir -p /home/node/.claude /home/node/.config \
+# Create directories (including subdirs that volumes may mount to)
+RUN mkdir -p /home/node/.claude/projects /home/node/.claude/skills \
+    /home/node/.config /etc/claude-code/.claude/skills \
     && chown -R node:node /home/node
 
 USER node
 WORKDIR /home/node
 
+# Entrypoint script to fix volume permissions at runtime
 CMD ["tail", "-f", "/dev/null"]

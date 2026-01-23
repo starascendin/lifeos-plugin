@@ -16,8 +16,9 @@ use api_keys::{
 };
 use beeper::{
     check_beeper_available, check_beeper_database_exists, get_beeper_conversation,
-    get_beeper_conversation_by_id, get_beeper_messages, get_beeper_threads,
-    search_beeper_messages, sync_beeper_database,
+    get_beeper_conversation_by_id, get_beeper_messages, get_beeper_messages_for_sync,
+    get_beeper_sync_interval, get_beeper_threads, save_beeper_sync_interval, search_beeper_messages,
+    sync_beeper_database,
 };
 use claudecode::{
     check_docker_available, create_claude_session, create_container, delete_claude_session,
@@ -333,7 +334,10 @@ pub fn run() {
             get_beeper_conversation,
             get_beeper_conversation_by_id,
             get_beeper_messages,
+            get_beeper_messages_for_sync,
             search_beeper_messages,
+            get_beeper_sync_interval,
+            save_beeper_sync_interval,
             // ClaudeCode Integration
             check_docker_available,
             get_container_status,

@@ -53,7 +53,7 @@ export async function getMessages(nameOrThread: string, limit = 50) {
 
 export async function searchText(text: string, limit = 30) {
   return query(`
-    SELECT thread_id, thread_name, sender, text, timestamp_readable
+    SELECT message_id, thread_id, thread_name, sender, text, timestamp_readable, timestamp
     FROM conversations
     WHERE LOWER(text) LIKE '%${text.toLowerCase()}%'
     ORDER BY timestamp DESC
@@ -73,11 +73,23 @@ export async function getConversation(threadName: string, limit = 100) {
 
 export async function getConversationById(threadId: string, limit = 100) {
   return query(`
-    SELECT sender, text, timestamp_readable
+    SELECT message_id, sender, text, timestamp_readable, timestamp
     FROM conversations
     WHERE thread_id = '${threadId}'
     ORDER BY timestamp ASC
     LIMIT ${limit}
+  `);
+}
+
+/**
+ * Get all messages for syncing a thread to Convex (includes all fields needed for sync)
+ */
+export async function getMessagesForSync(threadId: string) {
+  return query(`
+    SELECT message_id, thread_id, sender, text, timestamp
+    FROM conversations
+    WHERE thread_id = '${threadId}'
+    ORDER BY timestamp ASC
   `);
 }
 
@@ -97,6 +109,7 @@ Usage:
   bun query.ts search <text>         - Search message text
   bun query.ts convo <thread_name>   - Get full conversation by exact thread name
   bun query.ts convo-id <thread_id>  - Get full conversation by thread ID (preferred)
+  bun query.ts sync-msgs <thread_id> - Get all messages for syncing (includes message_id)
     `);
     return;
   }
@@ -125,6 +138,10 @@ Usage:
     case 'convo-id':
       if (!args[0]) { console.error('Need thread_id'); return; }
       result = await getConversationById(args[0], parseInt(args[1]) || 100);
+      break;
+    case 'sync-msgs':
+      if (!args[0]) { console.error('Need thread_id'); return; }
+      result = await getMessagesForSync(args[0]);
       break;
     default:
       console.error(`Unknown command: ${cmd}`);

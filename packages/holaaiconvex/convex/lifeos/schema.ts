@@ -1,6 +1,7 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { avatarTables } from "./avatar_schema";
+import { beeperTables } from "./beeper_schema";
 import { calendarTables } from "./calendar_schema";
 import { chatnexusTables } from "./chatnexus_schema";
 import { dailyFieldsTables } from "./daily_fields_schema";
@@ -23,6 +24,8 @@ import { voiceAgentTables } from "./voiceagent_schema";
 export const lifeosTables = {
   // Avatar Stats tables
   ...avatarTables,
+  // Beeper (WhatsApp via Beeper Desktop) tables
+  ...beeperTables,
   // Calendar tables
   ...calendarTables,
   // Chat Nexus tables

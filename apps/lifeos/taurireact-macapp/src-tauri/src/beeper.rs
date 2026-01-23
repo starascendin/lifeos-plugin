@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
-use tauri::command;
+use tauri::{command, AppHandle};
+use tauri_plugin_store::StoreExt;
 
 /// Represents a Beeper thread/conversation
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -19,12 +20,26 @@ pub struct BeeperThread {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BeeperMessage {
     #[serde(default)]
+    pub message_id: Option<String>,
+    #[serde(default)]
     pub thread_id: Option<String>,
     #[serde(default)]
     pub thread_name: Option<String>,
     pub sender: String,
     pub text: String,
     pub timestamp_readable: String,
+    #[serde(default)]
+    pub timestamp: Option<i64>,
+}
+
+/// Message for syncing to Convex (includes all fields needed for sync)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BeeperSyncMessage {
+    pub message_id: String,
+    pub thread_id: String,
+    pub sender: String,
+    pub text: String,
+    pub timestamp: i64,
 }
 
 /// Result of syncing the Beeper database
@@ -327,4 +342,68 @@ pub async fn get_beeper_messages(
         .map_err(|e| format!("Failed to parse messages JSON: {}", e))?;
 
     Ok(messages)
+}
+
+/// Get all messages for a thread (for syncing to Convex)
+#[command]
+pub async fn get_beeper_messages_for_sync(thread_id: String) -> Result<Vec<BeeperSyncMessage>, String> {
+    let beeperdb_path = get_beeperdb_path();
+
+    // Build the command: bun query.ts sync-msgs "<thread_id>"
+    let output = Command::new("bun")
+        .arg("query.ts")
+        .arg("sync-msgs")
+        .arg(&thread_id)
+        .current_dir(&beeperdb_path)
+        .output()
+        .map_err(|e| format!("Failed to run bun query.ts sync-msgs: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("bun query.ts sync-msgs failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Parse JSON output
+    let messages: Vec<BeeperSyncMessage> = serde_json::from_str(&stdout)
+        .map_err(|e| format!("Failed to parse sync messages JSON: {}", e))?;
+
+    Ok(messages)
+}
+
+// ==================== BEEPER SYNC SETTINGS ====================
+
+const BEEPER_STORE_FILE: &str = "beeper-settings.json";
+const SYNC_INTERVAL_KEY: &str = "sync_interval_minutes";
+
+/// Get the Beeper sync interval from the store (default 3 minutes)
+#[command]
+pub async fn get_beeper_sync_interval(app: AppHandle) -> Result<i32, String> {
+    let store = app
+        .store(BEEPER_STORE_FILE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    let interval: i32 = store
+        .get(SYNC_INTERVAL_KEY)
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or(3); // Default 3 minutes
+
+    Ok(interval)
+}
+
+/// Save the Beeper sync interval to the store
+#[command]
+pub async fn save_beeper_sync_interval(app: AppHandle, interval: i32) -> Result<(), String> {
+    let store = app
+        .store(BEEPER_STORE_FILE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    store.set(SYNC_INTERVAL_KEY, interval);
+
+    store
+        .save()
+        .map_err(|e| format!("Failed to persist store: {}", e))?;
+
+    Ok(())
 }

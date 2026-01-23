@@ -4,13 +4,13 @@ import {
   checkBeeperDatabaseExists,
   syncBeeperDatabase,
   getBeeperThreads,
+  getBeeperSyncInterval,
+  saveBeeperSyncInterval,
+  SYNC_INTERVAL_OPTIONS,
   type BeeperThread,
   type BeeperSyncProgress,
   initialSyncProgress,
 } from "../../lib/services/beeper";
-
-// Auto-sync interval in milliseconds (10 minutes)
-const AUTO_SYNC_INTERVAL = 10 * 60 * 1000;
 
 // Storage key for last sync timestamp
 const LAST_SYNC_KEY = "beeper_last_sync_timestamp";
@@ -37,6 +37,9 @@ export function BeeperSyncTab() {
   // Auto-sync enabled state
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
 
+  // Sync interval in minutes (configurable, default 3)
+  const [syncIntervalMinutes, setSyncIntervalMinutes] = useState<number>(3);
+
   // Countdown to next sync
   const [nextSyncIn, setNextSyncIn] = useState<number | null>(null);
 
@@ -53,6 +56,14 @@ export function BeeperSyncTab() {
   useEffect(() => {
     lastSyncTimeRef.current = lastSyncTime;
   }, [lastSyncTime]);
+
+  // Load sync interval setting on mount
+  useEffect(() => {
+    getBeeperSyncInterval().then(setSyncIntervalMinutes);
+  }, []);
+
+  // Calculate interval in milliseconds
+  const autoSyncInterval = syncIntervalMinutes * 60 * 1000;
 
   // Check availability on mount
   useEffect(() => {
@@ -141,9 +152,9 @@ export function BeeperSyncTab() {
   const calculateNextSyncIn = useCallback(() => {
     if (!lastSyncTimeRef.current || !autoSyncEnabled) return null;
     const elapsed = Date.now() - lastSyncTimeRef.current.getTime();
-    const remaining = AUTO_SYNC_INTERVAL - elapsed;
+    const remaining = autoSyncInterval - elapsed;
     return Math.max(0, Math.ceil(remaining / 1000));
-  }, [autoSyncEnabled]);
+  }, [autoSyncEnabled, autoSyncInterval]);
 
   // Auto-sync timer setup
   useEffect(() => {
@@ -167,7 +178,7 @@ export function BeeperSyncTab() {
       const lastSync = lastSyncTimeRef.current?.getTime() || 0;
 
       // Only sync if enough time has passed
-      if (now - lastSync >= AUTO_SYNC_INTERVAL) {
+      if (now - lastSync >= autoSyncInterval) {
         await handleSync(true);
       }
     };
@@ -177,12 +188,12 @@ export function BeeperSyncTab() {
       ? Date.now() - lastSyncTimeRef.current.getTime()
       : Infinity;
 
-    if (timeSinceLastSync >= AUTO_SYNC_INTERVAL) {
+    if (timeSinceLastSync >= autoSyncInterval) {
       performAutoSync();
     }
 
     // Set up auto-sync interval
-    autoSyncTimerRef.current = setInterval(performAutoSync, AUTO_SYNC_INTERVAL);
+    autoSyncTimerRef.current = setInterval(performAutoSync, autoSyncInterval);
 
     // Countdown timer - update every second
     countdownTimerRef.current = setInterval(() => {
@@ -200,7 +211,7 @@ export function BeeperSyncTab() {
         clearInterval(countdownTimerRef.current);
       }
     };
-  }, [autoSyncEnabled, isBeeperAvailable, handleSync, calculateNextSyncIn]);
+  }, [autoSyncEnabled, isBeeperAvailable, handleSync, calculateNextSyncIn, autoSyncInterval]);
 
   // Format time ago
   const formatTimeAgo = (date: Date): string => {
@@ -286,8 +297,24 @@ export function BeeperSyncTab() {
                 onChange={(e) => setAutoSyncEnabled(e.target.checked)}
                 className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
               />
-              <span className="text-sm">Auto-sync every 10 min</span>
+              <span className="text-sm">Auto-sync every</span>
             </label>
+            <select
+              value={syncIntervalMinutes}
+              onChange={async (e) => {
+                const newInterval = parseInt(e.target.value, 10);
+                setSyncIntervalMinutes(newInterval);
+                await saveBeeperSyncInterval(newInterval);
+              }}
+              disabled={!autoSyncEnabled}
+              className="text-sm px-2 py-1 rounded border border-[var(--border)] bg-[var(--bg-primary)] disabled:opacity-50"
+            >
+              {SYNC_INTERVAL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
             {lastSyncTime && (

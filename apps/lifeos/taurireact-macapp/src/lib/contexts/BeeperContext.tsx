@@ -1,11 +1,16 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import {
   getBeeperThreads,
   getBeeperConversationById,
   searchBeeperMessages,
   checkBeeperDatabaseExists,
+  getBusinessMarks,
+  markThreadAsBusiness as markThreadAsBusinessLocal,
+  isThreadMarkedAsBusiness,
+  getBusinessNote,
   type BeeperThread,
   type BeeperMessage,
+  type BusinessThreadMark,
 } from "@/lib/services/beeper";
 
 interface BeeperContextValue {
@@ -14,6 +19,10 @@ interface BeeperContextValue {
   selectedThread: BeeperThread | null;
   conversation: BeeperMessage[];
   searchResults: BeeperMessage[];
+
+  // Business state
+  businessMarks: Map<string, BusinessThreadMark>;
+  showBusinessOnly: boolean;
 
   // Loading states
   isLoadingThreads: boolean;
@@ -27,6 +36,13 @@ interface BeeperContextValue {
   search: (query: string) => Promise<void>;
   clearSearch: () => void;
   checkDatabase: () => Promise<void>;
+
+  // Business actions
+  markAsBusiness: (threadId: string, isBusinessChat: boolean, businessNote?: string) => void;
+  isThreadBusiness: (threadId: string) => boolean;
+  getThreadBusinessNote: (threadId: string) => string | undefined;
+  setShowBusinessOnly: (show: boolean) => void;
+  refreshBusinessMarks: () => void;
 
   // Search state
   searchQuery: string;
@@ -45,6 +61,12 @@ export function BeeperProvider({ children }: { children: React.ReactNode }) {
   const [searchResults, setSearchResults] = useState<BeeperMessage[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Business state
+  const [businessMarks, setBusinessMarks] = useState<Map<string, BusinessThreadMark>>(
+    () => getBusinessMarks()
+  );
+  const [showBusinessOnly, setShowBusinessOnly] = useState(false);
+
   // Loading states
   const [isLoadingThreads, setIsLoadingThreads] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
@@ -52,6 +74,16 @@ export function BeeperProvider({ children }: { children: React.ReactNode }) {
   const [hasDatabaseSynced, setHasDatabaseSynced] = useState<boolean | null>(
     null
   );
+
+  // Refresh business marks from localStorage
+  const refreshBusinessMarks = useCallback(() => {
+    setBusinessMarks(getBusinessMarks());
+  }, []);
+
+  // Load business marks on mount
+  useEffect(() => {
+    refreshBusinessMarks();
+  }, [refreshBusinessMarks]);
 
   // Check if database exists
   const checkDatabase = useCallback(async () => {
@@ -124,12 +156,46 @@ export function BeeperProvider({ children }: { children: React.ReactNode }) {
     setSearchResults([]);
   }, []);
 
+  // Mark thread as business (or unmark)
+  const markAsBusiness = useCallback(
+    (threadId: string, isBusinessChat: boolean, businessNote?: string) => {
+      markThreadAsBusinessLocal(threadId, isBusinessChat, businessNote);
+      refreshBusinessMarks();
+    },
+    [refreshBusinessMarks]
+  );
+
+  // Check if thread is marked as business
+  const isThreadBusiness = useCallback(
+    (threadId: string) => {
+      return businessMarks.has(threadId);
+    },
+    [businessMarks]
+  );
+
+  // Get business note for thread
+  const getThreadBusinessNote = useCallback(
+    (threadId: string) => {
+      return businessMarks.get(threadId)?.businessNote;
+    },
+    [businessMarks]
+  );
+
+  // Filter threads if showing business only
+  const filteredThreads = showBusinessOnly
+    ? threads.filter((t) => businessMarks.has(t.thread_id))
+    : threads;
+
   const value: BeeperContextValue = {
     // Data
-    threads,
+    threads: filteredThreads,
     selectedThread,
     conversation,
     searchResults,
+
+    // Business state
+    businessMarks,
+    showBusinessOnly,
 
     // Loading states
     isLoadingThreads,
@@ -143,6 +209,13 @@ export function BeeperProvider({ children }: { children: React.ReactNode }) {
     search,
     clearSearch,
     checkDatabase,
+
+    // Business actions
+    markAsBusiness,
+    isThreadBusiness,
+    getThreadBusinessNote,
+    setShowBusinessOnly,
+    refreshBusinessMarks,
 
     // Search state
     searchQuery,
