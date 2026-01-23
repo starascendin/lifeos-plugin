@@ -4,6 +4,7 @@ import { useBeeperSync } from "@/lib/hooks/useBeeperSync";
 import { syncBeeperDatabase } from "@/lib/services/beeper";
 import { ThreadsList } from "./ThreadsList";
 import { ConversationView } from "./ConversationView";
+import { ThreadDetailPanel } from "./ThreadDetailPanel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -58,6 +59,7 @@ export function BeeperTab() {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [nextRefreshIn, setNextRefreshIn] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showDetailPanel, setShowDetailPanel] = useState(false);
 
   // Timer refs
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -68,6 +70,13 @@ export function BeeperTab() {
   useEffect(() => {
     lastRefreshTimeRef.current = lastRefreshTime;
   }, [lastRefreshTime]);
+
+  // Show detail panel when thread is selected
+  useEffect(() => {
+    if (selectedThread) {
+      setShowDetailPanel(true);
+    }
+  }, [selectedThread]);
 
   // Manual sync and refresh handler - actually syncs from Beeper source
   const handleSyncAndRefresh = useCallback(async () => {
@@ -237,64 +246,83 @@ export function BeeperTab() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with search */}
-      <div className="border-b p-4 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-muted-foreground" />
-            <h1 className="text-lg font-semibold">Beeper Messages</h1>
+      {/* Compact Header */}
+      <div className="border-b px-4 py-2 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          {/* Title */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <MessageCircle className="w-4 h-4 text-muted-foreground" />
+            <h1 className="text-sm font-semibold">Beeper</h1>
             {businessCount > 0 && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
-                {businessCount} business
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
+                {businessCount}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3">
+
+          {/* Search inline */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search messages..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="h-8 pl-8 pr-8 text-sm"
+            />
+            {searchInput && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded"
+              >
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
+          {/* Right side controls */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Business filter toggle */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Switch
                       id="business-filter"
                       checked={showBusinessOnly}
                       onCheckedChange={setShowBusinessOnly}
+                      className="scale-90"
                     />
                     <Label
                       htmlFor="business-filter"
-                      className="text-xs cursor-pointer flex items-center gap-1"
+                      className="text-xs cursor-pointer"
                     >
-                      <Briefcase className="w-3 h-3" />
-                      Business
+                      <Briefcase className="w-3.5 h-3.5" />
                     </Label>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Show only business-marked threads</p>
+                  <p>Show only business threads</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
-            {/* Sync to Cloud button */}
+            {/* Sync to Cloud */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={syncAll}
                     disabled={isSyncing || businessCount === 0}
                   >
                     {isSyncing ? (
-                      <>
-                        <CloudUpload className="w-4 h-4 mr-1 animate-pulse" />
-                        Syncing...
-                      </>
+                      <CloudUpload className="w-4 h-4 animate-pulse" />
                     ) : (
-                      <>
-                        <Cloud className="w-4 h-4 mr-1" />
-                        Sync to Cloud
-                      </>
+                      <Cloud className="w-4 h-4" />
                     )}
                   </Button>
                 </TooltipTrigger>
@@ -302,66 +330,45 @@ export function BeeperTab() {
                   <p>
                     {businessCount === 0
                       ? "Mark threads as business first"
-                      : `Sync ${businessCount} business thread(s) to Convex`}
+                      : `Sync ${businessCount} business thread(s) to cloud`}
                   </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
-            {/* Refresh status */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {lastRefreshTime && (
-                <span title={lastRefreshTime.toLocaleString()}>
-                  Updated {formatTimeAgo(lastRefreshTime)}
-                </span>
-              )}
-              {nextRefreshIn !== null && nextRefreshIn > 0 && !isRefreshing && (
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatCountdown(nextRefreshIn)}
-                </span>
-              )}
-            </div>
-            {/* Sync button - actually syncs from Beeper source */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSyncAndRefresh}
-              disabled={isRefreshing || isLoadingThreads}
-            >
-              <RefreshCw className={`w-4 h-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
-              {isRefreshing ? "Syncing..." : "Sync"}
-            </Button>
+            {/* Refresh/Sync button with status */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={handleSyncAndRefresh}
+                    disabled={isRefreshing || isLoadingThreads}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {isRefreshing
+                      ? "Syncing..."
+                      : lastRefreshTime
+                        ? `Updated ${formatTimeAgo(lastRefreshTime)}${nextRefreshIn && nextRefreshIn > 0 ? ` · Next in ${formatCountdown(nextRefreshIn)}` : ""}`
+                        : "Sync from Beeper"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
-        <div className="flex items-center gap-2 mt-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search messages..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="pl-9 pr-9"
-            />
-            {searchInput && (
-              <button
-                onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-          <Button onClick={handleSearch} disabled={!searchInput.trim()}>
-            Search
-          </Button>
-        </div>
+
+        {/* Search results indicator */}
         {searchQuery && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
             <span>
-              Showing results for: <strong>"{searchQuery}"</strong>
+              Results for: <strong>"{searchQuery}"</strong>
             </span>
             <button
               onClick={handleClearSearch}
@@ -371,15 +378,16 @@ export function BeeperTab() {
             </button>
           </div>
         )}
+
         {/* Sync progress */}
         {isSyncing && (
-          <div className="mt-2 p-2 rounded bg-muted/50 text-sm">
+          <div className="mt-2 p-2 rounded bg-muted/50 text-xs">
             <div className="flex items-center gap-2">
-              <CloudUpload className="w-4 h-4 animate-pulse text-blue-500" />
+              <CloudUpload className="w-3.5 h-3.5 animate-pulse text-blue-500" />
               <span>{progress.currentStep || "Starting sync..."}</span>
             </div>
             {progress.threadsToSync > 0 && (
-              <div className="mt-1 text-xs text-muted-foreground">
+              <div className="mt-1 text-muted-foreground">
                 Threads: {progress.threadsSynced}/{progress.threadsToSync}
                 {progress.messagesTotal > 0 &&
                   ` | Messages: ${progress.messagesSynced}/${progress.messagesTotal}`}
@@ -389,31 +397,22 @@ export function BeeperTab() {
         )}
         {/* Sync result */}
         {lastSyncResult && !isSyncing && progress.status === "complete" && (
-          <div className="mt-2 p-2 rounded bg-green-500/10 text-sm text-green-600">
-            <div className="flex items-center gap-2">
-              <Cloud className="w-4 h-4" />
-              <span>
-                Synced {lastSyncResult.threadsInserted} new thread(s),{" "}
-                {lastSyncResult.messagesInserted} new message(s)
-              </span>
-            </div>
+          <div className="mt-2 p-2 rounded bg-green-500/10 text-xs text-green-600">
+            Synced {lastSyncResult.threadsInserted} thread(s), {lastSyncResult.messagesInserted} message(s)
           </div>
         )}
         {/* Sync error */}
         {progress.status === "error" && (
-          <div className="mt-2 p-2 rounded bg-red-500/10 text-sm text-red-600">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              <span>{progress.error || "Sync failed"}</span>
-            </div>
+          <div className="mt-2 p-2 rounded bg-red-500/10 text-xs text-red-600">
+            {progress.error || "Sync failed"}
           </div>
         )}
       </div>
 
-      {/* Main content - two column layout */}
+      {/* Main content - three column layout */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Threads list */}
-        <div className="w-80 border-r flex-shrink-0 overflow-hidden">
+        <div className="w-72 border-r flex-shrink-0 overflow-hidden">
           <ThreadsList
             threads={searchQuery ? [] : threads}
             searchResults={searchQuery ? searchResults : []}
@@ -426,6 +425,13 @@ export function BeeperTab() {
         <div className="flex-1 overflow-hidden">
           <ConversationView />
         </div>
+
+        {/* Detail panel */}
+        {showDetailPanel && selectedThread && (
+          <div className="w-72 flex-shrink-0 overflow-hidden">
+            <ThreadDetailPanel onClose={() => setShowDetailPanel(false)} />
+          </div>
+        )}
       </div>
     </div>
   );

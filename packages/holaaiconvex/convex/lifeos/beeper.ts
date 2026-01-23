@@ -162,6 +162,26 @@ export const getThreadsForPerson = query({
   },
 });
 
+/**
+ * Get threads linked to a specific client
+ */
+export const getThreadsForClient = query({
+  args: {
+    clientId: v.id("lifeos_pmClients"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const threads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_linkedClient", (q) => q.eq("linkedClientId", args.clientId))
+      .collect();
+
+    // Filter by user (since linkedClient index doesn't include userId)
+    return threads.filter((t) => t.userId === user._id);
+  },
+});
+
 // ==================== MUTATIONS ====================
 
 /**
@@ -235,6 +255,47 @@ export const linkThreadToPerson = mutation({
 
     await ctx.db.patch(existing._id, {
       linkedPersonId: args.personId,
+      updatedAt: now,
+    });
+
+    return existing._id;
+  },
+});
+
+/**
+ * Link a thread to a client (for business chats)
+ */
+export const linkThreadToClient = mutation({
+  args: {
+    threadId: v.string(),
+    clientId: v.optional(v.id("lifeos_pmClients")),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    // Find existing thread
+    const existing = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_threadId", (q) =>
+        q.eq("userId", user._id).eq("threadId", args.threadId)
+      )
+      .unique();
+
+    if (!existing) {
+      throw new Error("Thread not found. Sync the thread first.");
+    }
+
+    // If clientId provided, verify it belongs to user
+    if (args.clientId) {
+      const client = await ctx.db.get(args.clientId);
+      if (!client || client.userId !== user._id) {
+        throw new Error("Client not found or access denied");
+      }
+    }
+
+    await ctx.db.patch(existing._id, {
+      linkedClientId: args.clientId,
       updatedAt: now,
     });
 

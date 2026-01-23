@@ -1,14 +1,9 @@
 import { useBeeper } from "@/lib/contexts/BeeperContext";
 import type { BeeperThread, BeeperMessage } from "@/lib/services/beeper";
-import { Users, User, MessageSquare, Briefcase, MoreVertical } from "lucide-react";
+import { Users, User, MessageSquare, Briefcase, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+import { useQuery } from "convex/react";
+import { api } from "@holaai/convex";
 
 interface ThreadsListProps {
   threads: BeeperThread[];
@@ -23,7 +18,17 @@ export function ThreadsList({
   isLoading,
   isSearchMode,
 }: ThreadsListProps) {
-  const { selectedThread, selectThread, markAsBusiness, isThreadBusiness } = useBeeper();
+  const { selectedThread, selectThread, isThreadBusiness } = useBeeper();
+
+  // Fetch synced threads from Convex to get linkedClientId and linkedPersonId
+  const syncedThreads = useQuery(api.lifeos.beeper.getAllThreads, {});
+  const clients = useQuery(api.lifeos.pm_clients.getClients, {});
+  const people = useQuery(api.lifeos.frm_people.getPeople, {});
+
+  // Create lookup maps for client and person data
+  const syncedThreadMap = new Map(syncedThreads?.map(t => [t.threadId, t]) ?? []);
+  const clientMap = new Map(clients?.map(c => [c._id, c.name]) ?? []);
+  const personMap = new Map(people?.map(p => [p._id, { name: p.name, avatarEmoji: p.avatarEmoji }]) ?? []);
 
   // Format timestamp for display
   const formatTimestamp = (timestamp: string) => {
@@ -144,19 +149,17 @@ export function ThreadsList({
     );
   }
 
-  // Handle business toggle
-  const handleToggleBusiness = (e: React.MouseEvent, thread: BeeperThread) => {
-    e.stopPropagation();
-    const isBusiness = isThreadBusiness(thread.thread_id);
-    markAsBusiness(thread.thread_id, !isBusiness);
-  };
-
   // Threads list
   return (
     <div className="h-full overflow-y-auto">
       <div className="divide-y">
         {threads.map((thread) => {
           const isBusiness = isThreadBusiness(thread.thread_id);
+          const syncedThread = syncedThreadMap.get(thread.thread_id);
+          const linkedClientId = syncedThread?.linkedClientId;
+          const linkedClientName = linkedClientId ? clientMap.get(linkedClientId) : null;
+          const linkedPersonId = syncedThread?.linkedPersonId;
+          const linkedPerson = linkedPersonId ? personMap.get(linkedPersonId) : null;
           return (
             <div
               key={thread.thread_id}
@@ -201,31 +204,22 @@ export function ThreadsList({
                           Business
                         </span>
                       )}
+                      {linkedClientName && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 flex items-center gap-0.5 flex-shrink-0">
+                          <Building2 className="w-2.5 h-2.5" />
+                          {linkedClientName}
+                        </span>
+                      )}
+                      {linkedPerson && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 flex items-center gap-0.5 flex-shrink-0">
+                          <span>{linkedPerson.avatarEmoji || "👤"}</span>
+                          {linkedPerson.name}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className="text-xs text-muted-foreground">
-                        {formatTimestamp(thread.last_message_at)}
-                      </span>
-                      {/* Action menu */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="w-3.5 h-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => handleToggleBusiness(e, thread)}>
-                            <Briefcase className="w-4 h-4 mr-2" />
-                            {isBusiness ? "Unmark as Business" : "Mark as Business"}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                      {formatTimestamp(thread.last_message_at)}
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {thread.message_count.toLocaleString()} messages

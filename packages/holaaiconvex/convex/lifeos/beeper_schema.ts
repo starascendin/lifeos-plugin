@@ -40,6 +40,9 @@ export const beeperTables = {
     // For DMs: optional link to frm_people contact
     linkedPersonId: v.optional(v.id("lifeos_frmPeople")),
 
+    // For business chats: optional link to a client
+    linkedClientId: v.optional(v.id("lifeos_pmClients")),
+
     // Sync tracking (from local Beeper data)
     messageCount: v.number(),
     lastMessageAt: v.number(), // Unix timestamp
@@ -52,7 +55,8 @@ export const beeperTables = {
     .index("by_user", ["userId"])
     .index("by_user_threadId", ["userId", "threadId"])
     .index("by_user_business", ["userId", "isBusinessChat"])
-    .index("by_linkedPerson", ["linkedPersonId"]),
+    .index("by_linkedPerson", ["linkedPersonId"])
+    .index("by_linkedClient", ["linkedClientId"]),
 
   // ==================== BEEPER MESSAGES ====================
   // Messages from business-marked threads, synced for AI/MCP access
