@@ -53,6 +53,7 @@ export function ThreadDetailPanel({ onClose }: ThreadDetailPanelProps) {
   const people = useQuery(api.lifeos.frm_people.getPeople, {});
   const linkToClient = useMutation(api.lifeos.beeper.linkThreadToClient);
   const linkToPerson = useMutation(api.lifeos.beeper.linkThreadToPerson);
+  const upsertThread = useMutation(api.lifeos.beeper.upsertThread);
 
   // Get current thread's synced data
   const syncedThread = syncedThreads?.find(
@@ -104,6 +105,25 @@ export function ThreadDetailPanel({ onClose }: ThreadDetailPanelProps) {
 
   const handlePersonSelect = async (personId: string | null) => {
     try {
+      // If thread is not synced yet, sync it first
+      if (!syncedThread) {
+        const threadType: "dm" | "group" =
+          selectedThread.thread_type === "group" ||
+          selectedThread.participant_count > 2
+            ? "group"
+            : "dm";
+        await upsertThread({
+          threadId: selectedThread.thread_id,
+          threadName: selectedThread.name,
+          threadType,
+          participantCount: selectedThread.participant_count,
+          messageCount: selectedThread.message_count,
+          lastMessageAt: new Date(selectedThread.last_message_at).getTime(),
+          isBusinessChat: isBusiness,
+          businessNote: businessNote || undefined,
+        });
+      }
+      // Now link to person
       await linkToPerson({
         threadId: selectedThread.thread_id,
         personId: personId as Id<"lifeos_frmPeople"> | undefined,
@@ -242,66 +262,64 @@ export function ThreadDetailPanel({ onClose }: ThreadDetailPanelProps) {
           </div>
         )}
 
-        {/* Link to Person/Contact - available for all synced threads */}
-        {syncedThread && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-purple-500" />
-              <Label className="text-sm font-medium">Linked Contact</Label>
-            </div>
-            <Popover open={personPopoverOpen} onOpenChange={setPersonPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-sm h-9"
-                >
-                  {linkedPerson ? (
-                    <>
-                      <span className="mr-2">{linkedPerson.avatarEmoji || "👤"}</span>
-                      {linkedPerson.name}
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">Select a contact...</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[250px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search contacts..." />
-                  <CommandList>
-                    <CommandEmpty>No contacts found</CommandEmpty>
-                    {linkedPersonId && (
-                      <CommandGroup>
-                        <CommandItem
-                          onSelect={() => handlePersonSelect(null)}
-                          className="text-destructive"
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Remove link
-                        </CommandItem>
-                      </CommandGroup>
-                    )}
-                    <CommandGroup heading="Contacts">
-                      {people?.map((person) => (
-                        <CommandItem
-                          key={person._id}
-                          value={person.name}
-                          onSelect={() => handlePersonSelect(person._id)}
-                        >
-                          <span className="mr-2">{person.avatarEmoji || "👤"}</span>
-                          <span className="flex-1 truncate">{person.name}</span>
-                          {linkedPersonId === person._id && (
-                            <Check className="h-4 w-4" />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+        {/* Link to Person/Contact - available for all threads */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-purple-500" />
+            <Label className="text-sm font-medium">Linked Contact</Label>
           </div>
-        )}
+          <Popover open={personPopoverOpen} onOpenChange={setPersonPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-sm h-9"
+              >
+                {linkedPerson ? (
+                  <>
+                    <span className="mr-2">{linkedPerson.avatarEmoji || "👤"}</span>
+                    {linkedPerson.name}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Select a contact...</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[250px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search contacts..." />
+                <CommandList>
+                  <CommandEmpty>No contacts found</CommandEmpty>
+                  {linkedPersonId && (
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={() => handlePersonSelect(null)}
+                        className="text-destructive"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Remove link
+                      </CommandItem>
+                    </CommandGroup>
+                  )}
+                  <CommandGroup heading="Contacts">
+                    {people?.map((person) => (
+                      <CommandItem
+                        key={person._id}
+                        value={person.name}
+                        onSelect={() => handlePersonSelect(person._id)}
+                      >
+                        <span className="mr-2">{person.avatarEmoji || "👤"}</span>
+                        <span className="flex-1 truncate">{person.name}</span>
+                        {linkedPersonId === person._id && (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {/* Thread not synced warning */}
         {isBusiness && !syncedThread && (

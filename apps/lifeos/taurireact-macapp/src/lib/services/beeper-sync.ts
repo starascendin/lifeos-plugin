@@ -104,10 +104,16 @@ export async function syncBusinessThreadsToConvex(
     // Prepare threads for upsert
     const threadData = threadsToSync.map((thread) => {
       const mark = businessMarks.get(thread.thread_id);
+      // Determine thread type: default to "dm" if not specified
+      // Groups typically have participant_count > 2
+      const threadType: "dm" | "group" =
+        thread.thread_type === "group" || thread.participant_count > 2
+          ? "group"
+          : "dm";
       return {
         threadId: thread.thread_id,
         threadName: thread.name,
-        threadType: thread.thread_type as "dm" | "group",
+        threadType,
         participantCount: thread.participant_count,
         messageCount: thread.message_count,
         lastMessageAt: parseTimestamp(thread.last_message_at),
