@@ -67,6 +67,129 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "get_project",
+    description:
+      "Get a single project's full details with stats. Use this to see detailed project info.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        projectIdOrKey: {
+          type: "string",
+          description: "Project ID or key like 'ACME' (required)",
+        },
+      },
+      required: ["projectIdOrKey"],
+    },
+  },
+  {
+    name: "create_project",
+    description: "Create a new project with a unique key.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        name: {
+          type: "string",
+          description: "The project name (required)",
+        },
+        key: {
+          type: "string",
+          description: "Unique project key like 'ACME', uppercase (required)",
+        },
+        description: {
+          type: "string",
+          description: "Project description (optional)",
+        },
+        clientId: {
+          type: "string",
+          description: "Associate with a client ID (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["planned", "in_progress", "paused", "completed", "cancelled"],
+          description: "Project status (optional, default: planned)",
+        },
+        priority: {
+          type: "string",
+          enum: ["urgent", "high", "medium", "low", "none"],
+          description: "Priority level (optional, default: none)",
+        },
+      },
+      required: ["name", "key"],
+    },
+  },
+  {
+    name: "update_project",
+    description: "Update a project's details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        projectIdOrKey: {
+          type: "string",
+          description: "Project ID or key like 'ACME' (required)",
+        },
+        name: {
+          type: "string",
+          description: "Updated name (optional)",
+        },
+        description: {
+          type: "string",
+          description: "Updated description (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["planned", "in_progress", "paused", "completed", "cancelled"],
+          description: "Updated status (optional)",
+        },
+        health: {
+          type: "string",
+          enum: ["on_track", "at_risk", "off_track"],
+          description: "Updated health status (optional)",
+        },
+        priority: {
+          type: "string",
+          enum: ["urgent", "high", "medium", "low", "none"],
+          description: "Updated priority (optional)",
+        },
+        clientId: {
+          type: "string",
+          description: "Associate with a client ID, or empty to unlink (optional)",
+        },
+      },
+      required: ["projectIdOrKey"],
+    },
+  },
+  {
+    name: "delete_project",
+    description:
+      "Delete a project. Issues are preserved but unlinked from the project.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        projectIdOrKey: {
+          type: "string",
+          description: "Project ID or key like 'ACME' (required)",
+        },
+      },
+      required: ["projectIdOrKey"],
+    },
+  },
+  {
     name: "get_tasks",
     description:
       "Get tasks/issues with optional filters. Use this to list tasks in a project or by status/priority.",
@@ -182,6 +305,89 @@ const TOOLS: Tool[] = [
       required: ["issueIdOrIdentifier"],
     },
   },
+  {
+    name: "get_issue",
+    description:
+      "Get a single issue/task's full details. Accepts issue ID or identifier like 'PROJ-123'.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        issueIdOrIdentifier: {
+          type: "string",
+          description: "Issue ID or identifier like PROJ-123 (required)",
+        },
+      },
+      required: ["issueIdOrIdentifier"],
+    },
+  },
+  {
+    name: "update_issue",
+    description:
+      "Update an issue/task's details. Accepts issue ID or identifier like 'PROJ-123'.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        issueIdOrIdentifier: {
+          type: "string",
+          description: "Issue ID or identifier like PROJ-123 (required)",
+        },
+        title: {
+          type: "string",
+          description: "Updated title (optional)",
+        },
+        description: {
+          type: "string",
+          description: "Updated description (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"],
+          description: "Updated status (optional)",
+        },
+        priority: {
+          type: "string",
+          enum: ["urgent", "high", "medium", "low", "none"],
+          description: "Updated priority (optional)",
+        },
+        dueDate: {
+          type: "string",
+          description: "Due date in ISO format, or empty to clear (optional)",
+        },
+        isTopPriority: {
+          type: "boolean",
+          description: "Mark as top priority (optional)",
+        },
+      },
+      required: ["issueIdOrIdentifier"],
+    },
+  },
+  {
+    name: "delete_issue",
+    description:
+      "Delete an issue/task permanently. Accepts issue ID or identifier like 'PROJ-123'.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        issueIdOrIdentifier: {
+          type: "string",
+          description: "Issue ID or identifier like PROJ-123 (required)",
+        },
+      },
+      required: ["issueIdOrIdentifier"],
+    },
+  },
 
   // Cycle/Sprint Tools
   {
@@ -219,6 +425,117 @@ const TOOLS: Tool[] = [
         },
       },
       required: ["issueIdOrIdentifier"],
+    },
+  },
+  {
+    name: "get_cycles",
+    description:
+      "Get all cycles/sprints for the user with stats and progress.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["upcoming", "active", "completed"],
+          description: "Filter by cycle status (optional)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 20)",
+        },
+      },
+    },
+  },
+  {
+    name: "create_cycle",
+    description: "Create a new cycle/sprint.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        name: {
+          type: "string",
+          description: "Cycle name (optional, defaults to 'Cycle N')",
+        },
+        startDate: {
+          type: "string",
+          description: "Start date in ISO format like '2024-01-15' (required)",
+        },
+        endDate: {
+          type: "string",
+          description: "End date in ISO format like '2024-01-29' (required)",
+        },
+        goals: {
+          type: "string",
+          description: "Cycle goals/objectives (optional)",
+        },
+      },
+      required: ["startDate", "endDate"],
+    },
+  },
+  {
+    name: "update_cycle",
+    description: "Update a cycle's details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        cycleId: {
+          type: "string",
+          description: "Cycle ID (required)",
+        },
+        name: {
+          type: "string",
+          description: "Updated name (optional)",
+        },
+        startDate: {
+          type: "string",
+          description: "Updated start date in ISO format (optional)",
+        },
+        endDate: {
+          type: "string",
+          description: "Updated end date in ISO format (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["upcoming", "active", "completed"],
+          description: "Updated status (optional)",
+        },
+        goals: {
+          type: "string",
+          description: "Updated goals (optional)",
+        },
+      },
+      required: ["cycleId"],
+    },
+  },
+  {
+    name: "delete_cycle",
+    description:
+      "Delete a cycle. Issues in the cycle are unlinked (not deleted).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        cycleId: {
+          type: "string",
+          description: "Cycle ID (required)",
+        },
+      },
+      required: ["cycleId"],
     },
   },
 
@@ -672,6 +989,25 @@ const TOOLS: Tool[] = [
           type: "string",
           enum: ["active", "archived"],
           description: "Updated status (optional)",
+        },
+      },
+      required: ["clientId"],
+    },
+  },
+  {
+    name: "delete_client",
+    description:
+      "Delete a client. Projects are unlinked (not deleted).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        clientId: {
+          type: "string",
+          description: "The client's ID (required)",
         },
       },
       required: ["clientId"],

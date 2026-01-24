@@ -32,6 +32,41 @@ export const TOOL_DEFINITIONS = {
       includeArchived: "optional - include archived projects (default false)",
     },
   },
+  get_project: {
+    description: "Get a single project's details with full stats",
+    params: {
+      projectIdOrKey: "required - project ID or key (e.g., ACME)",
+    },
+  },
+  create_project: {
+    description: "Create a new project with a unique key",
+    params: {
+      name: "required - the project name",
+      key: "required - unique project key (e.g., ACME, uppercase)",
+      description: "optional - project description",
+      clientId: "optional - associate with a client",
+      status: "optional - planned, in_progress, paused, completed, cancelled",
+      priority: "optional - urgent, high, medium, low, none",
+    },
+  },
+  update_project: {
+    description: "Update a project's details",
+    params: {
+      projectIdOrKey: "required - project ID or key (e.g., ACME)",
+      name: "optional - updated name",
+      description: "optional - updated description",
+      status: "optional - planned, in_progress, paused, completed, cancelled",
+      health: "optional - on_track, at_risk, off_track",
+      priority: "optional - urgent, high, medium, low, none",
+      clientId: "optional - associate with a client",
+    },
+  },
+  delete_project: {
+    description: "Delete a project (issues are preserved but unlinked)",
+    params: {
+      projectIdOrKey: "required - project ID or key (e.g., ACME)",
+    },
+  },
   get_tasks: {
     description: "Get tasks with optional filters",
     params: {
@@ -111,6 +146,30 @@ export const TOOL_DEFINITIONS = {
       issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
     },
   },
+  get_issue: {
+    description: "Get a single issue/task's full details",
+    params: {
+      issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
+    },
+  },
+  update_issue: {
+    description: "Update an issue/task's details",
+    params: {
+      issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
+      title: "optional - updated title",
+      description: "optional - updated description",
+      status: "optional - backlog, todo, in_progress, in_review, done, cancelled",
+      priority: "optional - urgent, high, medium, low, none",
+      dueDate: "optional - ISO date string or empty to clear",
+      isTopPriority: "optional - true/false",
+    },
+  },
+  delete_issue: {
+    description: "Delete an issue/task permanently",
+    params: {
+      issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
+    },
+  },
   // Cycle Management tools
   get_current_cycle: {
     description:
@@ -122,6 +181,39 @@ export const TOOL_DEFINITIONS = {
     params: {
       issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
       cycleId: "optional - cycle ID (defaults to active cycle)",
+    },
+  },
+  get_cycles: {
+    description: "Get all cycles/sprints for the user",
+    params: {
+      status: "optional - filter by status (upcoming, active, completed)",
+      limit: "optional - max results (default 20)",
+    },
+  },
+  create_cycle: {
+    description: "Create a new cycle/sprint",
+    params: {
+      name: "optional - cycle name (defaults to 'Cycle N')",
+      startDate: "required - start date in ISO format",
+      endDate: "required - end date in ISO format",
+      goals: "optional - cycle goals/objectives",
+    },
+  },
+  update_cycle: {
+    description: "Update a cycle's details",
+    params: {
+      cycleId: "required - cycle ID",
+      name: "optional - updated name",
+      startDate: "optional - updated start date",
+      endDate: "optional - updated end date",
+      status: "optional - upcoming, active, completed",
+      goals: "optional - updated goals",
+    },
+  },
+  delete_cycle: {
+    description: "Delete a cycle (issues are unlinked, not deleted)",
+    params: {
+      cycleId: "required - cycle ID",
     },
   },
   // FRM (Friend Relationship Management) tools
@@ -225,6 +317,12 @@ export const TOOL_DEFINITIONS = {
       name: "optional - updated name",
       description: "optional - updated description",
       status: "optional - active or archived",
+    },
+  },
+  delete_client: {
+    description: "Delete a client (projects are unlinked, not deleted)",
+    params: {
+      clientId: "required - the client's ID",
     },
   },
   // Phase Management tools
@@ -3233,6 +3331,1055 @@ export const assignIssueToPhaseInternal = internalMutation({
         name: phase.name,
       },
       confirmationMessage: `Assigned ${issue.identifier}: "${issue.title}" to phase "${phase.name}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== PROJECT MANAGEMENT TOOLS ====================
+
+/**
+ * Get a single project with full details and stats
+ */
+export const getProjectInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    projectIdOrKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const project = await resolveProject(ctx, userId, args.projectIdOrKey);
+    if (!project) {
+      return {
+        success: false,
+        error: `Project "${args.projectIdOrKey}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get client info if associated
+    let client = null;
+    if (project.clientId) {
+      const clientDoc = await ctx.db.get(project.clientId);
+      if (clientDoc) {
+        client = { id: clientDoc._id, name: clientDoc.name };
+      }
+    }
+
+    // Get phase count
+    const phases = await ctx.db
+      .query("lifeos_pmPhases")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .collect();
+
+    const completionPercentage =
+      project.issueCount > 0
+        ? Math.round((project.completedIssueCount / project.issueCount) * 100)
+        : 0;
+
+    return {
+      success: true,
+      project: {
+        id: project._id,
+        key: project.key,
+        name: project.name,
+        description: htmlToPlainText(project.description),
+        status: project.status,
+        health: project.health,
+        priority: project.priority,
+        issueCount: project.issueCount,
+        completedIssueCount: project.completedIssueCount,
+        completionPercentage,
+        phaseCount: phases.length,
+        client,
+        createdAt: new Date(project.createdAt).toISOString(),
+        updatedAt: new Date(project.updatedAt).toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a new project
+ */
+export const createProjectInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    key: v.string(),
+    description: v.optional(v.string()),
+    clientId: v.optional(v.string()),
+    status: v.optional(v.string()),
+    priority: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+    const key = args.key.toUpperCase().trim();
+
+    // Check if key is unique for this user
+    const existingProject = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_key", (q) => q.eq("userId", userId).eq("key", key))
+      .first();
+
+    if (existingProject) {
+      return {
+        success: false,
+        error: `A project with key "${key}" already exists`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Validate status
+    type ProjectStatus = "planned" | "in_progress" | "paused" | "completed" | "cancelled";
+    const validStatuses: ProjectStatus[] = ["planned", "in_progress", "paused", "completed", "cancelled"];
+    const status: ProjectStatus =
+      args.status && validStatuses.includes(args.status as ProjectStatus)
+        ? (args.status as ProjectStatus)
+        : "planned";
+
+    // Validate priority
+    type Priority = "urgent" | "high" | "medium" | "low" | "none";
+    const validPriorities: Priority[] = ["urgent", "high", "medium", "low", "none"];
+    const priority: Priority =
+      args.priority && validPriorities.includes(args.priority as Priority)
+        ? (args.priority as Priority)
+        : "none";
+
+    // Validate client if provided
+    let clientId: Id<"lifeos_pmClients"> | undefined;
+    if (args.clientId) {
+      try {
+        const client = await ctx.db.get(args.clientId as Id<"lifeos_pmClients">);
+        if (client && client.userId === userId) {
+          clientId = client._id;
+        }
+      } catch {
+        // Invalid client ID, ignore
+      }
+    }
+
+    const projectId = await ctx.db.insert("lifeos_pmProjects", {
+      userId,
+      clientId,
+      key,
+      name: args.name.trim(),
+      description: args.description?.trim(),
+      status,
+      health: "on_track",
+      priority,
+      nextIssueNumber: 1,
+      issueCount: 0,
+      completedIssueCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      projectId,
+      key,
+      name: args.name.trim(),
+      confirmationMessage: `Created project "${args.name.trim()}" with key ${key}.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update a project
+ */
+export const updateProjectInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    projectIdOrKey: v.string(),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    status: v.optional(v.string()),
+    health: v.optional(v.string()),
+    priority: v.optional(v.string()),
+    clientId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    const project = await resolveProject(ctx, userId, args.projectIdOrKey);
+    if (!project) {
+      return {
+        success: false,
+        error: `Project "${args.projectIdOrKey}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Build updates object
+    const updates: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.name !== undefined) updates.name = args.name.trim();
+    if (args.description !== undefined) {
+      updates.description = args.description.trim() || undefined;
+    }
+
+    // Validate and set status
+    if (args.status !== undefined) {
+      const validStatuses = ["planned", "in_progress", "paused", "completed", "cancelled"];
+      if (validStatuses.includes(args.status)) {
+        updates.status = args.status;
+      }
+    }
+
+    // Validate and set health
+    if (args.health !== undefined) {
+      const validHealth = ["on_track", "at_risk", "off_track"];
+      if (validHealth.includes(args.health)) {
+        updates.health = args.health;
+      }
+    }
+
+    // Validate and set priority
+    if (args.priority !== undefined) {
+      const validPriorities = ["urgent", "high", "medium", "low", "none"];
+      if (validPriorities.includes(args.priority)) {
+        updates.priority = args.priority;
+      }
+    }
+
+    // Handle client association
+    if (args.clientId !== undefined) {
+      if (args.clientId) {
+        try {
+          const client = await ctx.db.get(args.clientId as Id<"lifeos_pmClients">);
+          if (client && client.userId === userId) {
+            updates.clientId = client._id;
+          }
+        } catch {
+          // Invalid client ID, ignore
+        }
+      } else {
+        updates.clientId = undefined;
+      }
+    }
+
+    await ctx.db.patch(project._id, updates);
+
+    return {
+      success: true,
+      projectId: project._id,
+      projectKey: project.key,
+      confirmationMessage: `Updated project "${args.name ?? project.name}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete a project (issues are unlinked, not deleted)
+ */
+export const deleteProjectInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    projectIdOrKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    const project = await resolveProject(ctx, userId, args.projectIdOrKey);
+    if (!project) {
+      return {
+        success: false,
+        error: `Project "${args.projectIdOrKey}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const projectName = project.name;
+    const projectKey = project.key;
+
+    // Unlink issues from project
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .collect();
+
+    for (const issue of issues) {
+      await ctx.db.patch(issue._id, {
+        projectId: undefined,
+        phaseId: undefined,
+        updatedAt: now,
+      });
+    }
+
+    // Delete phases
+    const phases = await ctx.db
+      .query("lifeos_pmPhases")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .collect();
+
+    for (const phase of phases) {
+      // Delete phase notes
+      const notes = await ctx.db
+        .query("lifeos_pmNotes")
+        .withIndex("by_phase", (q) => q.eq("phaseId", phase._id))
+        .collect();
+      for (const note of notes) {
+        await ctx.db.delete(note._id);
+      }
+      await ctx.db.delete(phase._id);
+    }
+
+    // Delete project notes
+    const projectNotes = await ctx.db
+      .query("lifeos_pmNotes")
+      .withIndex("by_project", (q) => q.eq("projectId", project._id))
+      .collect();
+    for (const note of projectNotes) {
+      await ctx.db.delete(note._id);
+    }
+
+    // Delete the project
+    await ctx.db.delete(project._id);
+
+    return {
+      success: true,
+      projectName,
+      projectKey,
+      unlinkedIssues: issues.length,
+      deletedPhases: phases.length,
+      confirmationMessage: `Deleted project "${projectName}" (${projectKey}). ${issues.length} issues were unlinked and ${phases.length} phases were deleted.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== ADDITIONAL ISSUE MANAGEMENT TOOLS ====================
+
+/**
+ * Get a single issue with full details
+ */
+export const getIssueInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    issueIdOrIdentifier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
+    if (!issue) {
+      return {
+        success: false,
+        error: `Issue "${args.issueIdOrIdentifier}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get related entities
+    let project = null;
+    if (issue.projectId) {
+      const projectDoc = await ctx.db.get(issue.projectId);
+      if (projectDoc) {
+        project = { id: projectDoc._id, key: projectDoc.key, name: projectDoc.name };
+      }
+    }
+
+    let phase = null;
+    if (issue.phaseId) {
+      const phaseDoc = await ctx.db.get(issue.phaseId);
+      if (phaseDoc) {
+        phase = { id: phaseDoc._id, name: phaseDoc.name };
+      }
+    }
+
+    let cycle = null;
+    if (issue.cycleId) {
+      const cycleDoc = await ctx.db.get(issue.cycleId);
+      if (cycleDoc) {
+        cycle = { id: cycleDoc._id, name: cycleDoc.name ?? `Cycle ${cycleDoc.number}` };
+      }
+    }
+
+    return {
+      success: true,
+      issue: {
+        id: issue._id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: htmlToPlainText(issue.description),
+        status: issue.status,
+        priority: issue.priority,
+        isTopPriority: issue.isTopPriority || false,
+        estimate: issue.estimate,
+        dueDate: issue.dueDate ? new Date(issue.dueDate).toISOString() : null,
+        completedAt: issue.completedAt ? new Date(issue.completedAt).toISOString() : null,
+        project,
+        phase,
+        cycle,
+        createdAt: new Date(issue.createdAt).toISOString(),
+        updatedAt: new Date(issue.updatedAt).toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update an issue
+ */
+export const updateIssueInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    issueIdOrIdentifier: v.string(),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    status: v.optional(v.string()),
+    priority: v.optional(v.string()),
+    dueDate: v.optional(v.string()),
+    isTopPriority: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
+    if (!issue) {
+      return {
+        success: false,
+        error: `Issue "${args.issueIdOrIdentifier}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Build updates object
+    const updates: Record<string, unknown> = {
+      updatedAt: now,
+    };
+
+    if (args.title !== undefined) updates.title = args.title.trim();
+    if (args.description !== undefined) {
+      updates.description = args.description.trim() || undefined;
+    }
+    if (args.isTopPriority !== undefined) updates.isTopPriority = args.isTopPriority;
+
+    // Validate and set status
+    const previousStatus = issue.status;
+    if (args.status !== undefined) {
+      const validStatuses = ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"];
+      if (validStatuses.includes(args.status)) {
+        updates.status = args.status;
+
+        // Handle status transitions for counts
+        if (args.status === "done" && previousStatus !== "done") {
+          updates.completedAt = now;
+
+          // Update project completed count
+          if (issue.projectId) {
+            const project = await ctx.db.get(issue.projectId);
+            if (project) {
+              await ctx.db.patch(issue.projectId, {
+                completedIssueCount: project.completedIssueCount + 1,
+                updatedAt: now,
+              });
+            }
+          }
+
+          // Update cycle completed count
+          if (issue.cycleId) {
+            const cycle = await ctx.db.get(issue.cycleId);
+            if (cycle) {
+              await ctx.db.patch(issue.cycleId, {
+                completedIssueCount: cycle.completedIssueCount + 1,
+                updatedAt: now,
+              });
+            }
+          }
+        } else if (previousStatus === "done" && args.status !== "done") {
+          // Reopening task
+          updates.completedAt = undefined;
+
+          if (issue.projectId) {
+            const project = await ctx.db.get(issue.projectId);
+            if (project) {
+              await ctx.db.patch(issue.projectId, {
+                completedIssueCount: Math.max(0, project.completedIssueCount - 1),
+                updatedAt: now,
+              });
+            }
+          }
+
+          if (issue.cycleId) {
+            const cycle = await ctx.db.get(issue.cycleId);
+            if (cycle) {
+              await ctx.db.patch(issue.cycleId, {
+                completedIssueCount: Math.max(0, cycle.completedIssueCount - 1),
+                updatedAt: now,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Validate and set priority
+    if (args.priority !== undefined) {
+      const validPriorities = ["urgent", "high", "medium", "low", "none"];
+      if (validPriorities.includes(args.priority)) {
+        updates.priority = args.priority;
+      }
+    }
+
+    // Handle due date
+    if (args.dueDate !== undefined) {
+      if (args.dueDate) {
+        const parsed = new Date(args.dueDate);
+        if (!isNaN(parsed.getTime())) {
+          updates.dueDate = parsed.getTime();
+        }
+      } else {
+        updates.dueDate = undefined;
+      }
+    }
+
+    await ctx.db.patch(issue._id, updates);
+
+    return {
+      success: true,
+      issue: {
+        id: issue._id,
+        identifier: issue.identifier,
+        title: args.title ?? issue.title,
+      },
+      confirmationMessage: `Updated issue ${issue.identifier}: "${args.title ?? issue.title}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete an issue permanently
+ */
+export const deleteIssueInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    issueIdOrIdentifier: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
+    if (!issue) {
+      return {
+        success: false,
+        error: `Issue "${args.issueIdOrIdentifier}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const identifier = issue.identifier;
+    const title = issue.title;
+
+    // Update project counts
+    if (issue.projectId) {
+      const project = await ctx.db.get(issue.projectId);
+      if (project) {
+        await ctx.db.patch(issue.projectId, {
+          issueCount: Math.max(0, project.issueCount - 1),
+          completedIssueCount:
+            issue.status === "done"
+              ? Math.max(0, project.completedIssueCount - 1)
+              : project.completedIssueCount,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Update cycle counts
+    if (issue.cycleId) {
+      const cycle = await ctx.db.get(issue.cycleId);
+      if (cycle) {
+        await ctx.db.patch(issue.cycleId, {
+          issueCount: Math.max(0, cycle.issueCount - 1),
+          completedIssueCount:
+            issue.status === "done"
+              ? Math.max(0, cycle.completedIssueCount - 1)
+              : cycle.completedIssueCount,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Delete the issue
+    await ctx.db.delete(issue._id);
+
+    return {
+      success: true,
+      identifier,
+      title,
+      confirmationMessage: `Deleted issue ${identifier}: "${title}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== DELETE CLIENT TOOL ====================
+
+/**
+ * Delete a client (projects are unlinked, not deleted)
+ */
+export const deleteClientInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    clientId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const clientIdTyped = args.clientId as Id<"lifeos_pmClients">;
+    const now = Date.now();
+
+    const client = await ctx.db.get(clientIdTyped);
+    if (!client || client.userId !== userId) {
+      return {
+        success: false,
+        error: "Client not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const clientName = client.name;
+
+    // Unlink projects from client
+    const projects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_client", (q) => q.eq("clientId", clientIdTyped))
+      .collect();
+
+    for (const project of projects) {
+      await ctx.db.patch(project._id, {
+        clientId: undefined,
+        updatedAt: now,
+      });
+    }
+
+    // Delete the client
+    await ctx.db.delete(clientIdTyped);
+
+    return {
+      success: true,
+      clientName,
+      unlinkedProjects: projects.length,
+      confirmationMessage: `Deleted client "${clientName}". ${projects.length} projects were unlinked.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== CYCLE MANAGEMENT TOOLS ====================
+
+/**
+ * Get all cycles for a user
+ */
+export const getCyclesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    status: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 20;
+
+    let cycles;
+    if (args.status === "upcoming" || args.status === "active" || args.status === "completed") {
+      cycles = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", userId).eq("status", args.status as "upcoming" | "active" | "completed")
+        )
+        .order("desc")
+        .take(limit);
+    } else {
+      cycles = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc")
+        .take(limit);
+    }
+
+    const cyclesWithInfo = cycles.map((cycle) => {
+      const now = Date.now();
+      const daysRemaining = cycle.status === "active"
+        ? Math.max(0, Math.ceil((cycle.endDate - now) / (24 * 60 * 60 * 1000)))
+        : null;
+
+      return {
+        id: cycle._id,
+        name: cycle.name ?? `Cycle ${cycle.number}`,
+        number: cycle.number,
+        status: cycle.status,
+        startDate: new Date(cycle.startDate).toISOString().split("T")[0],
+        endDate: new Date(cycle.endDate).toISOString().split("T")[0],
+        daysRemaining,
+        issueCount: cycle.issueCount,
+        completedIssueCount: cycle.completedIssueCount,
+        completionPercent:
+          cycle.issueCount > 0
+            ? Math.round((cycle.completedIssueCount / cycle.issueCount) * 100)
+            : 0,
+        goals: cycle.goals,
+      };
+    });
+
+    return {
+      cycles: cyclesWithInfo,
+      count: cyclesWithInfo.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a new cycle
+ */
+export const createCycleInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.optional(v.string()),
+    startDate: v.string(),
+    endDate: v.string(),
+    goals: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    // Parse dates
+    const startDate = new Date(args.startDate);
+    const endDate = new Date(args.endDate);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return {
+        success: false,
+        error: "Invalid start or end date format",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (endDate <= startDate) {
+      return {
+        success: false,
+        error: "End date must be after start date",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get next cycle number
+    const existingCycles = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const maxNumber = existingCycles.length > 0
+      ? Math.max(...existingCycles.map((c) => c.number))
+      : 0;
+
+    const number = maxNumber + 1;
+
+    // Determine status based on dates
+    type CycleStatus = "upcoming" | "active" | "completed";
+    let status: CycleStatus = "upcoming";
+    if (startDate.getTime() <= now && endDate.getTime() >= now) {
+      status = "active";
+    } else if (endDate.getTime() < now) {
+      status = "completed";
+    }
+
+    // Convert goals string to array (split by newlines or semicolons)
+    let goalsArray: string[] | undefined;
+    if (args.goals?.trim()) {
+      goalsArray = args.goals
+        .split(/[\n;]/)
+        .map((g) => g.trim())
+        .filter((g) => g.length > 0);
+    }
+
+    const cycleId = await ctx.db.insert("lifeos_pmCycles", {
+      userId,
+      number,
+      name: args.name?.trim() || undefined,
+      status,
+      startDate: startDate.getTime(),
+      endDate: endDate.getTime(),
+      goals: goalsArray,
+      issueCount: 0,
+      completedIssueCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const cycleName = args.name?.trim() || `Cycle ${number}`;
+
+    return {
+      success: true,
+      cycleId,
+      number,
+      name: cycleName,
+      status,
+      confirmationMessage: `Created ${cycleName} from ${args.startDate} to ${args.endDate}.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update a cycle
+ */
+export const updateCycleInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    cycleId: v.string(),
+    name: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    status: v.optional(v.string()),
+    goals: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const cycleIdTyped = args.cycleId as Id<"lifeos_pmCycles">;
+
+    const cycle = await ctx.db.get(cycleIdTyped);
+    if (!cycle || cycle.userId !== userId) {
+      return {
+        success: false,
+        error: "Cycle not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Build updates object
+    const updates: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.name !== undefined) {
+      updates.name = args.name.trim() || undefined;
+    }
+    if (args.goals !== undefined) {
+      // Convert goals string to array (split by newlines or semicolons)
+      if (args.goals.trim()) {
+        updates.goals = args.goals
+          .split(/[\n;]/)
+          .map((g) => g.trim())
+          .filter((g) => g.length > 0);
+      } else {
+        updates.goals = undefined;
+      }
+    }
+
+    // Parse and validate dates
+    if (args.startDate !== undefined) {
+      const parsed = new Date(args.startDate);
+      if (!isNaN(parsed.getTime())) {
+        updates.startDate = parsed.getTime();
+      }
+    }
+
+    if (args.endDate !== undefined) {
+      const parsed = new Date(args.endDate);
+      if (!isNaN(parsed.getTime())) {
+        updates.endDate = parsed.getTime();
+      }
+    }
+
+    // Validate and set status
+    if (args.status !== undefined) {
+      const validStatuses = ["upcoming", "active", "completed"];
+      if (validStatuses.includes(args.status)) {
+        updates.status = args.status;
+      }
+    }
+
+    await ctx.db.patch(cycleIdTyped, updates);
+
+    const cycleName = args.name?.trim() || cycle.name || `Cycle ${cycle.number}`;
+
+    return {
+      success: true,
+      cycleId: cycleIdTyped,
+      confirmationMessage: `Updated ${cycleName}.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete a cycle (issues are unlinked, not deleted)
+ */
+export const deleteCycleInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    cycleId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const cycleIdTyped = args.cycleId as Id<"lifeos_pmCycles">;
+    const now = Date.now();
+
+    const cycle = await ctx.db.get(cycleIdTyped);
+    if (!cycle || cycle.userId !== userId) {
+      return {
+        success: false,
+        error: "Cycle not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const cycleName = cycle.name ?? `Cycle ${cycle.number}`;
+
+    // Unlink issues from cycle
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", cycleIdTyped))
+      .collect();
+
+    for (const issue of issues) {
+      await ctx.db.patch(issue._id, {
+        cycleId: undefined,
+        updatedAt: now,
+      });
+    }
+
+    // Delete the cycle
+    await ctx.db.delete(cycleIdTyped);
+
+    return {
+      success: true,
+      cycleName,
+      unlinkedIssues: issues.length,
+      confirmationMessage: `Deleted ${cycleName}. ${issues.length} issues were unlinked.`,
       generatedAt: new Date().toISOString(),
     };
   },

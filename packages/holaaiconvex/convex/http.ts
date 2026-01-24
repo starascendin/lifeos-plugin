@@ -1226,6 +1226,10 @@ const AVAILABLE_TOOLS = [
   // Task/Project tools
   "get_todays_tasks",
   "get_projects",
+  "get_project",
+  "create_project",
+  "update_project",
+  "delete_project",
   "get_tasks",
   // Notes/Journal tools
   "search_notes",
@@ -1238,8 +1242,15 @@ const AVAILABLE_TOOLS = [
   // Issue Management tools
   "create_issue",
   "mark_issue_complete",
+  "get_issue",
+  "update_issue",
+  "delete_issue",
   // Cycle Management tools
   "get_current_cycle",
+  "get_cycles",
+  "create_cycle",
+  "update_cycle",
+  "delete_cycle",
   "assign_issue_to_cycle",
   // FRM (Friend Relationship Management) tools
   "get_people",
@@ -1256,6 +1267,7 @@ const AVAILABLE_TOOLS = [
   "get_projects_for_client",
   "create_client",
   "update_client",
+  "delete_client",
   // Phase Management tools
   "get_phases",
   "get_phase",
@@ -1384,6 +1396,45 @@ http.route({
           });
           break;
 
+        case "get_project":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getProjectInternal, {
+            userId: auth.userId,
+            projectIdOrKey: params?.projectIdOrKey as string,
+          });
+          break;
+
+        case "create_project":
+          result = await ctx.runMutation(internal.lifeos.tool_call.createProjectInternal, {
+            userId: auth.userId,
+            name: params?.name as string,
+            key: params?.key as string,
+            description: params?.description as string | undefined,
+            clientId: params?.clientId as string | undefined,
+            status: params?.status as string | undefined,
+            priority: params?.priority as string | undefined,
+          });
+          break;
+
+        case "update_project":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updateProjectInternal, {
+            userId: auth.userId,
+            projectIdOrKey: params?.projectIdOrKey as string,
+            name: params?.name as string | undefined,
+            description: params?.description as string | undefined,
+            status: params?.status as string | undefined,
+            health: params?.health as string | undefined,
+            priority: params?.priority as string | undefined,
+            clientId: params?.clientId as string | undefined,
+          });
+          break;
+
+        case "delete_project":
+          result = await ctx.runMutation(internal.lifeos.tool_call.deleteProjectInternal, {
+            userId: auth.userId,
+            projectIdOrKey: params?.projectIdOrKey as string,
+          });
+          break;
+
         case "get_tasks":
           result = await ctx.runQuery(internal.lifeos.tool_call.getTasksInternal, {
             userId: auth.userId,
@@ -1464,6 +1515,33 @@ http.route({
           });
           break;
 
+        case "get_issue":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getIssueInternal, {
+            userId: auth.userId,
+            issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
+          });
+          break;
+
+        case "update_issue":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updateIssueInternal, {
+            userId: auth.userId,
+            issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
+            title: params?.title as string | undefined,
+            description: params?.description as string | undefined,
+            status: params?.status as string | undefined,
+            priority: params?.priority as string | undefined,
+            dueDate: params?.dueDate as string | undefined,
+            isTopPriority: params?.isTopPriority as boolean | undefined,
+          });
+          break;
+
+        case "delete_issue":
+          result = await ctx.runMutation(internal.lifeos.tool_call.deleteIssueInternal, {
+            userId: auth.userId,
+            issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
+          });
+          break;
+
         // Cycle Management tools
         case "get_current_cycle":
           result = await ctx.runQuery(internal.lifeos.tool_call.getCurrentCycleInternal, {
@@ -1476,6 +1554,43 @@ http.route({
             userId: auth.userId,
             issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
             cycleId: params?.cycleId as string | undefined,
+          });
+          break;
+
+        case "get_cycles":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getCyclesInternal, {
+            userId: auth.userId,
+            status: params?.status as string | undefined,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "create_cycle":
+          result = await ctx.runMutation(internal.lifeos.tool_call.createCycleInternal, {
+            userId: auth.userId,
+            name: params?.name as string | undefined,
+            startDate: params?.startDate as string,
+            endDate: params?.endDate as string,
+            goals: params?.goals as string | undefined,
+          });
+          break;
+
+        case "update_cycle":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updateCycleInternal, {
+            userId: auth.userId,
+            cycleId: params?.cycleId as string,
+            name: params?.name as string | undefined,
+            startDate: params?.startDate as string | undefined,
+            endDate: params?.endDate as string | undefined,
+            status: params?.status as string | undefined,
+            goals: params?.goals as string | undefined,
+          });
+          break;
+
+        case "delete_cycle":
+          result = await ctx.runMutation(internal.lifeos.tool_call.deleteCycleInternal, {
+            userId: auth.userId,
+            cycleId: params?.cycleId as string,
           });
           break;
 
@@ -1590,6 +1705,13 @@ http.route({
             name: params?.name as string | undefined,
             description: params?.description as string | undefined,
             status: params?.status as string | undefined,
+          });
+          break;
+
+        case "delete_client":
+          result = await ctx.runMutation(internal.lifeos.tool_call.deleteClientInternal, {
+            userId: auth.userId,
+            clientId: params?.clientId as string,
           });
           break;
 
