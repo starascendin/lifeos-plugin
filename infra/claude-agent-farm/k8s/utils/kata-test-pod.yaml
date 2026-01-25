@@ -1,0 +1,21 @@
+---
+# Test pod to verify Kata Containers + Firecracker runtime
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kata-test
+  namespace: default
+spec:
+  runtimeClassName: kata-fc
+  containers:
+    - name: test
+      image: busybox:latest
+      command: ["sh", "-c", "echo 'Running in Kata/Firecracker microVM!' && uname -a && cat /proc/version && sleep 300"]
+      resources:
+        limits:
+          memory: "128Mi"
+          cpu: "250m"
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+  restartPolicy: Never

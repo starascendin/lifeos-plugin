@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "lifeos-dev": {
+      "command": "npx",
+      "args": [
+        "@starascendin/lifeos-mcp@0.1.1",
+        "--url", "https://beaming-giraffe-300.convex.site",
+        "--user-id", "j9743f41z9e999ym1xvn1v013s7wqfq8",
+        "--api-key", "tool-call-secret-key-2024"
+      ]
+    },
+    "lifeos-staging": {
+      "command": "npx",
+      "args": [
+        "@starascendin/lifeos-mcp@0.1.1",
+        "--url", "https://adorable-firefly-704.convex.site",
+        "--user-id", "ks7a1gvd5h7674asa1ajsmm2ss7x55vm",
+        "--api-key", "tool-call-secret-key-2024"
+      ]
+    },
+    "lifeos-prod": {
+      "command": "npx",
+      "args": [
+        "@starascendin/lifeos-mcp@0.1.1",
+        "--url", "https://agreeable-ibex-949.convex.site",
+        "--user-id", "ks781knabdcchchddfwcaqwdn97zphqc",
+        "--api-key", "tool-call-secret-key-2024"
+      ]
+    }
+  }
+}

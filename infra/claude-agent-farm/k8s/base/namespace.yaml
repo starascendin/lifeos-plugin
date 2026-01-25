@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: claude-agents
+  labels:
+    app.kubernetes.io/name: claude-agent-farm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: controlplane
+  labels:
+    app.kubernetes.io/name: claude-agent-farm

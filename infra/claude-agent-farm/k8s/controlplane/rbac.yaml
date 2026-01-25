@@ -1,0 +1,74 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: controlplane
+  namespace: controlplane
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: controlplane-agent-manager
+  namespace: claude-agents
+rules:
+  # Pod management for agents
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list", "watch"]
+  # Pod exec for chat
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  # Secrets for GitHub PAT
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  # ConfigMaps for MCP configs
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: controlplane-agent-manager
+  namespace: claude-agents
+subjects:
+  - kind: ServiceAccount
+    name: controlplane
+    namespace: controlplane
+roleRef:
+  kind: Role
+  name: controlplane-agent-manager
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: controlplane-default-access
+  namespace: default
+rules:
+  # Access to shared secrets in default namespace
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: controlplane-default-access
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: controlplane
+    namespace: controlplane
+roleRef:
+  kind: Role
+  name: controlplane-default-access
+  apiGroup: rbac.authorization.k8s.io

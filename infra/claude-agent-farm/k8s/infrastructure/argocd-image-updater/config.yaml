@@ -1,0 +1,30 @@
+---
+# ConfigMap for ArgoCD Image Updater
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+  namespace: argocd
+data:
+  # Register GHCR as a container registry
+  registries.conf: |
+    registries:
+    - name: GitHub Container Registry
+      api_url: https://ghcr.io
+      prefix: ghcr.io
+      credentials: pullsecret:argocd/ghcr-credentials
+      default: true
+---
+# Secret for GHCR authentication (will be replaced by sealed secret)
+# For now, reference the existing ghcr-credentials from the controlplane namespace
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ghcr-credentials
+  namespace: argocd
+type: kubernetes.io/dockerconfigjson
+data:
+  # This will need to be populated with the same credentials
+  # Use: kubectl get secret ghcr-credentials -n controlplane -o yaml
+  # Then copy .dockerconfigjson value here
+  .dockerconfigjson: e30=

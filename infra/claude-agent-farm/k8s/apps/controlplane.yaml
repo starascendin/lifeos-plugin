@@ -1,0 +1,27 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: controlplane
+  namespace: argocd
+  annotations:
+    # ArgoCD Image Updater configuration
+    argocd-image-updater.argoproj.io/image-list: controlplane=ghcr.io/starascendin/claude-agent-farm-controlplane
+    argocd-image-updater.argoproj.io/controlplane.update-strategy: latest
+    argocd-image-updater.argoproj.io/controlplane.allow-tags: regexp:^[a-f0-9]{7}$
+    argocd-image-updater.argoproj.io/write-back-method: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/starascendin/claude-agent-farm.git
+    path: k8s/controlplane
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: controlplane
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,57 @@
+---
+# Agent Pod Template with MCP config and worktrunk
+apiVersion: v1
+kind: Pod
+metadata:
+  name: claude-agent-test
+  namespace: default
+spec:
+  restartPolicy: Never
+  initContainers:
+    # Install worktrunk CLI
+    - name: install-worktrunk
+      image: alpine:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          apk add --no-cache curl tar xz
+          curl -L https://github.com/max-sixty/worktrunk/releases/download/v0.18.2/worktrunk-x86_64-unknown-linux-musl.tar.xz -o /tmp/wt.tar.xz
+          tar xJf /tmp/wt.tar.xz -C /tmp
+          cp /tmp/worktrunk-x86_64-unknown-linux-musl/wt /tools/wt
+          cp /tmp/worktrunk-x86_64-unknown-linux-musl/git-wt /tools/git-wt
+          chmod +x /tools/wt /tools/git-wt
+      volumeMounts:
+        - name: tools
+          mountPath: /tools
+  containers:
+    - name: agent
+      image: ghcr.io/starascendin/claude-agent-farm-agent:latest
+      command: ["sleep", "infinity"]
+      env:
+        - name: HOME
+          value: /home/node
+        - name: PATH
+          value: /home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      volumeMounts:
+        # Claude credentials (NFS shared)
+        - name: claude-credentials
+          mountPath: /home/node/.claude
+        # MCP config
+        - name: mcp-config
+          mountPath: /home/node/.mcp.json
+          subPath: mcp.json
+        # Worktrunk binary
+        - name: tools
+          mountPath: /tools
+  volumes:
+    - name: claude-credentials
+      persistentVolumeClaim:
+        claimName: claude-credentials
+    - name: mcp-config
+      secret:
+        secretName: mcp-config
+    - name: tools
+      emptyDir: {}
+  imagePullSecrets:
+    - name: ghcr-credentials

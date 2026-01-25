@@ -1,0 +1,72 @@
+---
+# Coder base resources (PostgreSQL, secrets, nodeport)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: coder-base
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/starascendin/claude-agent-farm.git
+    path: k8s/coder
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: coder
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+# Coder Helm chart
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: coder
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.coder.com/v2
+    chart: coder
+    targetRevision: 2.29.2
+    helm:
+      values: |
+        coder:
+          env:
+            - name: CODER_PG_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: coder-db-credentials
+                  key: url
+            # Access URL
+            - name: CODER_ACCESS_URL
+              value: "http://5.78.64.201:30700"
+            # Disable telemetry (optional)
+            - name: CODER_TELEMETRY_ENABLE
+              value: "false"
+            # Wildcard access URL for workspace apps (optional)
+            # - name: CODER_WILDCARD_ACCESS_URL
+            #   value: "*.coder.YOUR_DOMAIN"
+          service:
+            type: ClusterIP
+          # Resource limits for small cluster
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: coder
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

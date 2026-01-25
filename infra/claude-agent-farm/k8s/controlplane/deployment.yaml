@@ -1,0 +1,105 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controlplane
+  namespace: controlplane
+  labels:
+    app: controlplane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: controlplane
+  template:
+    metadata:
+      labels:
+        app: controlplane
+    spec:
+      serviceAccountName: controlplane
+      containers:
+        - name: controlplane
+          image: ghcr.io/starascendin/claude-agent-farm-controlplane:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            - name: DB_PATH
+              value: "/data/controlplane.db"
+            - name: GITHUB_PAT
+              valueFrom:
+                secretKeyRef:
+                  name: github-credentials
+                  key: GITHUB_PAT
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: controlplane-data
+      imagePullSecrets:
+        - name: ghcr-credentials
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: controlplane-data
+  namespace: controlplane
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: controlplane
+  namespace: controlplane
+spec:
+  selector:
+    app: controlplane
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  type: ClusterIP
+---
+# Optional: Expose via NodePort for Tailscale access
+apiVersion: v1
+kind: Service
+metadata:
+  name: controlplane-nodeport
+  namespace: controlplane
+spec:
+  selector:
+    app: controlplane
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  type: NodePort

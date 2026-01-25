@@ -1,0 +1,48 @@
+{{define "configs-list"}}
+{{if .Configs}}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {{range .Configs}}
+    <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg dark:bg-gray-700 dark:border-gray-600">
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">{{.Name}}</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 truncate mb-3">{{.TaskPrompt}}</p>
+        <div class="flex flex-wrap gap-1 mb-4">
+            <span class="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-0.5 rounded dark:bg-gray-600 dark:text-gray-300">{{.MaxTurns}} turns</span>
+            <span class="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-0.5 rounded dark:bg-gray-600 dark:text-gray-300">${{.MaxBudgetUSD}}</span>
+            <span class="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-0.5 rounded dark:bg-gray-600 dark:text-gray-300">{{.CPULimit}} CPU</span>
+        </div>
+        <div class="flex justify-end gap-2">
+            <button class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-3 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+                    hx-get="/launch/{{.ID}}"
+                    hx-target="#modal-content"
+                    data-modal-target="modal"
+                    data-modal-toggle="modal">
+                Launch
+            </button>
+            <button class="text-gray-900 bg-transparent hover:bg-gray-100 dark:text-white dark:hover:bg-gray-600 font-medium rounded-lg text-sm px-3 py-2"
+                    hx-get="/config/form?id={{.ID}}"
+                    hx-target="#modal-content"
+                    data-modal-target="modal"
+                    data-modal-toggle="modal">
+                Edit
+            </button>
+            <button class="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 font-medium rounded-lg text-sm px-3 py-2"
+                    hx-delete="/config/{{.ID}}"
+                    hx-confirm="Delete this config?">
+                Delete
+            </button>
+        </div>
+    </div>
+    {{end}}
+</div>
+{{else}}
+<div class="flex items-center p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400" role="alert">
+    <svg class="flex-shrink-0 inline w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
+    </svg>
+    <span class="sr-only">Info</span>
+    <div>
+        No configs yet. Create one to get started!
+    </div>
+</div>
+{{end}}
+{{end}}

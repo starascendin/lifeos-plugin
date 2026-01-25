@@ -1,0 +1,825 @@
+package k8s
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"time"
+
+	"github.com/starascendin/claude-agent-farm/controlplane/internal/models"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
+)
+
+const (
+	agentNamespace = "claude-agents"
+	agentImage     = "ghcr.io/starascendin/claude-agent-farm-agent:latest"
+	credentialsPVC = "claude-credentials"
+)
+
+// getRuntimeClassName returns the runtime class from env var, or empty string to use default
+func getRuntimeClassName() string {
+	return os.Getenv("AGENT_RUNTIME_CLASS")
+}
+
+type Client struct {
+	clientset  *kubernetes.Clientset
+	restConfig *rest.Config
+}
+
+func NewClient() (*Client, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clientset: %w", err)
+	}
+
+	return &Client{clientset: clientset, restConfig: config}, nil
+}
+
+// LaunchAgent creates a new agent pod from a config
+func (c *Client) LaunchAgent(config *models.AgentConfig, taskPrompt string) (string, error) {
+	if taskPrompt == "" {
+		taskPrompt = config.TaskPrompt
+	}
+
+	podName := fmt.Sprintf("agent-%s-%d", config.Name, time.Now().Unix())
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: agentNamespace,
+			Labels: map[string]string{
+				"app":        "claude-agent",
+				"config-id":  fmt.Sprintf("%d", config.ID),
+				"config-name": config.Name,
+			},
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:  "agent",
+					Image: agentImage,
+					Env: []corev1.EnvVar{
+						{Name: "HOME", Value: "/home/node"},
+						{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+						{Name: "TASK_PROMPT", Value: taskPrompt},
+						{Name: "SYSTEM_PROMPT", Value: config.SystemPrompt},
+						{Name: "REPOS", Value: config.Repos},
+						{Name: "MAX_TURNS", Value: fmt.Sprintf("%d", config.MaxTurns)},
+						{Name: "MAX_BUDGET_USD", Value: fmt.Sprintf("%.2f", config.MaxBudgetUSD)},
+						{Name: "ALLOWED_TOOLS", Value: config.AllowedTools},
+						{
+							Name: "GITHUB_PAT",
+							ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "github-credentials"},
+									Key:                  "GITHUB_PAT",
+									Optional:             boolPtr(true),
+								},
+							},
+						},
+					},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse(config.CPULimit),
+							corev1.ResourceMemory: resource.MustParse(config.MemoryLimit),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "claude-credentials",
+							MountPath: "/home/node/.claude",
+							ReadOnly:  false,
+						},
+						{
+							Name:      "mcp-config",
+							MountPath: "/home/node/.mcp.json",
+							SubPath:   "mcp.json",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "claude-credentials",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: credentialsPVC,
+							ReadOnly:  false,
+						},
+					},
+				},
+				{
+					Name: "mcp-config",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "mcp-config",
+							Optional:   boolPtr(true),
+						},
+					},
+				},
+			},
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "ghcr-credentials"},
+			},
+		},
+	}
+
+	// Set runtime class if configured
+	if runtimeClass := getRuntimeClassName(); runtimeClass != "" {
+		pod.Spec.RuntimeClassName = &runtimeClass
+	}
+
+	_, err := c.clientset.CoreV1().Pods(agentNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create pod: %w", err)
+	}
+
+	return podName, nil
+}
+
+// IsPodRunning checks if a specific pod exists and is running
+func (c *Client) IsPodRunning(podName string) (bool, error) {
+	pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return pod.Status.Phase == corev1.PodRunning, nil
+}
+
+// ListRunningAgents returns all agent pods
+func (c *Client) ListRunningAgents() ([]models.RunningAgent, error) {
+	// List ALL pods in the namespace (no label filter)
+	pods, err := c.clientset.CoreV1().Pods(agentNamespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	var agents []models.RunningAgent
+	for _, pod := range pods.Items {
+		runtimeClass := ""
+		if pod.Spec.RuntimeClassName != nil {
+			runtimeClass = *pod.Spec.RuntimeClassName
+		}
+
+		var taskPrompt string
+		for _, env := range pod.Spec.Containers[0].Env {
+			if env.Name == "TASK_PROMPT" {
+				taskPrompt = env.Value
+				break
+			}
+		}
+
+		// Determine pod type and persistence
+		podType := "job"
+		persistent := false
+		if pod.Labels["app"] == "claude-chat" {
+			podType = "chat"
+			persistent = true
+		} else if pod.Labels["persistent"] == "true" {
+			podType = "agent"
+			persistent = true
+		} else if pod.Labels["app"] == "claude-agent" {
+			podType = "agent"
+		}
+
+		// Check if command is "sleep infinity" (persistent)
+		if len(pod.Spec.Containers) > 0 && len(pod.Spec.Containers[0].Command) >= 2 {
+			if pod.Spec.Containers[0].Command[0] == "sleep" {
+				persistent = true
+			}
+		}
+
+		// Parse config ID from label
+		var configID int64
+		if idStr := pod.Labels["config-id"]; idStr != "" {
+			fmt.Sscanf(idStr, "%d", &configID)
+		}
+
+		agent := models.RunningAgent{
+			PodName:      pod.Name,
+			PodType:      podType,
+			Persistent:   persistent,
+			ConfigID:     configID,
+			ConfigName:   pod.Labels["config-name"],
+			TaskPrompt:   taskPrompt,
+			Status:       string(pod.Status.Phase),
+			StartedAt:    pod.CreationTimestamp.Time,
+			Node:         pod.Spec.NodeName,
+			RuntimeClass: runtimeClass,
+		}
+
+		// Use agent-name label if config-name not set
+		if agent.ConfigName == "" {
+			agent.ConfigName = pod.Labels["agent-name"]
+		}
+		// Fallback to pod name
+		if agent.ConfigName == "" {
+			agent.ConfigName = pod.Name
+		}
+
+		agents = append(agents, agent)
+	}
+
+	return agents, nil
+}
+
+// StopAgent deletes an agent pod
+func (c *Client) StopAgent(podName string) error {
+	return c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+}
+
+// StreamLogs streams logs from a pod
+func (c *Client) StreamLogs(ctx context.Context, podName string, logChan chan<- string) error {
+	req := c.clientset.CoreV1().Pods(agentNamespace).GetLogs(podName, &corev1.PodLogOptions{
+		Follow:     true,
+		Timestamps: true,
+	})
+
+	stream, err := req.Stream(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to open log stream: %w", err)
+	}
+	defer stream.Close()
+
+	reader := bufio.NewReader(stream)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		select {
+		case logChan <- line:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// GetLogs returns logs from a pod (non-streaming)
+func (c *Client) GetLogs(podName string, tailLines int64) (string, error) {
+	req := c.clientset.CoreV1().Pods(agentNamespace).GetLogs(podName, &corev1.PodLogOptions{
+		TailLines:  &tailLines,
+		Timestamps: true,
+	})
+
+	logs, err := req.Do(context.Background()).Raw()
+	if err != nil {
+		return "", err
+	}
+	return string(logs), nil
+}
+
+// ExecStreamWriter wraps an io.Writer to send output to a channel
+type ExecStreamWriter struct {
+	OutputChan chan<- string
+}
+
+func (w *ExecStreamWriter) Write(p []byte) (n int, err error) {
+	w.OutputChan <- string(p)
+	return len(p), nil
+}
+
+// ExecCommand executes a command in a pod and streams output to the channel
+func (c *Client) ExecCommand(ctx context.Context, podName string, command []string, outputChan chan<- string) error {
+	req := c.clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(agentNamespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Command:   command,
+			Container: "agent",
+			Stdout:    true,
+			Stderr:    true,
+			Stdin:     false,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(c.restConfig, "POST", req.URL())
+	if err != nil {
+		return fmt.Errorf("failed to create executor: %w", err)
+	}
+
+	streamWriter := &ExecStreamWriter{OutputChan: outputChan}
+
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: streamWriter,
+		Stderr: streamWriter,
+	})
+	if err != nil {
+		return fmt.Errorf("exec failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetOrCreateChatPod ensures a chat pod exists and is running, returns pod name
+func (c *Client) GetOrCreateChatPod() (string, error) {
+	podName := "claude-chat-pod"
+
+	// Check if pod exists
+	pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err == nil {
+		// Pod exists, check if running
+		if pod.Status.Phase == corev1.PodRunning {
+			return podName, nil
+		}
+		// Pod exists but not running, delete and recreate
+		_ = c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+		time.Sleep(2 * time.Second)
+	}
+
+	// Create chat pod
+	chatPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: agentNamespace,
+			Labels: map[string]string{
+				"app": "claude-chat",
+			},
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    "agent",
+					Image:   agentImage,
+					Command: []string{"sleep", "infinity"},
+					Env: []corev1.EnvVar{
+						{Name: "HOME", Value: "/home/node"},
+						{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "claude-credentials",
+							MountPath: "/home/node/.claude",
+						},
+						{
+							Name:      "mcp-config",
+							MountPath: "/home/node/.mcp.json",
+							SubPath:   "mcp.json",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "claude-credentials",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: credentialsPVC,
+						},
+					},
+				},
+				{
+					Name: "mcp-config",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "mcp-config",
+							Optional:   boolPtr(true),
+						},
+					},
+				},
+			},
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "ghcr-credentials"},
+			},
+		},
+	}
+
+	_, err = c.clientset.CoreV1().Pods(agentNamespace).Create(context.Background(), chatPod, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create chat pod: %w", err)
+	}
+
+	// Wait for pod to be running
+	for i := 0; i < 60; i++ {
+		pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+		if err == nil && pod.Status.Phase == corev1.PodRunning {
+			return podName, nil
+		}
+		time.Sleep(time.Second)
+	}
+
+	return "", fmt.Errorf("timeout waiting for chat pod to start")
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+// GetOrCreateAgentPod ensures an agent pod exists and is running for the given config
+// Unlike LaunchAgent which runs a single task, this creates a persistent pod for interactive chat
+func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error) {
+	podName := fmt.Sprintf("agent-%s-pod", config.Name)
+
+	// Check if pod exists
+	pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err == nil {
+		// Pod exists, check if running
+		if pod.Status.Phase == corev1.PodRunning {
+			return podName, nil
+		}
+		// Pod exists but not running, delete and recreate
+		_ = c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+		time.Sleep(2 * time.Second)
+	}
+
+	// Build env vars
+	envVars := []corev1.EnvVar{
+		{Name: "HOME", Value: "/home/node"},
+		{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+		{Name: "AGENT_NAME", Value: config.Name},
+		{Name: "SYSTEM_PROMPT", Value: config.SystemPrompt},
+		{Name: "MAX_TURNS", Value: fmt.Sprintf("%d", config.MaxTurns)},
+		{Name: "ALLOWED_TOOLS", Value: config.AllowedTools},
+	}
+
+	// Add GitHub PAT if available
+	envVars = append(envVars, corev1.EnvVar{
+		Name: "GITHUB_PAT",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "github-credentials"},
+				Key:                  "GITHUB_PAT",
+				Optional:             boolPtr(true),
+			},
+		},
+	})
+
+	// Create agent pod with sleep infinity (persistent)
+	agentPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: agentNamespace,
+			Labels: map[string]string{
+				"app":         "claude-agent",
+				"agent-name":  config.Name,
+				"config-id":   fmt.Sprintf("%d", config.ID),
+				"persistent":  "true",
+			},
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    "agent",
+					Image:   agentImage,
+					Command: []string{"sleep", "infinity"},
+					Env:     envVars,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse(config.CPULimit),
+							corev1.ResourceMemory: resource.MustParse(config.MemoryLimit),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "claude-credentials",
+							MountPath: "/home/node/.claude",
+							ReadOnly:  false,
+						},
+						{
+							Name:      "mcp-config",
+							MountPath: "/home/node/.mcp.json",
+							SubPath:   "mcp.json",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "claude-credentials",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: credentialsPVC,
+							ReadOnly:  false,
+						},
+					},
+				},
+				{
+					Name: "mcp-config",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "mcp-config",
+							Optional:   boolPtr(true),
+						},
+					},
+				},
+			},
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "ghcr-credentials"},
+			},
+		},
+	}
+
+	// Set runtime class if configured
+	if runtimeClass := getRuntimeClassName(); runtimeClass != "" {
+		agentPod.Spec.RuntimeClassName = &runtimeClass
+	}
+
+	_, err = c.clientset.CoreV1().Pods(agentNamespace).Create(context.Background(), agentPod, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create agent pod: %w", err)
+	}
+
+	// Wait for pod to be running
+	for i := 0; i < 60; i++ {
+		pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+		if err == nil && pod.Status.Phase == corev1.PodRunning {
+			return podName, nil
+		}
+		time.Sleep(time.Second)
+	}
+
+	return "", fmt.Errorf("timeout waiting for agent pod to start")
+}
+
+// CreateMCPConfigMap creates a ConfigMap with MCP configuration for a pod
+func (c *Client) CreateMCPConfigMap(podName string, mcpJSON []byte) error {
+	configMapName := fmt.Sprintf("mcp-%s", podName)
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: agentNamespace,
+			Labels: map[string]string{
+				"app":      "claude-agent",
+				"mcp-for":  podName,
+			},
+		},
+		Data: map[string]string{
+			"mcp.json": string(mcpJSON),
+		},
+	}
+
+	_, err := c.clientset.CoreV1().ConfigMaps(agentNamespace).Create(context.Background(), configMap, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create MCP ConfigMap: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteMCPConfigMap deletes the MCP ConfigMap for a pod
+func (c *Client) DeleteMCPConfigMap(podName string) error {
+	configMapName := fmt.Sprintf("mcp-%s", podName)
+	return c.clientset.CoreV1().ConfigMaps(agentNamespace).Delete(context.Background(), configMapName, metav1.DeleteOptions{})
+}
+
+// LaunchAgentWithMCP creates a new agent pod with MCP configuration
+func (c *Client) LaunchAgentWithMCP(config *models.AgentConfig, taskPrompt string, mcpJSON []byte) (string, error) {
+	if taskPrompt == "" {
+		taskPrompt = config.TaskPrompt
+	}
+
+	podName := fmt.Sprintf("agent-%s-%d", config.Name, time.Now().Unix())
+
+	// Create MCP ConfigMap if MCP JSON is provided
+	hasMCP := len(mcpJSON) > 0 && string(mcpJSON) != "{\"mcpServers\":{}}"
+	if hasMCP {
+		if err := c.CreateMCPConfigMap(podName, mcpJSON); err != nil {
+			return "", fmt.Errorf("failed to create MCP ConfigMap: %w", err)
+		}
+	}
+
+	// Build volume mounts
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "claude-credentials",
+			MountPath: "/home/node/.claude",
+			ReadOnly:  false,
+		},
+	}
+
+	// Build volumes
+	volumes := []corev1.Volume{
+		{
+			Name: "claude-credentials",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: credentialsPVC,
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+	// Always add MCP volume mount
+	volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		Name:      "mcp-config",
+		MountPath: "/home/node/.mcp.json",
+		SubPath:   "mcp.json",
+	})
+
+	// Add MCP volume - from ConfigMap if custom MCP provided, otherwise from Secret
+	if hasMCP {
+		configMapName := fmt.Sprintf("mcp-%s", podName)
+		volumes = append(volumes, corev1.Volume{
+			Name: "mcp-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: configMapName,
+					},
+				},
+			},
+		})
+	} else {
+		// Use default MCP config from secret
+		volumes = append(volumes, corev1.Volume{
+			Name: "mcp-config",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "mcp-config",
+					Optional:   boolPtr(true),
+				},
+			},
+		})
+	}
+
+	// Build environment variables
+	envVars := []corev1.EnvVar{
+		{Name: "HOME", Value: "/home/node"},
+		{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+		{Name: "TASK_PROMPT", Value: taskPrompt},
+		{Name: "SYSTEM_PROMPT", Value: config.SystemPrompt},
+		{Name: "REPOS", Value: config.Repos},
+		{Name: "MAX_TURNS", Value: fmt.Sprintf("%d", config.MaxTurns)},
+		{Name: "MAX_BUDGET_USD", Value: fmt.Sprintf("%.2f", config.MaxBudgetUSD)},
+		{Name: "ALLOWED_TOOLS", Value: config.AllowedTools},
+		{
+			Name: "GITHUB_PAT",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "github-credentials"},
+					Key:                  "GITHUB_PAT",
+					Optional:             boolPtr(true),
+				},
+			},
+		},
+	}
+
+	// Add enabled skills if configured (for agent to install on startup)
+	if config.EnabledSkills != "" {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "ENABLED_SKILLS",
+			Value: config.EnabledSkills,
+		})
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: agentNamespace,
+			Labels: map[string]string{
+				"app":         "claude-agent",
+				"config-id":   fmt.Sprintf("%d", config.ID),
+				"config-name": config.Name,
+				"has-mcp":     fmt.Sprintf("%t", hasMCP),
+			},
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:  "agent",
+					Image: agentImage,
+					Env:   envVars,
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse(config.CPULimit),
+							corev1.ResourceMemory: resource.MustParse(config.MemoryLimit),
+						},
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+					VolumeMounts: volumeMounts,
+				},
+			},
+			Volumes: volumes,
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "ghcr-credentials"},
+			},
+		},
+	}
+
+	// Set runtime class if configured
+	if runtimeClass := getRuntimeClassName(); runtimeClass != "" {
+		pod.Spec.RuntimeClassName = &runtimeClass
+	}
+
+	_, err := c.clientset.CoreV1().Pods(agentNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		// Clean up ConfigMap if pod creation failed
+		if hasMCP {
+			_ = c.DeleteMCPConfigMap(podName)
+		}
+		return "", fmt.Errorf("failed to create pod: %w", err)
+	}
+
+	return podName, nil
+}
+
+// StopAgentWithCleanup deletes an agent pod and its MCP ConfigMap
+func (c *Client) StopAgentWithCleanup(podName string) error {
+	// Try to delete MCP ConfigMap (ignore errors if it doesn't exist)
+	_ = c.DeleteMCPConfigMap(podName)
+
+	// Delete the pod
+	return c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+}
+
+// CleanupCompletedPods deletes completed/failed pods older than the given duration
+// Returns the number of pods cleaned up
+func (c *Client) CleanupCompletedPods(olderThan time.Duration) (int, error) {
+	pods, err := c.clientset.CoreV1().Pods(agentNamespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	cutoff := time.Now().Add(-olderThan)
+	cleaned := 0
+
+	for _, pod := range pods.Items {
+		// Skip running or pending pods
+		if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
+			continue
+		}
+
+		// Skip persistent pods (chat pod, agent pods with sleep infinity)
+		if pod.Labels["app"] == "claude-chat" || pod.Labels["persistent"] == "true" {
+			continue
+		}
+
+		// Check if pod is old enough
+		if pod.CreationTimestamp.Time.Before(cutoff) {
+			// Delete pod and its MCP ConfigMap
+			_ = c.DeleteMCPConfigMap(pod.Name)
+			if err := c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{}); err == nil {
+				cleaned++
+			}
+		}
+	}
+
+	return cleaned, nil
+}
+
+// ExecInPod executes a command in a running pod
+func (c *Client) ExecInPod(podName, namespace string, command []string) error {
+	req := c.clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: "agent",
+			Command:   command,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(c.restConfig, "POST", req.URL())
+	if err != nil {
+		return fmt.Errorf("failed to create executor: %w", err)
+	}
+
+	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+		Stdout: io.Discard,
+		Stderr: io.Discard,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to execute command: %w", err)
+	}
+
+	return nil
+}
