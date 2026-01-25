@@ -176,3 +176,21 @@ ios/App/build/
 *.sqlite-shm
 *.sqlite-wal
 packages/beeperdb/data/
+
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+vendor/
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Temp/personal files
+Type
+file.py
+res
+v2ray_subscription_finder.py
+gsocket/

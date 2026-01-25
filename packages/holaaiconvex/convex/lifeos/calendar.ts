@@ -441,18 +441,24 @@ export const syncCalendarEvents = action({
     startDate: string;
     endDate: string;
   }> => {
+    console.log("[calendar:syncCalendarEvents] Starting sync...");
+
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
+      console.error("[calendar:syncCalendarEvents] Not authenticated");
       throw new Error("Not authenticated");
     }
+    console.log("[calendar:syncCalendarEvents] User identity subject:", identity.subject);
 
     // Get user from database
     const user = (await ctx.runQuery(internal.common.users.getUserByTokenIdentifier, {
       tokenIdentifier: identity.tokenIdentifier,
     })) as { _id: Id<"users"> } | null;
     if (!user) {
+      console.error("[calendar:syncCalendarEvents] User not found for tokenIdentifier:", identity.tokenIdentifier);
       throw new Error("User not found");
     }
+    console.log("[calendar:syncCalendarEvents] Found user:", user._id);
 
     // Calculate date range
     const now = new Date();
@@ -467,16 +473,32 @@ export const syncCalendarEvents = action({
     // Get Google OAuth token
     const secretKey = process.env.CLERK_SECRET_KEY;
     if (!secretKey) {
+      console.error("[calendar:syncCalendarEvents] CLERK_SECRET_KEY not configured");
       throw new Error("CLERK_SECRET_KEY not configured");
     }
+    console.log("[calendar:syncCalendarEvents] CLERK_SECRET_KEY is configured");
 
     const clerk = createClerkClient({ secretKey });
-    const tokens = await clerk.users.getUserOauthAccessToken(
-      identity.subject,
-      "oauth_google"
-    );
+    console.log("[calendar:syncCalendarEvents] Fetching OAuth token for user:", identity.subject);
+
+    let tokens;
+    try {
+      tokens = await clerk.users.getUserOauthAccessToken(
+        identity.subject,
+        "oauth_google"
+      );
+      console.log("[calendar:syncCalendarEvents] OAuth tokens response:", JSON.stringify({
+        hasData: !!tokens.data,
+        tokenCount: tokens.data?.length || 0,
+        scopes: tokens.data?.[0]?.scopes || []
+      }));
+    } catch (oauthError) {
+      console.error("[calendar:syncCalendarEvents] OAuth error:", oauthError);
+      throw new Error(`Failed to get OAuth token: ${oauthError instanceof Error ? oauthError.message : String(oauthError)}`);
+    }
 
     if (!tokens.data || tokens.data.length === 0) {
+      console.error("[calendar:syncCalendarEvents] No OAuth token found for user");
       await ctx.runMutation(internal.lifeos.calendar.updateSyncStatus, {
         userId: user._id,
         lastSyncError: "No Google OAuth token found. Please sign out and sign in again with Google.",
@@ -485,6 +507,7 @@ export const syncCalendarEvents = action({
     }
 
     const accessToken = tokens.data[0].token;
+    console.log("[calendar:syncCalendarEvents] Got access token, length:", accessToken?.length || 0);
 
     try {
       // Fetch events from Google Calendar
@@ -498,14 +521,19 @@ export const syncCalendarEvents = action({
       url.searchParams.set("orderBy", "startTime");
       url.searchParams.set("maxResults", "250");
 
+      console.log("[calendar:syncCalendarEvents] Fetching from Google Calendar API:", url.toString());
+
       const response = await fetch(url.toString(), {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       });
 
+      console.log("[calendar:syncCalendarEvents] Google API response status:", response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("[calendar:syncCalendarEvents] Google Calendar API error:", response.status, errorText);
         await ctx.runMutation(internal.lifeos.calendar.updateSyncStatus, {
           userId: user._id,
           lastSyncError: `Google Calendar API error: ${response.status} ${errorText}`,
@@ -556,6 +584,9 @@ export const syncCalendarEvents = action({
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error("[calendar:syncCalendarEvents] Catch block error:", errorMessage);
+      console.error("[calendar:syncCalendarEvents] Error stack:", errorStack);
       await ctx.runMutation(internal.lifeos.calendar.updateSyncStatus, {
         userId: user._id,
         lastSyncError: errorMessage,

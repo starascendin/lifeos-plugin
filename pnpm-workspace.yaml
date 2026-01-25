@@ -2,3 +2,4 @@ packages:
   - 'apps/*'
   - 'apps/lifeos/*'
   - 'packages/*'
+  - 'infra/claude-agent-farm/controlplane/frontend'
