@@ -8,7 +8,7 @@
     "dev:once": "convex dev --once",
     "dev:prod": "dotenv -e .env.production -- bash -c 'echo \"=> Target: $CONVEX_URL (PROD)\" && convex dev'",
     "dev:prod:once": "dotenv -e .env.production -- bash -c 'echo \"=> Target: $CONVEX_URL (PROD)\" && convex dev --once'",
-    "convex:deploy": "dotenv -e .env.local -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (STAGING)\" && convex deploy'",
+    "convex:deploy": "dotenv -e .env.local -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (DEV)\" && convex deploy'",
     "convex:deploy:prod": "dotenv -e .env.production -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (PROD)\" && convex deploy'",
     "typecheck": "tsc --noEmit",
     "seed:prod": "./scripts/seed-prod.sh",
@@ -23,7 +23,6 @@
     "env:check:verbose": "./scripts/check-env-parity.sh --verbose",
     "env:update": "./scripts/update-env.sh",
     "env:update:dev": "./scripts/update-env.sh --target dev --file",
-    "env:update:staging": "./scripts/update-env.sh --target staging --file",
     "env:update:prod": "./scripts/update-env.sh --target prod --file"
   },
   "exports": {

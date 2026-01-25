@@ -20,9 +20,8 @@
 // Configuration
 const DEFAULT_EMAIL = "bryanshliu@gmail.com";
 const CONVEX_URLS = {
-  dev: "https://beaming-giraffe-300.convex.cloud",
-  staging: "https://exalted-shrimp-978.convex.cloud",
-  prod: "https://exalted-shrimp-978.convex.cloud", // Update if different
+  dev: "https://keen-nightingale-310.convex.cloud",
+  prod: "https://agreeable-ibex-949.convex.cloud",
 };
 
 async function getUserIdByEmail(email: string, convexUrl: string): Promise<string | null> {

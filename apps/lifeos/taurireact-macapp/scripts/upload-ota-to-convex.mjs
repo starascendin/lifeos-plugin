@@ -11,9 +11,8 @@
  *   node scripts/upload-ota-to-convex.mjs dev 1.0.1-test
  *
  * Environment URLs:
- *   dev:     https://beaming-giraffe-300.convex.cloud
- *   staging: https://adorable-firefly-704.convex.cloud
- *   prod:    https://agreeable-ibex-949.convex.cloud
+ *   dev:  https://keen-nightingale-310.convex.cloud
+ *   prod: https://agreeable-ibex-949.convex.cloud
  */
 
 import { readFileSync, statSync, existsSync } from "fs";
@@ -25,8 +24,7 @@ const rootDir = path.resolve(__dirname, "..");
 
 // Convex URLs for each environment
 const CONVEX_URLS = {
-  dev: "https://beaming-giraffe-300.convex.cloud",
-  staging: "https://adorable-firefly-704.convex.cloud",
+  dev: "https://keen-nightingale-310.convex.cloud",
   prod: "https://agreeable-ibex-949.convex.cloud",
 };
 

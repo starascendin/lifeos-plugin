@@ -18,7 +18,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 // Convex API configuration
-const CONVEX_URL = process.env.CONVEX_URL || 'https://beaming-giraffe-300.convex.site';
+const CONVEX_URL = process.env.CONVEX_URL || 'https://keen-nightingale-310.convex.site';
 const TOOL_CALL_API_KEY = 'tool-call-secret-key-2024';
 
 // Log configuration on startup
@@ -26,8 +26,8 @@ console.log('[VoiceAgent] ========================================');
 console.log('[VoiceAgent] Voice Agent Starting');
 console.log('[VoiceAgent] CONVEX_URL:', CONVEX_URL);
 console.log('[VoiceAgent] LIVEKIT_URL:', process.env.LIVEKIT_URL || 'not set (using default)');
-console.log('[VoiceAgent] Environment:', CONVEX_URL.includes('beaming-giraffe-300') ? 'DEV' :
-  CONVEX_URL.includes('adorable-firefly-704') ? 'PROD' : 'PREVIEW');
+console.log('[VoiceAgent] Environment:', CONVEX_URL.includes('keen-nightingale-310') ? 'DEV' :
+  CONVEX_URL.includes('agreeable-ibex-949') ? 'PROD' : 'PREVIEW');
 console.log('[VoiceAgent] ========================================');
 
 // Available tools on the backend

@@ -1,16 +1,14 @@
 #!/bin/bash
 
 # Update Environment Variables for a Specific Convex Environment
-# Syncs env vars from a .env file to DEV, STAGING, or PROD
+# Syncs env vars from a .env file to DEV or PROD
 #
 # Environments:
-#   dev:     beaming-giraffe-300 (holaaiconvex-staging dev cloud)
-#   staging: adorable-firefly-704 (holaaiconvex-staging production cloud)
-#   prod:    agreeable-ibex-949 (holaconvex-prod production cloud)
+#   dev:  keen-nightingale-310 (holaconvex-prod dev cloud)
+#   prod: agreeable-ibex-949 (holaconvex-prod production cloud)
 #
 # Usage:
 #   ./scripts/update-env.sh --target dev --file .env.aikeys.dev
-#   ./scripts/update-env.sh --target staging --file .env.aikeys.dev
 #   ./scripts/update-env.sh --target prod --file .env.aikeys.dev
 #   ./scripts/update-env.sh --target dev --file .env.aikeys.dev --all  # overwrite existing
 
@@ -53,7 +51,7 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $0 --target <env> --file <path> [OPTIONS]"
       echo ""
       echo "Required:"
-      echo "  --target, -t <env>    Target environment: dev, staging, or prod"
+      echo "  --target, -t <env>    Target environment: dev or prod"
       echo "  --file, -f <path>     Path to .env file to sync from"
       echo ""
       echo "Options:"
@@ -61,13 +59,11 @@ while [[ $# -gt 0 ]]; do
       echo "  --help, -h            Show this help message"
       echo ""
       echo "Environments:"
-      echo "  dev:     beaming-giraffe-300 (holaaiconvex-staging dev cloud)"
-      echo "  staging: adorable-firefly-704 (holaaiconvex-staging production cloud)"
-      echo "  prod:    agreeable-ibex-949 (holaconvex-prod production cloud)"
+      echo "  dev:  keen-nightingale-310 (holaconvex-prod dev cloud)"
+      echo "  prod: agreeable-ibex-949 (holaconvex-prod production cloud)"
       echo ""
       echo "Examples:"
       echo "  $0 --target dev --file .env.aikeys.dev"
-      echo "  $0 -t staging -f .env.aikeys.dev"
       echo "  $0 -t prod -f .env.aikeys.dev --all"
       exit 0
       ;;
@@ -81,7 +77,7 @@ done
 
 # Validate required arguments
 if [ -z "$TARGET" ]; then
-  echo -e "${RED}Error: --target is required (dev, staging, or prod)${NC}"
+  echo -e "${RED}Error: --target is required (dev or prod)${NC}"
   exit 1
 fi
 
@@ -106,10 +102,10 @@ get_convex_url() {
 }
 
 # Get project URLs
-STAGING_PROJECT_URL=$(get_convex_url ".env.local")
+DEV_PROJECT_URL=$(get_convex_url ".env.local")
 PROD_PROJECT_URL=$(get_convex_url ".env.production")
 
-if [ -z "$STAGING_PROJECT_URL" ]; then
+if [ -z "$DEV_PROJECT_URL" ]; then
   echo -e "${RED}Error: Could not find CONVEX_URL in .env.local${NC}"
   exit 1
 fi
@@ -123,14 +119,8 @@ fi
 case $TARGET in
   dev)
     CONVEX_CMD="npx convex env"
-    CONVEX_URL="$STAGING_PROJECT_URL"
-    TARGET_DESC="DEV (beaming-giraffe-300)"
-    ;;
-  staging)
-    CONVEX_CMD="npx convex env"
-    CONVEX_URL="$STAGING_PROJECT_URL"
-    PROD_FLAG="--prod"
-    TARGET_DESC="STAGING (adorable-firefly-704)"
+    CONVEX_URL="$DEV_PROJECT_URL"
+    TARGET_DESC="DEV (keen-nightingale-310)"
     ;;
   prod)
     CONVEX_CMD="npx convex env"
@@ -138,7 +128,7 @@ case $TARGET in
     TARGET_DESC="PROD (agreeable-ibex-949)"
     ;;
   *)
-    echo -e "${RED}Error: Invalid target '$TARGET'. Must be: dev, staging, or prod${NC}"
+    echo -e "${RED}Error: Invalid target '$TARGET'. Must be: dev or prod${NC}"
     exit 1
     ;;
 esac
@@ -159,11 +149,7 @@ echo ""
 
 # Get existing env vars
 echo -e "${BLUE}Fetching existing env vars...${NC}"
-if [ -n "$PROD_FLAG" ]; then
-  EXISTING_VARS=$($CONVEX_CMD list --url "$CONVEX_URL" $PROD_FLAG 2>/dev/null | grep -E "^[A-Z_][A-Z0-9_]*=" | cut -d'=' -f1 || echo "")
-else
-  EXISTING_VARS=$($CONVEX_CMD list --url "$CONVEX_URL" 2>/dev/null | grep -E "^[A-Z_][A-Z0-9_]*=" | cut -d'=' -f1 || echo "")
-fi
+EXISTING_VARS=$($CONVEX_CMD list --url "$CONVEX_URL" 2>/dev/null | grep -E "^[A-Z_][A-Z0-9_]*=" | cut -d'=' -f1 || echo "")
 
 # Function to check if var exists
 var_exists() {
@@ -200,7 +186,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     if var_exists "$VAR_NAME"; then
       if [ "$SYNC_ALL" = true ]; then
         echo -e "${YELLOW}Updating: $VAR_NAME${NC}"
-        if $CONVEX_CMD set --url "$CONVEX_URL" $PROD_FLAG "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
+        if $CONVEX_CMD set --url "$CONVEX_URL" "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
           ((UPDATED++))
         else
           echo -e "${RED}  Failed to update $VAR_NAME${NC}"
@@ -212,7 +198,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       fi
     else
       echo -e "${GREEN}Adding: $VAR_NAME${NC}"
-      if $CONVEX_CMD set --url "$CONVEX_URL" $PROD_FLAG "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
+      if $CONVEX_CMD set --url "$CONVEX_URL" "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
         ((ADDED++))
       else
         echo -e "${RED}  Failed to add $VAR_NAME${NC}"

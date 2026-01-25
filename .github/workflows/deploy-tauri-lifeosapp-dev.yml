@@ -39,7 +39,7 @@ jobs:
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEV_DEPLOY_KEY }}
         run: |
-          echo "=> Deploying to: https://beaming-giraffe-300.convex.cloud (DEV)"
+          echo "=> Deploying to: https://keen-nightingale-310.convex.cloud (DEV)"
           npx convex dev --once
 
       - name: Install Vercel CLI
@@ -51,7 +51,7 @@ jobs:
       - name: Build Project
         env:
           SKIP_CONVEX_DEPLOY: "1"
-          VITE_CONVEX_URL: https://beaming-giraffe-300.convex.cloud
+          VITE_CONVEX_URL: https://keen-nightingale-310.convex.cloud
         run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel

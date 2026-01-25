@@ -1,6 +1,6 @@
 ---
 name: lifeos-dev
-description: Work with LifeOS DEV environment (beaming-giraffe-300). Use for tasks, projects, clients, contacts, notes, and agenda in development.
+description: Work with LifeOS DEV environment (keen-nightingale-310). Use for tasks, projects, clients, contacts, notes, and agenda in development.
 user-invocable: true
 ---
 
@@ -11,8 +11,8 @@ You are now working with the **LifeOS DEV** environment.
 ## Environment Details
 | Property | Value |
 |----------|-------|
-| Convex Deployment | beaming-giraffe-300 |
-| URL | https://beaming-giraffe-300.convex.site |
+| Convex Deployment | keen-nightingale-310 |
+| URL | https://keen-nightingale-310.convex.site |
 | Clerk | Development environment |
 | Purpose | Local development and testing |
 

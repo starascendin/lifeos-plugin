@@ -53,9 +53,6 @@ function getEnvironmentInfo(convexUrl: string | undefined): {
   if (deploymentName === "keen-nightingale-310") {
     return { name: "Development", badge: "secondary", description: "Dev environment" };
   }
-  if (deploymentName === "adorable-firefly-704") {
-    return { name: "Staging", badge: "outline", description: "Staging environment" };
-  }
   if (deploymentName === "agreeable-ibex-949") {
     return { name: "Production", badge: "default", description: "Production environment" };
   }

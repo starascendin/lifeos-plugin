@@ -27,14 +27,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 
 const CONVEX_URLS = {
-  dev: "https://beaming-giraffe-300.convex.cloud",
-  staging: "https://adorable-firefly-704.convex.cloud",
+  dev: "https://keen-nightingale-310.convex.cloud",
   prod: "https://agreeable-ibex-949.convex.cloud",
 };
 
 const BUILD_COMMANDS = {
   dev: "pnpm build",
-  staging: "pnpm build:staging",
   prod: "pnpm build:production",
 };
 
