@@ -1,0 +1,383 @@
+{{define "chat"}}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Claude Chat</title>
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.3.0/dist/flowbite.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        html, body { height: 100%; overflow: hidden; }
+        .chat-container { height: calc(100vh - 180px); overflow-y: auto; }
+        .chat-input-container { position: fixed; bottom: 0; left: 0; right: 0; }
+        .typing-indicator span { animation: blink 1.4s infinite both; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 80%, 100% { opacity: 0; } 40% { opacity: 1; } }
+        .json-output { font-family: monospace; font-size: 11px; background: #1e1e2e; border-radius: 8px; padding: 8px; max-height: 200px; overflow-y: auto; }
+
+        /* Markdown styles */
+        .markdown-content { font-size: 14px; line-height: 1.6; }
+        .markdown-content p { margin-bottom: 0.5em; }
+        .markdown-content pre { background: #1e1e2e; border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto; }
+        .markdown-content code { font-family: 'Menlo', 'Monaco', monospace; font-size: 13px; }
+        .markdown-content :not(pre) > code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; }
+        .markdown-content ul, .markdown-content ol { margin-left: 1.5em; margin-bottom: 0.5em; }
+        .markdown-content li { margin-bottom: 0.25em; }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 { font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+        .markdown-content h1 { font-size: 1.5em; }
+        .markdown-content h2 { font-size: 1.25em; }
+        .markdown-content h3 { font-size: 1.1em; }
+        .markdown-content blockquote { border-left: 3px solid #666; padding-left: 1em; margin: 0.5em 0; opacity: 0.8; }
+        .markdown-content a { color: #58a6ff; text-decoration: underline; }
+        .markdown-content table { border-collapse: collapse; margin: 0.5em 0; }
+        .markdown-content th, .markdown-content td { border: 1px solid #444; padding: 6px 12px; }
+        .markdown-content th { background: rgba(255,255,255,0.1); }
+
+        /* Status bar */
+        .status-bar { font-size: 11px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .status-dot.connected { background: #22c55e; }
+        .status-dot.connecting { background: #eab308; animation: pulse 1s infinite; }
+        .status-dot.disconnected { background: #ef4444; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* Chat bubble styles */
+        .chat-bubble-user {
+            background: #2563eb;
+            color: white;
+            border-radius: 1rem 1rem 0 1rem;
+        }
+        .chat-bubble-assistant {
+            background: #374151;
+            color: white;
+            border-radius: 1rem 1rem 1rem 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+    <!-- Header -->
+    <nav class="bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+        <div class="px-3 py-3 flex items-center justify-between">
+            <div class="flex items-center">
+                <a href="/" class="p-2 text-gray-500 rounded-lg hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </a>
+                <span class="text-lg font-bold text-gray-900 dark:text-white ml-2">Claude Chat</span>
+                <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300 ml-2" id="thread-badge">{{if .ThreadID}}{{.ThreadID}}{{else}}New{{end}}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="p-2 text-gray-500 rounded-lg hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700" onclick="toggleJsonOutput()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                </button>
+                <button class="p-2 text-gray-500 rounded-lg hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700" onclick="newThread()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Status Bar -->
+    <div class="status-bar bg-gray-200 dark:bg-gray-700 px-4 py-1 flex items-center gap-4 border-b border-gray-300 dark:border-gray-600">
+        <div class="flex items-center gap-2">
+            <span class="status-dot disconnected" id="status-dot"></span>
+            <span id="status-text" class="text-gray-500 dark:text-gray-400">Disconnected</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
+            </svg>
+            <span id="pod-name" class="text-gray-500 dark:text-gray-400">-</span>
+        </div>
+    </div>
+
+    <!-- Chat Messages -->
+    <div class="chat-container p-4" id="chat-container">
+        <div id="messages" class="space-y-4">
+            {{range .Messages}}
+            <div class="flex {{if eq .Role "user"}}justify-end{{else}}justify-start{{end}}">
+                <div class="max-w-[80%] p-4 {{if eq .Role "user"}}chat-bubble-user{{else}}chat-bubble-assistant{{end}}">
+                    {{if eq .Role "user"}}
+                    <div class="whitespace-pre-wrap">{{.Content}}</div>
+                    {{else}}
+                    <div class="markdown-content">{{.Content}}</div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Typing Indicator -->
+        <div class="flex justify-start hidden" id="typing-indicator">
+            <div class="max-w-[80%] p-4 chat-bubble-assistant">
+                <span class="typing-indicator">
+                    <span>●</span><span>●</span><span>●</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- JSON Output Panel -->
+        <div id="json-panel" class="mt-4 hidden">
+            <div id="accordion-json" data-accordion="collapse">
+                <h2 id="accordion-json-heading">
+                    <button type="button" class="flex items-center justify-between w-full p-3 font-medium text-left text-gray-500 border border-gray-200 rounded-t-lg focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" data-accordion-target="#accordion-json-body" aria-expanded="true" aria-controls="accordion-json-body">
+                        <span class="text-sm">Stream JSON Output</span>
+                        <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5 5 1 1 5"/>
+                        </svg>
+                    </button>
+                </h2>
+                <div id="accordion-json-body" class="hidden" aria-labelledby="accordion-json-heading">
+                    <div class="p-3 border border-t-0 border-gray-200 dark:border-gray-700 rounded-b-lg">
+                        <div class="json-output text-gray-300" id="json-output"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="chat-input-container bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+        <form id="chat-form" onsubmit="sendMessage(event)">
+            <div class="flex">
+                <input type="text"
+                       id="message-input"
+                       placeholder="Message Claude..."
+                       class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-s-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                       autocomplete="off" />
+                <button type="submit" id="send-btn" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-e-lg text-sm px-4 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                </button>
+            </div>
+        </form>
+        <div class="flex justify-center gap-4 mt-2">
+            <label class="flex items-center cursor-pointer gap-2">
+                <input type="checkbox" id="skip-permissions" checked class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" />
+                <span class="text-xs text-gray-500 dark:text-gray-400">Skip Permissions</span>
+            </label>
+            <label class="flex items-center cursor-pointer gap-2">
+                <input type="checkbox" id="stream-json" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" />
+                <span class="text-xs text-gray-500 dark:text-gray-400">Stream JSON</span>
+            </label>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.3.0/dist/flowbite.min.js"></script>
+    <script>
+        let threadID = "{{.ThreadID}}";
+        let isStreaming = false;
+        let showJsonOutput = false;
+        let eventSource = null;
+        let podName = null;
+
+        // Configure marked for safe rendering
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
+
+        function setStatus(status, text) {
+            const dot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            dot.className = 'status-dot ' + status;
+            statusText.textContent = text;
+        }
+
+        function setPodName(name) {
+            podName = name;
+            document.getElementById('pod-name').textContent = name || '-';
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('chat-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function toggleJsonOutput() {
+            showJsonOutput = !showJsonOutput;
+            document.getElementById('json-panel').classList.toggle('hidden', !showJsonOutput);
+            if (showJsonOutput && typeof initFlowbite === 'function') {
+                initFlowbite();
+            }
+        }
+
+        function newThread() {
+            if (confirm('Start a new thread?')) {
+                window.location.href = '/chat';
+            }
+        }
+
+        function renderMarkdown(text) {
+            try {
+                return marked.parse(text);
+            } catch (e) {
+                return escapeHtml(text);
+            }
+        }
+
+        function addMessage(role, content) {
+            const messages = document.getElementById('messages');
+            const isUser = role === 'user';
+            const bubble = document.createElement('div');
+            bubble.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
+
+            if (isUser) {
+                bubble.innerHTML = `
+                    <div class="max-w-[80%] p-4 chat-bubble-user">
+                        <div class="whitespace-pre-wrap">${escapeHtml(content)}</div>
+                    </div>
+                `;
+            } else {
+                bubble.innerHTML = `
+                    <div class="max-w-[80%] p-4 chat-bubble-assistant">
+                        <div class="markdown-content">${content ? renderMarkdown(content) : ''}</div>
+                    </div>
+                `;
+            }
+            messages.appendChild(bubble);
+            scrollToBottom();
+        }
+
+        function updateLastAssistantMessage(content) {
+            const messages = document.getElementById('messages');
+            const lastBubble = messages.querySelector('.flex.justify-start:last-child .chat-bubble-assistant .markdown-content');
+            if (lastBubble) {
+                lastBubble.innerHTML = renderMarkdown(content);
+                // Re-highlight code blocks
+                lastBubble.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+                scrollToBottom();
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function setLoading(loading) {
+            isStreaming = loading;
+            document.getElementById('send-btn').disabled = loading;
+            document.getElementById('message-input').disabled = loading;
+            document.getElementById('typing-indicator').classList.toggle('hidden', !loading);
+            scrollToBottom();
+        }
+
+        function appendJsonOutput(data) {
+            if (showJsonOutput || document.getElementById('stream-json').checked) {
+                document.getElementById('json-panel').classList.remove('hidden');
+                const output = document.getElementById('json-output');
+                output.textContent += JSON.stringify(data, null, 2) + '\n---\n';
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+
+        async function sendMessage(event) {
+            event.preventDefault();
+
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (!message || isStreaming) return;
+
+            input.value = '';
+            addMessage('user', message);
+            setLoading(true);
+            setStatus('connecting', 'Connecting...');
+
+            // Clear JSON output
+            document.getElementById('json-output').textContent = '';
+
+            const skipPermissions = document.getElementById('skip-permissions').checked;
+            const streamJson = document.getElementById('stream-json').checked;
+
+            try {
+                // Start SSE connection for streaming response
+                const params = new URLSearchParams({
+                    message: message,
+                    thread_id: threadID,
+                    skip_permissions: skipPermissions,
+                    stream_json: streamJson
+                });
+
+                eventSource = new EventSource(`/chat/send?${params}`);
+                let fullResponse = '';
+                let assistantBubbleCreated = false;
+
+                eventSource.onmessage = function(e) {
+                    const data = JSON.parse(e.data);
+
+                    if (data.type === 'start') {
+                        threadID = data.thread_id;
+                        document.getElementById('thread-badge').textContent = threadID.substring(0, 8);
+                        if (data.pod_name) {
+                            setPodName(data.pod_name);
+                        }
+                        setStatus('connected', 'Connected');
+                        // Create empty assistant bubble
+                        addMessage('assistant', '');
+                        assistantBubbleCreated = true;
+                    } else if (data.type === 'content') {
+                        fullResponse += data.content;
+                        updateLastAssistantMessage(fullResponse);
+                    } else if (data.type === 'json') {
+                        appendJsonOutput(data.data);
+                    } else if (data.type === 'done') {
+                        setLoading(false);
+                        setStatus('connected', 'Ready');
+                        eventSource.close();
+                    } else if (data.type === 'error') {
+                        if (!assistantBubbleCreated) {
+                            addMessage('assistant', 'Error: ' + data.message);
+                        } else {
+                            updateLastAssistantMessage(fullResponse + '\n\n**Error:** ' + data.message);
+                        }
+                        setLoading(false);
+                        setStatus('disconnected', 'Error');
+                        eventSource.close();
+                    }
+                };
+
+                eventSource.onerror = function(e) {
+                    console.error('SSE Error:', e);
+                    setLoading(false);
+                    setStatus('disconnected', 'Connection lost');
+                    if (eventSource) {
+                        eventSource.close();
+                    }
+                };
+
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('assistant', '**Error:** ' + error.message);
+                setLoading(false);
+                setStatus('disconnected', 'Error');
+            }
+        }
+
+        // Initial scroll
+        scrollToBottom();
+    </script>
+</body>
+</html>
+{{end}}

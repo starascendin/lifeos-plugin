@@ -1,0 +1,32 @@
+{{define "launch-form"}}
+<form hx-post="/launch/{{.ID}}" hx-swap="none">
+    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Launch Agent: {{.Name}}</h3>
+
+    <div class="flex items-start p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-700 dark:text-blue-400" role="alert">
+        <svg class="flex-shrink-0 inline w-4 h-4 me-3 mt-0.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
+        </svg>
+        <div>
+            <p><strong>Repos:</strong> {{if .Repos}}{{.Repos}}{{else}}None{{end}}</p>
+            <p><strong>Limits:</strong> {{.MaxTurns}} turns, ${{.MaxBudgetUSD}} budget</p>
+            <p><strong>Resources:</strong> {{.CPULimit}} CPU, {{.MemoryLimit}} RAM</p>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Task Prompt</label>
+        <textarea name="task_prompt" rows="4" class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="What should this agent do?" required>{{.TaskPrompt}}</textarea>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Be specific about what you want accomplished</p>
+    </div>
+
+    <div class="flex justify-end gap-2">
+        <button type="submit" class="inline-flex items-center text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+            </svg>
+            Launch Agent
+        </button>
+        <button type="button" class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600" onclick="closeModal()">Cancel</button>
+    </div>
+</form>
+{{end}}

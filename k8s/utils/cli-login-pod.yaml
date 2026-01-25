@@ -1,0 +1,70 @@
+---
+# Login Pod for CLI authentication (Claude & OpenCode)
+# This pod mounts the shared credentials PVC so OAuth tokens and API keys
+# are saved for all future agent pods to use.
+#
+# IMPORTANT: This pod mounts the PVC the same way agent pods do,
+# so credentials are stored at the correct paths within the PVC.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cli-login
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+    - name: login
+      image: ghcr.io/starascendin/claude-agent-farm-agent:latest
+      command:
+        - /bin/bash
+        - -c
+        - |
+          # Create directories in PVC if they don't exist
+          mkdir -p /credentials/.claude
+          mkdir -p /credentials/.local/share/opencode
+          mkdir -p /credentials/.config/opencode
+          # Symlink to home directory
+          rm -rf ~/.claude && ln -sf /credentials/.claude ~/.claude
+          rm -rf ~/.local/share/opencode && mkdir -p ~/.local/share && ln -sf /credentials/.local/share/opencode ~/.local/share/opencode
+          rm -rf ~/.config/opencode && mkdir -p ~/.config && ln -sf /credentials/.config/opencode ~/.config/opencode
+          # Keep container running
+          sleep infinity
+      volumeMounts:
+        # Mount PVC root to /credentials (same as agent pods)
+        - name: shared-credentials
+          mountPath: /credentials
+      env:
+        - name: HOME
+          value: /home/node
+  volumes:
+    - name: shared-credentials
+      persistentVolumeClaim:
+        claimName: claude-credentials
+  imagePullSecrets:
+    - name: ghcr-credentials
+---
+# Instructions:
+#
+# === Deploy the login pod ===
+# kubectl apply -f cli-login-pod.yaml
+#
+# === Exec into the pod ===
+# kubectl exec -it cli-login -- bash
+#
+# === Claude Login ===
+# claude /login
+# (Complete OAuth flow in browser)
+#
+# === OpenCode Login ===
+# opencode auth login
+# (Enter API keys for desired providers: OpenAI, Anthropic, etc.)
+#
+# === Verify credentials saved ===
+# ls -la ~/.claude/
+# ls -la ~/.local/share/opencode/
+#
+# === Delete the pod ===
+# kubectl delete pod cli-login
+#
+# Credentials are now saved in the shared PVC and will be
+# available to all future agent pods.

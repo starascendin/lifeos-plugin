@@ -1,0 +1,53 @@
+# MCP Server Presets
+# These are embedded presets that can be selected when creating agent configs
+
+[servers.lifeos-dev]
+command = "npx"
+args = ["@starascendin/lifeos-mcp@0.1.2", "--url", "https://beaming-giraffe-300.convex.site", "--user-id", "j9743f41z9e999ym1xvn1v013s7wqfq8", "--api-key", "${LIFEOS_API_KEY}"]
+description = "LifeOS MCP - Development"
+category = "lifeos"
+
+[servers.lifeos-staging]
+command = "npx"
+args = ["@starascendin/lifeos-mcp@0.1.2", "--url", "https://adorable-firefly-704.convex.site", "--user-id", "ks7a1gvd5h7674asa1ajsmm2ss7x55vm", "--api-key", "${LIFEOS_API_KEY}"]
+description = "LifeOS MCP - Staging"
+category = "lifeos"
+
+[servers.lifeos-prod]
+command = "npx"
+args = ["@starascendin/lifeos-mcp@0.1.2", "--url", "https://agreeable-ibex-949.convex.site", "--user-id", "ks781knabdcchchddfwcaqwdn97zphqc", "--api-key", "${LIFEOS_API_KEY}"]
+description = "LifeOS MCP - Production"
+category = "lifeos"
+
+[servers.filesystem]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-filesystem", "/workspace"]
+description = "Local filesystem access"
+category = "standard"
+
+[servers.github]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-github"]
+env = { GITHUB_TOKEN = "${GITHUB_PAT}" }
+description = "GitHub API access"
+category = "standard"
+
+[servers.playwright]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-playwright"]
+description = "Browser automation with Playwright"
+category = "standard"
+
+[servers.memory]
+command = "npx"
+args = ["-y", "@anthropic/mcp-server-memory"]
+description = "Persistent memory storage"
+category = "standard"
+
+# Claude Skills
+# These are installed via claude plugin marketplace
+
+[skills.worktrunk]
+install_command = "claude plugin marketplace add max-sixty/worktrunk"
+description = "Git worktree management for parallel AI workflows"
+category = "git"

@@ -1,0 +1,118 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: claude-agent-farm-alerts
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cluster-health
+      rules:
+        - alert: HighNodeCPU
+          expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage on {{ $labels.instance }}"
+            description: "CPU usage is above 80% for more than 5 minutes"
+
+        - alert: HighNodeMemory
+          expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage on {{ $labels.instance }}"
+            description: "Memory usage is above 85% for more than 5 minutes"
+
+        - alert: HighDiskUsage
+          expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High disk usage on {{ $labels.instance }}"
+            description: "Disk usage is above 85% on {{ $labels.mountpoint }}"
+
+    - name: kubernetes-pods
+      rules:
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 3
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+            description: "Pod has restarted more than 3 times in the last 15 minutes"
+
+        - alert: PodNotReady
+          expr: kube_pod_status_ready{condition="true"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} not ready"
+            description: "Pod has been not ready for more than 10 minutes"
+
+    - name: claude-agents
+      rules:
+        - alert: ClaudeAgentPodFailed
+          expr: kube_pod_status_phase{namespace="claude-agents", phase="Failed"} > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Claude agent pod failed: {{ $labels.pod }}"
+            description: "A Claude agent pod has failed in the claude-agents namespace"
+
+        - alert: ChatPodNotRunning
+          expr: absent(kube_pod_status_phase{namespace="claude-agents", pod="claude-chat-pod", phase="Running"})
+          for: 5m
+          labels:
+            severity: info
+          annotations:
+            summary: "Chat pod is not running"
+            description: "The claude-chat-pod is not running (may be normal if no chat is active)"
+
+    - name: controlplane
+      rules:
+        - alert: ControlPlaneDown
+          expr: absent(up{job="controlplane"}) or up{job="controlplane"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Control plane is down"
+            description: "The control plane service is not responding"
+
+        - alert: ControlPlanePodNotReady
+          expr: kube_pod_status_ready{namespace="controlplane", condition="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Control plane pod not ready"
+            description: "The control plane pod has been not ready for more than 5 minutes"
+
+    - name: storage
+      rules:
+        - alert: NFSServerDown
+          expr: absent(kube_pod_status_phase{namespace="storage", pod=~"nfs-server.*", phase="Running"})
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "NFS server is down"
+            description: "The NFS server pod is not running"
+
+        - alert: PVCAlmostFull
+          expr: (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PVC {{ $labels.persistentvolumeclaim }} almost full"
+            description: "PVC in namespace {{ $labels.namespace }} is above 85% capacity"

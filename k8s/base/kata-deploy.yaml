@@ -1,0 +1,128 @@
+---
+# Kata Containers deployment for K3s
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kata-deploy-sa
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kata-deploy-role
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["node.k8s.io"]
+    resources: ["runtimeclasses"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kata-deploy-rb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kata-deploy-role
+subjects:
+  - kind: ServiceAccount
+    name: kata-deploy-sa
+    namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kata-deploy
+  namespace: kube-system
+  labels:
+    app: kata-deploy
+spec:
+  selector:
+    matchLabels:
+      app: kata-deploy
+  template:
+    metadata:
+      labels:
+        app: kata-deploy
+    spec:
+      serviceAccountName: kata-deploy-sa
+      hostPID: true
+      nodeSelector:
+        node-role.kubernetes.io/worker: "true"
+      containers:
+        - name: kata-deploy
+          image: quay.io/kata-containers/kata-deploy:3.2.0
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - bash
+                  - -c
+                  - /opt/kata-artifacts/scripts/kata-deploy.sh cleanup
+          command:
+            - bash
+            - -c
+            - /opt/kata-artifacts/scripts/kata-deploy.sh install && sleep infinity
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: SHIM_V2
+              value: "true"
+            - name: CREATE_RUNTIMECLASSES
+              value: "true"
+            - name: CREATE_DEFAULT_RUNTIMECLASS
+              value: "false"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: kata-artifacts
+              mountPath: /opt/kata/
+            - name: host-opt-kata
+              mountPath: /opt/kata-artifacts
+            - name: host-containerd
+              mountPath: /etc/containerd/
+            - name: host-crio
+              mountPath: /etc/crio/
+      volumes:
+        - name: kata-artifacts
+          hostPath:
+            path: /opt/kata/
+            type: DirectoryOrCreate
+        - name: host-opt-kata
+          hostPath:
+            path: /opt/kata-artifacts/
+            type: DirectoryOrCreate
+        - name: host-containerd
+          hostPath:
+            path: /etc/containerd/
+            type: DirectoryOrCreate
+        - name: host-crio
+          hostPath:
+            path: /etc/crio/
+            type: DirectoryOrCreate
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: kata-fc
+handler: kata-fc
+scheduling:
+  nodeSelector:
+    kata-fc: "true"
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: kata-qemu
+handler: kata-qemu
+scheduling:
+  nodeSelector:
+    kata-qemu: "true"

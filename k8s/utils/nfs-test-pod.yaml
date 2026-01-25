@@ -1,0 +1,58 @@
+---
+# Test pod to verify NFS shared storage works
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-test-1
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test
+      image: busybox:latest
+      command:
+        - sh
+        - -c
+        - |
+          echo "Pod 1 writing at $(date)" >> /shared/test.log
+          cat /shared/test.log
+          sleep 60
+      volumeMounts:
+        - name: shared
+          mountPath: /shared
+  volumes:
+    - name: shared
+      persistentVolumeClaim:
+        claimName: claude-credentials
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-test-2
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test
+      image: busybox:latest
+      command:
+        - sh
+        - -c
+        - |
+          echo "Pod 2 writing at $(date)" >> /shared/test.log
+          cat /shared/test.log
+          sleep 60
+      volumeMounts:
+        - name: shared
+          mountPath: /shared
+  volumes:
+    - name: shared
+      persistentVolumeClaim:
+        claimName: claude-credentials
+---
+# Test steps:
+# 1. kubectl apply -f nfs-test-pod.yaml
+# 2. kubectl logs nfs-test-1
+# 3. kubectl logs nfs-test-2
+# 4. Both pods should show entries from both pods in test.log
+# 5. kubectl delete pods nfs-test-1 nfs-test-2
