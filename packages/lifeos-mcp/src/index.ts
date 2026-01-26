@@ -1074,7 +1074,7 @@ const TOOLS: Tool[] = [
         },
         description: {
           type: "string",
-          description: "Phase description, markdown supported (optional)",
+          description: "Phase description in tiptap HTML format (e.g., '<p>Phase description here</p>'). Do NOT use JSON format. (optional)",
         },
         status: {
           type: "string",
@@ -1105,7 +1105,7 @@ const TOOLS: Tool[] = [
         },
         description: {
           type: "string",
-          description: "Updated description (optional)",
+          description: "Updated description in tiptap HTML format (e.g., '<p>Updated description here</p>'). Do NOT use JSON format. (optional)",
         },
         status: {
           type: "string",
