@@ -108,9 +108,24 @@ echo "===================================="
 echo "Installing dependencies..."
 pnpm install --frozen-lockfile
 
-# Decrypt environment variables
-echo "Decrypting environment variables..."
-pnpm env:decrypt
+# Copy decrypted environment variables from main repo (already decrypted there)
+echo "Copying environment variables from main repo..."
+copy_env_files() {
+    local src_dir="$1"
+    local dst_dir="$2"
+    for f in "$src_dir"/.env*; do
+        [ -f "$f" ] || continue
+        [[ "$f" == *.age ]] && continue  # Skip encrypted files
+        local filename=$(basename "$f")
+        if [ -f "$f" ]; then
+            cp "$f" "$dst_dir/$filename" 2>/dev/null && echo "  ✓ Copied $filename" || true
+        fi
+    done
+}
+
+# Copy env files for holaaiconvex (needed for deploy)
+copy_env_files "$REPO_ROOT/packages/holaaiconvex" "$WORKTREE_PATH/packages/holaaiconvex"
+echo "Environment files copied."
 
 # Deploy Convex to production (agreeable-ibex-949)
 echo "Deploying Convex to production (agreeable-ibex-949)..."
