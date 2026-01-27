@@ -552,25 +552,6 @@
 		</Card.Content>
 	</Card.Root>
 
-	<!-- About -->
-	<Card.Root>
-		<Card.Header class="pb-3">
-			<Card.Title class="text-sm uppercase tracking-wide text-muted-foreground">
-				About
-			</Card.Title>
-		</Card.Header>
-		<Card.Content class="space-y-2">
-			<div class="flex items-center justify-between">
-				<span class="text-sm text-muted-foreground">Version</span>
-				<Badge variant="outline">1.0.24</Badge>
-			</div>
-			<div class="flex items-center justify-between">
-				<span class="text-sm text-muted-foreground">Build</span>
-				<span class="text-xs text-muted-foreground">2026-01-27</span>
-			</div>
-		</Card.Content>
-	</Card.Root>
-
 	<!-- Tab Navigation -->
 	<div class="flex gap-1 overflow-x-auto rounded-lg bg-muted/50 p-1">
 		{#each tabs as tab}
