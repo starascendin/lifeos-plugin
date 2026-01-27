@@ -279,11 +279,14 @@ importers:
 
   infra/claude-agent-farm/controlplane/frontend:
     dependencies:
+      '@capacitor/app':
+        specifier: ^6.0.3
+        version: 6.0.3(@capacitor/core@6.2.1)
       '@capacitor/core':
-        specifier: ^6.0.0
+        specifier: ^6.2.1
         version: 6.2.1
       '@capacitor/ios':
-        specifier: ^6.0.0
+        specifier: ^6.2.1
         version: 6.2.1(@capacitor/core@6.2.1)
       '@capgo/capacitor-updater':
         specifier: ^6.0.0
@@ -1003,6 +1006,11 @@ packages:
 
   '@bufbuild/protobuf@1.10.1':
     resolution: {integrity: sha512-wJ8ReQbHxsAfXhrf9ixl0aYbZorRuOWpBNzm8pL8ftmSxQx/wnJD5Eg861NwJU/czy2VXFIebCeZnZrI9rktIQ==}
+
+  '@capacitor/app@6.0.3':
+    resolution: {integrity: sha512-4gFUCbcVz0N/YYN32OBFerocWXslIv3Nc90gDiRsBkJc0plwK6kIUT6PKa5WtW2kfhteUeCVXQbvArH2fH+0Ug==}
+    peerDependencies:
+      '@capacitor/core': ^6.0.0
 
   '@capacitor/app@8.0.0':
     resolution: {integrity: sha512-OwzIkUs4w433Bu9WWAEbEYngXEfJXZ9Wmdb8eoaqzYBgB0W9/3Ed/mh6sAYPNBAZlpyarmewgP7Nb+d3Vrh+xA==}
@@ -9660,6 +9668,10 @@ snapshots:
       - zod
 
   '@bufbuild/protobuf@1.10.1': {}
+
+  '@capacitor/app@6.0.3(@capacitor/core@6.2.1)':
+    dependencies:
+      '@capacitor/core': 6.2.1
 
   '@capacitor/app@8.0.0(@capacitor/core@8.0.0)':
     dependencies:
