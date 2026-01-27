@@ -835,10 +835,12 @@ As Chairman, please synthesize the best elements from all responses into a compr
 Provide a well-structured, complete answer that represents the wisdom of the council.`;
 
             try {
+              // Use longer timeout for synthesis (5 min) since the prompt includes all responses
               const synthesizedResponse = await queryModel(
                 aiGatewayKey,
                 chairmanModel.modelId,
-                [{ role: "user", content: synthesisPrompt }]
+                [{ role: "user", content: synthesisPrompt }],
+                300000 // 5 minute timeout for synthesis
               );
 
               await ctx.runMutation(internal.lifeos.llmcouncil.updateStage3Internal, {
@@ -951,30 +953,45 @@ http.route({
 async function queryModel(
   apiKey: string,
   modelId: string,
-  messages: Array<{ role: string; content: string }>
+  messages: Array<{ role: string; content: string }>,
+  timeoutMs: number = 240000 // 4 minute default timeout
 ): Promise<string> {
-  const response = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages,
-      stream: false,
-    }),
-  });
+  // Create abort controller for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+  try {
+    const response = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return data.choices?.[0]?.message?.content ?? "";
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Model ${modelId} request timed out after ${timeoutMs / 1000}s`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = await response.json() as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return data.choices?.[0]?.message?.content ?? "";
 }
 
 /**
