@@ -9,13 +9,18 @@ const config: CapacitorConfig = {
     scrollEnabled: false,
     scheme: 'Agent Farm',
     backgroundColor: '#0a0a0f',
+    allowsLinkPreview: false,
   },
   server: {
     allowNavigation: ['*.r2.dev', '*.tail05d28.ts.net'],
+    cleartext: true,
   },
   plugins: {
     CapacitorUpdater: {
       autoUpdate: false,
+    },
+    CapacitorHttp: {
+      enabled: true,
     },
   },
 };
