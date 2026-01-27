@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 
-// HARDCODED API URL for native
-const NATIVE_API_URL = 'http://claude-farm-master.tail05d28.ts.net:30080/api';
+// HARDCODED API URL for native (uses Tailscale HTTPS)
+const NATIVE_API_URL = 'https://claude-farm-master.tail05d28.ts.net/api';
 
 const getApiBase = (): string => {
   if (Capacitor.isNativePlatform()) {
