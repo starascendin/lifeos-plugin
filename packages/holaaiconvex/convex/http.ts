@@ -573,11 +573,16 @@ http.route({
             }> = [];
 
             // Query all council models in parallel
+            // Each model gets a tier-appropriate timeout (pro-tier models get 5 min, normal get 4 min)
             const stage1Promises = councilModels.map(async (model) => {
               try {
-                const response = await queryModel(aiGatewayKey, model.modelId, [
-                  { role: "user", content: query },
-                ]);
+                const stage1Timeout = getModelTimeout(model.modelId, "query");
+                const response = await queryModel(
+                  aiGatewayKey,
+                  model.modelId,
+                  [{ role: "user", content: query }],
+                  stage1Timeout
+                );
 
                 stage1Responses.push({
                   modelId: model.modelId,
@@ -713,11 +718,16 @@ Replace the order with your actual ranking (best first). For example: "FINAL RAN
             }> = [];
 
             // Each council member evaluates (except their own response is anonymized)
+            // Each model gets a tier-appropriate timeout (pro-tier models get 5 min, normal get 4 min)
             const stage2Promises = councilModels.map(async (evaluator) => {
               try {
-                const evaluation = await queryModel(aiGatewayKey, evaluator.modelId, [
-                  { role: "user", content: rankingPrompt },
-                ]);
+                const stage2Timeout = getModelTimeout(evaluator.modelId, "query");
+                const evaluation = await queryModel(
+                  aiGatewayKey,
+                  evaluator.modelId,
+                  [{ role: "user", content: rankingPrompt }],
+                  stage2Timeout
+                );
 
                 // Parse ranking from response
                 const parsedRanking = parseRanking(evaluation, stage1Responses.length, labelToModel);
@@ -834,13 +844,24 @@ As Chairman, please synthesize the best elements from all responses into a compr
 
 Provide a well-structured, complete answer that represents the wisdom of the council.`;
 
+            // Log synthesis prompt size for monitoring
+            const promptSizeKB = (synthesisPrompt.length / 1024).toFixed(2);
+            const isChairmanProTier = isProTierModel(chairmanModel.modelId);
+            const synthesisTimeout = getModelTimeout(chairmanModel.modelId, "synthesis");
+            console.log(
+              `[Stage 3] Synthesis prompt size: ${synthesisPrompt.length} chars (${promptSizeKB}KB), ` +
+              `Chairman: ${chairmanModel.modelId} (pro-tier: ${isChairmanProTier}), ` +
+              `Timeout: ${synthesisTimeout / 1000}s`
+            );
+
             try {
-              // Use longer timeout for synthesis (5 min) since the prompt includes all responses
+              // Use tier-aware timeout for synthesis (10 min for pro-tier, 5 min for normal)
+              // Pro-tier models are slower and synthesis prompts can be 40KB+
               const synthesizedResponse = await queryModel(
                 aiGatewayKey,
                 chairmanModel.modelId,
                 [{ role: "user", content: synthesisPrompt }],
-                300000 // 5 minute timeout for synthesis
+                synthesisTimeout
               );
 
               await ctx.runMutation(internal.lifeos.llmcouncil.updateStage3Internal, {
@@ -946,6 +967,40 @@ http.route({
 });
 
 // ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Pro-tier model IDs that are slower and require longer timeouts
+ * These models are the most capable but take 2-5x longer to generate responses
+ */
+const PRO_TIER_MODELS = [
+  "anthropic/claude-opus-4.5",
+  "openai/gpt-5.2-pro",
+  "google/gemini-3-pro-preview",
+  "xai/grok-4",
+] as const;
+
+/**
+ * Check if a model is pro-tier (slower, more capable)
+ */
+function isProTierModel(modelId: string): boolean {
+  return PRO_TIER_MODELS.includes(modelId as (typeof PRO_TIER_MODELS)[number]);
+}
+
+/**
+ * Get timeout for a model based on its tier and operation type
+ * Pro-tier models get longer timeouts due to their slower response times
+ */
+function getModelTimeout(modelId: string, operation: "query" | "synthesis"): number {
+  const isProTier = isProTierModel(modelId);
+
+  if (operation === "synthesis") {
+    // Synthesis needs extra time due to large prompts (all Stage 1 responses + rankings)
+    return isProTier ? 600000 : 300000; // 10 min for pro-tier, 5 min for normal
+  }
+
+  // Regular query (Stage 1 and Stage 2)
+  return isProTier ? 300000 : 240000; // 5 min for pro-tier, 4 min for normal
+}
 
 /**
  * Query a single model via AI Gateway (non-streaming)
