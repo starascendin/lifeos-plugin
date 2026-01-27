@@ -613,9 +613,9 @@ export const generateWeeklySummary = action({
     );
 
     // Separate completed and remaining tasks
-    const allTasks = Object.values(tasksByDay).flat();
-    const completedTasks = allTasks.filter((t) => t.status === "done");
-    const remainingTasks = allTasks.filter((t) => t.status !== "done");
+    const allTasks = Object.values(tasksByDay).flat() as Doc<"lifeos_pmIssues">[];
+    const completedTasks = allTasks.filter((t: Doc<"lifeos_pmIssues">) => t.status === "done");
+    const remainingTasks = allTasks.filter((t: Doc<"lifeos_pmIssues">) => t.status !== "done");
 
     // Build prompt context
     const promptContext: WeeklySummaryContext = {
@@ -625,7 +625,7 @@ export const generateWeeklySummary = action({
       weeklyAverage: null,
       completedTasks,
       remainingTasks,
-      memos: memos.map((m) => ({
+      memos: (memos as Doc<"life_voiceMemos">[]).map((m: Doc<"life_voiceMemos">) => ({
         name: m.name,
         transcript: m.transcript,
         clientCreatedAt: m.clientCreatedAt,

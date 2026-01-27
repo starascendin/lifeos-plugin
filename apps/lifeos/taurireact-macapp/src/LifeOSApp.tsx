@@ -29,6 +29,7 @@ import { LifeOSFRM } from "./components/lifeos/FRM";
 import { LifeOSClientProjects } from "./components/lifeos/ClientProjects";
 import { LifeOSBeeper } from "./components/lifeos/Beeper";
 import { LifeOSClaudeCode } from "./components/lifeos/ClaudeCode";
+import { LifeOSGranolaAI } from "./components/lifeos/GranolaAI";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -117,6 +118,7 @@ export default function LifeOSApp() {
                   <Route path="frm/:tab" element={<LifeOSFRM />} />
                   <Route path="frm/:tab/:id" element={<LifeOSFRM />} />
                   <Route path="beeper" element={<LifeOSBeeper />} />
+                  <Route path="granola" element={<LifeOSGranolaAI />} />
                   <Route path="claudecode" element={<LifeOSClaudeCode />} />
                   <Route path="avatar" element={<LifeOSAvatar />} />
                   <Route path="voiceagent" element={<LifeOSVoiceAgent />} />

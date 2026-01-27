@@ -19,7 +19,10 @@ WORKTREE_PATH="$HOME/.claude-worktrees/$REPO_NAME/deploy-temp-$TIMESTAMP"
 
 echo "Deploy to Production (Isolated Worktree)"
 echo "========================================="
-echo "This will merge: dev -> staging -> main"
+echo "This will: dev -> main + deploy Convex to production"
+echo ""
+echo "Convex deployment:"
+echo "  - packages/holaaiconvex -> agreeable-ibex-949 (production)"
 echo ""
 
 # Get the current local dev branch commit (before creating worktree)
@@ -34,7 +37,7 @@ echo ""
 # Create worktree directory if it doesn't exist
 mkdir -p "$(dirname "$WORKTREE_PATH")"
 
-# Fetch latest for staging and main
+# Fetch latest for main
 echo "Fetching latest from origin..."
 git fetch origin
 
@@ -77,51 +80,49 @@ git checkout -B temp-dev "$DEV_COMMIT"
 echo "Created temp-dev from local dev branch"
 
 echo ""
-echo "Step 1: Merge dev -> staging"
-echo "============================"
-
-# Create a temp staging branch from origin/staging
-git checkout -B temp-staging origin/staging
-echo "Created temp-staging from origin/staging"
-
-# Merge temp-dev into temp-staging
-git merge temp-dev -m "Merge dev into staging"
-echo "Merged dev into temp-staging"
-
-# Push temp-staging to origin/staging
-git push origin temp-staging:staging
-echo "Pushed to origin/staging"
-echo "dev -> staging complete"
-
-echo ""
-echo "Step 2: Merge staging -> main"
-echo "============================="
+echo "Step 1: Merge dev -> main"
+echo "========================="
 
 # Create a temp main branch from origin/main
 git checkout -B temp-main origin/main
 echo "Created temp-main from origin/main"
 
-# Merge the updated staging (which is now temp-staging) into temp-main
-git merge temp-staging -m "Merge staging into main"
-echo "Merged staging into temp-main"
+# Merge temp-dev into temp-main
+git merge temp-dev -m "Merge dev into main"
+echo "Merged dev into temp-main"
 
 # Push temp-main to origin/main
 git push origin temp-main:main
 echo "Pushed to origin/main"
-echo "staging -> main complete"
+echo "dev -> main complete"
 
 echo ""
-echo "Updating local staging and main branches..."
-# Update local branches to match origin (fast-forward only)
-# Using -C to run in original repo, not the worktree
-git -C "$REPO_ROOT" branch -f staging origin/staging 2>/dev/null && echo "  ✓ staging updated" || echo "  ✗ staging update failed (may have local changes)"
+echo "Updating local main branch..."
 git -C "$REPO_ROOT" branch -f main origin/main 2>/dev/null && echo "  ✓ main updated" || echo "  ✗ main update failed (may have local changes)"
 
 echo ""
-echo "Deploy complete! All branches pushed."
-echo "   dev -> staging -> main"
+echo "Step 2: Deploy Convex to production"
+echo "===================================="
+
+# Install dependencies
+echo "Installing dependencies..."
+pnpm install --frozen-lockfile
+
+# Decrypt environment variables
+echo "Decrypting environment variables..."
+pnpm env:decrypt
+
+# Deploy Convex to production (agreeable-ibex-949)
+echo "Deploying Convex to production (agreeable-ibex-949)..."
+NODE_OPTIONS="--max-old-space-size=8192" pnpm --filter @holaai/convex deploy:prod
+
+echo ""
+echo "Deploy complete!"
+echo "================"
+echo "  ✓ dev -> main (pushed)"
+echo "  ✓ Convex deployed to production (agreeable-ibex-949)"
 echo ""
 echo "Your main worktree at $REPO_ROOT was not modified."
-echo "Local staging and main branches have been updated to match origin."
+echo "Local main branch has been updated to match origin."
 
 exit 0

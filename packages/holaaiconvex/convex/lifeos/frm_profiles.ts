@@ -461,22 +461,32 @@ export const runProfileExtraction = action({
       }
 
       // Get all linked memos with transcripts
+      // Define type for linked memos (from getMemosForPerson query)
+      type LinkedMemoType = Doc<"life_voiceMemos"> & {
+        audioUrl?: string;
+        linkId: Id<"lifeos_frmPersonMemos">;
+        context?: string;
+        linkedAt: number;
+        linkedPeople: Array<{ personId: string; personName: string; context?: string }>;
+        labels: string[];
+        summary?: string;
+      };
       const linkedMemos = await ctx.runQuery(api.lifeos.frm_memos.getMemosForPerson, {
         personId: profileRecord.personId,
         limit: 100, // Get all memos
-      });
+      }) as LinkedMemoType[];
 
-      // Get all files for this person
+      // Define type for files (from getFilesForPerson query)
+      type FileType = Doc<"lifeos_frmFiles"> & { url?: string };
       const files = await ctx.runQuery(api.lifeos.frm_files.getFilesForPerson, {
         personId: profileRecord.personId,
-      });
+      }) as FileType[];
 
       // Filter to only memos with transcripts
-      type LinkedMemo = NonNullable<typeof linkedMemos[number]>;
       console.log(`[FRM Profile] Found ${linkedMemos.length} linked memos`);
 
       const memosWithTranscripts = linkedMemos.filter(
-        (memo): memo is LinkedMemo => memo !== null && !!memo.transcript && memo.transcript.trim().length > 0
+        (memo: LinkedMemoType): memo is LinkedMemoType => memo !== null && !!memo.transcript && memo.transcript.trim().length > 0
       );
 
       console.log(`[FRM Profile] ${memosWithTranscripts.length} memos have transcripts`);
@@ -484,7 +494,7 @@ export const runProfileExtraction = action({
 
       // Check if we have any sources at all
       if (memosWithTranscripts.length === 0 && files.length === 0) {
-        linkedMemos.forEach((memo, i) => {
+        linkedMemos.forEach((memo: LinkedMemoType, i: number) => {
           if (memo) {
             console.log(`[FRM Profile] Memo ${i}: transcript=${memo.transcript ? 'yes' : 'no'}, status=${memo.transcriptionStatus || 'unknown'}`);
           }
@@ -496,7 +506,7 @@ export const runProfileExtraction = action({
       const sourceMapping: SourceMapping[] = [];
 
       // Build the context for AI - Voice Memos
-      const transcriptSections = memosWithTranscripts.map((memo: LinkedMemo, i: number) => {
+      const transcriptSections = memosWithTranscripts.map((memo: LinkedMemoType, i: number) => {
         const label = `MEMO-${i + 1}`;
         sourceMapping.push({
           label,
@@ -512,7 +522,7 @@ export const runProfileExtraction = action({
 
       // Build the context for AI - Intel Files (text-based files only for now)
       const textFileTypes = ["text/plain", "text/markdown", "application/json"];
-      const textFiles = files.filter((f) => textFileTypes.some((t) => f.mimeType.startsWith(t)));
+      const textFiles = files.filter((f: FileType) => textFileTypes.some((t) => f.mimeType.startsWith(t)));
 
       const fileSections: string[] = [];
       for (let i = 0; i < textFiles.length; i++) {
@@ -615,7 +625,7 @@ ${fileSections.join("\n\n")}
       console.log(`[FRM Profile] Transformed citations:`, JSON.stringify(transformedCitations, null, 2));
 
       // Get file IDs for tracking
-      const fileIdsAnalyzed = textFiles.map((f) => f._id) as Id<"lifeos_frmFiles">[];
+      const fileIdsAnalyzed = textFiles.map((f: FileType) => f._id) as Id<"lifeos_frmFiles">[];
 
       // Update profile with results
       await ctx.runMutation(internal.lifeos.frm_profiles.updateProfileInternal, {

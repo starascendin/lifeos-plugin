@@ -762,8 +762,10 @@ Generate a natural A1-level conversation that uses vocabulary and concepts from 
     const conversationTitle = conversationContent.title || "Untitled Conversation";
 
     // Handle session: use existing or create new
-    let sessionId = args.sessionId;
-    if (!sessionId) {
+    let sessionId: Id<"hola_conversationSessions">;
+    if (args.sessionId) {
+      sessionId = args.sessionId;
+    } else {
       // Create a new session
       sessionId = await ctx.runMutation(internal.holaai.ai.createSession, {
         userId: args.userId,

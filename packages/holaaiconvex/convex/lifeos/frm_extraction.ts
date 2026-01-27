@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { action, internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { Id } from "../_generated/dataModel";
+import { Id, Doc } from "../_generated/dataModel";
 
 // ==================== SYSTEM PROMPT ====================
 
@@ -367,7 +367,7 @@ export const extractPeopleFromMemo = action({
       const existingPeople = await ctx.runQuery(
         internal.lifeos.frm_extraction.getUserPeopleInternal,
         { userId }
-      );
+      ) as Doc<"lifeos_frmPeople">[];
 
       // Call AI to extract people
       const model = "google/gemini-2.5-flash";

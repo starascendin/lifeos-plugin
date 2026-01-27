@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Users,
   User,
@@ -13,6 +15,10 @@ import {
   Building2,
   MessageSquare,
   Check,
+  Calendar,
+  FileText,
+  Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import {
   Popover,
@@ -30,6 +36,37 @@ import {
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import type { Id } from "@holaai/convex";
+
+// Helper to format meeting date in short form
+function formatMeetingDateShort(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffDays = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays === 0) {
+      return `Today at ${date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      })}`;
+    } else if (diffDays === 1) {
+      return `Yesterday`;
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString("en-US", {
+        weekday: "short",
+      });
+    } else {
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    }
+  } catch {
+    return dateString;
+  }
+}
 
 interface ThreadDetailPanelProps {
   onClose: () => void;
@@ -63,6 +100,12 @@ export function ThreadDetailPanel({ onClose }: ThreadDetailPanelProps) {
   const linkedClient = clients?.find((c) => c._id === linkedClientId);
   const linkedPersonId = syncedThread?.linkedPersonId;
   const linkedPerson = people?.find((p) => p._id === linkedPersonId);
+
+  // Get linked meetings for this thread
+  const linkedMeetings = useQuery(
+    api.lifeos.granola.getMeetingsForThread,
+    syncedThread?._id ? { beeperThreadId: syncedThread._id } : "skip"
+  );
 
   // Get business status
   const isBusiness = selectedThread
@@ -320,6 +363,71 @@ export function ThreadDetailPanel({ onClose }: ThreadDetailPanelProps) {
             </PopoverContent>
           </Popover>
         </div>
+
+        {/* Linked Meetings */}
+        {syncedThread && linkedMeetings && linkedMeetings.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-green-500" />
+              <Label className="text-sm font-medium">
+                Linked Meetings ({linkedMeetings.length})
+              </Label>
+            </div>
+            <ScrollArea className="max-h-[200px]">
+              <div className="space-y-2">
+                {linkedMeetings.map((link) => (
+                  <div
+                    key={link._id}
+                    className="p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm font-medium truncate">
+                            {link.meetingTitle || "Meeting"}
+                          </span>
+                          {link.linkSource === "ai_suggestion" && (
+                            <Sparkles className="w-3 h-3 text-yellow-500 flex-shrink-0" />
+                          )}
+                        </div>
+                        {link.meetingDate && (
+                          <p className="text-xs text-muted-foreground mt-0.5 ml-5">
+                            {formatMeetingDateShort(link.meetingDate)}
+                          </p>
+                        )}
+                        {link.aiReason && (
+                          <p className="text-xs text-muted-foreground mt-1 ml-5 line-clamp-2">
+                            {link.aiReason}
+                          </p>
+                        )}
+                      </div>
+                      {link.hasTranscript && (
+                        <Badge variant="outline" className="text-[10px] flex-shrink-0">
+                          <MessageSquare className="w-2.5 h-2.5 mr-0.5" />
+                          T
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* No linked meetings hint for business threads */}
+        {isBusiness && syncedThread && (!linkedMeetings || linkedMeetings.length === 0) && (
+          <div className="p-3 rounded-lg bg-muted/30 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar className="w-3.5 h-3.5" />
+              <span className="font-medium">No linked meetings</span>
+            </div>
+            <p>
+              Link meetings from the GranolaAI tab using the AI suggestions feature.
+            </p>
+          </div>
+        )}
 
         {/* Thread not synced warning */}
         {isBusiness && !syncedThread && (

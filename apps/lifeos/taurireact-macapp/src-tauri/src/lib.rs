@@ -6,6 +6,7 @@ mod beeper;
 mod claudecode;
 mod coder;
 mod council_server;
+mod granola;
 mod notes;
 mod screentime;
 mod voicememos;
@@ -27,6 +28,7 @@ use claudecode::{
 };
 use coder::{delegate_to_coder, get_coder_presets, get_coder_templates};
 use council_server::{get_council_server_status, start_council_server, stop_council_server};
+use granola::{check_granola_available, get_granola_meetings, get_granola_sync_settings, run_granola_auth, sync_granola};
 use notes::{
     count_apple_notes, export_apple_notes, export_notes_internal, get_exported_folders,
     get_exported_notes, should_run_notes_sync,
@@ -349,6 +351,12 @@ pub fn run() {
             create_claude_session,
             list_claude_sessions,
             delete_claude_session,
+            // Granola Integration
+            check_granola_available,
+            sync_granola,
+            get_granola_meetings,
+            get_granola_sync_settings,
+            run_granola_auth,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
