@@ -2,7 +2,7 @@ name: Build Agent Farm - Agent
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - 'infra/claude-agent-farm/agent/**'
       - '.github/workflows/agent-farm-build-agent.yaml'

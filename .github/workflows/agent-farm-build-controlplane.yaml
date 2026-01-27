@@ -2,7 +2,7 @@ name: Build Agent Farm - Control Plane
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - 'infra/claude-agent-farm/controlplane/**'
       - '.github/workflows/agent-farm-build-controlplane.yaml'
