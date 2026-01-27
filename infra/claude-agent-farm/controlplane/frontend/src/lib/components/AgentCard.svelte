@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { FileText, Clock, Cpu, Server, MessageSquare, Bot, Zap, Trash2, Square } from 'lucide-svelte';
+	import { FileText, Clock, Cpu, Server, MessageSquare, Bot, Zap, Trash2, Square, RotateCw } from 'lucide-svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -8,11 +8,13 @@
 	import type { RunningAgent } from '$lib/api/types';
 
 	export let agent: RunningAgent;
+	export let relaunching = false;
 
 	const dispatch = createEventDispatcher<{
 		stop: { podName: string };
 		delete: { podName: string };
 		logs: { podName: string };
+		relaunch: { podName: string; configId: number; taskPrompt: string };
 	}>();
 
 	const statusColors: Record<string, string> = {
@@ -122,15 +124,32 @@
 		</Button>
 		{#if isTerminated}
 			<Button
+				variant="outline"
+				size="sm"
+				disabled={relaunching}
+				on:click={() => dispatch('relaunch', { podName: agent.pod_name, configId: agent.config_id, taskPrompt: agent.task_prompt })}
+			>
+				<RotateCw class={cn('h-4 w-4', relaunching && 'animate-spin')} />
+				{relaunching ? 'Relaunching...' : 'Relaunch'}
+			</Button>
+			<Button
 				variant="ghost"
 				size="sm"
 				class="text-muted-foreground hover:text-destructive"
 				on:click={() => dispatch('delete', { podName: agent.pod_name })}
 			>
 				<Trash2 class="h-4 w-4" />
-				Delete
 			</Button>
 		{:else}
+			<Button
+				variant="outline"
+				size="sm"
+				disabled={relaunching}
+				on:click={() => dispatch('relaunch', { podName: agent.pod_name, configId: agent.config_id, taskPrompt: agent.task_prompt })}
+			>
+				<RotateCw class={cn('h-4 w-4', relaunching && 'animate-spin')} />
+				{relaunching ? 'Relaunching...' : 'Relaunch'}
+			</Button>
 			<Button
 				variant="ghost"
 				size="sm"
@@ -138,7 +157,6 @@
 				on:click={() => dispatch('stop', { podName: agent.pod_name })}
 			>
 				<Square class="h-4 w-4" />
-				Stop
 			</Button>
 		{/if}
 	</Card.Footer>

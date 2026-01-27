@@ -77,6 +77,7 @@ func main() {
 		// Agents
 		apiGroup.GET("/agents", apiHandler.ListAgents)
 		apiGroup.POST("/agents/launch/:id", apiHandler.LaunchAgent)
+		apiGroup.POST("/agents/recreate/:id", apiHandler.RecreateAgentPod)
 		apiGroup.DELETE("/agents/:name", apiHandler.StopAgent)
 		apiGroup.GET("/agents/:name/logs", apiHandler.GetAgentLogs)
 		apiGroup.GET("/agents/:name/logs/stream", apiHandler.StreamAgentLogs)
@@ -104,8 +105,23 @@ func main() {
 		apiGroup.GET("/mcp/active-servers", apiHandler.GetActiveServers)
 		apiGroup.POST("/mcp/clear-cache", apiHandler.ClearMCPCache)
 
+		// Skills
+		apiGroup.GET("/skills", apiHandler.ListSkills)
+		apiGroup.GET("/skills/:name", apiHandler.GetSkill)
+		apiGroup.POST("/skills", apiHandler.CreateSkill)
+		apiGroup.PUT("/skills/:name", apiHandler.UpdateSkill)
+		apiGroup.DELETE("/skills/:name", apiHandler.DeleteSkill)
+		apiGroup.POST("/skills/:name/toggle", apiHandler.ToggleSkill)
+
 		// GitHub
 		apiGroup.GET("/github/repos", apiHandler.ListGitHubRepos)
+
+		// Council
+		apiGroup.GET("/council/providers", apiHandler.ListCouncilProviders)
+		apiGroup.GET("/council/pod", apiHandler.GetCouncilPodStatus)
+		apiGroup.POST("/council/pod/launch", apiHandler.LaunchCouncilPod)
+		apiGroup.POST("/council/pod/refresh", apiHandler.RefreshCouncilPod)
+		apiGroup.GET("/council/ask", apiHandler.CouncilAsk)
 
 		// Health
 		apiGroup.GET("/health", func(c echo.Context) error {

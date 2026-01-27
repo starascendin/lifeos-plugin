@@ -85,6 +85,26 @@ export interface MCPTomlConfig {
   updated_at: string
 }
 
+// Skill (database-stored)
+export interface Skill {
+  id: number
+  name: string
+  install_command: string
+  description: string
+  category: string
+  is_builtin: boolean
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SkillCreate {
+  name: string
+  install_command: string
+  description?: string
+  category?: string
+}
+
 // Running Agent (Pod)
 export interface RunningAgent {
   pod_name: string
@@ -233,3 +253,152 @@ export interface DashboardData {
   agents: RunningAgent[]
   configs: AgentConfig[]
 }
+
+// Council Types
+export type CouncilTier = 'pro' | 'normal'
+
+export interface CouncilProvider {
+  id: string
+  name: string
+  model: string
+  tier: CouncilTier
+}
+
+export interface CouncilPodStatus {
+  status: 'running' | 'stopped' | 'not_found' | 'unavailable'
+  pod_name: string
+  message?: string
+}
+
+export interface CouncilProviderResponse {
+  provider: string
+  provider_id: string
+  model: string
+  response: string
+  error?: string
+}
+
+export interface DimensionScore {
+  accuracy: number      // 1-5
+  completeness: number  // 1-5
+  clarity: number       // 1-5
+  insight: number       // 1-5
+  total: number         // sum
+  pros: string[]
+  cons: string[]
+}
+
+export interface CouncilPeerRanking {
+  ranker_id: string
+  rankings: Record<string, number> // provider_id -> rank (1 = best)
+  scores: Record<string, DimensionScore> // provider_id -> dimension scores
+  reasoning: string
+}
+
+export interface ChairmanSynthesis {
+  chairman_id: string
+  chairman_name: string
+  synthesis: string
+  error?: string
+}
+
+export interface CouncilResult {
+  question: string
+  responses: CouncilProviderResponse[]
+  peer_reviews: CouncilPeerRanking[]
+  syntheses?: ChairmanSynthesis[]
+  // Backwards compatibility
+  synthesis?: string
+  chairman_id?: string
+}
+
+// Council SSE Events
+export interface CouncilStartEvent {
+  type: 'start'
+  providers: string[]
+  chairmen?: string[]
+  chairman?: string // backwards compat
+  pod_name: string
+}
+
+export interface CouncilStageEvent {
+  type: 'stage'
+  stage: 'deliberation' | 'peer_review' | 'synthesis'
+}
+
+export interface CouncilProviderStartEvent {
+  type: 'provider_start'
+  provider: string
+  provider_id: string
+}
+
+export interface CouncilProviderDoneEvent {
+  type: 'provider_done'
+  provider: string
+  provider_id: string
+  has_error: boolean
+}
+
+export interface CouncilProviderResponseEvent {
+  type: 'provider_response'
+  provider: string
+  provider_id: string
+  model: string
+  response: string
+  error?: string
+}
+
+export interface CouncilReviewStartEvent {
+  type: 'review_start'
+}
+
+export interface CouncilReviewDoneEvent {
+  type: 'review_done'
+  rankings: CouncilPeerRanking[]
+}
+
+export interface CouncilSynthesisStartEvent {
+  type: 'synthesis_start'
+  chairman: string
+  chairman_id?: string
+}
+
+export interface CouncilSynthesisContentEvent {
+  type: 'synthesis_content'
+  chairman_id?: string
+  chairman?: string
+  content: string
+}
+
+export interface CouncilResultEvent {
+  type: 'result'
+  result: CouncilResult
+}
+
+export interface CouncilErrorEvent {
+  type: 'error'
+  message: string
+}
+
+export interface CouncilDoneEvent {
+  type: 'done'
+}
+
+export interface CouncilHeartbeatEvent {
+  type: 'heartbeat'
+}
+
+export type CouncilEvent =
+  | CouncilStartEvent
+  | CouncilStageEvent
+  | CouncilProviderStartEvent
+  | CouncilProviderDoneEvent
+  | CouncilProviderResponseEvent
+  | CouncilReviewStartEvent
+  | CouncilReviewDoneEvent
+  | CouncilSynthesisStartEvent
+  | CouncilSynthesisContentEvent
+  | CouncilResultEvent
+  | CouncilErrorEvent
+  | CouncilDoneEvent
+  | CouncilHeartbeatEvent

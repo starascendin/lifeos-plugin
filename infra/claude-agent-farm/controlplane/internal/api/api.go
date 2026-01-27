@@ -250,6 +250,7 @@ func (a *API) LaunchAgent(c echo.Context) error {
 	if taskPrompt == "" {
 		taskPrompt = config.TaskPrompt
 	}
+	// Task prompt is optional - main interaction is via Chat tab or claude -p
 
 	// Generate MCP configuration from enabled TOML configs
 	var mcpJSON []byte
@@ -299,10 +300,66 @@ func (a *API) LaunchAgent(c echo.Context) error {
 		}
 	}
 
-	podName, err := a.k8sClient.LaunchAgentWithMCP(config, taskPrompt, mcpJSON)
+	// Get skill install commands from database
+	var skillInstallCommands []string
+	if config.EnabledSkills != "" {
+		commands, err := a.store.GetSkillInstallCommands(config.EnabledSkills)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
+			})
+		}
+		skillInstallCommands = commands
+	}
+
+	podName, err := a.k8sClient.LaunchAgentWithMCP(config, taskPrompt, mcpJSON, skillInstallCommands)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("Failed to launch: %v", err),
+		})
+	}
+
+	return c.JSON(http.StatusCreated, map[string]string{
+		"pod_name": podName,
+		"status":   "Pending",
+	})
+}
+
+// RecreateAgentPod recreates a persistent agent pod with the latest config
+// This is used for "relaunch" of persistent pods (not task jobs)
+func (a *API) RecreateAgentPod(c echo.Context) error {
+	if a.k8sClient == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "Kubernetes not available",
+		})
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid ID",
+		})
+	}
+
+	config, err := a.store.GetConfig(id)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "Config not found",
+		})
+	}
+
+	// Delete existing persistent pod if it exists (name pattern: agent-{config.Name}-pod)
+	existingPodName := fmt.Sprintf("agent-%s-pod", config.Name)
+	_ = a.k8sClient.StopAgent(existingPodName) // Ignore error if doesn't exist
+
+	// Wait a moment for deletion to process
+	time.Sleep(500 * time.Millisecond)
+
+	// Create new persistent pod
+	podName, err := a.k8sClient.GetOrCreateAgentPod(config)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Failed to create pod: %v", err),
 		})
 	}
 
@@ -688,7 +745,9 @@ func (a *API) DeleteMCPServer(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// GetMCPPresets returns the embedded MCP server presets and skills
+// GetMCPPresets returns the embedded MCP server presets and skills, merged with
+// active servers from user's saved TOML configs in the database.
+// DB servers OVERRIDE embedded presets with the same name.
 func (a *API) GetMCPPresets(c echo.Context) error {
 	presets, err := mcp.LoadPresets()
 	if err != nil {
@@ -696,6 +755,60 @@ func (a *API) GetMCPPresets(c echo.Context) error {
 			"error": fmt.Sprintf("Failed to load presets: %v", err),
 		})
 	}
+
+	// Collect all DB servers into a map (DB servers override embedded presets)
+	configs, err := a.store.GetEnabledTomlConfigs()
+	if err == nil {
+		dbServers := make(map[string]mcp.PresetServer)
+
+		for _, tomlConfig := range configs {
+			servers, err := mcp.ParseTOML(tomlConfig.Content)
+			if err != nil {
+				continue // Skip malformed configs
+			}
+			for _, server := range servers {
+				// Convert Args from JSON string to []string
+				var args []string
+				if server.Args != "" && server.Args != "[]" {
+					json.Unmarshal([]byte(server.Args), &args)
+				}
+
+				// Convert Env from JSON string to map[string]string
+				var env map[string]string
+				if server.Env != "" && server.Env != "{}" {
+					json.Unmarshal([]byte(server.Env), &env)
+				}
+
+				dbServers[server.Name] = mcp.PresetServer{
+					Name:        server.Name,
+					Command:     server.Command,
+					Args:        args,
+					Env:         env,
+					Description: server.Description,
+					Category:    "custom",
+				}
+			}
+		}
+
+		// Override embedded presets with DB servers, preserve category for existing ones
+		for i, preset := range presets.Servers {
+			if dbServer, exists := dbServers[preset.Name]; exists {
+				// Keep original category and description if DB doesn't have one
+				if dbServer.Description == "" {
+					dbServer.Description = preset.Description
+				}
+				dbServer.Category = preset.Category // Keep original category
+				presets.Servers[i] = dbServer
+				delete(dbServers, preset.Name)
+			}
+		}
+
+		// Add remaining DB servers that weren't in embedded presets
+		for _, server := range dbServers {
+			presets.Servers = append(presets.Servers, server)
+		}
+	}
+
 	return c.JSON(http.StatusOK, presets)
 }
 
@@ -988,6 +1101,187 @@ func (a *API) ListGitHubRepos(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, repos)
+}
+
+// --- Skill Endpoints ---
+
+// ListSkills returns all skills
+func (a *API) ListSkills(c echo.Context) error {
+	skills, err := a.store.ListSkills()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to list skills",
+		})
+	}
+	if skills == nil {
+		skills = []models.Skill{}
+	}
+	return c.JSON(http.StatusOK, skills)
+}
+
+// GetSkill returns a skill by name
+func (a *API) GetSkill(c echo.Context) error {
+	name := c.Param("name")
+	skill, err := a.store.GetSkill(name)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "Skill not found",
+		})
+	}
+	return c.JSON(http.StatusOK, skill)
+}
+
+// CreateSkillRequest is the request body for creating a skill
+type CreateSkillRequest struct {
+	Name           string `json:"name"`
+	InstallCommand string `json:"install_command"`
+	Description    string `json:"description"`
+	Category       string `json:"category"`
+}
+
+// CreateSkill creates a new skill
+func (a *API) CreateSkill(c echo.Context) error {
+	var req CreateSkillRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	if req.Name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Name is required",
+		})
+	}
+
+	if req.InstallCommand == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Install command is required",
+		})
+	}
+
+	skill := &models.Skill{
+		Name:           req.Name,
+		InstallCommand: req.InstallCommand,
+		Description:    req.Description,
+		Category:       req.Category,
+		IsBuiltin:      false,
+		Enabled:        true,
+	}
+
+	if skill.Category == "" {
+		skill.Category = "other"
+	}
+
+	id, err := a.store.CreateSkill(skill)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to create skill",
+		})
+	}
+
+	skill.ID = id
+	return c.JSON(http.StatusCreated, skill)
+}
+
+// UpdateSkillRequest is the request body for updating a skill
+type UpdateSkillRequest struct {
+	InstallCommand string `json:"install_command"`
+	Description    string `json:"description"`
+	Category       string `json:"category"`
+}
+
+// UpdateSkill updates an existing skill
+func (a *API) UpdateSkill(c echo.Context) error {
+	name := c.Param("name")
+
+	var req UpdateSkillRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Get existing skill
+	existing, err := a.store.GetSkill(name)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "Skill not found",
+		})
+	}
+
+	// Update fields
+	if req.InstallCommand != "" {
+		existing.InstallCommand = req.InstallCommand
+	}
+	if req.Description != "" {
+		existing.Description = req.Description
+	}
+	if req.Category != "" {
+		existing.Category = req.Category
+	}
+
+	if err := a.store.UpdateSkill(existing); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to update skill",
+		})
+	}
+
+	return c.JSON(http.StatusOK, existing)
+}
+
+// DeleteSkill deletes a skill
+func (a *API) DeleteSkill(c echo.Context) error {
+	name := c.Param("name")
+
+	// Check if skill exists and is not builtin
+	skill, err := a.store.GetSkill(name)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "Skill not found",
+		})
+	}
+
+	if skill.IsBuiltin {
+		return c.JSON(http.StatusForbidden, map[string]string{
+			"error": "Cannot delete builtin skills",
+		})
+	}
+
+	if err := a.store.DeleteSkill(name); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to delete skill",
+		})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// ToggleSkillRequest is the request body for toggling a skill
+type ToggleSkillRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// ToggleSkill enables or disables a skill
+func (a *API) ToggleSkill(c echo.Context) error {
+	name := c.Param("name")
+
+	var req ToggleSkillRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	if err := a.store.ToggleSkill(name, req.Enabled); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to toggle skill",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"message": fmt.Sprintf("Skill %s %s", name, map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
+	})
 }
 
 // ClearMCPCache clears the npx cache on all running agent pods

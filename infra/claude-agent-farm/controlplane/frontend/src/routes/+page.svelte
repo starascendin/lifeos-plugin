@@ -21,6 +21,9 @@
 	let launching = false;
 	let cleaning = false;
 
+	// Relaunching state (track by pod name)
+	let relaunchingPods: Set<string> = new Set();
+
 	// Logs modal
 	let logsModalOpen = false;
 	let logsPodName = '';
@@ -109,6 +112,23 @@
 			alert('Failed to cleanup: ' + (err as Error).message);
 		} finally {
 			cleaning = false;
+		}
+	}
+
+	async function handleRelaunch(e: CustomEvent<{ podName: string; configId: number; taskPrompt: string }>) {
+		const { podName, configId, taskPrompt: prompt } = e.detail;
+		relaunchingPods = new Set([...relaunchingPods, podName]);
+		try {
+			// Stop the old pod first
+			await stopAgent(podName);
+			agents.removeAgent(podName);
+			// Launch new pod with same config (will use latest MCP configs from Settings)
+			await launchAgent(configId, prompt);
+			agents.refresh();
+		} catch (err) {
+			alert('Failed to relaunch: ' + (err as Error).message);
+		} finally {
+			relaunchingPods = new Set([...relaunchingPods].filter(p => p !== podName));
 		}
 	}
 
@@ -228,9 +248,11 @@
 				{#each filteredAgents as agent (agent.pod_name)}
 					<AgentCard
 						{agent}
+						relaunching={relaunchingPods.has(agent.pod_name)}
 						on:stop={handleStopAgent}
 						on:delete={handleDeleteAgent}
 						on:logs={handleViewLogs}
+						on:relaunch={handleRelaunch}
 					/>
 				{/each}
 			</div>
@@ -295,12 +317,14 @@
 			</Card.Root>
 
 			<div>
-				<label for="task-prompt" class="mb-2 block text-sm font-medium">Task Prompt</label>
+				<label for="task-prompt" class="mb-2 block text-sm font-medium">
+					Task Prompt <span class="text-zinc-500">(optional)</span>
+				</label>
 				<Textarea
 					id="task-prompt"
 					bind:value={taskPrompt}
 					rows={4}
-					placeholder="What should this agent do?"
+					placeholder="Leave empty to use Chat tab or claude -p"
 				/>
 			</div>
 		</div>

@@ -5,21 +5,17 @@ const config: CapacitorConfig = {
   appName: 'Agent Farm',
   webDir: 'build',
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
+    scrollEnabled: false,
     scheme: 'Agent Farm',
+    backgroundColor: '#0a0a0f',
+  },
+  server: {
+    allowNavigation: ['*.r2.dev'],
   },
   plugins: {
     CapacitorUpdater: {
-      autoUpdate: true,
-      // Capgo cloud settings (configure after signup at https://capgo.app)
-      // statsUrl: 'https://api.capgo.app/stats',
-      // channelUrl: 'https://api.capgo.app/channel_self',
-      // updateUrl: 'https://api.capgo.app/updates',
-
-      // Or self-hosted settings (point to your k3s backend):
-      // statsUrl: 'https://your-api.example.com/api/app/stats',
-      // channelUrl: 'https://your-api.example.com/api/app/channel',
-      // updateUrl: 'https://your-api.example.com/api/app/updates',
+      autoUpdate: false,
     },
   },
 };

@@ -32,11 +32,20 @@ spec:
         - name: HOME
           value: /home/node
         - name: PATH
-          value: /home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          value: /home/node/.opencode/bin:/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       volumeMounts:
         # Claude credentials (NFS shared)
         - name: claude-credentials
           mountPath: /home/node/.claude
+          subPath: .claude
+        # OpenCode data
+        - name: claude-credentials
+          mountPath: /home/node/.local/share/opencode
+          subPath: .opencode-data
+        # OpenCode config
+        - name: claude-credentials
+          mountPath: /home/node/.config/opencode
+          subPath: .opencode-config
         # MCP config
         - name: mcp-config
           mountPath: /home/node/.mcp.json

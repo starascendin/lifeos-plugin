@@ -1,0 +1,127 @@
+name: Publish Capacitor Bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'controlplane/frontend/src/**'
+      - 'controlplane/frontend/static/**'
+      - 'controlplane/frontend/package.json'
+      - 'controlplane/frontend/svelte.config.js'
+      - 'controlplane/frontend/vite.config.ts'
+      - 'controlplane/frontend/tailwind.config.js'
+      - '.github/workflows/publish-capacitor-bundle.yaml'
+  workflow_dispatch:  # Manual trigger
+
+env:
+  R2_BUCKET: capacitorfiles
+  R2_PUBLIC_URL: https://pub-bf60ae0f93494d11877f2c59d3db71bd.r2.dev
+
+jobs:
+  publish-bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed to push version bump
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: controlplane/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: controlplane/frontend
+        run: npm ci
+
+      - name: Bump patch version
+        id: version
+        working-directory: controlplane/frontend
+        run: |
+          # Fetch current version from R2 manifest (source of truth)
+          CURRENT_VERSION=$(curl -s ${R2_PUBLIC_URL}/latest.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version")
+
+          # Bump patch version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+          # Update package.json to match
+          node -e "const pkg = require('./package.json'); pkg.version = '${NEW_VERSION}'; require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n')"
+
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version bump: $CURRENT_VERSION → $NEW_VERSION"
+
+      - name: Build frontend
+        working-directory: controlplane/frontend
+        run: npm run build
+
+      - name: Create bundle zip
+        working-directory: controlplane/frontend
+        run: |
+          BUNDLE_NAME="bundle-v${{ steps.version.outputs.new_version }}.zip"
+          cd build
+          zip -r "../${BUNDLE_NAME}" .
+          cd ..
+          echo "BUNDLE_NAME=${BUNDLE_NAME}" >> $GITHUB_ENV
+
+      - name: Setup wrangler
+        run: npm install -g wrangler
+
+      - name: Upload bundle to R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: controlplane/frontend
+        run: |
+          wrangler r2 object put "${R2_BUCKET}/${BUNDLE_NAME}" \
+            --file="${BUNDLE_NAME}" \
+            --remote
+
+      - name: Update latest.json manifest
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: controlplane/frontend
+        run: |
+          cat > /tmp/latest.json << EOF
+          {
+            "version": "${{ steps.version.outputs.new_version }}",
+            "url": "${R2_PUBLIC_URL}/${BUNDLE_NAME}"
+          }
+          EOF
+          wrangler r2 object put "${R2_BUCKET}/latest.json" \
+            --file="/tmp/latest.json" \
+            --remote \
+            --content-type="application/json"
+
+      - name: Cleanup bundle file
+        working-directory: controlplane/frontend
+        run: rm -f "${BUNDLE_NAME}"
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add controlplane/frontend/package.json
+          git commit -m "chore: bump frontend version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          git push
+
+      - name: Summary
+        run: |
+          echo "### 📦 Capacitor Bundle Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Bundle URL:** ${R2_PUBLIC_URL}/${BUNDLE_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Manifest URL:** ${R2_PUBLIC_URL}/latest.json" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📱 iOS apps will auto-update on next launch" >> $GITHUB_STEP_SUMMARY

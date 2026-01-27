@@ -19,14 +19,14 @@ spec:
         - /bin/bash
         - -c
         - |
-          # Create directories in PVC if they don't exist
+          # Create directories in PVC if they don't exist (flat structure for subPath mounts)
           mkdir -p /credentials/.claude
-          mkdir -p /credentials/.local/share/opencode
-          mkdir -p /credentials/.config/opencode
+          mkdir -p /credentials/.opencode-data
+          mkdir -p /credentials/.opencode-config
           # Symlink to home directory
           rm -rf ~/.claude && ln -sf /credentials/.claude ~/.claude
-          rm -rf ~/.local/share/opencode && mkdir -p ~/.local/share && ln -sf /credentials/.local/share/opencode ~/.local/share/opencode
-          rm -rf ~/.config/opencode && mkdir -p ~/.config && ln -sf /credentials/.config/opencode ~/.config/opencode
+          rm -rf ~/.local/share/opencode && mkdir -p ~/.local/share && ln -sf /credentials/.opencode-data ~/.local/share/opencode
+          rm -rf ~/.config/opencode && mkdir -p ~/.config && ln -sf /credentials/.opencode-config ~/.config/opencode
           # Keep container running
           sleep infinity
       volumeMounts:

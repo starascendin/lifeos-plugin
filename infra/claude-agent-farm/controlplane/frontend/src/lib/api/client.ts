@@ -1,8 +1,40 @@
-import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPImportResponse, MCPExportResponse, MCPPresets, MCPTomlConfig, GitHubRepo } from './types'
+import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPImportResponse, MCPExportResponse, MCPPresets, MCPTomlConfig, GitHubRepo, Skill, SkillCreate } from './types'
 import { API_BASE } from '$lib/config'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, {
+  const fullUrl = `${API_BASE}${url}`
+  console.log('[API] Request:', fullUrl)
+
+  // Use native HTTP on mobile to bypass CORS and properly route through VPN/Tailscale
+  if (Capacitor.isNativePlatform()) {
+    console.log('[API] Using native HTTP')
+    const response = await CapacitorHttp.request({
+      url: fullUrl,
+      method: (options?.method as 'GET' | 'POST' | 'PUT' | 'DELETE') || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.headers as Record<string, string>),
+      },
+      data: options?.body ? JSON.parse(options.body as string) : undefined,
+    })
+    console.log('[API] Response:', response.status, response.data)
+
+    if (response.status >= 400) {
+      const error = typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+      throw new Error(error || `HTTP ${response.status}`)
+    }
+
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return undefined as T
+    }
+
+    return typeof response.data === 'string' ? JSON.parse(response.data) : response.data
+  }
+
+  // Web fallback uses regular fetch
+  const response = await fetch(fullUrl, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -62,6 +94,12 @@ export async function launchAgent(configId: number, taskPrompt: string): Promise
   })
 }
 
+export async function recreateAgentPod(configId: number): Promise<{ pod_name: string }> {
+  return fetchJson<{ pod_name: string }>(`/agents/recreate/${configId}`, {
+    method: 'POST',
+  })
+}
+
 export async function stopAgent(podName: string): Promise<void> {
   await fetchJson<void>(`/agents/${podName}`, { method: 'DELETE' })
 }
@@ -85,6 +123,73 @@ export function streamAgentLogs(podName: string, onLog: (log: string) => void): 
   return () => eventSource.close()
 }
 
+// SSE streaming using fetch with ReadableStream (works on native webview)
+function streamSSE<T>(
+  url: string,
+  onEvent: (event: T) => void,
+  isDone: (event: T) => boolean
+): () => void {
+  const controller = new AbortController()
+
+  async function connect() {
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'text/event-stream',
+        },
+      })
+
+      if (!response.ok) {
+        onEvent({ type: 'error', message: `HTTP ${response.status}` } as T)
+        return
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        onEvent({ type: 'error', message: 'No response body' } as T)
+        return
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6)) as T
+              onEvent(data)
+
+              if (isDone(data)) {
+                reader.cancel()
+                return
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e)
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        onEvent({ type: 'error', message: 'Connection lost' } as T)
+      }
+    }
+  }
+
+  connect()
+
+  return () => controller.abort()
+}
+
 // Chat
 export function sendChatMessage(
   message: string,
@@ -101,7 +206,15 @@ export function sendChatMessage(
     stream_json: String(options.streamJson ?? false),
   })
 
-  const eventSource = new EventSource(`${API_BASE}/chat/send?${params}`)
+  const url = `${API_BASE}/chat/send?${params}`
+
+  // Use fetch-based SSE on native (EventSource has issues with Capacitor)
+  if (Capacitor.isNativePlatform()) {
+    return streamSSE<ChatEvent>(url, onEvent, (e) => e.type === 'done' || e.type === 'error')
+  }
+
+  // Web uses native EventSource
+  const eventSource = new EventSource(url)
 
   eventSource.onmessage = (event) => {
     try {
@@ -204,5 +317,39 @@ export async function getGitHubRepos(): Promise<GitHubRepo[]> {
 export async function cleanupPods(minutes = 30): Promise<{ cleaned: number; message: string }> {
   return fetchJson<{ cleaned: number; message: string }>(`/agents/cleanup?minutes=${minutes}`, {
     method: 'POST',
+  })
+}
+
+// Skills
+export async function getSkills(): Promise<Skill[]> {
+  return fetchJson<Skill[]>('/skills')
+}
+
+export async function getSkill(name: string): Promise<Skill> {
+  return fetchJson<Skill>(`/skills/${encodeURIComponent(name)}`)
+}
+
+export async function createSkill(skill: SkillCreate): Promise<Skill> {
+  return fetchJson<Skill>('/skills', {
+    method: 'POST',
+    body: JSON.stringify(skill),
+  })
+}
+
+export async function updateSkill(name: string, skill: Partial<SkillCreate>): Promise<Skill> {
+  return fetchJson<Skill>(`/skills/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    body: JSON.stringify(skill),
+  })
+}
+
+export async function deleteSkill(name: string): Promise<void> {
+  await fetchJson<void>(`/skills/${encodeURIComponent(name)}`, { method: 'DELETE' })
+}
+
+export async function toggleSkill(name: string, enabled: boolean): Promise<void> {
+  await fetchJson<void>(`/skills/${encodeURIComponent(name)}/toggle`, {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
   })
 }

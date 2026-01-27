@@ -36,6 +36,19 @@ if [ -n "${REPOS:-}" ]; then
     /home/node/clone-repos.sh
 fi
 
+# Install skills if specified
+if [ -n "${SKILL_INSTALL_COMMANDS:-}" ]; then
+    echo "Installing Claude skills..."
+    # Each command is on a separate line
+    while IFS= read -r cmd; do
+        if [ -n "$cmd" ]; then
+            echo "Running: $cmd"
+            eval "$cmd" || echo "Warning: skill installation failed: $cmd"
+        fi
+    done <<< "$SKILL_INSTALL_COMMANDS"
+    echo "Skills installation complete."
+fi
+
 # Build claude command
 CLAUDE_CMD="claude"
 

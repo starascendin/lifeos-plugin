@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/starascendin/claude-agent-farm/controlplane/internal/mcp"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/models"
 	_ "modernc.org/sqlite"
 )
@@ -71,6 +72,20 @@ func (s *SQLiteStore) migrate() error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_mcp_toml_configs_name ON mcp_toml_configs(name);
+
+	CREATE TABLE IF NOT EXISTS skills (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE,
+		install_command TEXT NOT NULL,
+		description TEXT DEFAULT '',
+		category TEXT DEFAULT 'other',
+		is_builtin INTEGER DEFAULT 0,
+		enabled INTEGER DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_skills_name ON skills(name);
 	`
 	_, err := s.db.Exec(schema)
 	if err != nil {
@@ -91,6 +106,9 @@ func (s *SQLiteStore) migrate() error {
 
 	// Enable defaults config by default
 	_, _ = s.db.Exec("UPDATE mcp_toml_configs SET enabled = 1 WHERE is_default = 1")
+
+	// Seed skills from presets.toml
+	s.seedSkillsFromPresets()
 
 	return nil
 }
@@ -444,4 +462,182 @@ func (s *SQLiteStore) GetEnabledTomlConfigs() ([]models.MCPTomlConfig, error) {
 		configs = append(configs, config)
 	}
 	return configs, nil
+}
+
+// --- Skill Methods ---
+
+// seedSkillsFromPresets seeds the skills table from presets.toml
+func (s *SQLiteStore) seedSkillsFromPresets() {
+	presets, err := mcp.LoadPresets()
+	if err != nil {
+		return
+	}
+
+	for _, skill := range presets.Skills {
+		// Only insert if doesn't exist
+		_, _ = s.db.Exec(`
+			INSERT OR IGNORE INTO skills (name, install_command, description, category, is_builtin, enabled)
+			VALUES (?, ?, ?, ?, 1, 1)
+		`, skill.Name, skill.InstallCommand, skill.Description, skill.Category)
+	}
+}
+
+// ListSkills returns all skills
+func (s *SQLiteStore) ListSkills() ([]models.Skill, error) {
+	rows, err := s.db.Query(`
+		SELECT id, name, install_command, description, category, is_builtin, enabled, created_at, updated_at
+		FROM skills ORDER BY category, name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var skills []models.Skill
+	for rows.Next() {
+		var skill models.Skill
+		var isBuiltin, enabled int
+		if err := rows.Scan(&skill.ID, &skill.Name, &skill.InstallCommand, &skill.Description, &skill.Category, &isBuiltin, &enabled, &skill.CreatedAt, &skill.UpdatedAt); err != nil {
+			return nil, err
+		}
+		skill.IsBuiltin = isBuiltin == 1
+		skill.Enabled = enabled == 1
+		skills = append(skills, skill)
+	}
+	return skills, nil
+}
+
+// GetSkill retrieves a skill by name
+func (s *SQLiteStore) GetSkill(name string) (*models.Skill, error) {
+	skill := &models.Skill{}
+	var isBuiltin, enabled int
+	err := s.db.QueryRow(`
+		SELECT id, name, install_command, description, category, is_builtin, enabled, created_at, updated_at
+		FROM skills WHERE name = ?
+	`, name).Scan(&skill.ID, &skill.Name, &skill.InstallCommand, &skill.Description, &skill.Category, &isBuiltin, &enabled, &skill.CreatedAt, &skill.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	skill.IsBuiltin = isBuiltin == 1
+	skill.Enabled = enabled == 1
+	return skill, nil
+}
+
+// CreateSkill creates a new skill
+func (s *SQLiteStore) CreateSkill(skill *models.Skill) (int64, error) {
+	isBuiltin := 0
+	if skill.IsBuiltin {
+		isBuiltin = 1
+	}
+	enabled := 1
+	if !skill.Enabled {
+		enabled = 0
+	}
+
+	result, err := s.db.Exec(`
+		INSERT INTO skills (name, install_command, description, category, is_builtin, enabled)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, skill.Name, skill.InstallCommand, skill.Description, skill.Category, isBuiltin, enabled)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+// UpdateSkill updates an existing skill
+func (s *SQLiteStore) UpdateSkill(skill *models.Skill) error {
+	enabled := 1
+	if !skill.Enabled {
+		enabled = 0
+	}
+
+	_, err := s.db.Exec(`
+		UPDATE skills
+		SET install_command = ?, description = ?, category = ?, enabled = ?, updated_at = ?
+		WHERE name = ?
+	`, skill.InstallCommand, skill.Description, skill.Category, enabled, time.Now(), skill.Name)
+	return err
+}
+
+// DeleteSkill deletes a skill by name (cannot delete builtin skills)
+func (s *SQLiteStore) DeleteSkill(name string) error {
+	_, err := s.db.Exec("DELETE FROM skills WHERE name = ? AND is_builtin = 0", name)
+	return err
+}
+
+// ToggleSkill enables or disables a skill
+func (s *SQLiteStore) ToggleSkill(name string, enabled bool) error {
+	enabledInt := 0
+	if enabled {
+		enabledInt = 1
+	}
+	_, err := s.db.Exec(`
+		UPDATE skills SET enabled = ?, updated_at = ? WHERE name = ?
+	`, enabledInt, time.Now(), name)
+	return err
+}
+
+// GetEnabledSkills returns all enabled skills
+func (s *SQLiteStore) GetEnabledSkills() ([]models.Skill, error) {
+	rows, err := s.db.Query(`
+		SELECT id, name, install_command, description, category, is_builtin, enabled, created_at, updated_at
+		FROM skills WHERE enabled = 1 ORDER BY category, name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var skills []models.Skill
+	for rows.Next() {
+		var skill models.Skill
+		var isBuiltin, enabled int
+		if err := rows.Scan(&skill.ID, &skill.Name, &skill.InstallCommand, &skill.Description, &skill.Category, &isBuiltin, &enabled, &skill.CreatedAt, &skill.UpdatedAt); err != nil {
+			return nil, err
+		}
+		skill.IsBuiltin = isBuiltin == 1
+		skill.Enabled = enabled == 1
+		skills = append(skills, skill)
+	}
+	return skills, nil
+}
+
+// GetSkillInstallCommands returns install commands for the given comma-separated skill names
+func (s *SQLiteStore) GetSkillInstallCommands(skillNames string) ([]string, error) {
+	if skillNames == "" {
+		return nil, nil
+	}
+
+	names := mcp.ParseCommaSeparated(skillNames)
+	if len(names) == 0 {
+		return nil, nil
+	}
+
+	// Build query with placeholders
+	placeholders := ""
+	args := make([]interface{}, len(names))
+	for i, name := range names {
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "?"
+		args[i] = name
+	}
+
+	query := `SELECT install_command FROM skills WHERE name IN (` + placeholders + `) AND enabled = 1`
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var commands []string
+	for rows.Next() {
+		var cmd string
+		if err := rows.Scan(&cmd); err != nil {
+			return nil, err
+		}
+		commands = append(commands, cmd)
+	}
+	return commands, nil
 }

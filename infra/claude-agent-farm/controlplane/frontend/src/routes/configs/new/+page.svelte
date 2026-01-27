@@ -109,13 +109,13 @@
 			<div class="space-y-4">
 				<div>
 					<label for="task_prompt" class="mb-2 block text-sm font-medium">
-						Default Task Prompt
+						Default Task Prompt <span class="text-zinc-500">(optional)</span>
 					</label>
 					<Textarea
 						id="task_prompt"
 						bind:value={formData.task_prompt}
 						rows={4}
-						placeholder="What should the agent do?"
+						placeholder="Optional - use Chat tab or claude -p to interact"
 					/>
 				</div>
 

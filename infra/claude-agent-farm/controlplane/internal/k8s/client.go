@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/models"
@@ -22,11 +23,55 @@ const (
 	agentNamespace = "claude-agents"
 	agentImage     = "ghcr.io/starascendin/claude-agent-farm-agent:latest"
 	credentialsPVC = "claude-credentials"
+	agentPATH      = "/home/node/.opencode/bin:/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 )
 
 // getRuntimeClassName returns the runtime class from env var, or empty string to use default
 func getRuntimeClassName() string {
 	return os.Getenv("AGENT_RUNTIME_CLASS")
+}
+
+// waitForPodDeletion waits for a pod to be fully deleted (up to timeout)
+func (c *Client) waitForPodDeletion(podName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for pod %s to be deleted", podName)
+		case <-ticker.C:
+			_, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+			if err != nil {
+				// Pod is gone
+				return nil
+			}
+		}
+	}
+}
+
+// getCredentialVolumeMounts returns the volume mounts for Claude and OpenCode credentials
+func getCredentialVolumeMounts() []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      "claude-credentials",
+			MountPath: "/home/node/.claude",
+			SubPath:   ".claude",
+		},
+		{
+			Name:      "claude-credentials",
+			MountPath: "/home/node/.local/share/opencode",
+			SubPath:   ".opencode-data",
+		},
+		{
+			Name:      "claude-credentials",
+			MountPath: "/home/node/.config/opencode",
+			SubPath:   ".opencode-config",
+		},
+	}
 }
 
 type Client struct {
@@ -74,7 +119,7 @@ func (c *Client) LaunchAgent(config *models.AgentConfig, taskPrompt string) (str
 					Image: agentImage,
 					Env: []corev1.EnvVar{
 						{Name: "HOME", Value: "/home/node"},
-						{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+						{Name: "PATH", Value: agentPATH},
 						{Name: "TASK_PROMPT", Value: taskPrompt},
 						{Name: "SYSTEM_PROMPT", Value: config.SystemPrompt},
 						{Name: "REPOS", Value: config.Repos},
@@ -102,18 +147,11 @@ func (c *Client) LaunchAgent(config *models.AgentConfig, taskPrompt string) (str
 							corev1.ResourceMemory: resource.MustParse("1Gi"),
 						},
 					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "claude-credentials",
-							MountPath: "/home/node/.claude",
-							ReadOnly:  false,
-						},
-						{
-							Name:      "mcp-config",
-							MountPath: "/home/node/.mcp.json",
-							SubPath:   "mcp.json",
-						},
-					},
+					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
+						Name:      "mcp-config",
+						MountPath: "/home/node/.mcp.json",
+						SubPath:   "mcp.json",
+					}),
 				},
 			},
 			Volumes: []corev1.Volume{
@@ -368,19 +406,13 @@ func (c *Client) GetOrCreateChatPod() (string, error) {
 					Command: []string{"sleep", "infinity"},
 					Env: []corev1.EnvVar{
 						{Name: "HOME", Value: "/home/node"},
-						{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+						{Name: "PATH", Value: agentPATH},
 					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "claude-credentials",
-							MountPath: "/home/node/.claude",
-						},
-						{
-							Name:      "mcp-config",
-							MountPath: "/home/node/.mcp.json",
-							SubPath:   "mcp.json",
-						},
-					},
+					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
+						Name:      "mcp-config",
+						MountPath: "/home/node/.mcp.json",
+						SubPath:   "mcp.json",
+					}),
 				},
 			},
 			Volumes: []corev1.Volume{
@@ -429,6 +461,99 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
+// GetOrCreateCouncilPod ensures a council pod exists and is running, returns pod name
+func (c *Client) GetOrCreateCouncilPod() (string, error) {
+	podName := "claude-council-pod"
+
+	// Check if pod exists
+	pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err == nil {
+		// Pod exists, check if running
+		if pod.Status.Phase == corev1.PodRunning {
+			return podName, nil
+		}
+		// Pod exists but not running (Failed, Succeeded, Pending, or Terminating), delete and wait
+		_ = c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+		if err := c.waitForPodDeletion(podName, 30*time.Second); err != nil {
+			// Force delete if normal delete times out
+			gracePeriod := int64(0)
+			_ = c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{
+				GracePeriodSeconds: &gracePeriod,
+			})
+			// Wait a bit more after force delete
+			_ = c.waitForPodDeletion(podName, 10*time.Second)
+		}
+	}
+
+	// Create council pod
+	councilPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: agentNamespace,
+			Labels: map[string]string{
+				"app": "claude-council",
+			},
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    "agent",
+					Image:   agentImage,
+					Command: []string{"sleep", "infinity"},
+					Env: []corev1.EnvVar{
+						{Name: "HOME", Value: "/home/node"},
+						{Name: "PATH", Value: agentPATH},
+					},
+					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
+						Name:      "mcp-config",
+						MountPath: "/home/node/.mcp.json",
+						SubPath:   "mcp.json",
+					}),
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "claude-credentials",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: credentialsPVC,
+						},
+					},
+				},
+				{
+					Name: "mcp-config",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "mcp-config",
+							Optional:   boolPtr(true),
+						},
+					},
+				},
+			},
+			ImagePullSecrets: []corev1.LocalObjectReference{
+				{Name: "ghcr-credentials"},
+			},
+		},
+	}
+
+	_, err = c.clientset.CoreV1().Pods(agentNamespace).Create(context.Background(), councilPod, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create council pod: %w", err)
+	}
+
+	// Wait for pod to be running
+	for i := 0; i < 60; i++ {
+		pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
+		if err == nil && pod.Status.Phase == corev1.PodRunning {
+			return podName, nil
+		}
+		time.Sleep(time.Second)
+	}
+
+	return "", fmt.Errorf("timeout waiting for council pod to start")
+}
+
 // GetOrCreateAgentPod ensures an agent pod exists and is running for the given config
 // Unlike LaunchAgent which runs a single task, this creates a persistent pod for interactive chat
 func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error) {
@@ -441,15 +566,22 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error)
 		if pod.Status.Phase == corev1.PodRunning {
 			return podName, nil
 		}
-		// Pod exists but not running, delete and recreate
+		// Pod exists but not running (Failed, Succeeded, Pending, or Terminating), delete and wait
 		_ = c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
-		time.Sleep(2 * time.Second)
+		if err := c.waitForPodDeletion(podName, 30*time.Second); err != nil {
+			// Force delete if normal delete times out
+			gracePeriod := int64(0)
+			_ = c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{
+				GracePeriodSeconds: &gracePeriod,
+			})
+			_ = c.waitForPodDeletion(podName, 10*time.Second)
+		}
 	}
 
 	// Build env vars
 	envVars := []corev1.EnvVar{
 		{Name: "HOME", Value: "/home/node"},
-		{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+		{Name: "PATH", Value: agentPATH},
 		{Name: "AGENT_NAME", Value: config.Name},
 		{Name: "SYSTEM_PROMPT", Value: config.SystemPrompt},
 		{Name: "MAX_TURNS", Value: fmt.Sprintf("%d", config.MaxTurns)},
@@ -498,18 +630,11 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error)
 							corev1.ResourceMemory: resource.MustParse("1Gi"),
 						},
 					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "claude-credentials",
-							MountPath: "/home/node/.claude",
-							ReadOnly:  false,
-						},
-						{
-							Name:      "mcp-config",
-							MountPath: "/home/node/.mcp.json",
-							SubPath:   "mcp.json",
-						},
-					},
+					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
+						Name:      "mcp-config",
+						MountPath: "/home/node/.mcp.json",
+						SubPath:   "mcp.json",
+					}),
 				},
 			},
 			Volumes: []corev1.Volume{
@@ -593,7 +718,8 @@ func (c *Client) DeleteMCPConfigMap(podName string) error {
 }
 
 // LaunchAgentWithMCP creates a new agent pod with MCP configuration
-func (c *Client) LaunchAgentWithMCP(config *models.AgentConfig, taskPrompt string, mcpJSON []byte) (string, error) {
+// skillInstallCommands is a list of shell commands to install Claude skills
+func (c *Client) LaunchAgentWithMCP(config *models.AgentConfig, taskPrompt string, mcpJSON []byte, skillInstallCommands []string) (string, error) {
 	if taskPrompt == "" {
 		taskPrompt = config.TaskPrompt
 	}
@@ -608,14 +734,8 @@ func (c *Client) LaunchAgentWithMCP(config *models.AgentConfig, taskPrompt strin
 		}
 	}
 
-	// Build volume mounts
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "claude-credentials",
-			MountPath: "/home/node/.claude",
-			ReadOnly:  false,
-		},
-	}
+	// Build volume mounts - start with credential mounts
+	volumeMounts := getCredentialVolumeMounts()
 
 	// Build volumes
 	volumes := []corev1.Volume{
@@ -666,7 +786,7 @@ func (c *Client) LaunchAgentWithMCP(config *models.AgentConfig, taskPrompt strin
 	// Build environment variables
 	envVars := []corev1.EnvVar{
 		{Name: "HOME", Value: "/home/node"},
-		{Name: "PATH", Value: "/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+		{Name: "PATH", Value: agentPATH},
 		{Name: "TASK_PROMPT", Value: taskPrompt},
 		{Name: "SYSTEM_PROMPT", Value: config.SystemPrompt},
 		{Name: "REPOS", Value: config.Repos},
@@ -685,11 +805,11 @@ func (c *Client) LaunchAgentWithMCP(config *models.AgentConfig, taskPrompt strin
 		},
 	}
 
-	// Add enabled skills if configured (for agent to install on startup)
-	if config.EnabledSkills != "" {
+	// Add skill install commands (newline-separated shell commands to run)
+	if len(skillInstallCommands) > 0 {
 		envVars = append(envVars, corev1.EnvVar{
-			Name:  "ENABLED_SKILLS",
-			Value: config.EnabledSkills,
+			Name:  "SKILL_INSTALL_COMMANDS",
+			Value: strings.Join(skillInstallCommands, "\n"),
 		})
 	}
 
@@ -790,6 +910,45 @@ func (c *Client) CleanupCompletedPods(olderThan time.Duration) (int, error) {
 	}
 
 	return cleaned, nil
+}
+
+// ExecCommandWithOutput executes a command in a pod and returns the full output (not streamed)
+func (c *Client) ExecCommandWithOutput(ctx context.Context, podName string, command []string) (string, error) {
+	req := c.clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(agentNamespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Command:   command,
+			Container: "agent",
+			Stdout:    true,
+			Stderr:    true,
+			Stdin:     false,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(c.restConfig, "POST", req.URL())
+	if err != nil {
+		return "", fmt.Errorf("failed to create executor: %w", err)
+	}
+
+	var stdout, stderr strings.Builder
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		return "", fmt.Errorf("exec failed: %w (stderr: %s)", err, stderr.String())
+	}
+
+	// Combine stdout and stderr, prioritizing stdout
+	output := stdout.String()
+	if output == "" && stderr.String() != "" {
+		output = stderr.String()
+	}
+
+	return output, nil
 }
 
 // ExecInPod executes a command in a running pod

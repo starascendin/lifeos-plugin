@@ -48,3 +48,16 @@ type AgentLog struct {
 	Timestamp time.Time `json:"timestamp"`
 	Message   string    `json:"message"`
 }
+
+// Skill represents a Claude skill that can be installed
+type Skill struct {
+	ID             int64     `json:"id"`
+	Name           string    `json:"name"`
+	InstallCommand string    `json:"install_command"`
+	Description    string    `json:"description"`
+	Category       string    `json:"category"`
+	IsBuiltin      bool      `json:"is_builtin"`
+	Enabled        bool      `json:"enabled"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
