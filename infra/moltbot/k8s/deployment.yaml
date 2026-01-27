@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/name: moltbot
 spec:
   replicas: 1
+  strategy:
+    type: Recreate  # Required for RWO PVC
   selector:
     matchLabels:
       app: moltbot
@@ -15,9 +17,9 @@ spec:
       labels:
         app: moltbot
     spec:
-      # Use Kata Containers with Firecracker for secure isolation
-      # AI can run freely inside the microVM sandbox
-      runtimeClassName: kata-fc
+      # TODO: Use Kata Containers with Firecracker for secure isolation
+      # Uncomment when kata-fc RuntimeClass is available:
+      # runtimeClassName: kata-fc
 
       securityContext:
         runAsNonRoot: true
@@ -29,46 +31,79 @@ spec:
           image: ghcr.io/starascendin/moltbot:latest
           imagePullPolicy: Always
 
+          ports:
+            - name: gateway
+              containerPort: 18789
+              protocol: TCP
+
           resources:
             requests:
               cpu: "100m"
-              memory: "256Mi"
+              memory: "512Mi"
             limits:
-              cpu: "1000m"
-              memory: "1Gi"
+              cpu: "2000m"
+              memory: "3Gi"
 
           volumeMounts:
-            - name: workspace
-              mountPath: /workspace
-            - name: moltbot-config
-              mountPath: /home/moltbot/.moltbot
-              readOnly: true
+            # Persist ~/.clawdbot (config, credentials, sessions)
+            - name: moltbot-state
+              mountPath: /home/node/.clawdbot
+            # Persist ~/clawd (workspace with AGENTS.md, memory, etc.)
+            - name: moltbot-workspace
+              mountPath: /home/node/clawd
 
           env:
             - name: NODE_ENV
               value: "production"
-            # Add API keys via secret reference
-            - name: ANTHROPIC_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: moltbot-secrets
-                  key: ANTHROPIC_API_KEY
-                  optional: true
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: moltbot-secrets
-                  key: OPENAI_API_KEY
-                  optional: true
+            # State directory (default, but explicit)
+            - name: MOLTBOT_STATE_DIR
+              value: "/home/node/.clawdbot"
+            # Increase Node.js heap size
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=2048"
+
+          # TODO: Re-enable health checks after onboarding
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: gateway
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 30
+          #   failureThreshold: 3
+          # readinessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: gateway
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 10
 
       volumes:
-        - name: workspace
-          emptyDir: {}
-        - name: moltbot-config
-          configMap:
-            name: moltbot-config
-            optional: true
+        - name: moltbot-state
+          persistentVolumeClaim:
+            claimName: moltbot-state
+        - name: moltbot-workspace
+          persistentVolumeClaim:
+            claimName: moltbot-workspace
 
-      # Ensure pods run on nodes with Kata support
-      nodeSelector:
-        kata-fc: "true"
+      # TODO: Ensure pods run on nodes with Kata support
+      # Uncomment when kata-fc RuntimeClass is available:
+      # nodeSelector:
+      #   kata-fc: "true"
+
+      imagePullSecrets:
+        - name: ghcr-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: moltbot
+  namespace: moltbot
+spec:
+  selector:
+    app: moltbot
+  ports:
+    - name: gateway
+      port: 18789
+      targetPort: gateway
+      protocol: TCP
+  type: ClusterIP

@@ -205,6 +205,12 @@ function ask(questionText: string) {
     return
   }
 
+  // Save current session before starting new one (if there's data to save)
+  const currentResponses = get(responses)
+  if (currentResponses.size > 0) {
+    saveCurrentSession()
+  }
+
   // Generate new session ID
   const sessionId = generateId()
   currentSessionId.set(sessionId)

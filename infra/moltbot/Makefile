@@ -30,9 +30,17 @@ status:
 logs:
 	kubectl -n moltbot logs -f deployment/moltbot
 
-# Get shell into the pod (for debugging)
+# Get shell into the pod (for onboarding and debugging)
 shell:
 	kubectl -n moltbot exec -it deployment/moltbot -- /bin/sh
+
+# Run onboarding wizard (first-time setup)
+onboard:
+	kubectl -n moltbot exec -it deployment/moltbot -- moltbot onboard
+
+# Port-forward gateway to localhost
+port-forward:
+	kubectl -n moltbot port-forward svc/moltbot 18789:18789
 
 # Delete all moltbot resources
 clean:

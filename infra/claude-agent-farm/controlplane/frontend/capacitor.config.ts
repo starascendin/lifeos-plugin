@@ -11,7 +11,7 @@ const config: CapacitorConfig = {
     backgroundColor: '#0a0a0f',
   },
   server: {
-    allowNavigation: ['*.r2.dev'],
+    allowNavigation: ['*.r2.dev', '*.tail05d28.ts.net'],
   },
   plugins: {
     CapacitorUpdater: {

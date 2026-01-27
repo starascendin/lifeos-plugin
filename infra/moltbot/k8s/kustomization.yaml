@@ -5,8 +5,8 @@ namespace: moltbot
 
 resources:
   - namespace.yaml
+  - pvc.yaml
   - deployment.yaml
-  - secrets.yaml
 
 commonLabels:
   app.kubernetes.io/name: moltbot
