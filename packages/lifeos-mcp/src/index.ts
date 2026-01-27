@@ -576,6 +576,139 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: "get_monthly_agenda",
+    description:
+      "Get monthly agenda: tasks and events for the month, plus AI monthly summary.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        monthStartDate: {
+          type: "string",
+          description: "First day of month in ISO format like '2024-01-01' (optional, default: current month)",
+        },
+      },
+    },
+  },
+  {
+    name: "regenerate_daily_summary",
+    description:
+      "Regenerate the AI summary for a specific day.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        date: {
+          type: "string",
+          description: "Date in ISO format like '2024-01-15' (required)",
+        },
+        model: {
+          type: "string",
+          description: "AI model to use (optional, default: openai/gpt-4o-mini)",
+        },
+      },
+      required: ["date"],
+    },
+  },
+  {
+    name: "regenerate_weekly_summary",
+    description:
+      "Regenerate the AI summary for a specific week.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        weekStartDate: {
+          type: "string",
+          description: "Monday of the week in ISO format like '2024-01-15' (required)",
+        },
+        model: {
+          type: "string",
+          description: "AI model to use (optional, default: openai/gpt-4o-mini)",
+        },
+      },
+      required: ["weekStartDate"],
+    },
+  },
+  {
+    name: "regenerate_monthly_summary",
+    description:
+      "Regenerate the AI summary for a specific month.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        monthStartDate: {
+          type: "string",
+          description: "First day of month in ISO format like '2024-01-01' (required)",
+        },
+        model: {
+          type: "string",
+          description: "AI model to use (optional, default: openai/gpt-4o-mini)",
+        },
+      },
+      required: ["monthStartDate"],
+    },
+  },
+  {
+    name: "update_weekly_prompt",
+    description:
+      "Update the custom prompt used for generating weekly summaries.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        weekStartDate: {
+          type: "string",
+          description: "Monday of the week in ISO format like '2024-01-15' (required)",
+        },
+        customPrompt: {
+          type: "string",
+          description: "Custom prompt template for AI summary generation (required)",
+        },
+      },
+      required: ["weekStartDate", "customPrompt"],
+    },
+  },
+  {
+    name: "update_monthly_prompt",
+    description:
+      "Update the custom prompt used for generating monthly summaries.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        monthStartDate: {
+          type: "string",
+          description: "First day of month in ISO format like '2024-01-01' (required)",
+        },
+        customPrompt: {
+          type: "string",
+          description: "Custom prompt template for AI summary generation (required)",
+        },
+      },
+      required: ["monthStartDate", "customPrompt"],
+    },
+  },
 
   // Notes Tools
   {

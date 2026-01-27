@@ -1239,6 +1239,12 @@ const AVAILABLE_TOOLS = [
   // Agenda tools
   "get_daily_agenda",
   "get_weekly_agenda",
+  "get_monthly_agenda",
+  "regenerate_daily_summary",
+  "regenerate_weekly_summary",
+  "regenerate_monthly_summary",
+  "update_weekly_prompt",
+  "update_monthly_prompt",
   // Issue Management tools
   "create_issue",
   "mark_issue_complete",
@@ -1491,6 +1497,54 @@ http.route({
             userId: auth.userId,
             startDate: params?.startDate as string | undefined,
             localTime: params?.localTime as string | undefined,
+          });
+          break;
+
+        case "get_monthly_agenda":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getMonthlyAgendaInternal, {
+            userId: auth.userId,
+            monthStartDate: params?.monthStartDate as string | undefined,
+            localTime: params?.localTime as string | undefined,
+          });
+          break;
+
+        case "regenerate_daily_summary":
+          result = await ctx.runMutation(internal.lifeos.tool_call.regenerateDailySummaryInternal, {
+            userId: auth.userId,
+            date: params?.date as string,
+            model: params?.model as string | undefined,
+          });
+          break;
+
+        case "regenerate_weekly_summary":
+          result = await ctx.runMutation(internal.lifeos.tool_call.regenerateWeeklySummaryInternal, {
+            userId: auth.userId,
+            weekStartDate: params?.weekStartDate as string,
+            model: params?.model as string | undefined,
+          });
+          break;
+
+        case "regenerate_monthly_summary":
+          result = await ctx.runMutation(internal.lifeos.tool_call.regenerateMonthlySummaryInternal, {
+            userId: auth.userId,
+            monthStartDate: params?.monthStartDate as string,
+            model: params?.model as string | undefined,
+          });
+          break;
+
+        case "update_weekly_prompt":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updateWeeklyPromptInternal, {
+            userId: auth.userId,
+            weekStartDate: params?.weekStartDate as string,
+            customPrompt: params?.customPrompt as string,
+          });
+          break;
+
+        case "update_monthly_prompt":
+          result = await ctx.runMutation(internal.lifeos.tool_call.updateMonthlyPromptInternal, {
+            userId: auth.userId,
+            monthStartDate: params?.monthStartDate as string,
+            customPrompt: params?.customPrompt as string,
           });
           break;
 

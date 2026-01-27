@@ -352,6 +352,32 @@ export const pmTables = {
     .index("by_user", ["userId"])
     .index("by_user_week", ["userId", "weekStartDate"]),
 
+  // ==================== MONTHLY SUMMARIES (for Agenda Monthly View) ====================
+  lifeos_monthlySummaries: defineTable({
+    userId: v.id("users"),
+    monthStartDate: v.string(), // YYYY-MM-DD format (1st of the month)
+    monthEndDate: v.string(), // YYYY-MM-DD format (last day of the month)
+    // Custom prompt for monthly summary (user editable, persistent)
+    customPrompt: v.optional(v.string()),
+    // AI-generated summary
+    aiSummary: v.optional(v.string()),
+    generatedAt: v.optional(v.number()),
+    // Model and usage info
+    model: v.optional(v.string()), // e.g., "openai/gpt-4o-mini"
+    usage: v.optional(
+      v.object({
+        promptTokens: v.number(),
+        completionTokens: v.number(),
+        totalTokens: v.number(),
+      }),
+    ),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_month", ["userId", "monthStartDate"]),
+
   // ==================== CODER INTEGRATION ====================
   // Per-user Coder.com API integration for delegating issues to AI agents
   lifeos_coderIntegration: defineTable({

@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moltbot
+  namespace: moltbot
+  labels:
+    app.kubernetes.io/name: moltbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: moltbot
+  template:
+    metadata:
+      labels:
+        app: moltbot
+    spec:
+      # Use Kata Containers with Firecracker for secure isolation
+      # AI can run freely inside the microVM sandbox
+      runtimeClassName: kata-fc
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: moltbot
+          image: ghcr.io/starascendin/moltbot:latest
+          imagePullPolicy: Always
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: moltbot-config
+              mountPath: /home/moltbot/.moltbot
+              readOnly: true
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+            # Add API keys via secret reference
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: moltbot-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: moltbot-secrets
+                  key: OPENAI_API_KEY
+                  optional: true
+
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: moltbot-config
+          configMap:
+            name: moltbot-config
+            optional: true
+
+      # Ensure pods run on nodes with Kata support
+      nodeSelector:
+        kata-fc: "true"

@@ -692,3 +692,419 @@ export const generateWeeklySummary = action({
     }
   },
 });
+
+// ==================== MONTHLY SUMMARY QUERIES ====================
+
+/**
+ * Get monthly summary for a specific month
+ */
+export const getMonthlySummary = query({
+  args: {
+    monthStartDate: v.string(), // YYYY-MM-DD format (1st of month)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const summary = await ctx.db
+      .query("lifeos_monthlySummaries")
+      .withIndex("by_user_month", (q) =>
+        q.eq("userId", user._id).eq("monthStartDate", args.monthStartDate)
+      )
+      .first();
+
+    return summary;
+  },
+});
+
+// ==================== MONTHLY SUMMARY MUTATIONS ====================
+
+/**
+ * Save or update monthly summary
+ */
+export const saveMonthlySummary = mutation({
+  args: {
+    monthStartDate: v.string(), // YYYY-MM-DD (1st of month)
+    monthEndDate: v.string(), // YYYY-MM-DD (last day of month)
+    aiSummary: v.string(),
+    model: v.optional(v.string()),
+    usage: v.optional(
+      v.object({
+        promptTokens: v.number(),
+        completionTokens: v.number(),
+        totalTokens: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("lifeos_monthlySummaries")
+      .withIndex("by_user_month", (q) =>
+        q.eq("userId", user._id).eq("monthStartDate", args.monthStartDate)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
+        generatedAt: now,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      return await ctx.db.insert("lifeos_monthlySummaries", {
+        userId: user._id,
+        monthStartDate: args.monthStartDate,
+        monthEndDate: args.monthEndDate,
+        aiSummary: args.aiSummary,
+        model: args.model,
+        usage: args.usage,
+        generatedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
+ * Update custom prompt for monthly summary (persistent per-month)
+ */
+export const updateMonthlyPrompt = mutation({
+  args: {
+    monthStartDate: v.string(), // YYYY-MM-DD (1st of month)
+    customPrompt: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("lifeos_monthlySummaries")
+      .withIndex("by_user_month", (q) =>
+        q.eq("userId", user._id).eq("monthStartDate", args.monthStartDate)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        customPrompt: args.customPrompt,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      // Calculate month end date
+      const startDate = new Date(args.monthStartDate);
+      const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+      const monthEndStr = formatDateString(monthEnd);
+
+      return await ctx.db.insert("lifeos_monthlySummaries", {
+        userId: user._id,
+        monthStartDate: args.monthStartDate,
+        monthEndDate: monthEndStr,
+        customPrompt: args.customPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+// ==================== DELETE MUTATIONS ====================
+
+/**
+ * Delete a daily summary
+ */
+export const deleteDailySummary = mutation({
+  args: {
+    date: v.string(), // YYYY-MM-DD format
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const existing = await ctx.db
+      .query("lifeos_dailySummaries")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", user._id).eq("date", args.date)
+      )
+      .first();
+
+    if (!existing) {
+      return { success: false, error: "Daily summary not found" };
+    }
+
+    await ctx.db.delete(existing._id);
+    return { success: true, deletedId: existing._id };
+  },
+});
+
+/**
+ * Delete a weekly summary
+ */
+export const deleteWeeklySummary = mutation({
+  args: {
+    weekStartDate: v.string(), // YYYY-MM-DD format (Monday)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const existing = await ctx.db
+      .query("lifeos_weeklySummaries")
+      .withIndex("by_user_week", (q) =>
+        q.eq("userId", user._id).eq("weekStartDate", args.weekStartDate)
+      )
+      .first();
+
+    if (!existing) {
+      return { success: false, error: "Weekly summary not found" };
+    }
+
+    await ctx.db.delete(existing._id);
+    return { success: true, deletedId: existing._id };
+  },
+});
+
+/**
+ * Delete a monthly summary
+ */
+export const deleteMonthlySummary = mutation({
+  args: {
+    monthStartDate: v.string(), // YYYY-MM-DD format (1st of month)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const existing = await ctx.db
+      .query("lifeos_monthlySummaries")
+      .withIndex("by_user_month", (q) =>
+        q.eq("userId", user._id).eq("monthStartDate", args.monthStartDate)
+      )
+      .first();
+
+    if (!existing) {
+      return { success: false, error: "Monthly summary not found" };
+    }
+
+    await ctx.db.delete(existing._id);
+    return { success: true, deletedId: existing._id };
+  },
+});
+
+// ==================== MONTHLY SUMMARY ACTION ====================
+
+// Default monthly prompt template
+const DEFAULT_MONTHLY_PROMPT = `Provide a monthly summary for {monthStartDate} to {monthEndDate}:
+
+WEEKLY SUMMARIES:
+{weeklySummaries}
+
+TASKS COMPLETED THIS MONTH: {completedCount}
+{completedTasksList}
+
+TASKS REMAINING: {remainingCount}
+{remainingTasksList}
+
+VOICE MEMO HIGHLIGHTS:
+{memoTranscripts}
+
+Please provide:
+1. Month overview and accomplishments (2-3 sentences)
+2. Key patterns and trends observed
+3. Focus areas and recommendations for next month`;
+
+interface MonthlySummaryContext {
+  monthStartDate: string;
+  monthEndDate: string;
+  weeklySummaries: string[];
+  completedTasks: Doc<"lifeos_pmIssues">[];
+  remainingTasks: Doc<"lifeos_pmIssues">[];
+  memos: Array<{
+    name: string;
+    transcript: string | undefined;
+    clientCreatedAt: number;
+  }>;
+  customPrompt?: string;
+}
+
+function buildMonthlySummaryPrompt(context: MonthlySummaryContext): string {
+  const template = context.customPrompt || DEFAULT_MONTHLY_PROMPT;
+
+  // Format weekly summaries
+  const weeklySummariesStr = context.weeklySummaries.length > 0
+    ? context.weeklySummaries.join("\n\n")
+    : "No weekly summaries available";
+
+  // Format tasks
+  const completedTasksList = context.completedTasks
+    .slice(0, 15)
+    .map((t) => `- ${t.title}`)
+    .join("\n");
+  const remainingTasksList = context.remainingTasks
+    .slice(0, 15)
+    .map((t) => `- ${t.title}`)
+    .join("\n");
+
+  // Format memos
+  const memoTranscripts = context.memos
+    .filter((m) => m.transcript)
+    .slice(0, 10)
+    .map((m) => {
+      const date = new Date(m.clientCreatedAt);
+      const dateStr = date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      const transcript =
+        m.transcript!.length > 150
+          ? m.transcript!.slice(0, 150) + "..."
+          : m.transcript!;
+      return `[${dateStr}] ${m.name}: ${transcript}`;
+    })
+    .join("\n");
+
+  return template
+    .replace("{monthStartDate}", context.monthStartDate)
+    .replace("{monthEndDate}", context.monthEndDate)
+    .replace("{weeklySummaries}", weeklySummariesStr)
+    .replace("{completedCount}", String(context.completedTasks.length))
+    .replace("{completedTasksList}", completedTasksList || "None")
+    .replace("{remainingCount}", String(context.remainingTasks.length))
+    .replace("{remainingTasksList}", remainingTasksList || "None")
+    .replace("{memoTranscripts}", memoTranscripts || "None recorded");
+}
+
+/**
+ * Generate AI summary for a specific month using centralized AI service
+ */
+export const generateMonthlySummary = action({
+  args: {
+    monthStartDate: v.string(), // YYYY-MM-DD format (1st of month)
+    model: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<GenerateSummaryResult> => {
+    const selectedModel = args.model || "openai/gpt-4o-mini";
+
+    // Calculate month end date
+    const startDate = new Date(args.monthStartDate);
+    const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    const monthEndDate = formatDateString(monthEnd);
+
+    // Fetch all month data in parallel
+    const [tasksByDay, memos, existingSummary] = await Promise.all([
+      ctx.runQuery(api.lifeos.pm_issues.getTasksForDateRange, {
+        startDate: args.monthStartDate,
+        endDate: monthEndDate,
+        includeCompleted: true,
+      }),
+      ctx.runQuery(api.lifeos.voicememo.getMemosForDateRange, {
+        startDate: args.monthStartDate,
+        endDate: monthEndDate,
+      }),
+      ctx.runQuery(api.lifeos.agenda.getMonthlySummary, {
+        monthStartDate: args.monthStartDate,
+      }),
+    ]);
+
+    // Get weekly summaries for this month
+    const weeklySummaries: string[] = [];
+    const currentWeekStart = new Date(args.monthStartDate);
+    // Adjust to Monday
+    const dayOfWeek = currentWeekStart.getDay();
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    currentWeekStart.setDate(currentWeekStart.getDate() + diff);
+
+    while (currentWeekStart <= monthEnd) {
+      const weekStartStr = formatDateString(currentWeekStart);
+      const weekSummary = await ctx.runQuery(api.lifeos.agenda.getWeeklySummary, {
+        weekStartDate: weekStartStr,
+      });
+      if (weekSummary?.aiSummary) {
+        weeklySummaries.push(`Week of ${weekStartStr}: ${weekSummary.aiSummary}`);
+      }
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    }
+
+    // Separate completed and remaining tasks
+    const allTasks = Object.values(tasksByDay).flat() as Doc<"lifeos_pmIssues">[];
+    const completedTasks = allTasks.filter((t: Doc<"lifeos_pmIssues">) => t.status === "done");
+    const remainingTasks = allTasks.filter((t: Doc<"lifeos_pmIssues">) => t.status !== "done");
+
+    // Build prompt context
+    const promptContext: MonthlySummaryContext = {
+      monthStartDate: args.monthStartDate,
+      monthEndDate,
+      weeklySummaries,
+      completedTasks,
+      remainingTasks,
+      memos: (memos as Doc<"life_voiceMemos">[]).map((m: Doc<"life_voiceMemos">) => ({
+        name: m.name,
+        transcript: m.transcript,
+        clientCreatedAt: m.clientCreatedAt,
+      })),
+      customPrompt: existingSummary?.customPrompt ?? undefined,
+    };
+
+    const prompt = buildMonthlySummaryPrompt(promptContext);
+
+    // Save helper function
+    const saveSummary = async (
+      summary: string,
+      model: string,
+      usage: UsageInfo | null
+    ) => {
+      await ctx.runMutation(api.lifeos.agenda.saveMonthlySummary, {
+        monthStartDate: args.monthStartDate,
+        monthEndDate,
+        aiSummary: summary,
+        model,
+        usage: usage ?? undefined,
+      });
+    };
+
+    try {
+      // Use centralized AI service (handles credit check, AI call, and deduction)
+      const result = await ctx.runAction(internal.common.ai.executeAICall, {
+        request: {
+          model: selectedModel,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a helpful personal assistant that provides insightful monthly summaries. Keep responses comprehensive, highlighting patterns, accomplishments, and actionable insights for the upcoming month.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          maxTokens: 800,
+          temperature: 0.7,
+        },
+        context: {
+          feature: "agenda_monthly_summary",
+          description: `Monthly summary for ${args.monthStartDate}`,
+        },
+      });
+
+      const usage: UsageInfo = {
+        promptTokens: result.usage.promptTokens,
+        completionTokens: result.usage.completionTokens,
+        totalTokens: result.usage.totalTokens,
+      };
+
+      await saveSummary(result.content, selectedModel, usage);
+
+      return { summary: result.content, model: selectedModel, usage };
+    } catch (error) {
+      console.error("Error generating monthly AI summary:", error);
+      const fallbackSummary = `Month ${args.monthStartDate} to ${monthEndDate}: ${completedTasks.length} tasks completed, ${remainingTasks.length} remaining.`;
+      await saveSummary(fallbackSummary, "fallback", null);
+      return { summary: fallbackSummary, model: "fallback", usage: null };
+    }
+  },
+});

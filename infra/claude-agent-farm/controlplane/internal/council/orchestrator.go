@@ -1,6 +1,7 @@
 package council
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,45 @@ import (
 
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/k8s"
 )
+
+// parseOpenCodeOutput extracts text content from opencode JSON format output
+// opencode --format json outputs NDJSON with events like:
+// {"type":"text","part":{"type":"text","text":"response content"}}
+func parseOpenCodeOutput(output string) string {
+	var result strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(output))
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		var event struct {
+			Type string `json:"type"`
+			Part struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"part"`
+		}
+
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			continue
+		}
+
+		// Extract text from "text" type events
+		if event.Type == "text" && event.Part.Type == "text" {
+			result.WriteString(event.Part.Text)
+		}
+	}
+
+	// If no JSON was parsed, return original output (might be plain text)
+	if result.Len() == 0 {
+		return output
+	}
+
+	return result.String()
+}
 
 // Provider represents a supported LLM provider
 type Provider struct {
@@ -180,23 +220,26 @@ func (o *Orchestrator) Deliberate(ctx context.Context, question string, provider
 }
 
 func (o *Orchestrator) queryProvider(ctx context.Context, provider *Provider, question string, emit EventEmitter) (string, error) {
-	// Use opencode with the specific model
-	cmd := []string{
-		"opencode", "run",
-		"--model", provider.Model,
-		question,
-	}
-
 	// Create a context with timeout for each provider query
 	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	output, err := o.k8sClient.ExecCommandWithOutput(queryCtx, o.podName, cmd)
+	// Write question to temp file and use --file flag to pass to opencode
+	// This avoids command-line argument length limits for long questions
+	promptFile := fmt.Sprintf("/tmp/question_%s_%d.txt", provider.ID, time.Now().UnixNano())
+	cmd := []string{
+		"sh", "-c",
+		fmt.Sprintf("cat > %s && opencode run --model %s --format json --file %s -- 'Answer the question in the attached file' && rm -f %s",
+			promptFile, provider.Model, promptFile, promptFile),
+	}
+
+	output, err := o.k8sClient.ExecCommandWithStdin(queryCtx, o.podName, cmd, question)
 	if err != nil {
 		return "", fmt.Errorf("query failed: %w", err)
 	}
 
-	return strings.TrimSpace(output), nil
+	// Parse JSON output to extract text content
+	return strings.TrimSpace(parseOpenCodeOutput(output)), nil
 }
 
 // PeerReview has each provider rank the anonymized responses (Stage 2)
@@ -266,23 +309,27 @@ Respond in this exact JSON format:
 				return
 			}
 
-			// Query the provider for rankings
-			reviewCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			// Query the provider for rankings - use longer timeout (3 min) for pro models
+			reviewCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 			defer cancel()
 
+			// Write prompt to temp file and use --file flag to pass to opencode
+			// This avoids command-line argument length limits for large review prompts
+			promptFile := fmt.Sprintf("/tmp/review_%s_%d.txt", resp.ProviderID, time.Now().UnixNano())
 			cmd := []string{
-				"opencode", "run",
-				"--model", provider.Model,
-				reviewPrompt,
+				"sh", "-c",
+				fmt.Sprintf("cat > %s && opencode run --model %s --format json --file %s -- 'Review and rank the responses in the attached file as instructed' && rm -f %s",
+					promptFile, provider.Model, promptFile, promptFile),
 			}
 
-			output, err := o.k8sClient.ExecCommandWithOutput(reviewCtx, o.podName, cmd)
+			output, err := o.k8sClient.ExecCommandWithStdin(reviewCtx, o.podName, cmd, reviewPrompt)
 			if err != nil {
 				return
 			}
 
-			// Parse the JSON response
-			ranking, err := parseRankingResponse(output, providerLabels, responses)
+			// Parse opencode JSON output to get text, then parse the ranking JSON from that
+			textOutput := parseOpenCodeOutput(output)
+			ranking, err := parseRankingResponse(textOutput, providerLabels, responses)
 			if err != nil {
 				return
 			}
@@ -378,7 +425,13 @@ func (o *Orchestrator) Synthesize(ctx context.Context, question string, response
 
 	chairman := GetProviderByID(chairmanID)
 	if chairman == nil {
-		return "", fmt.Errorf("unknown chairman provider: %s", chairmanID)
+		errMsg := fmt.Sprintf("unknown chairman provider: %s", chairmanID)
+		emit(map[string]interface{}{
+			"type":         "synthesis_error",
+			"chairman_id":  chairmanID,
+			"error":        errMsg,
+		})
+		return "", fmt.Errorf(errMsg)
 	}
 
 	// Build the synthesis prompt
@@ -430,21 +483,34 @@ Your task: Synthesize the best possible answer by combining the collective wisdo
 
 Provide only the synthesized answer, no meta-commentary.`, question, responsesText.String(), rankingsText.String())
 
-	synthesisCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	// Use longer timeout for synthesis with pro models (5 minutes instead of 3)
+	synthesisCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
+	// Write prompt to temp file and use --file flag to pass to opencode
+	// This avoids command-line argument length limits which is critical for
+	// pro-tier queries where responses can be very long (50KB+)
+	promptFile := fmt.Sprintf("/tmp/synthesis_%d.txt", time.Now().UnixNano())
 	cmd := []string{
-		"opencode", "run",
-		"--model", chairman.Model,
-		synthesisPrompt,
+		"sh", "-c",
+		fmt.Sprintf("cat > %s && opencode run --model %s --format json --file %s -- 'Process the council synthesis task in the attached file' && rm -f %s",
+			promptFile, chairman.Model, promptFile, promptFile),
 	}
 
-	output, err := o.k8sClient.ExecCommandWithOutput(synthesisCtx, o.podName, cmd)
+	output, err := o.k8sClient.ExecCommandWithStdin(synthesisCtx, o.podName, cmd, synthesisPrompt)
 	if err != nil {
-		return "", fmt.Errorf("synthesis failed: %w", err)
+		errMsg := fmt.Sprintf("synthesis failed: %v", err)
+		emit(map[string]interface{}{
+			"type":         "synthesis_error",
+			"chairman_id":  chairmanID,
+			"chairman":     chairman.Name,
+			"error":        errMsg,
+		})
+		return "", fmt.Errorf(errMsg)
 	}
 
-	synthesis := strings.TrimSpace(output)
+	// Parse opencode JSON output to get text content
+	synthesis := strings.TrimSpace(parseOpenCodeOutput(output))
 
 	emit(map[string]interface{}{
 		"type":         "synthesis_content",

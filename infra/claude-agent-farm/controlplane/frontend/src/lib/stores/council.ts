@@ -287,6 +287,23 @@ function handleEvent(event: CouncilEvent) {
         saveCurrentSession()
       }
       break
+    case 'synthesis_error':
+      // Handle synthesis failure for specific chairman
+      if (event.chairman_id) {
+        syntheses.update(map => {
+          const m = new Map(map)
+          m.set(event.chairman_id!, {
+            chairman_id: event.chairman_id!,
+            chairman_name: event.chairman || event.chairman_id!,
+            synthesis: '',
+            error: event.error || 'Synthesis failed'
+          })
+          return m
+        })
+        activeSynthesizers.update(set => { const s = new Set(set); s.delete(event.chairman_id!); return s })
+        saveCurrentSession()
+      }
+      break
     case 'result':
       result.set(event.result)
       // Also populate syntheses from result if available

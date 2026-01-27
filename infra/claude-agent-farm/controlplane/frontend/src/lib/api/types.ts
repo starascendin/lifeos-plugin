@@ -370,6 +370,13 @@ export interface CouncilSynthesisContentEvent {
   content: string
 }
 
+export interface CouncilSynthesisErrorEvent {
+  type: 'synthesis_error'
+  chairman_id?: string
+  chairman?: string
+  error: string
+}
+
 export interface CouncilResultEvent {
   type: 'result'
   result: CouncilResult
@@ -398,6 +405,7 @@ export type CouncilEvent =
   | CouncilReviewDoneEvent
   | CouncilSynthesisStartEvent
   | CouncilSynthesisContentEvent
+  | CouncilSynthesisErrorEvent
   | CouncilResultEvent
   | CouncilErrorEvent
   | CouncilDoneEvent

@@ -951,6 +951,48 @@ func (c *Client) ExecCommandWithOutput(ctx context.Context, podName string, comm
 	return output, nil
 }
 
+// ExecCommandWithStdin executes a command in a pod with stdin input and returns the output
+// This is useful for passing large prompts that would exceed command-line argument limits
+func (c *Client) ExecCommandWithStdin(ctx context.Context, podName string, command []string, stdin string) (string, error) {
+	req := c.clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(agentNamespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Command:   command,
+			Container: "agent",
+			Stdout:    true,
+			Stderr:    true,
+			Stdin:     true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(c.restConfig, "POST", req.URL())
+	if err != nil {
+		return "", fmt.Errorf("failed to create executor: %w", err)
+	}
+
+	var stdout, stderr strings.Builder
+	stdinReader := strings.NewReader(stdin)
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdin:  stdinReader,
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+	if err != nil {
+		return "", fmt.Errorf("exec failed: %w (stderr: %s)", err, stderr.String())
+	}
+
+	// Combine stdout and stderr, prioritizing stdout
+	output := stdout.String()
+	if output == "" && stderr.String() != "" {
+		output = stderr.String()
+	}
+
+	return output, nil
+}
+
 // ExecInPod executes a command in a running pod
 func (c *Client) ExecInPod(podName, namespace string, command []string) error {
 	req := c.clientset.CoreV1().RESTClient().Post().
