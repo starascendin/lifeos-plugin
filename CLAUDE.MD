@@ -1,9 +1,24 @@
-MONO repo instructions:
+
+
+## MONO repo instructions:
 Context:
 - I am the sole user of this stack.
 - I just want a SEAMLESS dev exp, where:
     - i just run everything on prod urls, since im the only user.
     - i just deploy everything to prod w/ `pnpm deploy:prod:isolated --yes`
+
+Goal:
+- I want 1 place where:
+    - all my data (professional and personal) lives in 1 place (the convex db). This is my lifeOS
+    - AI agents can use all my data and work on them.
+- I just want to speak/use AI agents, and it can use all my data as it see fits, to empower me in my:
+    - professional life -- client management, project management, CRM, etc.
+    - do e2e software development using AI (TBD)
+
+Main Apps in this stack:
+- the controlplane capacitor app -- i use this to config AI agents and use AI agents.
+- the tauri LIFEOS apps
+
 
 A ./apps/lifeos/taurireact-macapp
     - this is my tauri app. It has a simple webapp and it can be deployed to web (hosted on vercel) or I run it locally on my macair as tauri app
@@ -21,10 +36,29 @@ B. ./packages/holaaiconvex
     - i mostly just use the PROD url + PROD clerk all the time.
     - when a feature is done developing w/ ai, i usually just run `pnpm deploy:prod:isolated --yes   ` and deploy directly to prod
 
-C. 
+B.1. ./packages/lifeos-mcp
+    - this has MCP tools that has access to my LIFEOS convex data.
+    - these are published to npm, so I can use them in other area as mcp and I can have AI agents access my lifeos data (see ./infra)
+
+C. ./infra
+    - this is my k3s stack that i deploy to hetzner.
+    - in there, this is where i setup my AI army, using claude-code + opencode as main agent.
+        - in there they all use a shared volume and share teh same credentials
+    - the goal is to use claude-code and opencode as AI agents (for non-coding and coding) that use my personal subscriptions (claude max, codex pro, etc)
+    - there is a "controlplane" app, and i build a capacitor app w/ it for my iphone use.
+        - **IMPORTANT** this entire stack i use tailscale to connect to. Theres no AUTH; its only accessible via my tailscale
+        - the controlplane capacitorapp is my main driver:
+            - I use it to config AI Agents
+            - I use an AGENT to use all my lifeOS data.
+
+D. ./packages
+    - everything else here, are my one off experiments.
+    - beeper --  ./packages/beeperdb -- this is for my mac use, so i can scrape data from beeper, so i can see my chats in the tauri "beeper" tab.
+    - granola ai -- this is a macos app that is the ai meeting note app. I may have some code to help me scrape data there and add it to my lifeos convex
 
 
 
+## INSTRUCTIONS FOR DEVELOPMENT
 - when starting a new feature, use worktrunk skill to create a new GIT WORK WORKTREE, then proceed to do what the user asks. 
     - when you created a new worktree, you can use pnpm env:decrypt to decrypt the environment variables for all apps and packages.
 
