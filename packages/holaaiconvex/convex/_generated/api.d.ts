@@ -53,6 +53,8 @@ import type * as lifeos_calendar from "../lifeos/calendar.js";
 import type * as lifeos_calendar_schema from "../lifeos/calendar_schema.js";
 import type * as lifeos_chatnexus from "../lifeos/chatnexus.js";
 import type * as lifeos_chatnexus_schema from "../lifeos/chatnexus_schema.js";
+import type * as lifeos_controlplane from "../lifeos/controlplane.js";
+import type * as lifeos_controlplane_schema from "../lifeos/controlplane_schema.js";
 import type * as lifeos_daily_fields from "../lifeos/daily_fields.js";
 import type * as lifeos_daily_fields_schema from "../lifeos/daily_fields_schema.js";
 import type * as lifeos_demo_agent from "../lifeos/demo_agent.js";
@@ -160,6 +162,8 @@ declare const fullApi: ApiFromModules<{
   "lifeos/calendar_schema": typeof lifeos_calendar_schema;
   "lifeos/chatnexus": typeof lifeos_chatnexus;
   "lifeos/chatnexus_schema": typeof lifeos_chatnexus_schema;
+  "lifeos/controlplane": typeof lifeos_controlplane;
+  "lifeos/controlplane_schema": typeof lifeos_controlplane_schema;
   "lifeos/daily_fields": typeof lifeos_daily_fields;
   "lifeos/daily_fields_schema": typeof lifeos_daily_fields_schema;
   "lifeos/demo_agent": typeof lifeos_demo_agent;

@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/api"
+	"github.com/starascendin/claude-agent-farm/controlplane/internal/convex"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/github"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/k8s"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/storage"
@@ -48,8 +49,30 @@ func main() {
 		log.Printf("GitHub integration disabled (GITHUB_PAT not set)")
 	}
 
+	// Initialize Convex client for config storage
+	convexURL := os.Getenv("CONVEX_URL")
+	convexAPIKey := os.Getenv("CONTROLPLANE_API_KEY")
+	if convexAPIKey == "" {
+		convexAPIKey = "controlplane-api-key-2024" // Default matches http.ts
+	}
+
+	var convexClient *convex.Client
+	if convexURL != "" {
+		convexClient = convex.NewClient(convexURL, convexAPIKey)
+		log.Printf("Convex integration enabled (CONVEX_URL configured)")
+	} else {
+		log.Printf("Convex integration disabled (CONVEX_URL not set, using SQLite)")
+	}
+
 	// Initialize API
-	apiHandler := api.NewAPI(store, k8sClient, githubClient)
+	var apiHandler *api.API
+	if convexClient != nil {
+		// Use Convex for configs, keep K8s for pod management
+		apiHandler = api.NewAPIWithConvex(convexClient, k8sClient, githubClient)
+	} else {
+		// Legacy mode: use SQLite for everything
+		apiHandler = api.NewAPI(store, k8sClient, githubClient)
+	}
 
 	// Initialize Echo
 	e := echo.New()

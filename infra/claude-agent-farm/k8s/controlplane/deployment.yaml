@@ -33,6 +33,14 @@ spec:
                 secretKeyRef:
                   name: github-credentials
                   key: GITHUB_PAT
+            - name: CONVEX_URL
+              value: "https://keen-nightingale-310.convex.site"
+            - name: CONTROLPLANE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: convex-credentials
+                  key: CONTROLPLANE_API_KEY
+                  optional: true
           resources:
             requests:
               cpu: "100m"

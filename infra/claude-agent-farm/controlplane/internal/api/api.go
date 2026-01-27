@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/starascendin/claude-agent-farm/controlplane/internal/convex"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/github"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/k8s"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/mcp"
@@ -19,11 +20,13 @@ import (
 )
 
 type API struct {
-	store        *storage.SQLiteStore
+	store        *storage.SQLiteStore // Legacy SQLite storage (deprecated)
+	convex       *convex.Client       // Convex client for configs
 	k8sClient    *k8s.Client
 	githubClient *github.Client
 }
 
+// NewAPI creates a new API handler with SQLite storage (legacy)
 func NewAPI(store *storage.SQLiteStore, k8sClient *k8s.Client, githubClient *github.Client) *API {
 	return &API{
 		store:        store,
@@ -32,10 +35,45 @@ func NewAPI(store *storage.SQLiteStore, k8sClient *k8s.Client, githubClient *git
 	}
 }
 
+// NewAPIWithConvex creates a new API handler with Convex client for configs
+func NewAPIWithConvex(convexClient *convex.Client, k8sClient *k8s.Client, githubClient *github.Client) *API {
+	return &API{
+		convex:       convexClient,
+		k8sClient:    k8sClient,
+		githubClient: githubClient,
+	}
+}
+
+// SetConvexClient sets the Convex client (for gradual migration)
+func (a *API) SetConvexClient(convexClient *convex.Client) {
+	a.convex = convexClient
+}
+
+// useConvex returns true if we should use Convex instead of SQLite
+func (a *API) useConvex() bool {
+	return a.convex != nil
+}
+
 // --- Config Endpoints ---
 
 // ListConfigs returns all configs as JSON
 func (a *API) ListConfigs(c echo.Context) error {
+	if a.useConvex() {
+		configs, err := a.convex.ListAgentConfigs()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to list configs: %v", err),
+			})
+		}
+		// Convert to models.AgentConfig for compatibility
+		result := make([]models.AgentConfig, len(configs))
+		for i, cfg := range configs {
+			result[i] = convexToModelConfig(&cfg)
+		}
+		return c.JSON(http.StatusOK, result)
+	}
+
+	// Legacy SQLite path
 	configs, err := a.store.ListConfigs()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -45,9 +83,45 @@ func (a *API) ListConfigs(c echo.Context) error {
 	return c.JSON(http.StatusOK, configs)
 }
 
+// convexToModelConfig converts a Convex AgentConfig to models.AgentConfig
+func convexToModelConfig(cfg *convex.AgentConfig) models.AgentConfig {
+	return models.AgentConfig{
+		ID:            0, // Convex uses string IDs, we'll use a placeholder
+		ConvexID:      cfg.ID,
+		Name:          cfg.Name,
+		Repos:         cfg.Repos,
+		TaskPrompt:    cfg.TaskPrompt,
+		SystemPrompt:  cfg.SystemPrompt,
+		MaxTurns:      cfg.MaxTurns,
+		MaxBudgetUSD:  cfg.MaxBudgetUSD,
+		CPULimit:      cfg.CPULimit,
+		MemoryLimit:   cfg.MemoryLimit,
+		AllowedTools:  cfg.AllowedTools,
+		EnabledMCPs:   cfg.EnabledMCPs,
+		EnabledSkills: cfg.EnabledSkills,
+		CreatedAt:     time.UnixMilli(cfg.CreatedAt),
+		UpdatedAt:     time.UnixMilli(cfg.UpdatedAt),
+	}
+}
+
 // GetConfig returns a single config by ID
 func (a *API) GetConfig(c echo.Context) error {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	idParam := c.Param("id")
+
+	if a.useConvex() {
+		// Convex uses string IDs
+		config, err := a.convex.GetAgentConfig(idParam)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Config not found",
+			})
+		}
+		result := convexToModelConfig(config)
+		return c.JSON(http.StatusOK, result)
+	}
+
+	// Legacy SQLite path - parse as int64
+	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid ID",
@@ -94,6 +168,66 @@ func (a *API) CreateConfig(c echo.Context) error {
 		})
 	}
 
+	// Set defaults
+	if req.MaxTurns == 0 {
+		req.MaxTurns = 50
+	}
+	if req.MaxBudgetUSD == 0 {
+		req.MaxBudgetUSD = 10.0
+	}
+	if req.CPULimit == "" {
+		req.CPULimit = "1000m"
+	}
+	if req.MemoryLimit == "" {
+		req.MemoryLimit = "2Gi"
+	}
+	if req.AllowedTools == "" {
+		req.AllowedTools = "Read,Write,Edit,Bash,Glob,Grep"
+	}
+
+	if a.useConvex() {
+		convexReq := &convex.CreateAgentConfigRequest{
+			Name:          req.Name,
+			Repos:         req.Repos,
+			TaskPrompt:    req.TaskPrompt,
+			SystemPrompt:  req.SystemPrompt,
+			MaxTurns:      req.MaxTurns,
+			MaxBudgetUSD:  req.MaxBudgetUSD,
+			CPULimit:      req.CPULimit,
+			MemoryLimit:   req.MemoryLimit,
+			AllowedTools:  req.AllowedTools,
+			EnabledMCPs:   req.EnabledMCPs,
+			EnabledSkills: req.EnabledSkills,
+		}
+
+		convexID, err := a.convex.CreateAgentConfig(convexReq)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to create config: %v", err),
+			})
+		}
+
+		// Return the created config
+		config := models.AgentConfig{
+			ConvexID:      convexID,
+			Name:          req.Name,
+			Repos:         req.Repos,
+			TaskPrompt:    req.TaskPrompt,
+			SystemPrompt:  req.SystemPrompt,
+			MaxTurns:      req.MaxTurns,
+			MaxBudgetUSD:  req.MaxBudgetUSD,
+			CPULimit:      req.CPULimit,
+			MemoryLimit:   req.MemoryLimit,
+			AllowedTools:  req.AllowedTools,
+			EnabledMCPs:   req.EnabledMCPs,
+			EnabledSkills: req.EnabledSkills,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		return c.JSON(http.StatusCreated, config)
+	}
+
+	// Legacy SQLite path
 	config := &models.AgentConfig{
 		Name:          req.Name,
 		Repos:         req.Repos,
@@ -106,23 +240,6 @@ func (a *API) CreateConfig(c echo.Context) error {
 		AllowedTools:  req.AllowedTools,
 		EnabledMCPs:   req.EnabledMCPs,
 		EnabledSkills: req.EnabledSkills,
-	}
-
-	// Set defaults
-	if config.MaxTurns == 0 {
-		config.MaxTurns = 50
-	}
-	if config.MaxBudgetUSD == 0 {
-		config.MaxBudgetUSD = 10.0
-	}
-	if config.CPULimit == "" {
-		config.CPULimit = "1000m"
-	}
-	if config.MemoryLimit == "" {
-		config.MemoryLimit = "2Gi"
-	}
-	if config.AllowedTools == "" {
-		config.AllowedTools = "Read,Write,Edit,Bash,Glob,Grep"
 	}
 
 	id, err := a.store.CreateConfig(config)
@@ -138,17 +255,60 @@ func (a *API) CreateConfig(c echo.Context) error {
 
 // UpdateConfig updates an existing config
 func (a *API) UpdateConfig(c echo.Context) error {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid ID",
-		})
-	}
+	idParam := c.Param("id")
 
 	var req CreateConfigRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid request body",
+		})
+	}
+
+	if a.useConvex() {
+		// Convex uses string IDs
+		convexReq := &convex.CreateAgentConfigRequest{
+			Name:          req.Name,
+			Repos:         req.Repos,
+			TaskPrompt:    req.TaskPrompt,
+			SystemPrompt:  req.SystemPrompt,
+			MaxTurns:      req.MaxTurns,
+			MaxBudgetUSD:  req.MaxBudgetUSD,
+			CPULimit:      req.CPULimit,
+			MemoryLimit:   req.MemoryLimit,
+			AllowedTools:  req.AllowedTools,
+			EnabledMCPs:   req.EnabledMCPs,
+			EnabledSkills: req.EnabledSkills,
+		}
+
+		if err := a.convex.UpdateAgentConfig(idParam, convexReq); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to update config: %v", err),
+			})
+		}
+
+		config := models.AgentConfig{
+			ConvexID:      idParam,
+			Name:          req.Name,
+			Repos:         req.Repos,
+			TaskPrompt:    req.TaskPrompt,
+			SystemPrompt:  req.SystemPrompt,
+			MaxTurns:      req.MaxTurns,
+			MaxBudgetUSD:  req.MaxBudgetUSD,
+			CPULimit:      req.CPULimit,
+			MemoryLimit:   req.MemoryLimit,
+			AllowedTools:  req.AllowedTools,
+			EnabledMCPs:   req.EnabledMCPs,
+			EnabledSkills: req.EnabledSkills,
+			UpdatedAt:     time.Now(),
+		}
+		return c.JSON(http.StatusOK, config)
+	}
+
+	// Legacy SQLite path - parse as int64
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid ID",
 		})
 	}
 
@@ -178,7 +338,19 @@ func (a *API) UpdateConfig(c echo.Context) error {
 
 // DeleteConfig deletes a config
 func (a *API) DeleteConfig(c echo.Context) error {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	idParam := c.Param("id")
+
+	if a.useConvex() {
+		if err := a.convex.DeleteAgentConfig(idParam); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to delete config: %v", err),
+			})
+		}
+		return c.NoContent(http.StatusNoContent)
+	}
+
+	// Legacy SQLite path - parse as int64
+	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid ID",
@@ -225,18 +397,33 @@ func (a *API) LaunchAgent(c echo.Context) error {
 		})
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid ID",
-		})
-	}
+	idParam := c.Param("id")
+	var config *models.AgentConfig
 
-	config, err := a.store.GetConfig(id)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, map[string]string{
-			"error": "Config not found",
-		})
+	if a.useConvex() {
+		// Convex uses string IDs
+		convexConfig, err := a.convex.GetAgentConfig(idParam)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Config not found",
+			})
+		}
+		modelConfig := convexToModelConfig(convexConfig)
+		config = &modelConfig
+	} else {
+		// Legacy SQLite path - parse as int64
+		id, err := strconv.ParseInt(idParam, 10, 64)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "Invalid ID",
+			})
+		}
+		config, err = a.store.GetConfig(id)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Config not found",
+			})
+		}
 	}
 
 	var req LaunchAgentRequest
@@ -257,18 +444,36 @@ func (a *API) LaunchAgent(c echo.Context) error {
 	if config.EnabledMCPs != "" {
 		mcpNames := mcp.ParseEnabledMCPs(config.EnabledMCPs)
 		if len(mcpNames) > 0 {
-			// Get servers from enabled TOML configs (not the old mcp_servers table)
-			enabledConfigs, err := a.store.GetEnabledTomlConfigs()
-			if err != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
-				})
+			// Get servers from enabled TOML configs
+			var enabledConfigContents []string
+
+			if a.useConvex() {
+				convexConfigs, err := a.convex.GetEnabledMCPConfigs()
+				if err != nil {
+					return c.JSON(http.StatusInternalServerError, map[string]string{
+						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
+					})
+				}
+				for _, cfg := range convexConfigs {
+					enabledConfigContents = append(enabledConfigContents, cfg.Content)
+				}
+			} else {
+				// Legacy SQLite path
+				enabledConfigs, err := a.store.GetEnabledTomlConfigs()
+				if err != nil {
+					return c.JSON(http.StatusInternalServerError, map[string]string{
+						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
+					})
+				}
+				for _, cfg := range enabledConfigs {
+					enabledConfigContents = append(enabledConfigContents, cfg.Content)
+				}
 			}
 
 			// Parse all enabled configs and build server map
 			serverMap := make(map[string]models.MCPServer)
-			for _, tomlConfig := range enabledConfigs {
-				servers, err := mcp.ParseTOML(tomlConfig.Content)
+			for _, tomlContent := range enabledConfigContents {
+				servers, err := mcp.ParseTOML(tomlContent)
 				if err != nil {
 					continue // Skip invalid configs
 				}
@@ -290,10 +495,11 @@ func (a *API) LaunchAgent(c echo.Context) error {
 				// For now, we'll leave placeholders that the pod can resolve at runtime
 				envValues := map[string]string{}
 
-				mcpJSON, err = mcp.GenerateMCPConfig(mcpServers, envValues)
-				if err != nil {
+				var mcpErr error
+				mcpJSON, mcpErr = mcp.GenerateMCPConfig(mcpServers, envValues)
+				if mcpErr != nil {
 					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": fmt.Sprintf("Failed to generate MCP config: %v", err),
+						"error": fmt.Sprintf("Failed to generate MCP config: %v", mcpErr),
 					})
 				}
 			}
@@ -303,13 +509,24 @@ func (a *API) LaunchAgent(c echo.Context) error {
 	// Get skill install commands from database
 	var skillInstallCommands []string
 	if config.EnabledSkills != "" {
-		commands, err := a.store.GetSkillInstallCommands(config.EnabledSkills)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
-			})
+		if a.useConvex() {
+			commands, err := a.convex.GetSkillInstallCommands(config.EnabledSkills)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
+				})
+			}
+			skillInstallCommands = commands
+		} else {
+			// Legacy SQLite path
+			commands, err := a.store.GetSkillInstallCommands(config.EnabledSkills)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
+				})
+			}
+			skillInstallCommands = commands
 		}
-		skillInstallCommands = commands
 	}
 
 	podName, err := a.k8sClient.LaunchAgentWithMCP(config, taskPrompt, mcpJSON, skillInstallCommands)
@@ -334,18 +551,33 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 		})
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid ID",
-		})
-	}
+	idParam := c.Param("id")
+	var config *models.AgentConfig
 
-	config, err := a.store.GetConfig(id)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, map[string]string{
-			"error": "Config not found",
-		})
+	if a.useConvex() {
+		// Convex uses string IDs
+		convexConfig, err := a.convex.GetAgentConfig(idParam)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Config not found",
+			})
+		}
+		modelConfig := convexToModelConfig(convexConfig)
+		config = &modelConfig
+	} else {
+		// Legacy SQLite path - parse as int64
+		id, err := strconv.ParseInt(idParam, 10, 64)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{
+				"error": "Invalid ID",
+			})
+		}
+		config, err = a.store.GetConfig(id)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Config not found",
+			})
+		}
 	}
 
 	// Delete existing persistent pod if it exists (name pattern: agent-{config.Name}-pod)
@@ -492,15 +724,27 @@ func (a *API) ChatSend(c echo.Context) error {
 	// Determine which pod to use
 	if agentIDStr != "" {
 		// Agent-based chat: get or create persistent agent pod
-		agentID, parseErr := strconv.ParseInt(agentIDStr, 10, 64)
-		if parseErr != nil {
-			sendSSEError(c, "Invalid agent_id")
-			return nil
-		}
-		agentConfig, err = a.store.GetConfig(agentID)
-		if err != nil {
-			sendSSEError(c, fmt.Sprintf("Agent config not found: %v", err))
-			return nil
+		if a.useConvex() {
+			// Convex uses string IDs
+			convexConfig, convexErr := a.convex.GetAgentConfig(agentIDStr)
+			if convexErr != nil {
+				sendSSEError(c, fmt.Sprintf("Agent config not found: %v", convexErr))
+				return nil
+			}
+			modelConfig := convexToModelConfig(convexConfig)
+			agentConfig = &modelConfig
+		} else {
+			// Legacy SQLite path - parse as int64
+			agentID, parseErr := strconv.ParseInt(agentIDStr, 10, 64)
+			if parseErr != nil {
+				sendSSEError(c, "Invalid agent_id")
+				return nil
+			}
+			agentConfig, err = a.store.GetConfig(agentID)
+			if err != nil {
+				sendSSEError(c, fmt.Sprintf("Agent config not found: %v", err))
+				return nil
+			}
 		}
 		podName, err = a.k8sClient.GetOrCreateAgentPod(agentConfig)
 		if err != nil {

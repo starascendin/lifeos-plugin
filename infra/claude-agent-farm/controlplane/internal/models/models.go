@@ -7,6 +7,7 @@ import (
 // AgentConfig represents a saved agent configuration template
 type AgentConfig struct {
 	ID            int64     `json:"id"`
+	ConvexID      string    `json:"convex_id,omitempty"` // Convex document ID (used when migrated to Convex)
 	Name          string    `json:"name"`
 	Repos         string    `json:"repos"`         // Comma-separated repo URLs
 	TaskPrompt    string    `json:"task_prompt"`   // Default task prompt

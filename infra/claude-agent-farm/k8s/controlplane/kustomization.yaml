@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - rbac.yaml
   - deployment.yaml
+  - convex-credentials.yaml
