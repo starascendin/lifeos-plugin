@@ -150,6 +150,9 @@ func main() {
 		apiGroup.GET("/health", func(c echo.Context) error {
 			return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 		})
+
+		// System Info
+		apiGroup.GET("/system-info", apiHandler.GetSystemInfo)
 	}
 
 	// Legacy health endpoint for k8s probes

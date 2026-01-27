@@ -54,6 +54,33 @@ func (a *API) useConvex() bool {
 	return a.convex != nil
 }
 
+// GetSystemInfo returns system information including Convex URL
+func (a *API) GetSystemInfo(c echo.Context) error {
+	info := map[string]interface{}{
+		"storage_type": "sqlite",
+		"convex_url":   "",
+	}
+
+	if a.useConvex() {
+		info["storage_type"] = "convex"
+		info["convex_url"] = a.convex.GetBaseURL()
+	}
+
+	if a.k8sClient != nil {
+		info["k8s_enabled"] = true
+	} else {
+		info["k8s_enabled"] = false
+	}
+
+	if a.githubClient != nil && a.githubClient.IsConfigured() {
+		info["github_enabled"] = true
+	} else {
+		info["github_enabled"] = false
+	}
+
+	return c.JSON(http.StatusOK, info)
+}
+
 // --- Config Endpoints ---
 
 // ListConfigs returns all configs as JSON

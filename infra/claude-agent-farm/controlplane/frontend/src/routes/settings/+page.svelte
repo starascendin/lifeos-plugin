@@ -38,7 +38,9 @@
 		stopAgent,
 		launchAgent,
 		recreateAgentPod,
-		cleanupPods
+		cleanupPods,
+		getSystemInfo,
+		type SystemInfo
 	} from '$lib/api/client';
 	import type { MCPTomlConfig, MCPServer, Skill, AgentConfig, RunningAgent } from '$lib/api/types';
 	import { skills, skillsByCategory, categoryLabels } from '$lib/stores/skills';
@@ -64,6 +66,7 @@
 	let downloadingUpdate = false;
 	let downloadProgress = 0;
 	let updateError = '';
+	let systemInfo: SystemInfo | null = null;
 
 	// MCP state
 	let tomlContent = '';
@@ -117,6 +120,13 @@
 
 	// App/Update functions
 	async function loadAppInfo() {
+		// Always load system info
+		try {
+			systemInfo = await getSystemInfo();
+		} catch (e) {
+			console.error('Failed to load system info:', e);
+		}
+
 		if (!isNative) return;
 		currentBundle = await getCurrentBundle();
 		latestVersion = await fetchLatestVersion();
@@ -519,6 +529,43 @@
 	<!-- App Tab (OTA Updates) -->
 	{#if activeTab === 'app'}
 		<div class="space-y-4">
+			<!-- System Info -->
+			{#if systemInfo}
+				<Card.Root>
+					<Card.Header class="pb-3">
+						<Card.Title class="text-sm uppercase tracking-wide text-muted-foreground">
+							Backend
+						</Card.Title>
+					</Card.Header>
+					<Card.Content class="space-y-2">
+						<div class="flex items-center justify-between">
+							<span class="text-sm text-muted-foreground">Storage</span>
+							<Badge variant={systemInfo.storage_type === 'convex' ? 'default' : 'secondary'}>
+								{systemInfo.storage_type}
+							</Badge>
+						</div>
+						{#if systemInfo.convex_url}
+							<div class="flex items-center justify-between gap-2">
+								<span class="text-sm text-muted-foreground">Convex URL</span>
+								<span class="truncate text-xs font-mono text-foreground/80">{systemInfo.convex_url}</span>
+							</div>
+						{/if}
+						<div class="flex items-center justify-between">
+							<span class="text-sm text-muted-foreground">Kubernetes</span>
+							<Badge variant={systemInfo.k8s_enabled ? 'default' : 'secondary'} class={systemInfo.k8s_enabled ? 'bg-green-600/20 text-green-400' : ''}>
+								{systemInfo.k8s_enabled ? 'Connected' : 'Disabled'}
+							</Badge>
+						</div>
+						<div class="flex items-center justify-between">
+							<span class="text-sm text-muted-foreground">GitHub</span>
+							<Badge variant={systemInfo.github_enabled ? 'default' : 'secondary'} class={systemInfo.github_enabled ? 'bg-green-600/20 text-green-400' : ''}>
+								{systemInfo.github_enabled ? 'Connected' : 'Disabled'}
+							</Badge>
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{/if}
+
 			<Card.Root>
 				<Card.Header class="pb-3">
 					<Card.Title class="text-sm uppercase tracking-wide text-muted-foreground">

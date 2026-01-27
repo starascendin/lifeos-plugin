@@ -19,7 +19,7 @@ spec:
       serviceAccountName: controlplane
       containers:
         - name: controlplane
-          image: ghcr.io/starascendin/claude-agent-farm-controlplane:latest
+          image: ghcr.io/starascendin/hola-monorepo-controlplane:latest
           ports:
             - containerPort: 8080
               name: http

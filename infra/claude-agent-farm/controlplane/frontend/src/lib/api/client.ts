@@ -353,3 +353,15 @@ export async function toggleSkill(name: string, enabled: boolean): Promise<void>
     body: JSON.stringify({ enabled }),
   })
 }
+
+// System Info
+export interface SystemInfo {
+  storage_type: 'sqlite' | 'convex'
+  convex_url: string
+  k8s_enabled: boolean
+  github_enabled: boolean
+}
+
+export async function getSystemInfo(): Promise<SystemInfo> {
+  return fetchJson<SystemInfo>('/system-info')
+}

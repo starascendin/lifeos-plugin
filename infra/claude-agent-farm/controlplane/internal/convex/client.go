@@ -28,6 +28,11 @@ func NewClient(baseURL, apiKey string) *Client {
 	}
 }
 
+// GetBaseURL returns the Convex deployment URL
+func (c *Client) GetBaseURL() string {
+	return c.baseURL
+}
+
 // ==================== AGENT CONFIGS ====================
 
 // AgentConfig represents an agent configuration from Convex
