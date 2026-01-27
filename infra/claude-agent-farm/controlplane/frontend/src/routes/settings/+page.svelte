@@ -67,6 +67,7 @@
 	let downloadProgress = 0;
 	let updateError = '';
 	let systemInfo: SystemInfo | null = null;
+	let systemInfoError = '';
 
 	// MCP state
 	let tomlContent = '';
@@ -123,8 +124,10 @@
 		// Always load system info
 		try {
 			systemInfo = await getSystemInfo();
+			systemInfoError = '';
 		} catch (e) {
 			console.error('Failed to load system info:', e);
+			systemInfoError = e instanceof Error ? e.message : 'Failed to load';
 		}
 
 		if (!isNative) return;
@@ -509,14 +512,16 @@
 	</div>
 
 	<!-- Backend Info - Always visible -->
-	{#if systemInfo}
-		<Card.Root>
-			<Card.Header class="pb-3">
-				<Card.Title class="text-sm uppercase tracking-wide text-muted-foreground">
-					Backend
-				</Card.Title>
-			</Card.Header>
-			<Card.Content class="space-y-2">
+	<Card.Root>
+		<Card.Header class="pb-3">
+			<Card.Title class="text-sm uppercase tracking-wide text-muted-foreground">
+				Backend
+			</Card.Title>
+		</Card.Header>
+		<Card.Content class="space-y-2">
+			{#if systemInfoError}
+				<div class="text-xs text-destructive">{systemInfoError}</div>
+			{:else if systemInfo}
 				<div class="flex items-center justify-between">
 					<span class="text-sm text-muted-foreground">Storage</span>
 					<Badge variant={systemInfo.storage_type === 'convex' ? 'default' : 'secondary'}>
@@ -541,9 +546,11 @@
 						{systemInfo.github_enabled ? 'Connected' : 'Off'}
 					</Badge>
 				</div>
-			</Card.Content>
-		</Card.Root>
-	{/if}
+			{:else}
+				<div class="text-xs text-muted-foreground">Loading...</div>
+			{/if}
+		</Card.Content>
+	</Card.Root>
 
 	<!-- Tab Navigation -->
 	<div class="flex gap-1 overflow-x-auto rounded-lg bg-muted/50 p-1">
