@@ -508,6 +508,43 @@
 		<p class="text-sm text-muted-foreground">Manage your agent farm</p>
 	</div>
 
+	<!-- Backend Info - Always visible -->
+	{#if systemInfo}
+		<Card.Root>
+			<Card.Header class="pb-3">
+				<Card.Title class="text-sm uppercase tracking-wide text-muted-foreground">
+					Backend
+				</Card.Title>
+			</Card.Header>
+			<Card.Content class="space-y-2">
+				<div class="flex items-center justify-between">
+					<span class="text-sm text-muted-foreground">Storage</span>
+					<Badge variant={systemInfo.storage_type === 'convex' ? 'default' : 'secondary'}>
+						{systemInfo.storage_type}
+					</Badge>
+				</div>
+				{#if systemInfo.convex_url}
+					<div class="flex items-center justify-between gap-2">
+						<span class="text-sm text-muted-foreground">Convex</span>
+						<span class="truncate text-xs font-mono text-foreground/80">{systemInfo.convex_url}</span>
+					</div>
+				{/if}
+				<div class="flex items-center justify-between">
+					<span class="text-sm text-muted-foreground">K8s</span>
+					<Badge variant={systemInfo.k8s_enabled ? 'default' : 'secondary'} class={systemInfo.k8s_enabled ? 'bg-green-600/20 text-green-400' : ''}>
+						{systemInfo.k8s_enabled ? 'Connected' : 'Off'}
+					</Badge>
+				</div>
+				<div class="flex items-center justify-between">
+					<span class="text-sm text-muted-foreground">GitHub</span>
+					<Badge variant={systemInfo.github_enabled ? 'default' : 'secondary'} class={systemInfo.github_enabled ? 'bg-green-600/20 text-green-400' : ''}>
+						{systemInfo.github_enabled ? 'Connected' : 'Off'}
+					</Badge>
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{/if}
+
 	<!-- Tab Navigation -->
 	<div class="flex gap-1 overflow-x-auto rounded-lg bg-muted/50 p-1">
 		{#each tabs as tab}
