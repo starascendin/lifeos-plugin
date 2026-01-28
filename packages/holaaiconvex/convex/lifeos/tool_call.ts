@@ -416,6 +416,84 @@ export const TOOL_DEFINITIONS = {
       phaseId: "optional - phase ID (omit to unassign from current phase)",
     },
   },
+  // Beeper Business Contacts tools
+  get_beeper_threads: {
+    description: "List all business-marked Beeper threads (WhatsApp contacts)",
+    params: {
+      limit: "optional - max results (default 50)",
+    },
+  },
+  get_beeper_thread: {
+    description: "Get a single Beeper thread by its thread ID",
+    params: {
+      threadId: "required - the Beeper thread ID string",
+    },
+  },
+  get_beeper_thread_messages: {
+    description: "Get messages for a Beeper thread",
+    params: {
+      threadId: "required - the Beeper thread ID string",
+      limit: "optional - max results (default 100)",
+    },
+  },
+  search_beeper_messages: {
+    description: "Full-text search across all Beeper messages",
+    params: {
+      query: "required - search terms to find in messages",
+      limit: "optional - max results (default 50)",
+    },
+  },
+  get_beeper_threads_for_person: {
+    description: "Get Beeper threads linked to a FRM person/contact",
+    params: {
+      personId: "required - the person's ID",
+    },
+  },
+  get_beeper_threads_for_client: {
+    description: "Get Beeper threads linked to a PM client",
+    params: {
+      clientId: "required - the client's ID",
+    },
+  },
+  // Granola Meeting tools
+  get_granola_meetings: {
+    description: "List all synced Granola meetings",
+    params: {
+      limit: "optional - max results (default 50)",
+    },
+  },
+  get_granola_meeting: {
+    description: "Get a single Granola meeting by its Granola doc ID (includes AI notes)",
+    params: {
+      granolaDocId: "required - the Granola document ID",
+    },
+  },
+  get_granola_transcript: {
+    description: "Get full transcript for a Granola meeting",
+    params: {
+      meetingId: "required - the Convex meeting ID",
+    },
+  },
+  search_granola_meetings: {
+    description: "Search Granola meetings by title or content",
+    params: {
+      query: "required - search terms",
+      limit: "optional - max results (default 20)",
+    },
+  },
+  // Cross-Entity Linking tools
+  get_granola_meetings_for_person: {
+    description: "Get Granola meetings linked to a FRM person/contact",
+    params: {
+      personId: "required - the person's ID",
+    },
+  },
+  get_granola_meetings_for_thread: {
+    description: "Get Granola meetings linked to a Beeper thread",
+    params: {
+      beeperThreadId: "required - the Beeper thread Convex ID",
+    },
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOL_DEFINITIONS;
@@ -4803,6 +4881,607 @@ export const deleteCycleInternal = internalMutation({
       cycleName,
       unlinkedIssues: issues.length,
       confirmationMessage: `Deleted ${cycleName}. ${issues.length} issues were unlinked.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== BEEPER BUSINESS CONTACTS TOOLS ====================
+
+/**
+ * Get all business-marked Beeper threads
+ */
+export const getBeeperThreadsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 50;
+
+    const threads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_business", (q) =>
+        q.eq("userId", userId).eq("isBusinessChat", true)
+      )
+      .order("desc")
+      .take(limit);
+
+    const threadList = threads.map((t) => ({
+      id: t._id,
+      threadId: t.threadId,
+      threadName: t.threadName,
+      threadType: t.threadType,
+      participantCount: t.participantCount,
+      messageCount: t.messageCount,
+      lastMessageAt: new Date(t.lastMessageAt).toISOString(),
+      businessNote: t.businessNote,
+      linkedPersonId: t.linkedPersonId,
+      linkedClientId: t.linkedClientId,
+    }));
+
+    return {
+      threads: threadList,
+      count: threadList.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single Beeper thread by thread ID
+ */
+export const getBeeperThreadInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    threadId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const thread = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId)
+      )
+      .unique();
+
+    if (!thread) {
+      return {
+        success: false,
+        error: "Thread not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    return {
+      success: true,
+      thread: {
+        id: thread._id,
+        threadId: thread.threadId,
+        threadName: thread.threadName,
+        threadType: thread.threadType,
+        participantCount: thread.participantCount,
+        messageCount: thread.messageCount,
+        lastMessageAt: new Date(thread.lastMessageAt).toISOString(),
+        isBusinessChat: thread.isBusinessChat,
+        businessNote: thread.businessNote,
+        linkedPersonId: thread.linkedPersonId,
+        linkedClientId: thread.linkedClientId,
+        lastSyncedAt: new Date(thread.lastSyncedAt).toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get messages for a Beeper thread
+ */
+export const getBeeperThreadMessagesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    threadId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 100;
+
+    // Verify thread belongs to user
+    const thread = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId)
+      )
+      .unique();
+
+    if (!thread) {
+      return {
+        success: false,
+        error: "Thread not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const messages = await ctx.db
+      .query("lifeos_beeperMessages")
+      .withIndex("by_user_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId)
+      )
+      .order("desc")
+      .take(limit);
+
+    const messageList = messages.map((m) => ({
+      id: m._id,
+      sender: m.sender,
+      text: m.text,
+      timestamp: new Date(m.timestamp).toISOString(),
+    }));
+
+    return {
+      success: true,
+      threadName: thread.threadName,
+      messages: messageList,
+      count: messageList.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Full-text search across all Beeper messages
+ */
+export const searchBeeperMessagesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 50;
+
+    if (!args.query.trim()) {
+      return {
+        messages: [],
+        query: args.query,
+        count: 0,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const results = await ctx.db
+      .query("lifeos_beeperMessages")
+      .withSearchIndex("search_text", (q) =>
+        q.search("text", args.query).eq("userId", userId)
+      )
+      .take(limit);
+
+    const messageList = results.map((m) => ({
+      id: m._id,
+      threadId: m.threadId,
+      sender: m.sender,
+      text: m.text,
+      timestamp: new Date(m.timestamp).toISOString(),
+    }));
+
+    return {
+      messages: messageList,
+      query: args.query,
+      count: messageList.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get Beeper threads linked to a FRM person
+ */
+export const getBeeperThreadsForPersonInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    personId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const personId = args.personId as Id<"lifeos_frmPeople">;
+
+    // Verify person belongs to user
+    const person = await ctx.db.get(personId);
+    if (!person || person.userId !== userId) {
+      return {
+        success: false,
+        error: "Person not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const threads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_linkedPerson", (q) => q.eq("linkedPersonId", personId))
+      .collect();
+
+    // Filter by user (index doesn't include userId)
+    const userThreads = threads.filter((t) => t.userId === userId);
+
+    const threadList = userThreads.map((t) => ({
+      id: t._id,
+      threadId: t.threadId,
+      threadName: t.threadName,
+      threadType: t.threadType,
+      messageCount: t.messageCount,
+      lastMessageAt: new Date(t.lastMessageAt).toISOString(),
+      businessNote: t.businessNote,
+    }));
+
+    return {
+      success: true,
+      personName: person.name,
+      threads: threadList,
+      count: threadList.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get Beeper threads linked to a PM client
+ */
+export const getBeeperThreadsForClientInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    clientId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const clientId = args.clientId as Id<"lifeos_pmClients">;
+
+    // Verify client belongs to user
+    const client = await ctx.db.get(clientId);
+    if (!client || client.userId !== userId) {
+      return {
+        success: false,
+        error: "Client not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const threads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_linkedClient", (q) => q.eq("linkedClientId", clientId))
+      .collect();
+
+    // Filter by user (index doesn't include userId)
+    const userThreads = threads.filter((t) => t.userId === userId);
+
+    const threadList = userThreads.map((t) => ({
+      id: t._id,
+      threadId: t.threadId,
+      threadName: t.threadName,
+      threadType: t.threadType,
+      messageCount: t.messageCount,
+      lastMessageAt: new Date(t.lastMessageAt).toISOString(),
+      businessNote: t.businessNote,
+    }));
+
+    return {
+      success: true,
+      clientName: client.name,
+      threads: threadList,
+      count: threadList.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== GRANOLA MEETING TOOLS ====================
+
+/**
+ * Get all synced Granola meetings
+ */
+export const getGranolaMeetingsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 50;
+
+    const meetings = await ctx.db
+      .query("life_granolaMeetings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(limit);
+
+    const meetingList = meetings.map((m) => ({
+      id: m._id,
+      granolaDocId: m.granolaDocId,
+      title: m.title,
+      hasTranscript: m.hasTranscript,
+      granolaCreatedAt: m.granolaCreatedAt,
+      resumeMarkdown: m.resumeMarkdown
+        ? m.resumeMarkdown.substring(0, 500) + (m.resumeMarkdown.length > 500 ? "..." : "")
+        : undefined,
+      folders: m.folders,
+    }));
+
+    return {
+      meetings: meetingList,
+      count: meetingList.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single Granola meeting by Granola doc ID (includes full AI notes)
+ */
+export const getGranolaMeetingInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    granolaDocId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const meeting = await ctx.db
+      .query("life_granolaMeetings")
+      .withIndex("by_user_granola_doc_id", (q) =>
+        q.eq("userId", userId).eq("granolaDocId", args.granolaDocId)
+      )
+      .unique();
+
+    if (!meeting) {
+      return {
+        success: false,
+        error: "Meeting not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    return {
+      success: true,
+      meeting: {
+        id: meeting._id,
+        granolaDocId: meeting.granolaDocId,
+        title: meeting.title,
+        hasTranscript: meeting.hasTranscript,
+        resumeMarkdown: meeting.resumeMarkdown,
+        granolaCreatedAt: meeting.granolaCreatedAt,
+        granolaUpdatedAt: meeting.granolaUpdatedAt,
+        folders: meeting.folders,
+        workspaceName: meeting.workspaceName,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get full transcript for a Granola meeting
+ */
+export const getGranolaTranscriptInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    meetingId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const meetingId = args.meetingId as Id<"life_granolaMeetings">;
+
+    // Verify meeting belongs to user
+    const meeting = await ctx.db.get(meetingId);
+    if (!meeting || meeting.userId !== userId) {
+      return {
+        success: false,
+        error: "Meeting not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const transcript = await ctx.db
+      .query("life_granolaTranscripts")
+      .withIndex("by_meeting", (q) => q.eq("meetingId", meetingId))
+      .unique();
+
+    if (!transcript) {
+      return {
+        success: false,
+        error: "Transcript not found for this meeting",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    return {
+      success: true,
+      meetingTitle: meeting.title,
+      transcriptMarkdown: transcript.transcriptMarkdown,
+      utteranceCount: transcript.utterances.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Search Granola meetings by title or content
+ */
+export const searchGranolaMeetingsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = args.limit ?? 20;
+
+    if (!args.query.trim()) {
+      return {
+        meetings: [],
+        query: args.query,
+        count: 0,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Search by title
+    const titleResults = await ctx.db
+      .query("life_granolaMeetings")
+      .withSearchIndex("search_title", (q) =>
+        q.search("title", args.query).eq("userId", userId)
+      )
+      .take(limit);
+
+    // Search by resume content
+    const resumeResults = await ctx.db
+      .query("life_granolaMeetings")
+      .withSearchIndex("search_resume", (q) =>
+        q.search("resumeMarkdown", args.query).eq("userId", userId)
+      )
+      .take(limit);
+
+    // Deduplicate
+    const seen = new Set<string>();
+    const combined = [];
+    for (const meeting of [...titleResults, ...resumeResults]) {
+      if (!seen.has(meeting._id)) {
+        seen.add(meeting._id);
+        combined.push(meeting);
+      }
+    }
+
+    const meetingList = combined.slice(0, limit).map((m) => ({
+      id: m._id,
+      granolaDocId: m.granolaDocId,
+      title: m.title,
+      hasTranscript: m.hasTranscript,
+      granolaCreatedAt: m.granolaCreatedAt,
+      resumeMarkdown: m.resumeMarkdown
+        ? m.resumeMarkdown.substring(0, 300) + (m.resumeMarkdown.length > 300 ? "..." : "")
+        : undefined,
+    }));
+
+    return {
+      meetings: meetingList,
+      query: args.query,
+      count: meetingList.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== CROSS-ENTITY LINKING TOOLS ====================
+
+/**
+ * Get Granola meetings linked to a FRM person
+ */
+export const getGranolaMeetingsForPersonInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    personId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const personId = args.personId as Id<"lifeos_frmPeople">;
+
+    // Verify person belongs to user
+    const person = await ctx.db.get(personId);
+    if (!person || person.userId !== userId) {
+      return {
+        success: false,
+        error: "Person not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const links = await ctx.db
+      .query("life_granolaMeetingPersonLinks")
+      .withIndex("by_person", (q) => q.eq("personId", personId))
+      .collect();
+
+    // Enrich with meeting info
+    const enrichedLinks = await Promise.all(
+      links.map(async (link) => {
+        const meeting = await ctx.db.get(link.meetingId);
+        if (!meeting) return null;
+        return {
+          linkId: link._id,
+          meetingId: meeting._id,
+          meetingTitle: meeting.title,
+          meetingDate: meeting.granolaCreatedAt,
+          hasTranscript: meeting.hasTranscript,
+          linkSource: link.linkSource,
+          aiConfidence: link.aiConfidence,
+        };
+      })
+    );
+
+    const validLinks = enrichedLinks.filter((l): l is NonNullable<typeof l> => l !== null);
+
+    return {
+      success: true,
+      personName: person.name,
+      meetings: validLinks,
+      count: validLinks.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get Granola meetings linked to a Beeper thread
+ */
+export const getGranolaMeetingsForThreadInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    beeperThreadId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const beeperThreadId = args.beeperThreadId as Id<"lifeos_beeperThreads">;
+
+    // Verify thread belongs to user
+    const thread = await ctx.db.get(beeperThreadId);
+    if (!thread || thread.userId !== userId) {
+      return {
+        success: false,
+        error: "Thread not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const links = await ctx.db
+      .query("life_granolaMeetingLinks")
+      .withIndex("by_beeperThread", (q) => q.eq("beeperThreadId", beeperThreadId))
+      .collect();
+
+    // Enrich with meeting info
+    const enrichedLinks = await Promise.all(
+      links.map(async (link) => {
+        const meeting = await ctx.db.get(link.meetingId);
+        if (!meeting) return null;
+        return {
+          linkId: link._id,
+          meetingId: meeting._id,
+          meetingTitle: meeting.title,
+          meetingDate: meeting.granolaCreatedAt,
+          hasTranscript: meeting.hasTranscript,
+          linkSource: link.linkSource,
+          aiConfidence: link.aiConfidence,
+        };
+      })
+    );
+
+    const validLinks = enrichedLinks.filter((l): l is NonNullable<typeof l> => l !== null);
+
+    return {
+      success: true,
+      threadName: thread.threadName,
+      meetings: validLinks,
+      count: validLinks.length,
       generatedAt: new Date().toISOString(),
     };
   },

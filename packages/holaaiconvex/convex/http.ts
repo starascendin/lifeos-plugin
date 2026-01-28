@@ -1356,6 +1356,21 @@ const AVAILABLE_TOOLS = [
   "update_phase",
   "delete_phase",
   "assign_issue_to_phase",
+  // Beeper Business Contacts tools
+  "get_beeper_threads",
+  "get_beeper_thread",
+  "get_beeper_thread_messages",
+  "search_beeper_messages",
+  "get_beeper_threads_for_person",
+  "get_beeper_threads_for_client",
+  // Granola Meeting tools
+  "get_granola_meetings",
+  "get_granola_meeting",
+  "get_granola_transcript",
+  "search_granola_meetings",
+  // Cross-Entity Linking tools
+  "get_granola_meetings_for_person",
+  "get_granola_meetings_for_thread",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -1893,6 +1908,96 @@ http.route({
             userId: auth.userId,
             issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
             phaseId: params?.phaseId as string | undefined,
+          });
+          break;
+
+        // Beeper Business Contacts tools
+        case "get_beeper_threads":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getBeeperThreadsInternal, {
+            userId: auth.userId,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "get_beeper_thread":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getBeeperThreadInternal, {
+            userId: auth.userId,
+            threadId: params?.threadId as string,
+          });
+          break;
+
+        case "get_beeper_thread_messages":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getBeeperThreadMessagesInternal, {
+            userId: auth.userId,
+            threadId: params?.threadId as string,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "search_beeper_messages":
+          result = await ctx.runQuery(internal.lifeos.tool_call.searchBeeperMessagesInternal, {
+            userId: auth.userId,
+            query: params?.query as string,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "get_beeper_threads_for_person":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getBeeperThreadsForPersonInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string,
+          });
+          break;
+
+        case "get_beeper_threads_for_client":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getBeeperThreadsForClientInternal, {
+            userId: auth.userId,
+            clientId: params?.clientId as string,
+          });
+          break;
+
+        // Granola Meeting tools
+        case "get_granola_meetings":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getGranolaMeetingsInternal, {
+            userId: auth.userId,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        case "get_granola_meeting":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getGranolaMeetingInternal, {
+            userId: auth.userId,
+            granolaDocId: params?.granolaDocId as string,
+          });
+          break;
+
+        case "get_granola_transcript":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getGranolaTranscriptInternal, {
+            userId: auth.userId,
+            meetingId: params?.meetingId as string,
+          });
+          break;
+
+        case "search_granola_meetings":
+          result = await ctx.runQuery(internal.lifeos.tool_call.searchGranolaMeetingsInternal, {
+            userId: auth.userId,
+            query: params?.query as string,
+            limit: params?.limit as number | undefined,
+          });
+          break;
+
+        // Cross-Entity Linking tools
+        case "get_granola_meetings_for_person":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getGranolaMeetingsForPersonInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string,
+          });
+          break;
+
+        case "get_granola_meetings_for_thread":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getGranolaMeetingsForThreadInternal, {
+            userId: auth.userId,
+            beeperThreadId: params?.beeperThreadId as string,
           });
           break;
       }

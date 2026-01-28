@@ -18,6 +18,7 @@
  */
 
 import { Command } from "commander";
+import { VERSION, BUILD_TIME } from "./build-info.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -32,7 +33,7 @@ const program = new Command();
 program
   .name("lifeos-mcp")
   .description("MCP server for LifeOS Project Management")
-  .version("0.1.0")
+  .version(VERSION)
   .option("-u, --url <url>", "Convex deployment URL")
   .option("-i, --user-id <id>", "User ID for API authentication")
   .option("-k, --api-key <key>", "API key for authentication")
@@ -1299,6 +1300,261 @@ const TOOLS: Tool[] = [
       required: ["issueIdOrIdentifier"],
     },
   },
+
+  // Beeper Business Contacts Tools
+  {
+    name: "get_beeper_threads",
+    description:
+      "List all business-marked Beeper threads (WhatsApp contacts synced via Beeper).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_beeper_thread",
+    description:
+      "Get a single Beeper thread by its Beeper thread ID.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        threadId: {
+          type: "string",
+          description: "The Beeper thread ID string (required)",
+        },
+      },
+      required: ["threadId"],
+    },
+  },
+  {
+    name: "get_beeper_thread_messages",
+    description:
+      "Get messages for a Beeper thread.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        threadId: {
+          type: "string",
+          description: "The Beeper thread ID string (required)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 100)",
+        },
+      },
+      required: ["threadId"],
+    },
+  },
+  {
+    name: "search_beeper_messages",
+    description:
+      "Full-text search across all synced Beeper messages.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        query: {
+          type: "string",
+          description: "Search terms to find in messages (required)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_beeper_threads_for_person",
+    description:
+      "Get Beeper threads linked to a FRM person/contact.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        personId: {
+          type: "string",
+          description: "The person's ID (required)",
+        },
+      },
+      required: ["personId"],
+    },
+  },
+  {
+    name: "get_beeper_threads_for_client",
+    description:
+      "Get Beeper threads linked to a PM client.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        clientId: {
+          type: "string",
+          description: "The client's ID (required)",
+        },
+      },
+      required: ["clientId"],
+    },
+  },
+
+  // Granola Meeting Tools
+  {
+    name: "get_granola_meetings",
+    description:
+      "List all synced Granola meeting notes.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_granola_meeting",
+    description:
+      "Get a single Granola meeting by its Granola document ID. Includes full AI-generated notes.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        granolaDocId: {
+          type: "string",
+          description: "The Granola document ID (required)",
+        },
+      },
+      required: ["granolaDocId"],
+    },
+  },
+  {
+    name: "get_granola_transcript",
+    description:
+      "Get the full transcript for a Granola meeting.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        meetingId: {
+          type: "string",
+          description: "The Convex meeting ID (required)",
+        },
+      },
+      required: ["meetingId"],
+    },
+  },
+  {
+    name: "search_granola_meetings",
+    description:
+      "Search Granola meetings by title or content.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        query: {
+          type: "string",
+          description: "Search terms to find in meeting titles and notes (required)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 20)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+
+  // Cross-Entity Linking Tools
+  {
+    name: "get_granola_meetings_for_person",
+    description:
+      "Get Granola meetings linked to a FRM person/contact.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        personId: {
+          type: "string",
+          description: "The person's ID (required)",
+        },
+      },
+      required: ["personId"],
+    },
+  },
+  {
+    name: "get_granola_meetings_for_thread",
+    description:
+      "Get Granola meetings linked to a Beeper thread.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        beeperThreadId: {
+          type: "string",
+          description: "The Beeper thread Convex ID (required)",
+        },
+      },
+      required: ["beeperThreadId"],
+    },
+  },
+
+  // MCP Server Info
+  {
+    name: "get_version",
+    description:
+      "Get the current version and build time of the LifeOS MCP server package.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 ];
 
 // Configuration: CLI flags take precedence over env vars
@@ -1369,7 +1625,7 @@ async function callConvexTool(
 const server = new Server(
   {
     name: "lifeos-pm",
-    version: "0.1.0",
+    version: VERSION,
   },
   {
     capabilities: {
@@ -1388,6 +1644,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
+    // Handle local-only tools (no Convex call needed)
+    if (name === "get_version") {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ version: VERSION, buildTime: BUILD_TIME }, null, 2),
+          },
+        ],
+      };
+    }
+
     const result = await callConvexTool(name, (args as Record<string, unknown>) || {});
 
     return {
