@@ -142,6 +142,32 @@ export const granolaTables = {
     .index("by_person", ["personId"])
     .index("by_user_meeting", ["userId", "meetingId"]),
 
+  // ==================== GRANOLA CALENDAR LINKS ====================
+  // Links between Granola meetings and Google Calendar events
+  life_granolaCalendarLinks: defineTable({
+    // User who owns this link
+    userId: v.id("users"),
+    // Meeting ID (Granola meeting)
+    meetingId: v.id("life_granolaMeetings"),
+    // Calendar event ID
+    calendarEventId: v.id("lifeos_calendarEvents"),
+    // How this link was created
+    linkSource: v.union(
+      v.literal("auto_time_match"), // Automatically matched by time overlap
+      v.literal("ai_suggestion"), // AI suggested based on title/content
+      v.literal("manual") // User manually linked
+    ),
+    // Match confidence score (0-1)
+    matchConfidence: v.optional(v.number()),
+    // Match reasoning
+    matchReason: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_meeting", ["meetingId"])
+    .index("by_calendar_event", ["calendarEventId"])
+    .index("by_user_meeting", ["userId", "meetingId"]),
+
   // ==================== GRANOLA SYNC STATUS ====================
   life_granolaSyncStatus: defineTable({
     // User who owns this sync status

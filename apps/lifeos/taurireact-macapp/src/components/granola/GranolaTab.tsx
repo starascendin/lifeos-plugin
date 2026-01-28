@@ -36,17 +36,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   RefreshCw,
   Clock,
-  ChevronDown,
-  ChevronRight,
   FileText,
   MessageSquare,
   AlertCircle,
@@ -58,6 +50,7 @@ import {
   Link2,
   Sparkles,
   UserCircle,
+  Users,
   X,
 } from "lucide-react";
 
@@ -93,8 +86,8 @@ export function GranolaTab() {
   const [localMeetings, setLocalMeetings] = useState<GranolaMeeting[]>([]);
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(false);
 
-  // Expanded meeting for viewing details
-  const [expandedMeetingId, setExpandedMeetingId] = useState<string | null>(
+  // Selected meeting for detail panel
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(
     null
   );
 
@@ -559,65 +552,105 @@ export function GranolaTab() {
         </Card>
       )}
 
-      {/* Meetings List */}
-      <div className="flex-1 min-h-0">
-        <Card className="h-full flex flex-col">
-          <CardHeader className="flex-shrink-0 pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">
-                Meetings ({localMeetings.length})
-              </CardTitle>
-              {isLoadingMeetings && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 min-h-0 p-0">
-            <ScrollArea className="h-full">
-              <div className="px-6 pb-6 space-y-2">
-                {localMeetings.length === 0 && !isLoadingMeetings ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No meetings synced yet.</p>
-                    <p className="text-sm mt-1">
-                      Click "Sync Now" to import your Granola meetings.
-                    </p>
-                  </div>
-                ) : (
-                  localMeetings.map((meeting) => {
-                    // Find corresponding Convex meeting ID
-                    const convexMeeting = convexMeetings?.find(
-                      (cm) => cm.granolaDocId === meeting.id
-                    );
-                    return (
-                      <MeetingCard
-                        key={meeting.id}
-                        meeting={meeting}
-                        convexMeetingId={convexMeeting?._id}
-                        isExpanded={expandedMeetingId === meeting.id}
-                        onToggle={() =>
-                          setExpandedMeetingId(
-                            expandedMeetingId === meeting.id ? null : meeting.id
-                          )
-                        }
-                      />
-                    );
-                  })
+      {/* Split View: Meetings List + Detail Panel */}
+      <div className="flex-1 min-h-0 flex gap-4">
+        {/* Left Panel: Meetings List */}
+        <div className="w-80 flex-shrink-0">
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex-shrink-0 py-3 px-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Meetings ({localMeetings.length})
+                </span>
+                {isLoadingMeetings && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                 )}
               </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="flex-1 min-h-0 p-0">
+              <ScrollArea className="h-full">
+                <div className="px-2 pb-2">
+                  {localMeetings.length === 0 && !isLoadingMeetings ? (
+                    <div className="text-center py-8 text-muted-foreground px-4">
+                      <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No meetings synced yet.</p>
+                    </div>
+                  ) : (
+                    localMeetings.map((meeting) => {
+                      const convexMeeting = convexMeetings?.find(
+                        (cm) => cm.granolaDocId === meeting.id
+                      );
+                      const isSelected = selectedMeetingId === meeting.id;
+                      const hasTranscript = meeting.transcript && meeting.transcript.length > 0;
+                      const hasResume = !!meeting.resume_markdown;
+                      return (
+                        <button
+                          key={meeting.id}
+                          onClick={() => setSelectedMeetingId(meeting.id)}
+                          className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                            isSelected
+                              ? "bg-primary/10 border-l-2 border-primary"
+                              : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{meeting.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatMeetingDate(meeting.created_at)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {!convexMeeting && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" title="Not synced" />
+                              )}
+                              {hasResume && <FileText className="h-3 w-3 text-muted-foreground" />}
+                              {hasTranscript && <MessageSquare className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Panel: Meeting Detail */}
+        <div className="flex-1 min-w-0">
+          {selectedMeetingId ? (
+            (() => {
+              const meeting = localMeetings.find((m) => m.id === selectedMeetingId);
+              const convexMeeting = convexMeetings?.find(
+                (cm) => cm.granolaDocId === selectedMeetingId
+              );
+              if (!meeting) return null;
+              return (
+                <MeetingDetailPanel
+                  meeting={meeting}
+                  convexMeetingId={convexMeeting?._id}
+                />
+              );
+            })()
+          ) : (
+            <Card className="h-full flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p>Select a meeting to view details</p>
+              </div>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-interface MeetingCardProps {
+interface MeetingDetailPanelProps {
   meeting: GranolaMeeting;
   convexMeetingId?: Id<"life_granolaMeetings">;
-  isExpanded: boolean;
-  onToggle: () => void;
 }
 
 // Contact suggestion type from the AI action (for Beeper threads)
@@ -660,10 +693,52 @@ interface MeetingPersonLink {
   avatarEmoji?: string;
 }
 
-function MeetingCard({ meeting, convexMeetingId, isExpanded, onToggle }: MeetingCardProps) {
+// Calendar event attendee
+interface CalendarAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: string;
+  self?: boolean;
+}
+
+// Link with calendar event info
+interface MeetingCalendarLink {
+  _id: Id<"life_granolaCalendarLinks">;
+  calendarEventId: Id<"lifeos_calendarEvents">;
+  linkSource: "auto_time_match" | "ai_suggestion" | "manual";
+  matchConfidence?: number;
+  matchReason?: string;
+  eventTitle?: string;
+  eventStartTime?: number;
+  eventEndTime?: number;
+  eventLocation?: string;
+  eventAttendees?: CalendarAttendee[];
+  eventAttendeesCount?: number;
+}
+
+// Calendar event suggestion
+interface CalendarEventSuggestion {
+  event: {
+    _id: Id<"lifeos_calendarEvents">;
+    title: string;
+    startTime: number;
+    endTime: number;
+    location?: string;
+    attendees?: CalendarAttendee[];
+    attendeesCount?: number;
+  };
+  confidence: number;
+  reason: string;
+}
+
+function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProps) {
   const hasTranscript = meeting.transcript && meeting.transcript.length > 0;
   const hasResume = !!meeting.resume_markdown;
   const hasFolders = meeting.folders && meeting.folders.length > 0;
+
+  // Content view state
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [showFullNotes, setShowFullNotes] = useState(false);
 
   // Linking state (Beeper threads)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -671,12 +746,21 @@ function MeetingCard({ meeting, convexMeetingId, isExpanded, onToggle }: Meeting
   const [suggestionsAnalysis, setSuggestionsAnalysis] = useState<string>("");
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [acceptingThreadId, setAcceptingThreadId] = useState<Id<"lifeos_beeperThreads"> | null>(null);
-  const [showLinkSection, setShowLinkSection] = useState(false);
+  const [hasFetchedSuggestions, setHasFetchedSuggestions] = useState(false);
 
   // Person linking state (FRM People)
   const [personSuggestions, setPersonSuggestions] = useState<PersonSuggestion[]>([]);
   const [personSuggestionsAnalysis, setPersonSuggestionsAnalysis] = useState<string>("");
   const [acceptingPersonId, setAcceptingPersonId] = useState<Id<"lifeos_frmPeople"> | null>(null);
+
+  // Calendar linking state
+  const [acceptingCalendarEventId, setAcceptingCalendarEventId] = useState<Id<"lifeos_calendarEvents"> | null>(null);
+
+  // Sync to Convex state
+  const [isSyncingToConvex, setIsSyncingToConvex] = useState(false);
+
+  // Convex hooks for syncing individual meeting
+  const upsertMeeting = useMutation(api.lifeos.granola.upsertMeeting);
 
   // Convex hooks for thread linking
   const suggestContactLinks = useAction(api.lifeos.granola_linking.suggestContactLinks);
@@ -695,6 +779,18 @@ function MeetingCard({ meeting, convexMeetingId, isExpanded, onToggle }: Meeting
     convexMeetingId ? { meetingId: convexMeetingId } : "skip"
   ) as MeetingPersonLink[] | undefined;
   const deleteMeetingPersonLink = useMutation(api.lifeos.granola.deleteMeetingPersonLink);
+
+  // Convex hooks for calendar linking
+  const calendarSuggestionsResult = useQuery(
+    api.lifeos.granola.findCalendarEventsForMeeting,
+    convexMeetingId ? { meetingId: convexMeetingId, bufferMinutes: 60 } : "skip"
+  ) as { meetingTimestamp: number; meetingTitle: string; suggestions: CalendarEventSuggestion[] } | undefined;
+  const meetingCalendarLinks = useQuery(
+    api.lifeos.granola.getMeetingCalendarLinks,
+    convexMeetingId ? { meetingId: convexMeetingId } : "skip"
+  ) as MeetingCalendarLink[] | undefined;
+  const linkMeetingToCalendarEvent = useMutation(api.lifeos.granola.linkMeetingToCalendarEvent);
+  const deleteMeetingCalendarLink = useMutation(api.lifeos.granola.deleteMeetingCalendarLink);
 
   // Get AI suggestions for linking (both thread and person)
   const handleGetSuggestions = useCallback(async () => {
@@ -732,8 +828,16 @@ function MeetingCard({ meeting, convexMeetingId, isExpanded, onToggle }: Meeting
       setSuggestionsError(String(error));
     } finally {
       setIsLoadingSuggestions(false);
+      setHasFetchedSuggestions(true);
     }
   }, [convexMeetingId, suggestContactLinks, suggestPersonLinks]);
+
+  // Auto-fetch suggestions when synced to Convex
+  useEffect(() => {
+    if (convexMeetingId && !hasFetchedSuggestions && !isLoadingSuggestions) {
+      handleGetSuggestions();
+    }
+  }, [convexMeetingId, hasFetchedSuggestions, isLoadingSuggestions, handleGetSuggestions]);
 
   // Accept a suggestion and create the link
   const handleAcceptSuggestion = useCallback(
@@ -813,215 +917,305 @@ function MeetingCard({ meeting, convexMeetingId, isExpanded, onToggle }: Meeting
     [deleteMeetingPersonLink]
   );
 
-  // Determine default tab
-  const defaultTab = hasResume ? "notes" : hasTranscript ? "transcript" : "notes";
+  // Accept a calendar event suggestion and create the link
+  const handleAcceptCalendarSuggestion = useCallback(
+    async (suggestion: CalendarEventSuggestion) => {
+      if (!convexMeetingId) return;
 
-  // Count total linked contacts (both thread and person links)
+      setAcceptingCalendarEventId(suggestion.event._id);
+      try {
+        await linkMeetingToCalendarEvent({
+          meetingId: convexMeetingId,
+          calendarEventId: suggestion.event._id,
+          linkSource: "auto_time_match",
+          matchConfidence: suggestion.confidence,
+          matchReason: suggestion.reason,
+        });
+      } catch (error) {
+        console.error("Failed to link calendar event:", error);
+      } finally {
+        setAcceptingCalendarEventId(null);
+      }
+    },
+    [convexMeetingId, linkMeetingToCalendarEvent]
+  );
+
+  // Delete a calendar link
+  const handleDeleteCalendarLink = useCallback(
+    async (linkId: Id<"life_granolaCalendarLinks">) => {
+      try {
+        await deleteMeetingCalendarLink({ linkId });
+      } catch (error) {
+        console.error("Failed to delete calendar link:", error);
+      }
+    },
+    [deleteMeetingCalendarLink]
+  );
+
+  // Sync individual meeting to Convex
+  const handleSyncToConvex = useCallback(async () => {
+    if (convexMeetingId) return; // Already synced
+
+    setIsSyncingToConvex(true);
+    try {
+      await upsertMeeting({
+        granolaDocId: meeting.id,
+        title: meeting.title,
+        workspaceId: meeting.workspace_id,
+        workspaceName: meeting.workspace_name,
+        resumeMarkdown: meeting.resume_markdown,
+        hasTranscript: !!(meeting.transcript && meeting.transcript.length > 0),
+        folders: meeting.folders?.map((f) => ({ id: f.id, name: f.name })) || null,
+        granolaCreatedAt: meeting.created_at,
+        granolaUpdatedAt: meeting.updated_at,
+      });
+      // convexMeetingId will update automatically via the query
+    } catch (error) {
+      console.error("Failed to sync meeting to Convex:", error);
+    } finally {
+      setIsSyncingToConvex(false);
+    }
+  }, [convexMeetingId, meeting, upsertMeeting]);
+
+  // Count total linked items
   const linkedThreadCount = meetingLinks?.length || 0;
   const linkedPersonCount = meetingPersonLinks?.length || 0;
+  const linkedCalendarCount = meetingCalendarLinks?.length || 0;
   const linkedCount = linkedThreadCount + linkedPersonCount;
 
+  // Calendar suggestions
+  const calendarSuggestions = calendarSuggestionsResult?.suggestions || [];
+
+  // Check if notes are long enough to need truncation
+  const notesPreviewLength = 500;
+  const isNotesLong = hasResume && (meeting.resume_markdown?.length || 0) > notesPreviewLength;
+  const notesPreview = hasResume
+    ? meeting.resume_markdown?.slice(0, notesPreviewLength) + (isNotesLong ? "..." : "")
+    : "";
+
+  // Check if there are pending suggestions (contacts or calendar)
+  const hasSuggestions = suggestions.length > 0 || personSuggestions.length > 0;
+  const hasCalendarSuggestions = calendarSuggestions.length > 0;
+
   return (
-    <Collapsible open={isExpanded} onOpenChange={onToggle}>
-      <div className="border rounded-lg overflow-hidden">
-        <CollapsibleTrigger asChild>
-          <button className="w-full p-4 text-left hover:bg-muted/50 transition-colors">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                  )}
-                  <h3 className="font-medium truncate">{meeting.title}</h3>
-                </div>
-                <div className="flex items-center gap-3 mt-1 ml-6 text-sm text-muted-foreground">
-                  <span>{formatMeetingDate(meeting.created_at)}</span>
-                  {meeting.workspace_name && (
-                    <>
-                      <span>·</span>
-                      <span className="flex items-center gap-1">
-                        <FolderOpen className="h-3 w-3" />
-                        {meeting.workspace_name}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {linkedCount > 0 && (
-                  <Badge variant="default" className="text-xs bg-blue-500">
-                    <Link2 className="h-3 w-3 mr-1" />
-                    {linkedCount}
-                  </Badge>
-                )}
-                {hasResume && (
-                  <Badge variant="secondary" className="text-xs">
-                    <FileText className="h-3 w-3 mr-1" />
-                    Notes
-                  </Badge>
-                )}
-                {hasTranscript && (
-                  <Badge variant="outline" className="text-xs">
-                    <MessageSquare className="h-3 w-3 mr-1" />
-                    Transcript
-                  </Badge>
-                )}
-              </div>
+    <Card className="h-full flex flex-col">
+      {/* Header */}
+      <CardHeader className="flex-shrink-0 pb-3 border-b">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-lg">{meeting.title}</h2>
+            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+              <span>{formatMeetingDate(meeting.created_at)}</span>
+              {meeting.workspace_name && (
+                <>
+                  <span>·</span>
+                  <span>{meeting.workspace_name}</span>
+                </>
+              )}
+              {hasFolders && (
+                <>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    {meeting.folders!.length}
+                  </span>
+                </>
+              )}
             </div>
-          </button>
-        </CollapsibleTrigger>
+          </div>
+          {/* Sync status & button */}
+          {!convexMeetingId ? (
+            <Button
+              size="sm"
+              onClick={handleSyncToConvex}
+              disabled={isSyncingToConvex}
+              className="flex-shrink-0"
+            >
+              {isSyncingToConvex ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Sync to Convex
+                </>
+              )}
+            </Button>
+          ) : (
+            <Badge variant="secondary" className="bg-green-500/10 text-green-700">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Synced
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
 
-        <CollapsibleContent>
-          <div className="border-t bg-muted/30">
-            {/* Folders row */}
-            {hasFolders && (
-              <div className="px-4 pt-3 pb-2 border-b border-border/50">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-muted-foreground">Folders:</span>
-                  {meeting.folders!.map((folder) => (
-                    <Badge key={folder.id} variant="outline" className="text-xs">
-                      {folder.name}
-                    </Badge>
-                  ))}
+      {/* Content */}
+      <CardContent className="flex-1 min-h-0 p-0">
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4">
+            {/* Notes section */}
+            {hasResume && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <FileText className="h-4 w-4" />
+                    Notes
+                  </span>
+                  {hasTranscript && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTranscript(!showTranscript)}
+                      className="h-7"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                      {showTranscript ? "Hide" : "Show"} Transcript ({meeting.transcript!.length})
+                    </Button>
+                  )}
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                    {showFullNotes || !isNotesLong ? meeting.resume_markdown : notesPreview}
+                  </pre>
+                  {isNotesLong && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowFullNotes(!showFullNotes)}
+                      className="mt-2 h-7"
+                    >
+                      {showFullNotes ? "Show less" : "Show more"}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Tabs for Notes / Transcript */}
-            {(hasResume || hasTranscript) && (
-              <Tabs defaultValue={defaultTab} className="w-full">
-                <div className="px-4 pt-3">
-                  <TabsList className="grid w-full max-w-[300px] grid-cols-2">
-                    <TabsTrigger value="notes" disabled={!hasResume} className="gap-2">
-                      <FileText className="h-3.5 w-3.5" />
-                      Notes
-                    </TabsTrigger>
-                    <TabsTrigger value="transcript" disabled={!hasTranscript} className="gap-2">
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      Transcript
-                      {hasTranscript && (
-                        <span className="text-xs text-muted-foreground">
-                          ({meeting.transcript!.length})
+            {/* Transcript section */}
+            {showTranscript && hasTranscript && (
+              <div>
+                <span className="text-sm font-medium flex items-center gap-1.5 mb-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Transcript
+                </span>
+                <div className="bg-muted/30 rounded-lg p-4 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-2">
+                    {meeting.transcript!.map((utterance, idx) => (
+                      <div key={idx} className="flex gap-3 text-sm">
+                        <span
+                          className={`font-medium flex-shrink-0 w-12 ${
+                            utterance.source === "microphone" ? "text-blue-600" : "text-green-600"
+                          }`}
+                        >
+                          {utterance.source === "microphone" ? "You" : "Them"}
                         </span>
-                      )}
-                    </TabsTrigger>
-                  </TabsList>
+                        <span className="text-foreground/80">{utterance.text}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-
-                <TabsContent value="notes" className="px-4 pb-4 mt-0">
-                  {hasResume ? (
-                    <div className="bg-background rounded-md p-4 mt-3 max-h-[400px] overflow-y-auto">
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                          {meeting.resume_markdown}
-                        </pre>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No notes available for this meeting</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="transcript" className="px-4 pb-4 mt-0">
-                  {hasTranscript ? (
-                    <div className="bg-background rounded-md p-4 mt-3 max-h-[400px] overflow-y-auto">
-                      <div className="space-y-3">
-                        {meeting.transcript!.map((utterance, idx) => (
-                          <div key={idx} className="flex gap-3 text-sm">
-                            <span
-                              className={`font-medium flex-shrink-0 min-w-[60px] ${
-                                utterance.source === "microphone"
-                                  ? "text-blue-500"
-                                  : "text-green-500"
-                              }`}
-                            >
-                              {utterance.source === "microphone" ? "You" : "Them"}
-                            </span>
-                            <span className="text-foreground/90">{utterance.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No transcript available for this meeting</p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+              </div>
             )}
 
-            {/* No content message */}
+            {/* No notes - show transcript directly */}
+            {!hasResume && hasTranscript && !showTranscript && (
+              <div>
+                <span className="text-sm font-medium flex items-center gap-1.5 mb-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Transcript ({meeting.transcript!.length} utterances)
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTranscript(true)}
+                  className="h-7"
+                >
+                  Show Transcript
+                </Button>
+              </div>
+            )}
+
+            {/* No content */}
             {!hasResume && !hasTranscript && (
-              <div className="px-4 py-8 text-center text-muted-foreground">
+              <div className="text-center py-8 text-muted-foreground">
                 <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No notes or transcript available</p>
               </div>
             )}
 
-            {/* Contact Linking Section */}
+            {/* AI Linking Section */}
             {convexMeetingId && (
-              <div className="border-t px-4 py-3">
-                {/* Linked contacts (both threads and people) */}
-                {linkedCount > 0 && (
-                  <div className="mb-3">
-                    <div className="text-xs font-medium text-muted-foreground mb-2">
-                      Linked Contacts
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {/* Thread links (Beeper chats) */}
-                      {meetingLinks?.map((link) => (
-                        <Badge
-                          key={link._id}
-                          variant="secondary"
-                          className="gap-1 pr-1"
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                          {link.threadName || "Unknown"}
-                          {link.linkSource === "ai_suggestion" && (
-                            <Sparkles className="h-3 w-3 text-yellow-500" />
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteLink(link._id);
-                            }}
-                            className="ml-1 hover:bg-destructive/20 rounded p-0.5"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                      {/* Person links (FRM contacts) */}
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4" />
+                    AI Linking
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleGetSuggestions()}
+                    disabled={isLoadingSuggestions}
+                    className="h-7"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isLoadingSuggestions ? "animate-spin" : ""}`} />
+                    Refresh
+                  </Button>
+                </div>
+
+                {/* Linked items */}
+                {(linkedCount > 0 || linkedCalendarCount > 0) && (
+                  <div className="space-y-2 mb-4">
+                    <span className="text-xs text-muted-foreground">Linked</span>
+                    <div className="flex flex-wrap gap-1.5">
                       {meetingPersonLinks?.map((link) => (
                         <Badge
                           key={link._id}
                           variant="secondary"
                           className="gap-1 pr-1 bg-green-500/10 text-green-700 dark:text-green-400"
                         >
-                          {link.avatarEmoji ? (
-                            <span className="text-xs">{link.avatarEmoji}</span>
-                          ) : (
-                            <UserCircle className="h-3 w-3" />
-                          )}
-                          {link.personName || "Unknown"}
-                          {link.linkSource === "ai_suggestion" && (
-                            <Sparkles className="h-3 w-3 text-yellow-500" />
-                          )}
+                          {link.avatarEmoji || <UserCircle className="h-3 w-3" />}
+                          <span className="text-xs">{link.personName}</span>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletePersonLink(link._id);
-                            }}
-                            className="ml-1 hover:bg-destructive/20 rounded p-0.5"
+                            onClick={() => handleDeletePersonLink(link._id)}
+                            className="ml-0.5 hover:bg-red-500/20 rounded p-0.5"
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                      {meetingLinks?.map((link) => (
+                        <Badge
+                          key={link._id}
+                          variant="secondary"
+                          className="gap-1 pr-1 bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          <span className="text-xs">{link.threadName}</span>
+                          <button
+                            onClick={() => handleDeleteLink(link._id)}
+                            className="ml-0.5 hover:bg-red-500/20 rounded p-0.5"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                      {meetingCalendarLinks?.map((link) => (
+                        <Badge
+                          key={link._id}
+                          variant="secondary"
+                          className="gap-1 pr-1 bg-purple-500/10 text-purple-700 dark:text-purple-400"
+                        >
+                          <Calendar className="h-3 w-3" />
+                          <span className="text-xs truncate max-w-[150px]">{link.eventTitle}</span>
+                          <button
+                            onClick={() => handleDeleteCalendarLink(link._id)}
+                            className="ml-0.5 hover:bg-red-500/20 rounded p-0.5"
+                          >
+                            <X className="h-2.5 w-2.5" />
                           </button>
                         </Badge>
                       ))}
@@ -1029,210 +1223,157 @@ function MeetingCard({ meeting, convexMeetingId, isExpanded, onToggle }: Meeting
                   </div>
                 )}
 
-                {/* Link section toggle */}
-                {!showLinkSection ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowLinkSection(true);
-                      if (suggestions.length === 0 && personSuggestions.length === 0 && !suggestionsError) {
-                        handleGetSuggestions();
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Find Related Contacts
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs font-medium text-muted-foreground">
-                        AI Suggestions
-                      </div>
-                      <div className="flex gap-2">
+                {/* Loading */}
+                {isLoadingSuggestions && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Finding related contacts and calendar events...
+                  </div>
+                )}
+
+                {/* Error */}
+                {suggestionsError && (
+                  <div className="flex items-center gap-2 text-sm text-red-500 py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {suggestionsError}
+                  </div>
+                )}
+
+                {/* Suggestions */}
+                {!isLoadingSuggestions && (hasSuggestions || hasCalendarSuggestions) && (
+                  <div className="space-y-2">
+                    <span className="text-xs text-muted-foreground">Suggestions</span>
+
+                    {/* Person suggestions */}
+                    {personSuggestions.map((s) => (
+                      <div
+                        key={s.personId}
+                        className="flex items-center gap-3 p-2 rounded-lg bg-green-500/5 hover:bg-green-500/10"
+                      >
+                        <UserCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{s.contactName}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round(s.confidence * 100)}%
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{s.reason}</p>
+                        </div>
                         <Button
-                          variant="ghost"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGetSuggestions();
-                          }}
-                          disabled={isLoadingSuggestions}
-                          className="h-7 px-2"
+                          variant="ghost"
+                          onClick={() => handleAcceptPersonSuggestion(s)}
+                          disabled={acceptingPersonId === s.personId}
+                          className="text-green-600 hover:bg-green-500/20"
                         >
-                          {isLoadingSuggestions ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                          {acceptingPersonId === s.personId ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <RefreshCw className="h-3 w-3" />
+                            <Link2 className="h-4 w-4" />
                           )}
                         </Button>
+                      </div>
+                    ))}
+
+                    {/* Thread suggestions */}
+                    {suggestions.map((s) => (
+                      <div
+                        key={s.threadId}
+                        className="flex items-center gap-3 p-2 rounded-lg bg-blue-500/5 hover:bg-blue-500/10"
+                      >
+                        <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{s.contactName}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round(s.confidence * 100)}%
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{s.reason}</p>
+                        </div>
                         <Button
-                          variant="ghost"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowLinkSection(false);
-                          }}
-                          className="h-7 px-2"
+                          variant="ghost"
+                          onClick={() => handleAcceptSuggestion(s)}
+                          disabled={acceptingThreadId === s.threadId}
+                          className="text-blue-600 hover:bg-blue-500/20"
                         >
-                          <X className="h-3 w-3" />
+                          {acceptingThreadId === s.threadId ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link2 className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
-                    </div>
+                    ))}
 
-                    {/* Loading state */}
-                    {isLoadingSuggestions && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Analyzing meeting content...
-                      </div>
-                    )}
-
-                    {/* Error state */}
-                    {suggestionsError && (
-                      <div className="text-sm text-red-500 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4" />
-                        {suggestionsError}
-                      </div>
-                    )}
-
-                    {/* Person suggestions (FRM Contacts) */}
-                    {personSuggestions.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-green-600 dark:text-green-400">
-                          Contacts
+                    {/* Calendar suggestions */}
+                    {linkedCalendarCount === 0 && calendarSuggestions.map((s) => (
+                      <div
+                        key={s.event._id}
+                        className="flex items-center gap-3 p-2 rounded-lg bg-purple-500/5 hover:bg-purple-500/10"
+                      >
+                        <Calendar className="h-5 w-5 text-purple-600 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{s.event.title}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round(s.confidence * 100)}%
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(s.event.startTime).toLocaleString()}
+                          </p>
+                          {s.event.attendees && s.event.attendees.length > 0 && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {s.event.attendees
+                                .filter((a) => !a.self)
+                                .map((a) => a.displayName || a.email)
+                                .slice(0, 3)
+                                .join(", ")}
+                            </p>
+                          )}
                         </div>
-                        {personSuggestionsAnalysis && !isLoadingSuggestions && (
-                          <div className="text-xs text-muted-foreground bg-green-500/5 rounded p-2">
-                            {personSuggestionsAnalysis}
-                          </div>
-                        )}
-                        {personSuggestions.map((suggestion) => (
-                          <div
-                            key={suggestion.personId}
-                            className="flex items-center justify-between bg-green-500/10 rounded-lg p-3"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <UserCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                <span className="font-medium text-sm">
-                                  {suggestion.contactName}
-                                </span>
-                                <Badge
-                                  variant={
-                                    suggestion.confidence >= 0.8
-                                      ? "default"
-                                      : "secondary"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {Math.round(suggestion.confidence * 100)}%
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">
-                                {suggestion.reason}
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAcceptPersonSuggestion(suggestion);
-                              }}
-                              disabled={acceptingPersonId === suggestion.personId}
-                              className="ml-3 flex-shrink-0 bg-green-600 hover:bg-green-700"
-                            >
-                              {acceptingPersonId === suggestion.personId ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Link2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        ))}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAcceptCalendarSuggestion(s)}
+                          disabled={acceptingCalendarEventId === s.event._id}
+                          className="text-purple-600 hover:bg-purple-500/20"
+                        >
+                          {acceptingCalendarEventId === s.event._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Link2 className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
-                    )}
+                    ))}
+                  </div>
+                )}
 
-                    {/* Thread suggestions (Beeper Business Chats) */}
-                    {suggestions.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                          Business Chats
-                        </div>
-                        {suggestionsAnalysis && !isLoadingSuggestions && (
-                          <div className="text-xs text-muted-foreground bg-blue-500/5 rounded p-2">
-                            {suggestionsAnalysis}
-                          </div>
-                        )}
-                        {suggestions.map((suggestion) => (
-                          <div
-                            key={suggestion.threadId}
-                            className="flex items-center justify-between bg-blue-500/10 rounded-lg p-3"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                <span className="font-medium text-sm">
-                                  {suggestion.contactName}
-                                </span>
-                                <Badge
-                                  variant={
-                                    suggestion.confidence >= 0.8
-                                      ? "default"
-                                      : "secondary"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {Math.round(suggestion.confidence * 100)}%
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1 truncate">
-                                {suggestion.reason}
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAcceptSuggestion(suggestion);
-                              }}
-                              disabled={acceptingThreadId === suggestion.threadId}
-                              className="ml-3 flex-shrink-0"
-                            >
-                              {acceptingThreadId === suggestion.threadId ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Link2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* No suggestions state */}
-                    {!isLoadingSuggestions &&
-                      suggestions.length === 0 &&
-                      personSuggestions.length === 0 &&
-                      !suggestionsError &&
-                      (suggestionsAnalysis || personSuggestionsAnalysis) && (
-                        <div className="text-center py-4 text-muted-foreground text-sm">
-                          <UserCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          No matching contacts found
-                        </div>
-                      )}
+                {/* No suggestions */}
+                {!isLoadingSuggestions && !hasSuggestions && !hasCalendarSuggestions && !suggestionsError && hasFetchedSuggestions && (
+                  <div className="text-center py-4 text-sm text-muted-foreground">
+                    <UserCircle className="h-6 w-6 mx-auto mb-1.5 opacity-50" />
+                    No matching contacts or calendar events found
                   </div>
                 )}
               </div>
             )}
+
+            {/* Not synced message */}
+            {!convexMeetingId && (
+              <div className="border-t pt-4 text-center text-muted-foreground">
+                <Sparkles className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Sync this meeting to enable AI contact & calendar linking</p>
+              </div>
+            )}
           </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 }

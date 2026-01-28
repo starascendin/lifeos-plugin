@@ -59,6 +59,13 @@ D. ./packages
 
 
 ## INSTRUCTIONS FOR DEVELOPMENT
+DESIGN PRINCIPLES:
+- we are using shadcn
+- DESIGN THIS LIKE A SAAS PRODUCT, and use shadcn as much as possible like a saas product.
+- STREAMLINE THE UX
+- DO NOT OVER USE MODALS, ACCORDION CARDS, ETC.
+    
+
 - when starting a new feature, use worktrunk skill to create a new GIT WORK WORKTREE, then proceed to do what the user asks. 
     - when you created a new worktree, you can use pnpm env:decrypt to decrypt the environment variables for all apps and packages.
 

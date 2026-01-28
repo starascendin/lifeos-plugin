@@ -39,6 +39,16 @@ export const calendarTables = {
     colorId: v.optional(v.string()),
     // Attendees
     attendeesCount: v.optional(v.number()),
+    attendees: v.optional(
+      v.array(
+        v.object({
+          email: v.string(),
+          displayName: v.optional(v.string()),
+          responseStatus: v.optional(v.string()), // "accepted", "declined", "tentative", "needsAction"
+          self: v.optional(v.boolean()), // true if this is the calendar owner
+        })
+      )
+    ),
     isSelfOrganizer: v.optional(v.boolean()),
     // Google's updated timestamp (for sync comparison)
     googleUpdatedAt: v.string(),

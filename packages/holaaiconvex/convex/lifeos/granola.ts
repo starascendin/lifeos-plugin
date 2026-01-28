@@ -452,6 +452,16 @@ export const deleteMeeting = mutation({
       await ctx.db.delete(link._id);
     }
 
+    // Delete associated calendar links
+    const calendarLinks = await ctx.db
+      .query("life_granolaCalendarLinks")
+      .withIndex("by_meeting", (q) => q.eq("meetingId", args.meetingId))
+      .collect();
+
+    for (const link of calendarLinks) {
+      await ctx.db.delete(link._id);
+    }
+
     await ctx.db.delete(args.meetingId);
 
     return { success: true };
@@ -807,6 +817,217 @@ export const unlinkMeetingFromPerson = mutation({
 export const deleteMeetingPersonLink = mutation({
   args: {
     linkId: v.id("life_granolaMeetingPersonLinks"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const link = await ctx.db.get(args.linkId);
+    if (!link || link.userId !== user._id) {
+      throw new Error("Link not found or access denied");
+    }
+
+    await ctx.db.delete(args.linkId);
+
+    return { success: true };
+  },
+});
+
+// ==================== MEETING CALENDAR LINKS ====================
+
+/**
+ * Get all calendar links for a meeting
+ */
+export const getMeetingCalendarLinks = query({
+  args: {
+    meetingId: v.id("life_granolaMeetings"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const meeting = await ctx.db.get(args.meetingId);
+    if (!meeting || meeting.userId !== user._id) {
+      throw new Error("Meeting not found or access denied");
+    }
+
+    const links = await ctx.db
+      .query("life_granolaCalendarLinks")
+      .withIndex("by_meeting", (q) => q.eq("meetingId", args.meetingId))
+      .collect();
+
+    // Enrich with calendar event info
+    const enrichedLinks = await Promise.all(
+      links.map(async (link) => {
+        const event = await ctx.db.get(link.calendarEventId);
+        return {
+          ...link,
+          eventTitle: event?.title,
+          eventStartTime: event?.startTime,
+          eventEndTime: event?.endTime,
+          eventLocation: event?.location,
+          eventAttendees: event?.attendees,
+          eventAttendeesCount: event?.attendeesCount,
+        };
+      })
+    );
+
+    return enrichedLinks;
+  },
+});
+
+/**
+ * Find calendar events that overlap with a meeting's timestamp
+ * Uses the meeting's granolaCreatedAt to find events that were happening around that time
+ */
+export const findCalendarEventsForMeeting = query({
+  args: {
+    meetingId: v.id("life_granolaMeetings"),
+    bufferMinutes: v.optional(v.number()), // Buffer time in minutes (default: 30)
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const meeting = await ctx.db.get(args.meetingId);
+    if (!meeting || meeting.userId !== user._id) {
+      throw new Error("Meeting not found or access denied");
+    }
+
+    // Parse the meeting's created timestamp
+    const meetingTimestamp = new Date(meeting.granolaCreatedAt).getTime();
+    const bufferMs = (args.bufferMinutes ?? 30) * 60 * 1000;
+
+    // Find events that overlap with the meeting time
+    // Event overlaps if: event.startTime <= meetingTime + buffer AND event.endTime >= meetingTime - buffer
+    const searchStart = meetingTimestamp - bufferMs;
+    const searchEnd = meetingTimestamp + bufferMs;
+
+    // Get calendar events around this time
+    const events = await ctx.db
+      .query("lifeos_calendarEvents")
+      .withIndex("by_user_start_time", (q) =>
+        q.eq("userId", user._id).gte("startTime", searchStart - 86400000) // Look back 24 hours for long events
+      )
+      .filter((q) =>
+        q.and(
+          q.neq(q.field("status"), "cancelled"),
+          // Event overlaps with search window
+          q.lte(q.field("startTime"), searchEnd),
+          q.gte(q.field("endTime"), searchStart)
+        )
+      )
+      .collect();
+
+    // Check which events are already linked
+    const existingLinks = await ctx.db
+      .query("life_granolaCalendarLinks")
+      .withIndex("by_meeting", (q) => q.eq("meetingId", args.meetingId))
+      .collect();
+
+    const linkedEventIds = new Set(existingLinks.map((l) => l.calendarEventId));
+
+    // Calculate match confidence based on time overlap
+    const suggestions = events
+      .filter((event) => !linkedEventIds.has(event._id))
+      .map((event) => {
+        // Calculate how well the meeting time fits within the event
+        const isWithinEvent =
+          meetingTimestamp >= event.startTime && meetingTimestamp <= event.endTime;
+        const timeDiff = Math.abs(
+          meetingTimestamp - (event.startTime + event.endTime) / 2
+        );
+        const eventDuration = event.endTime - event.startTime;
+
+        // Higher confidence if meeting timestamp is within the event
+        let confidence = isWithinEvent ? 0.9 : 0.5;
+        // Adjust based on how close to the event center
+        if (eventDuration > 0) {
+          confidence -= (timeDiff / eventDuration) * 0.3;
+        }
+        confidence = Math.max(0.3, Math.min(1, confidence));
+
+        return {
+          event,
+          confidence,
+          reason: isWithinEvent
+            ? "Meeting recorded during this calendar event"
+            : "Meeting recorded near this calendar event time",
+        };
+      })
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 5); // Return top 5 suggestions
+
+    return {
+      meetingTimestamp,
+      meetingTitle: meeting.title,
+      suggestions,
+    };
+  },
+});
+
+/**
+ * Link a meeting to a calendar event
+ */
+export const linkMeetingToCalendarEvent = mutation({
+  args: {
+    meetingId: v.id("life_granolaMeetings"),
+    calendarEventId: v.id("lifeos_calendarEvents"),
+    linkSource: v.union(
+      v.literal("auto_time_match"),
+      v.literal("ai_suggestion"),
+      v.literal("manual")
+    ),
+    matchConfidence: v.optional(v.number()),
+    matchReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    // Verify meeting belongs to user
+    const meeting = await ctx.db.get(args.meetingId);
+    if (!meeting || meeting.userId !== user._id) {
+      throw new Error("Meeting not found or access denied");
+    }
+
+    // Verify calendar event belongs to user
+    const event = await ctx.db.get(args.calendarEventId);
+    if (!event || event.userId !== user._id) {
+      throw new Error("Calendar event not found or access denied");
+    }
+
+    // Check if link already exists
+    const existing = await ctx.db
+      .query("life_granolaCalendarLinks")
+      .withIndex("by_user_meeting", (q) =>
+        q.eq("userId", user._id).eq("meetingId", args.meetingId)
+      )
+      .filter((q) => q.eq(q.field("calendarEventId"), args.calendarEventId))
+      .first();
+
+    if (existing) {
+      return { id: existing._id, isNew: false };
+    }
+
+    // Create the link
+    const id = await ctx.db.insert("life_granolaCalendarLinks", {
+      userId: user._id,
+      meetingId: args.meetingId,
+      calendarEventId: args.calendarEventId,
+      linkSource: args.linkSource,
+      matchConfidence: args.matchConfidence,
+      matchReason: args.matchReason,
+      createdAt: now,
+    });
+
+    return { id, isNew: true };
+  },
+});
+
+/**
+ * Delete a specific calendar link by ID
+ */
+export const deleteMeetingCalendarLink = mutation({
+  args: {
+    linkId: v.id("life_granolaCalendarLinks"),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);

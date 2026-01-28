@@ -7,6 +7,13 @@ import { Doc, Id } from "../_generated/dataModel";
 
 // ==================== TYPES ====================
 
+interface GoogleCalendarAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: string; // "accepted", "declined", "tentative", "needsAction"
+  self?: boolean;
+}
+
 interface GoogleCalendarEvent {
   id: string;
   status: "confirmed" | "tentative" | "cancelled";
@@ -25,9 +32,17 @@ interface GoogleCalendarEvent {
   };
   recurringEventId?: string;
   colorId?: string;
-  attendees?: Array<{ email: string }>;
+  attendees?: GoogleCalendarAttendee[];
   organizer?: { self?: boolean };
   updated: string;
+}
+
+// Transformed attendee for storage
+interface StoredAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: string;
+  self?: boolean;
 }
 
 interface GoogleCalendarEventsResponse {
@@ -77,11 +92,20 @@ function transformGoogleEvent(
   status: "confirmed" | "tentative" | "cancelled";
   colorId?: string;
   attendeesCount?: number;
+  attendees?: StoredAttendee[];
   isSelfOrganizer?: boolean;
   googleUpdatedAt: string;
 } {
   const start = parseGoogleEventTime(event.start);
   const end = parseGoogleEventTime(event.end);
+
+  // Transform attendees - store full details
+  const attendees: StoredAttendee[] | undefined = event.attendees?.map((a) => ({
+    email: a.email,
+    displayName: a.displayName,
+    responseStatus: a.responseStatus,
+    self: a.self,
+  }));
 
   return {
     googleEventId: event.id,
@@ -98,6 +122,7 @@ function transformGoogleEvent(
     status: event.status,
     colorId: event.colorId,
     attendeesCount: event.attendees?.length,
+    attendees,
     isSelfOrganizer: event.organizer?.self,
     googleUpdatedAt: event.updated,
   };
@@ -128,6 +153,16 @@ export const upsertEvent = mutation({
     ),
     colorId: v.optional(v.string()),
     attendeesCount: v.optional(v.number()),
+    attendees: v.optional(
+      v.array(
+        v.object({
+          email: v.string(),
+          displayName: v.optional(v.string()),
+          responseStatus: v.optional(v.string()),
+          self: v.optional(v.boolean()),
+        })
+      )
+    ),
     isSelfOrganizer: v.optional(v.boolean()),
     googleUpdatedAt: v.string(),
   },
@@ -186,6 +221,16 @@ export const upsertEventBatch = internalMutation({
         ),
         colorId: v.optional(v.string()),
         attendeesCount: v.optional(v.number()),
+        attendees: v.optional(
+          v.array(
+            v.object({
+              email: v.string(),
+              displayName: v.optional(v.string()),
+              responseStatus: v.optional(v.string()),
+              self: v.optional(v.boolean()),
+            })
+          )
+        ),
         isSelfOrganizer: v.optional(v.boolean()),
         googleUpdatedAt: v.string(),
       })
