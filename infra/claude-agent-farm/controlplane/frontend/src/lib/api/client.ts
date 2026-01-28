@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPImportResponse, MCPExportResponse, MCPPresets, MCPTomlConfig, GitHubRepo, Skill, SkillCreate } from './types'
+import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPPresets, MCPTomlConfig, GitHubRepo, Skill, SkillCreate } from './types'
 import { API_BASE } from '$lib/config'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
@@ -237,38 +237,12 @@ export function sendChatMessage(
   return () => eventSource.close()
 }
 
-// MCP Servers
-export async function getMCPServers(): Promise<MCPServer[]> {
-  return fetchJson<MCPServer[]>('/mcp/servers')
-}
-
-export async function importMCPToml(toml: string): Promise<MCPImportResponse> {
-  return fetchJson<MCPImportResponse>('/mcp/import-toml', {
-    method: 'POST',
-    body: JSON.stringify({ toml }),
-  })
-}
-
-export async function exportMCPToml(): Promise<MCPExportResponse> {
-  return fetchJson<MCPExportResponse>('/mcp/export-toml')
-}
-
+// MCP Utilities
 export async function convertJsonToToml(json: string): Promise<{ toml: string }> {
   return fetchJson<{ toml: string }>('/mcp/convert-json', {
     method: 'POST',
     body: JSON.stringify({ json }),
   })
-}
-
-export async function importMCPJson(json: string): Promise<MCPImportResponse> {
-  return fetchJson<MCPImportResponse>('/mcp/import-json', {
-    method: 'POST',
-    body: JSON.stringify({ json }),
-  })
-}
-
-export async function deleteMCPServer(name: string): Promise<void> {
-  await fetchJson<void>(`/mcp/servers/${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
 
 // MCP Presets

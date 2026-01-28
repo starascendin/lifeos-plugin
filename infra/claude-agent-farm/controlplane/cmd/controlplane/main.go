@@ -109,13 +109,8 @@ func main() {
 		// Chat
 		apiGroup.GET("/chat/send", apiHandler.ChatSend)
 
-		// MCP Servers
-		apiGroup.GET("/mcp/servers", apiHandler.ListMCPServers)
-		apiGroup.POST("/mcp/import-toml", apiHandler.ImportTOML)
-		apiGroup.POST("/mcp/import-json", apiHandler.ImportJSON)
-		apiGroup.GET("/mcp/export-toml", apiHandler.ExportTOML)
+		// MCP Utilities
 		apiGroup.POST("/mcp/convert-json", apiHandler.ConvertJSONToTOML)
-		apiGroup.DELETE("/mcp/servers/:name", apiHandler.DeleteMCPServer)
 		apiGroup.GET("/mcp/presets", apiHandler.GetMCPPresets)
 
 		// MCP TOML Configs (saved configurations)

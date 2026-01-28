@@ -65,15 +65,6 @@ export interface MCPServer {
   updated_at: string
 }
 
-export interface MCPImportResponse {
-  message: string
-  servers: MCPServer[]
-}
-
-export interface MCPExportResponse {
-  toml: string
-}
-
 // Saved TOML configuration
 export interface MCPTomlConfig {
   id: number
