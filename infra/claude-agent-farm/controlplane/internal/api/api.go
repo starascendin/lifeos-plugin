@@ -17,6 +17,7 @@ import (
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/mcp"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/models"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/storage"
+	"github.com/starascendin/claude-agent-farm/controlplane/internal/version"
 )
 
 type API struct {
@@ -54,11 +55,13 @@ func (a *API) useConvex() bool {
 	return a.convex != nil
 }
 
-// GetSystemInfo returns system information including Convex URL
+// GetSystemInfo returns system information including Convex URL and version
 func (a *API) GetSystemInfo(c echo.Context) error {
 	info := map[string]interface{}{
 		"storage_type": "sqlite",
 		"convex_url":   "",
+		"version":      version.Version,
+		"build_time":   version.BuildTime,
 	}
 
 	if a.useConvex() {

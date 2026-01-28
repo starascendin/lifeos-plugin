@@ -523,6 +523,12 @@
 				<div class="text-xs text-destructive">{systemInfoError}</div>
 			{:else if systemInfo}
 				<div class="flex items-center justify-between">
+					<span class="text-sm text-muted-foreground">Version</span>
+					<Badge variant="outline" class="font-mono">
+						v{systemInfo.version}
+					</Badge>
+				</div>
+				<div class="flex items-center justify-between">
 					<span class="text-sm text-muted-foreground">Storage</span>
 					<Badge variant={systemInfo.storage_type === 'convex' ? 'default' : 'secondary'}>
 						{systemInfo.storage_type}

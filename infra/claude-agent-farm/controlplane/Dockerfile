@@ -22,6 +22,10 @@ RUN npm run build
 # Go build stage
 FROM golang:1.22-alpine AS builder
 
+# Build args for version injection
+ARG VERSION=dev
+ARG BUILD_TIME=unknown
+
 WORKDIR /app
 
 # 1. Copy go mod files - changes rarely
@@ -37,8 +41,10 @@ COPY internal/ ./internal/
 # 4. Copy built frontend from previous stage
 COPY --from=frontend-builder /app/frontend/build ./cmd/controlplane/dist
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags '-s -w' -o controlplane ./cmd/controlplane
+# Build the binary with version info
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags "-s -w -X github.com/starascendin/claude-agent-farm/controlplane/internal/version.Version=${VERSION} -X github.com/starascendin/claude-agent-farm/controlplane/internal/version.BuildTime=${BUILD_TIME}" \
+    -o controlplane ./cmd/controlplane
 
 # Runtime stage
 FROM alpine:3.19

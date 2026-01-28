@@ -334,6 +334,8 @@ export interface SystemInfo {
   convex_url: string
   k8s_enabled: boolean
   github_enabled: boolean
+  version: string
+  build_time: string
 }
 
 export async function getSystemInfo(): Promise<SystemInfo> {
