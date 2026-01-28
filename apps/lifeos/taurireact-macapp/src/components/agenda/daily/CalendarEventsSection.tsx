@@ -2,7 +2,8 @@ import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, RefreshCw, MapPin, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CalendarDays, RefreshCw, MapPin, Clock, Users, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Doc } from "@holaai/convex";
 
@@ -25,6 +26,11 @@ function formatTimeRange(startTime: number, endTime: number): string {
 }
 
 function EventItem({ event, isAllDay }: EventItemProps) {
+  // Get external attendees (not self)
+  const externalAttendees = event.attendees?.filter((a) => !a.self) ?? [];
+  const isOneOnOne = externalAttendees.length === 1;
+  const isGroupMeeting = externalAttendees.length > 1;
+
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
       <div className="flex-shrink-0 w-16 text-xs text-muted-foreground pt-0.5">
@@ -38,7 +44,21 @@ function EventItem({ event, isAllDay }: EventItemProps) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{event.title}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-medium truncate">{event.title}</p>
+          {isOneOnOne && (
+            <Badge variant="secondary" className="h-5 text-[10px] bg-blue-500/10 text-blue-700 flex items-center gap-1">
+              <User className="h-3 w-3" />
+              1-on-1
+            </Badge>
+          )}
+          {isGroupMeeting && (
+            <Badge variant="secondary" className="h-5 text-[10px] bg-orange-500/10 text-orange-700 flex items-center gap-1">
+              <Users className="h-3 w-3" />
+              Group ({externalAttendees.length + 1})
+            </Badge>
+          )}
+        </div>
         {!isAllDay && (
           <p className="text-xs text-muted-foreground">
             {formatTimeRange(event.startTime, event.endTime)}
@@ -49,6 +69,25 @@ function EventItem({ event, isAllDay }: EventItemProps) {
             <MapPin className="h-3 w-3" />
             {event.location}
           </p>
+        )}
+        {/* Display attendees */}
+        {externalAttendees.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {externalAttendees.slice(0, 4).map((attendee, idx) => (
+              <span
+                key={attendee.email || idx}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                title={attendee.email}
+              >
+                {attendee.displayName || attendee.email.split("@")[0]}
+              </span>
+            ))}
+            {externalAttendees.length > 4 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                +{externalAttendees.length - 4} more
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

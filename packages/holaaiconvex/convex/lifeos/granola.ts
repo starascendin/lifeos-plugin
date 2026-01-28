@@ -1123,20 +1123,37 @@ export const suggestBeeperContactsFromCalendarEvent = query({
       const attendeeName = attendee.displayName?.toLowerCase() || "";
       // Extract username from email (part before @)
       const emailUsername = attendeeEmail.split("@")[0];
+      // Normalize email username: "stefanie.fan" -> "stefanie fan", "john_doe" -> "john doe"
+      const emailUsernameNormalized = emailUsername.replace(/[._-]/g, " ").trim();
+      // Get parts from email: ["stefanie", "fan"]
+      const emailParts = emailUsernameNormalized.split(" ").filter(p => p.length > 1);
 
       for (const thread of beeperThreads) {
         // Skip already linked threads
         if (linkedThreadIds.has(thread._id.toString())) continue;
 
         const threadNameLower = thread.threadName.toLowerCase();
+        // Normalize thread name for comparison
+        const threadNameNormalized = threadNameLower.replace(/[._-]/g, " ").trim();
+        const threadParts = threadNameNormalized.split(" ").filter(p => p.length > 1);
 
         let confidence = 0;
         let reason = "";
 
-        // Exact name match
+        // Exact name match (displayName vs threadName)
         if (attendeeName && threadNameLower === attendeeName) {
           confidence = 0.95;
           reason = `Exact name match: "${attendee.displayName}"`;
+        }
+        // Normalized email username matches normalized thread name
+        else if (emailUsernameNormalized === threadNameNormalized) {
+          confidence = 0.92;
+          reason = `Email username matches: ${attendee.email}`;
+        }
+        // All email parts found in thread name (e.g., "stefanie.fan" matches "Stefanie Fan")
+        else if (emailParts.length >= 2 && emailParts.every(part => threadNameNormalized.includes(part))) {
+          confidence = 0.88;
+          reason = `Email parts match: ${attendee.email}`;
         }
         // Name contains match
         else if (attendeeName && threadNameLower.includes(attendeeName)) {
@@ -1148,10 +1165,16 @@ export const suggestBeeperContactsFromCalendarEvent = query({
           confidence = 0.75;
           reason = `"${attendee.displayName}" contains thread name`;
         }
-        // Email username matches thread name
-        else if (threadNameLower.includes(emailUsername) && emailUsername.length > 3) {
+        // Thread name parts match email parts (first + last name match)
+        else if (threadParts.length >= 2 && emailParts.length >= 2 &&
+                 threadParts[0] === emailParts[0] && threadParts.some(tp => emailParts.includes(tp))) {
+          confidence = 0.7;
+          reason = `Name parts match email: ${attendee.email}`;
+        }
+        // First name from email matches first word of thread
+        else if (emailParts.length > 0 && threadParts.length > 0 && emailParts[0] === threadParts[0] && emailParts[0].length > 2) {
           confidence = 0.6;
-          reason = `Thread matches email username: ${emailUsername}`;
+          reason = `First name match from email: ${emailParts[0]}`;
         }
         // First name match (if display name has multiple words)
         else if (attendeeName) {

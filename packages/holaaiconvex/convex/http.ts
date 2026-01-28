@@ -1371,6 +1371,9 @@ const AVAILABLE_TOOLS = [
   // Cross-Entity Linking tools
   "get_granola_meetings_for_person",
   "get_granola_meetings_for_thread",
+  // Composite tools
+  "get_contact_dossier",
+  "get_meeting_calendar_links",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -1998,6 +2001,22 @@ http.route({
           result = await ctx.runQuery(internal.lifeos.tool_call.getGranolaMeetingsForThreadInternal, {
             userId: auth.userId,
             beeperThreadId: params?.beeperThreadId as string,
+          });
+          break;
+
+        // Composite tools
+        case "get_contact_dossier":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getContactDossierInternal, {
+            userId: auth.userId,
+            personId: params?.personId as string | undefined,
+            nameQuery: params?.nameQuery as string | undefined,
+          });
+          break;
+
+        case "get_meeting_calendar_links":
+          result = await ctx.runQuery(internal.lifeos.tool_call.getMeetingCalendarLinksInternal, {
+            userId: auth.userId,
+            meetingId: params?.meetingId as string,
           });
           break;
       }

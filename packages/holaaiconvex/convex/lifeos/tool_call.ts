@@ -5486,3 +5486,265 @@ export const getGranolaMeetingsForThreadInternal = internalQuery({
     };
   },
 });
+
+// ==================== COMPOSITE / DOSSIER TOOLS ====================
+
+/**
+ * Get everything about a contact in one call:
+ * person info, AI profile, Beeper threads, Granola meetings (with calendar events), and voice memos.
+ * Supports lookup by personId OR fuzzy nameQuery search.
+ */
+export const getContactDossierInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    personId: v.optional(v.string()),
+    nameQuery: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    // Resolve person
+    let person: Doc<"lifeos_frmPeople"> | null = null;
+
+    if (args.nameQuery) {
+      const results = await ctx.db
+        .query("lifeos_frmPeople")
+        .withSearchIndex("search_name", (q) =>
+          q.search("name", args.nameQuery!).eq("userId", userId)
+        )
+        .take(1);
+      person = results[0] ?? null;
+    } else if (args.personId) {
+      const personId = args.personId as Id<"lifeos_frmPeople">;
+      const found = await ctx.db.get(personId);
+      if (found && found.userId === userId) {
+        person = found;
+      }
+    }
+
+    if (!person) {
+      return {
+        success: false,
+        error: args.nameQuery
+          ? `No person found matching "${args.nameQuery}"`
+          : "Person not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Fetch all related data in parallel
+    const [latestProfile, beeperThreads, meetingPersonLinks, memoLinks] =
+      await Promise.all([
+        // Latest AI profile
+        ctx.db
+          .query("lifeos_frmProfiles")
+          .withIndex("by_person_version", (q) => q.eq("personId", person!._id))
+          .order("desc")
+          .take(1)
+          .then((r) => r[0] ?? null),
+
+        // Beeper threads linked to this person
+        ctx.db
+          .query("lifeos_beeperThreads")
+          .withIndex("by_linkedPerson", (q) =>
+            q.eq("linkedPersonId", person!._id)
+          )
+          .collect(),
+
+        // Granola meeting person links
+        ctx.db
+          .query("life_granolaMeetingPersonLinks")
+          .withIndex("by_person", (q) => q.eq("personId", person!._id))
+          .collect(),
+
+        // Voice memo links (most recent 20)
+        ctx.db
+          .query("lifeos_frmPersonMemos")
+          .withIndex("by_person_created", (q) =>
+            q.eq("personId", person!._id)
+          )
+          .order("desc")
+          .take(20),
+      ]);
+
+    // Enrich granola meetings with calendar events
+    const granolaMeetings = await Promise.all(
+      meetingPersonLinks.map(async (link) => {
+        const meeting = await ctx.db.get(link.meetingId);
+        if (!meeting) return null;
+
+        // Get calendar link for this meeting
+        const calendarLinks = await ctx.db
+          .query("life_granolaCalendarLinks")
+          .withIndex("by_meeting", (q) => q.eq("meetingId", meeting._id))
+          .take(1);
+
+        let calendarEvent: {
+          title: string;
+          startTime: number;
+          endTime: number;
+          isAllDay: boolean;
+          location?: string;
+          attendees?: Array<{
+            email: string;
+            displayName?: string;
+            responseStatus?: string;
+          }>;
+        } | null = null;
+
+        if (calendarLinks[0]) {
+          const event = await ctx.db.get(calendarLinks[0].calendarEventId);
+          if (event) {
+            calendarEvent = {
+              title: event.title,
+              startTime: event.startTime,
+              endTime: event.endTime,
+              isAllDay: event.isAllDay,
+              location: event.location,
+              attendees: event.attendees?.map((a) => ({
+                email: a.email,
+                displayName: a.displayName,
+                responseStatus: a.responseStatus,
+              })),
+            };
+          }
+        }
+
+        // Truncate resume markdown to keep response size manageable
+        const resumeMarkdown = meeting.resumeMarkdown
+          ? meeting.resumeMarkdown.substring(0, 1000) +
+            (meeting.resumeMarkdown.length > 1000 ? "..." : "")
+          : undefined;
+
+        return {
+          meetingId: meeting._id,
+          title: meeting.title,
+          granolaCreatedAt: meeting.granolaCreatedAt,
+          resumeMarkdown,
+          calendarEvent,
+        };
+      })
+    );
+
+    // Enrich voice memos
+    const voiceMemos = await Promise.all(
+      memoLinks.map(async (link) => {
+        const memo = await ctx.db.get(link.voiceMemoId);
+        if (!memo) return null;
+        return {
+          id: memo._id,
+          name: memo.name,
+          transcript: memo.transcript
+            ? memo.transcript.substring(0, 500) +
+              (memo.transcript.length > 500 ? "..." : "")
+            : undefined,
+          duration: memo.duration,
+          context: link.context,
+          createdAt: memo.createdAt,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      person: {
+        id: person._id,
+        name: person.name,
+        nickname: person.nickname,
+        relationshipType: person.relationshipType,
+        email: person.email,
+        phone: person.phone,
+        avatarEmoji: person.avatarEmoji,
+        notes: person.notes,
+        memoCount: person.memoCount,
+        lastInteractionAt: person.lastInteractionAt,
+      },
+      profile: latestProfile
+        ? {
+            confidence: latestProfile.confidence,
+            communicationStyle: latestProfile.communicationStyle,
+            personality: latestProfile.personality,
+            tips: latestProfile.tips,
+            summary: latestProfile.summary,
+          }
+        : null,
+      beeperThreads: beeperThreads.map((t) => ({
+        id: t._id,
+        threadId: t.threadId,
+        threadName: t.threadName,
+        messageCount: t.messageCount,
+        lastMessageAt: t.lastMessageAt,
+      })),
+      granolaMeetings: granolaMeetings.filter(
+        (m): m is NonNullable<typeof m> => m !== null
+      ),
+      voiceMemos: voiceMemos.filter(
+        (m): m is NonNullable<typeof m> => m !== null
+      ),
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get calendar events linked to a specific Granola meeting.
+ */
+export const getMeetingCalendarLinksInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    meetingId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const meetingId = args.meetingId as Id<"life_granolaMeetings">;
+
+    // Get meeting and verify ownership
+    const meeting = await ctx.db.get(meetingId);
+    if (!meeting || meeting.userId !== userId) {
+      return {
+        success: false,
+        error: "Meeting not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get calendar links for this meeting
+    const calendarLinks = await ctx.db
+      .query("life_granolaCalendarLinks")
+      .withIndex("by_meeting", (q) => q.eq("meetingId", meetingId))
+      .collect();
+
+    // Enrich with full calendar event data
+    const calendarEvents = await Promise.all(
+      calendarLinks.map(async (link) => {
+        const event = await ctx.db.get(link.calendarEventId);
+        if (!event) return null;
+        return {
+          eventId: event._id,
+          title: event.title,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          isAllDay: event.isAllDay,
+          location: event.location,
+          attendees: event.attendees?.map((a) => ({
+            email: a.email,
+            displayName: a.displayName,
+            responseStatus: a.responseStatus,
+          })),
+        };
+      })
+    );
+
+    const validEvents = calendarEvents.filter(
+      (e): e is NonNullable<typeof e> => e !== null
+    );
+
+    return {
+      success: true,
+      meetingTitle: meeting.title,
+      calendarEvents: validEvents,
+      count: validEvents.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});

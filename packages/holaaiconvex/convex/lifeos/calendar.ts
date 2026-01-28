@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, internalMutation, mutation, query } from "../_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { requireUser } from "../_lib/auth";
 import { createClerkClient } from "@clerk/backend";
@@ -351,6 +351,84 @@ export const updateSyncStatus = internalMutation({
   },
 });
 
+/**
+ * Get a calendar event by ID (internal)
+ */
+export const getCalendarEventInternal = internalQuery({
+  args: {
+    eventId: v.id("lifeos_calendarEvents"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.eventId);
+  },
+});
+
+/**
+ * Upsert a single calendar event (internal)
+ */
+export const upsertEventInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    googleEventId: v.string(),
+    calendarId: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    location: v.optional(v.string()),
+    startTime: v.number(),
+    endTime: v.number(),
+    isAllDay: v.boolean(),
+    startDateStr: v.optional(v.string()),
+    endDateStr: v.optional(v.string()),
+    recurringEventId: v.optional(v.string()),
+    status: v.union(
+      v.literal("confirmed"),
+      v.literal("tentative"),
+      v.literal("cancelled")
+    ),
+    colorId: v.optional(v.string()),
+    attendeesCount: v.optional(v.number()),
+    attendees: v.optional(
+      v.array(
+        v.object({
+          email: v.string(),
+          displayName: v.optional(v.string()),
+          responseStatus: v.optional(v.string()),
+          self: v.optional(v.boolean()),
+        })
+      )
+    ),
+    isSelfOrganizer: v.optional(v.boolean()),
+    googleUpdatedAt: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const { userId, ...eventData } = args;
+
+    // Check if event already exists
+    const existing = await ctx.db
+      .query("lifeos_calendarEvents")
+      .withIndex("by_user_google_id", (q) =>
+        q.eq("userId", userId).eq("googleEventId", args.googleEventId)
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        ...eventData,
+        updatedAt: now,
+      });
+      return existing._id;
+    }
+
+    return await ctx.db.insert("lifeos_calendarEvents", {
+      userId,
+      ...eventData,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
 // ==================== QUERIES ====================
 
 /**
@@ -467,6 +545,25 @@ export const getSyncStatus = query({
       .query("lifeos_calendarSyncStatus")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .unique();
+  },
+});
+
+/**
+ * Get a specific calendar event by ID
+ */
+export const getCalendarEvent = query({
+  args: {
+    eventId: v.id("lifeos_calendarEvents"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const event = await ctx.db.get(args.eventId);
+
+    if (!event || event.userId !== user._id) {
+      return null;
+    }
+
+    return event;
   },
 });
 
@@ -637,6 +734,107 @@ export const syncCalendarEvents = action({
         lastSyncError: errorMessage,
       });
       throw error;
+    }
+  },
+});
+
+/**
+ * Resync a single calendar event by its Convex ID
+ * Fetches fresh data from Google Calendar API
+ */
+export const resyncSingleEvent = action({
+  args: {
+    eventId: v.id("lifeos_calendarEvents"),
+  },
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    error?: string;
+    hasAttendees: boolean;
+    attendeesCount: number;
+  }> => {
+    console.log("[calendar:resyncSingleEvent] Starting resync for event:", args.eventId);
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return { success: false, error: "Not authenticated", hasAttendees: false, attendeesCount: 0 };
+    }
+
+    // Get user
+    const user = (await ctx.runQuery(internal.common.users.getUserByTokenIdentifier, {
+      tokenIdentifier: identity.tokenIdentifier,
+    })) as { _id: Id<"users"> } | null;
+    if (!user) {
+      return { success: false, error: "User not found", hasAttendees: false, attendeesCount: 0 };
+    }
+
+    // Get existing event
+    const existingEvent = await ctx.runQuery(internal.lifeos.calendar.getCalendarEventInternal, {
+      eventId: args.eventId,
+    }) as Doc<"lifeos_calendarEvents"> | null;
+    if (!existingEvent || existingEvent.userId !== user._id) {
+      return { success: false, error: "Event not found", hasAttendees: false, attendeesCount: 0 };
+    }
+
+    // Get Google OAuth token
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) {
+      return { success: false, error: "CLERK_SECRET_KEY not configured", hasAttendees: false, attendeesCount: 0 };
+    }
+
+    const clerk = createClerkClient({ secretKey });
+    let tokens;
+    try {
+      tokens = await clerk.users.getUserOauthAccessToken(identity.subject, "oauth_google");
+    } catch (oauthError) {
+      return { success: false, error: `OAuth error: ${oauthError}`, hasAttendees: false, attendeesCount: 0 };
+    }
+
+    if (!tokens.data || tokens.data.length === 0) {
+      return { success: false, error: "No Google OAuth token", hasAttendees: false, attendeesCount: 0 };
+    }
+
+    const accessToken = tokens.data[0].token;
+
+    try {
+      // Fetch single event from Google Calendar API
+      const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${existingEvent.googleEventId}`;
+      console.log("[calendar:resyncSingleEvent] Fetching:", url);
+
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[calendar:resyncSingleEvent] API error:", response.status, errorText);
+        return { success: false, error: `API error: ${response.status}`, hasAttendees: false, attendeesCount: 0 };
+      }
+
+      const event = (await response.json()) as GoogleCalendarEvent;
+      console.log("[calendar:resyncSingleEvent] Got event:", {
+        id: event.id,
+        summary: event.summary,
+        hasAttendees: !!event.attendees,
+        attendeesCount: event.attendees?.length || 0,
+      });
+
+      // Transform and update
+      const transformed = transformGoogleEvent(event, "primary");
+
+      await ctx.runMutation(internal.lifeos.calendar.upsertEventInternal, {
+        userId: user._id,
+        ...transformed,
+      });
+
+      return {
+        success: true,
+        hasAttendees: !!transformed.attendees && transformed.attendees.length > 0,
+        attendeesCount: transformed.attendees?.length || 0,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("[calendar:resyncSingleEvent] Error:", errorMessage);
+      return { success: false, error: errorMessage, hasAttendees: false, attendeesCount: 0 };
     }
   },
 });

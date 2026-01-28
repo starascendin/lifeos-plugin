@@ -1545,6 +1545,49 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // Composite / Dossier Tools
+  {
+    name: "get_contact_dossier",
+    description:
+      "Get everything about a contact in one call: person info, AI profile, Beeper threads, Granola meetings (with AI notes and calendar events), and voice memos. Supports lookup by personId OR fuzzy name search.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        personId: {
+          type: "string",
+          description: "The person's ID (provide this OR nameQuery)",
+        },
+        nameQuery: {
+          type: "string",
+          description: "Fuzzy name search (provide this OR personId)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_meeting_calendar_links",
+    description:
+      "Get calendar events linked to a Granola meeting, including attendees and event details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        meetingId: {
+          type: "string",
+          description: "The Convex meeting ID (required)",
+        },
+      },
+      required: ["meetingId"],
+    },
+  },
+
   // MCP Server Info
   {
     name: "get_version",

@@ -3,7 +3,8 @@ import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, RefreshCw, Clock, MapPin, ChevronDown } from "lucide-react";
+import { CalendarDays, RefreshCw, Clock, MapPin, ChevronDown, Users, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -36,6 +37,11 @@ function EventItem({
   event: Doc<"lifeos_calendarEvents">;
   isAllDay?: boolean;
 }) {
+  // Get external attendees (not self)
+  const externalAttendees = event.attendees?.filter((a) => !a.self) ?? [];
+  const isOneOnOne = externalAttendees.length === 1;
+  const isGroupMeeting = externalAttendees.length > 1;
+
   return (
     <div className="flex items-start gap-2 py-1.5">
       <div className="flex-shrink-0 w-14 text-xs text-muted-foreground pt-0.5">
@@ -49,12 +55,40 @@ function EventItem({
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <span className="text-sm leading-tight truncate block">{event.title}</span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-sm leading-tight truncate">{event.title}</span>
+          {isOneOnOne && (
+            <Badge variant="secondary" className="h-4 text-[9px] bg-blue-500/10 text-blue-700 px-1 flex items-center gap-0.5">
+              <User className="h-2.5 w-2.5" />
+              1-on-1
+            </Badge>
+          )}
+          {isGroupMeeting && (
+            <Badge variant="secondary" className="h-4 text-[9px] bg-orange-500/10 text-orange-700 px-1 flex items-center gap-0.5">
+              <Users className="h-2.5 w-2.5" />
+              {externalAttendees.length + 1}
+            </Badge>
+          )}
+        </div>
         {event.location && (
           <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
             <MapPin className="h-3 w-3" />
             {event.location}
           </span>
+        )}
+        {/* Show attendees for 1-on-1 or small groups */}
+        {externalAttendees.length > 0 && externalAttendees.length <= 3 && (
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {externalAttendees.map((a, idx) => (
+              <span
+                key={a.email || idx}
+                className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground"
+                title={a.email}
+              >
+                {a.displayName || a.email.split("@")[0]}
+              </span>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -763,3 +763,230 @@ export const acceptPersonSuggestion = action({
     }
   },
 });
+
+// ==================== CALENDAR → BEEPER MATCHING ====================
+
+const CALENDAR_BEEPER_MATCHING_PROMPT = `You are an AI that matches calendar event attendees to business contacts.
+
+Given:
+1. Calendar event attendees (email addresses and optional display names)
+2. List of Beeper business contacts (names)
+
+Your task: Match attendees to business contacts based on name/email similarity.
+
+Matching rules:
+- Email "stefanie.fan@company.com" likely matches contact "Stefanie Fan"
+- Email "john.doe@example.com" likely matches "John Doe"
+- Match first names, last names, or full names
+- Consider email username parts (before @) for matching
+- Be flexible with name variations (e.g., "Mike" vs "Michael")
+
+Return ONLY raw JSON (no markdown):
+{
+  "matches": [
+    {
+      "threadId": "string (from provided contacts list)",
+      "contactName": "string (the contact name)",
+      "matchedEmail": "string (which attendee email matched)",
+      "matchedDisplayName": "string or null (attendee display name if available)",
+      "confidence": 0.0-1.0,
+      "reason": "brief explanation"
+    }
+  ]
+}
+
+Confidence levels:
+- 0.9+: Exact or near-exact name match
+- 0.7-0.9: Strong partial match (first+last name parts match)
+- 0.5-0.7: Moderate match (first name only)
+- Below 0.5: Don't include
+
+Only return high-confidence matches. Maximum 5 matches.`;
+
+// Result type
+type CalendarBeeperMatchResult = {
+  success: boolean;
+  error?: string;
+  suggestions?: Array<{
+    threadId: Id<"lifeos_beeperThreads">;
+    threadName: string;
+    matchedEmail: string;
+    matchedDisplayName?: string;
+    confidence: number;
+    reason: string;
+  }>;
+};
+
+/**
+ * Use AI to suggest Beeper contacts based on calendar event attendees
+ */
+export const suggestBeeperFromCalendar = action({
+  args: {
+    meetingId: v.id("life_granolaMeetings"),
+    calendarEventId: v.id("lifeos_calendarEvents"),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    error: v.optional(v.string()),
+    suggestions: v.optional(
+      v.array(
+        v.object({
+          threadId: v.id("lifeos_beeperThreads"),
+          threadName: v.string(),
+          matchedEmail: v.string(),
+          matchedDisplayName: v.optional(v.string()),
+          confidence: v.number(),
+          reason: v.string(),
+        })
+      )
+    ),
+  }),
+  handler: async (ctx, args): Promise<CalendarBeeperMatchResult> => {
+    try {
+      // Get the meeting to get userId
+      const meeting = await ctx.runQuery(
+        internal.lifeos.granola_linking.getMeetingInternal,
+        { meetingId: args.meetingId }
+      ) as Doc<"life_granolaMeetings"> | null;
+
+      if (!meeting) {
+        return { success: false, error: "Meeting not found" };
+      }
+
+      const userId = meeting.userId;
+
+      // Get calendar event
+      const event = await ctx.runQuery(
+        internal.lifeos.granola_linking.getCalendarEventInternal,
+        { eventId: args.calendarEventId }
+      ) as Doc<"lifeos_calendarEvents"> | null;
+
+      if (!event) {
+        return { success: false, error: "Calendar event not found" };
+      }
+
+      // Get external attendees (not self)
+      const attendees = (event.attendees || []).filter(a => !a.self);
+      if (attendees.length === 0) {
+        return { success: true, suggestions: [] };
+      }
+
+      // Get business threads
+      const businessThreads = await ctx.runQuery(
+        internal.lifeos.granola_linking.getBusinessThreadsInternal,
+        { userId }
+      ) as Doc<"lifeos_beeperThreads">[];
+
+      if (businessThreads.length === 0) {
+        return { success: true, suggestions: [] };
+      }
+
+      // Get existing links to filter out
+      const existingLinks = await ctx.runQuery(
+        internal.lifeos.granola_linking.getExistingLinksInternal,
+        { meetingId: args.meetingId }
+      ) as Doc<"life_granolaMeetingLinks">[];
+      const linkedThreadIds = new Set(existingLinks.map(l => l.beeperThreadId.toString()));
+
+      // Filter out already linked contacts
+      const availableContacts = businessThreads
+        .filter(t => !linkedThreadIds.has(t._id.toString()))
+        .map(t => ({
+          threadId: t._id.toString(),
+          name: t.threadName,
+        }));
+
+      if (availableContacts.length === 0) {
+        return { success: true, suggestions: [] };
+      }
+
+      // Build prompt for AI
+      const attendeesList = attendees.map(a => ({
+        email: a.email,
+        displayName: a.displayName || null,
+      }));
+
+      const prompt = `CALENDAR ATTENDEES:
+${JSON.stringify(attendeesList, null, 2)}
+
+BEEPER BUSINESS CONTACTS:
+${JSON.stringify(availableContacts, null, 2)}
+
+Match the calendar attendees to the business contacts.`;
+
+      console.log(`[Calendar→Beeper] Matching ${attendees.length} attendees to ${availableContacts.length} contacts`);
+
+      // Call AI
+      const model = "google/gemini-2.5-flash";
+      const result = await ctx.runAction(internal.common.ai.executeAICall, {
+        request: {
+          model,
+          messages: [
+            { role: "system", content: CALENDAR_BEEPER_MATCHING_PROMPT },
+            { role: "user", content: prompt },
+          ],
+          responseFormat: "json",
+          temperature: 0.2,
+          maxTokens: 1024,
+        },
+        context: {
+          feature: "calendar_beeper_matching",
+          description: "Match calendar attendees to Beeper contacts",
+        },
+      });
+
+      // Parse response
+      let parsed: { matches: Array<{ threadId: string; contactName: string; matchedEmail: string; matchedDisplayName?: string; confidence: number; reason: string }> };
+      try {
+        let jsonContent = result.content.trim();
+        const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+          jsonContent = jsonMatch[1].trim();
+        }
+        parsed = JSON.parse(jsonContent);
+      } catch {
+        console.error(`[Calendar→Beeper] Failed to parse AI response:`, result.content.substring(0, 200));
+        return { success: false, error: "Failed to parse AI response" };
+      }
+
+      // Validate and transform results
+      const suggestions = (parsed.matches || [])
+        .filter(m => m.confidence >= 0.5)
+        .map(m => {
+          // Find the actual thread to get the proper ID type
+          const thread = businessThreads.find(t => t._id.toString() === m.threadId);
+          if (!thread) return null;
+          return {
+            threadId: thread._id,
+            threadName: thread.threadName,
+            matchedEmail: m.matchedEmail || "",
+            // Convert null to undefined for Convex validator
+            matchedDisplayName: m.matchedDisplayName || undefined,
+            confidence: m.confidence,
+            reason: m.reason || "Matched by AI",
+          };
+        })
+        .filter((s): s is NonNullable<typeof s> => s !== null);
+
+      console.log(`[Calendar→Beeper] Found ${suggestions.length} matches`);
+
+      return { success: true, suggestions };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error(`[Calendar→Beeper] Error:`, errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  },
+});
+
+/**
+ * Get calendar event (internal)
+ */
+export const getCalendarEventInternal = internalQuery({
+  args: {
+    eventId: v.id("lifeos_calendarEvents"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.eventId);
+  },
+});

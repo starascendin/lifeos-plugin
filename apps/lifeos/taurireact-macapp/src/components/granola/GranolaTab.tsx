@@ -37,6 +37,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import {
   RefreshCw,
   Clock,
   FileText,
@@ -52,6 +58,8 @@ import {
   UserCircle,
   Users,
   X,
+  Plus,
+  Search,
 } from "lucide-react";
 
 export function GranolaTab() {
@@ -795,30 +803,99 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
   // Get the first linked calendar event ID for Beeper suggestions
   const firstLinkedCalendarEventId = meetingCalendarLinks?.[0]?.calendarEventId;
 
-  // Query for Beeper contact suggestions based on calendar event attendees
-  const beeperFromCalendarResult = useQuery(
-    api.lifeos.granola.suggestBeeperContactsFromCalendarEvent,
-    firstLinkedCalendarEventId
-      ? { calendarEventId: firstLinkedCalendarEventId, meetingId: convexMeetingId }
-      : "skip"
-  ) as {
-    event: {
-      title: string;
-      startTime: number;
-      endTime: number;
-      attendeesCount: number;
-      isOneOnOne: boolean;
-      isGroupMeeting: boolean;
+  // AI action to suggest Beeper contacts from calendar attendees
+  const suggestBeeperFromCalendar = useAction(api.lifeos.granola_linking.suggestBeeperFromCalendar);
+
+  // State for AI-suggested Beeper contacts from calendar
+  const [calendarBeeperSuggestions, setCalendarBeeperSuggestions] = useState<Array<{
+    threadId: Id<"lifeos_beeperThreads">;
+    threadName: string;
+    matchedEmail: string;
+    matchedDisplayName?: string;
+    confidence: number;
+    reason: string;
+  }>>([]);
+  const [isLoadingCalendarBeeper, setIsLoadingCalendarBeeper] = useState(false);
+  const [calendarBeeperError, setCalendarBeeperError] = useState<string | null>(null);
+
+  // Fetch AI suggestions when calendar link changes
+  useEffect(() => {
+    if (!convexMeetingId || !firstLinkedCalendarEventId) {
+      setCalendarBeeperSuggestions([]);
+      return;
+    }
+
+    const fetchSuggestions = async () => {
+      setIsLoadingCalendarBeeper(true);
+      setCalendarBeeperError(null);
+      try {
+        const result = await suggestBeeperFromCalendar({
+          meetingId: convexMeetingId,
+          calendarEventId: firstLinkedCalendarEventId,
+        });
+        if (result.success && result.suggestions) {
+          setCalendarBeeperSuggestions(result.suggestions);
+        } else if (result.error) {
+          setCalendarBeeperError(result.error);
+        }
+      } catch (err) {
+        console.error("Failed to get AI Beeper suggestions:", err);
+        setCalendarBeeperError("Failed to get suggestions");
+      } finally {
+        setIsLoadingCalendarBeeper(false);
+      }
     };
-    suggestions: Array<{
-      threadId: string;
-      threadName: string;
-      threadType: "dm" | "group";
-      matchedAttendee: { email: string; displayName?: string };
-      confidence: number;
-      reason: string;
-    }>;
-  } | undefined;
+
+    fetchSuggestions();
+  }, [convexMeetingId, firstLinkedCalendarEventId, suggestBeeperFromCalendar]);
+
+  // Query all business threads for manual linking
+  const allBusinessThreads = useQuery(
+    api.lifeos.beeper.getBusinessThreads,
+    convexMeetingId ? {} : "skip"
+  );
+
+  // Manual link state
+  const [manualLinkSearch, setManualLinkSearch] = useState("");
+  const [manualLinkPopoverOpen, setManualLinkPopoverOpen] = useState(false);
+  const [isManualLinking, setIsManualLinking] = useState(false);
+
+  // Already linked thread IDs
+  const linkedThreadIds = new Set(meetingLinks?.map((l) => l.beeperThreadId.toString()) || []);
+
+  // Filter business threads for manual linking (not already linked, and matching search)
+  const filteredBusinessThreads = (allBusinessThreads || [])
+    .filter((t) => !linkedThreadIds.has(t._id.toString()))
+    .filter((t) => {
+      if (!manualLinkSearch.trim()) return true;
+      const search = manualLinkSearch.toLowerCase();
+      return t.threadName.toLowerCase().includes(search);
+    })
+    .slice(0, 10); // Limit to 10 results
+
+  // Handle manual thread link
+  const handleManualLinkThread = useCallback(
+    async (threadId: Id<"lifeos_beeperThreads">, threadName: string) => {
+      if (!convexMeetingId) return;
+
+      setIsManualLinking(true);
+      try {
+        await acceptSuggestion({
+          meetingId: convexMeetingId,
+          beeperThreadId: threadId,
+          confidence: 1.0, // Manual link = full confidence
+          reason: `Manually linked by user`,
+        });
+        setManualLinkPopoverOpen(false);
+        setManualLinkSearch("");
+      } catch (error) {
+        console.error("Failed to link thread:", error);
+      } finally {
+        setIsManualLinking(false);
+      }
+    },
+    [convexMeetingId, acceptSuggestion]
+  );
 
   // Get AI suggestions for linking (both thread and person)
   const handleGetSuggestions = useCallback(async () => {
@@ -860,12 +937,13 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
     }
   }, [convexMeetingId, suggestContactLinks, suggestPersonLinks]);
 
-  // Auto-fetch suggestions when synced to Convex
+  // Auto-fetch suggestions when synced to Convex - but only if no contacts are already linked
+  const hasLinkedContacts = (meetingLinks?.length || 0) > 0 || (meetingPersonLinks?.length || 0) > 0;
   useEffect(() => {
-    if (convexMeetingId && !hasFetchedSuggestions && !isLoadingSuggestions) {
+    if (convexMeetingId && !hasFetchedSuggestions && !isLoadingSuggestions && !hasLinkedContacts) {
       handleGetSuggestions();
     }
-  }, [convexMeetingId, hasFetchedSuggestions, isLoadingSuggestions, handleGetSuggestions]);
+  }, [convexMeetingId, hasFetchedSuggestions, isLoadingSuggestions, handleGetSuggestions, hasLinkedContacts]);
 
   // Accept a suggestion and create the link
   const handleAcceptSuggestion = useCallback(
@@ -1182,16 +1260,119 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                     <Sparkles className="h-4 w-4" />
                     AI Linking
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleGetSuggestions()}
-                    disabled={isLoadingSuggestions}
-                    className="h-7"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isLoadingSuggestions ? "animate-spin" : ""}`} />
-                    Refresh
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {/* Manual Link Beeper Contact */}
+                    <Popover open={manualLinkPopoverOpen} onOpenChange={setManualLinkPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7">
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          Link Beeper
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0" align="end">
+                        <ScrollArea className="max-h-[350px]">
+                          {/* AI Suggested from Calendar Attendees */}
+                          {isLoadingCalendarBeeper && (
+                            <div className="p-3 border-b bg-cyan-500/5 flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Finding matches from calendar attendees...
+                            </div>
+                          )}
+                          {calendarBeeperError && (
+                            <div className="p-3 border-b bg-red-500/5 text-sm text-red-600">
+                              {calendarBeeperError}
+                            </div>
+                          )}
+                          {!isLoadingCalendarBeeper && calendarBeeperSuggestions.length > 0 && (
+                            <div className="p-2 border-b bg-cyan-500/5">
+                              <span className="text-xs font-medium text-cyan-700 flex items-center gap-1 px-1 mb-1">
+                                <Sparkles className="h-3 w-3" />
+                                AI Suggested from calendar
+                              </span>
+                              {calendarBeeperSuggestions.map((s) => (
+                                <button
+                                  key={s.threadId}
+                                  onClick={() => handleManualLinkThread(s.threadId, s.threadName)}
+                                  disabled={isManualLinking}
+                                  className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-cyan-500/10 text-left text-sm"
+                                >
+                                  <MessageSquare className="h-4 w-4 text-cyan-600 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-medium truncate">{s.threadName}</span>
+                                      <Badge variant="outline" className="h-4 text-[9px] font-mono px-1">
+                                        {s.confidence.toFixed(2)}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground truncate">
+                                      {s.matchedDisplayName || s.matchedEmail}
+                                    </p>
+                                    <p className="text-[10px] text-cyan-600/70 truncate">{s.reason}</p>
+                                  </div>
+                                  {isManualLinking && (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Search all business contacts */}
+                          <div className="p-2 border-b">
+                            <div className="flex items-center gap-2 px-1">
+                              <Search className="h-4 w-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search business contacts..."
+                                value={manualLinkSearch}
+                                onChange={(e) => setManualLinkSearch(e.target.value)}
+                                className="h-7 border-0 focus-visible:ring-0 p-0 text-sm"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+
+                          {/* All business contacts list */}
+                          {filteredBusinessThreads.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-muted-foreground">
+                              {allBusinessThreads?.length === 0
+                                ? "No business contacts available"
+                                : manualLinkSearch
+                                  ? "No matches found"
+                                  : "All business contacts are already linked"}
+                            </div>
+                          ) : (
+                            <div className="p-1">
+                              {filteredBusinessThreads.map((thread) => (
+                                <button
+                                  key={thread._id}
+                                  onClick={() => handleManualLinkThread(thread._id, thread.threadName)}
+                                  disabled={isManualLinking}
+                                  className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-muted text-left text-sm"
+                                >
+                                  <MessageSquare className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                  <span className="truncate">{thread.threadName}</span>
+                                  {isManualLinking && (
+                                    <Loader2 className="h-3 w-3 animate-spin ml-auto" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                    {/* Refresh AI Suggestions */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleGetSuggestions()}
+                      disabled={isLoadingSuggestions}
+                      className="h-7"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isLoadingSuggestions ? "animate-spin" : ""}`} />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Linked items */}
@@ -1262,11 +1443,14 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                   </div>
                 )}
 
-                {/* Loading */}
-                {isLoadingSuggestions && (
+                {/* Loading - only show if no contacts already linked */}
+                {isLoadingSuggestions && !hasLinkedContacts && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Finding related contacts and calendar events...
+                    <span>
+                      Finding related contacts and calendar events...
+                      <span className="text-[10px] font-mono ml-1 opacity-60">(gemini-2.5-flash)</span>
+                    </span>
                   </div>
                 )}
 
@@ -1278,10 +1462,13 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                   </div>
                 )}
 
-                {/* Suggestions */}
-                {!isLoadingSuggestions && (hasSuggestions || hasCalendarSuggestions) && (
+                {/* Suggestions - only show if no contacts already linked */}
+                {!isLoadingSuggestions && !hasLinkedContacts && (hasSuggestions || hasCalendarSuggestions) && (
                   <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground">Suggestions</span>
+                    <span className="text-xs text-muted-foreground flex items-center gap-2">
+                      AI Suggestions
+                      <span className="text-[9px] font-mono opacity-60">(gemini-2.5-flash)</span>
+                    </span>
 
                     {/* Person suggestions */}
                     {personSuggestions.map((s) => (
@@ -1347,6 +1534,130 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                       </div>
                     ))}
 
+                    {/* AI Beeper Suggestions from Calendar - only show if calendar linked but no Beeper contacts yet */}
+                    {firstLinkedCalendarEventId && linkedThreadCount === 0 && (
+                      <div className="border rounded-lg p-3 bg-cyan-500/5">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-cyan-700 flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            AI Beeper Match from Calendar
+                            <span className="text-[9px] text-muted-foreground font-mono">(gemini-2.5-flash)</span>
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (!convexMeetingId || !firstLinkedCalendarEventId) return;
+                              setIsLoadingCalendarBeeper(true);
+                              setCalendarBeeperError(null);
+                              try {
+                                const result = await suggestBeeperFromCalendar({
+                                  meetingId: convexMeetingId,
+                                  calendarEventId: firstLinkedCalendarEventId,
+                                });
+                                if (result.success && result.suggestions) {
+                                  setCalendarBeeperSuggestions(result.suggestions);
+                                } else if (result.error) {
+                                  setCalendarBeeperError(result.error);
+                                }
+                              } catch (err) {
+                                setCalendarBeeperError("Failed to get suggestions");
+                              } finally {
+                                setIsLoadingCalendarBeeper(false);
+                              }
+                            }}
+                            disabled={isLoadingCalendarBeeper}
+                            className="h-6 text-xs"
+                          >
+                            {isLoadingCalendarBeeper ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              <Sparkles className="h-3 w-3 mr-1" />
+                            )}
+                            Generate
+                          </Button>
+                        </div>
+
+                        {/* Warning if no attendees */}
+                        {(!meetingCalendarLinks?.[0]?.eventAttendees ||
+                          meetingCalendarLinks[0].eventAttendees.filter(a => !a.self).length === 0) && (
+                          <div className="p-2 mb-2 rounded bg-yellow-500/10 border border-yellow-500/30">
+                            <p className="text-xs text-yellow-700 font-medium mb-1">⚠️ No attendees found in calendar event</p>
+                            <p className="text-[10px] text-yellow-600">
+                              This calendar event has no attendee data. Try resyncing your calendar from Settings → Calendar.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Show context being sent to AI */}
+                        <details className="text-xs text-muted-foreground mb-2" open>
+                          <summary className="cursor-pointer hover:text-foreground">View AI Context</summary>
+                          <pre className="mt-2 p-2 bg-muted rounded text-[10px] overflow-auto max-h-32">
+{`Calendar Event: ${meetingCalendarLinks?.[0]?.eventTitle || 'Unknown'}
+Start: ${meetingCalendarLinks?.[0]?.eventStartTime ? new Date(meetingCalendarLinks[0].eventStartTime).toLocaleString() : 'Unknown'}
+
+Calendar Attendees (${meetingCalendarLinks?.[0]?.eventAttendees?.filter(a => !a.self).length || 0}):
+${meetingCalendarLinks?.[0]?.eventAttendees
+  ?.filter(a => !a.self)
+  .map(a => `- ${a.displayName || 'No name'} <${a.email}>`)
+  .join('\n') || '(No attendees found - resync calendar to fetch)'}
+
+Beeper Business Contacts (${allBusinessThreads?.filter(t => !linkedThreadIds.has(t._id.toString())).length || 0}):
+${allBusinessThreads
+  ?.filter(t => !linkedThreadIds.has(t._id.toString()))
+  .map(t => `- ${t.threadName}`)
+  .join('\n') || '(No contacts available)'}`}
+                          </pre>
+                        </details>
+
+                        {calendarBeeperError && (
+                          <div className="text-xs text-red-500 mb-2">{calendarBeeperError}</div>
+                        )}
+
+                        {/* AI Suggestions */}
+                        {calendarBeeperSuggestions.length > 0 && (
+                          <div className="space-y-1">
+                            {calendarBeeperSuggestions.map((s) => (
+                              <div
+                                key={s.threadId}
+                                className="flex items-center gap-2 p-2 rounded bg-cyan-500/10 hover:bg-cyan-500/20"
+                              >
+                                <MessageSquare className="h-4 w-4 text-cyan-600 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium text-sm">{s.threadName}</span>
+                                    <Badge variant="outline" className="h-4 text-[9px] font-mono">
+                                      {s.confidence.toFixed(2)}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {s.matchedDisplayName || s.matchedEmail} → {s.reason}
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleManualLinkThread(s.threadId, s.threadName)}
+                                  disabled={isManualLinking}
+                                  className="h-6 text-cyan-600 hover:bg-cyan-500/20"
+                                >
+                                  {isManualLinking ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Link2 className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {!isLoadingCalendarBeeper && calendarBeeperSuggestions.length === 0 && !calendarBeeperError && (
+                          <p className="text-xs text-muted-foreground">Click Generate to get AI suggestions</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Calendar suggestions */}
                     {linkedCalendarCount === 0 && calendarSuggestions.map((s) => {
                       const extAttendees = s.event.attendees?.filter((a) => !a.self) || [];
@@ -1406,62 +1717,8 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                   </div>
                 )}
 
-                {/* Beeper contacts from calendar attendees */}
-                {beeperFromCalendarResult && beeperFromCalendarResult.suggestions.length > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      Beeper contacts from calendar attendees
-                    </span>
-                    {beeperFromCalendarResult.suggestions.map((s) => (
-                      <div
-                        key={s.threadId}
-                        className="flex items-center gap-3 p-2 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
-                      >
-                        <MessageSquare className="h-5 w-5 text-cyan-600 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">{s.threadName}</span>
-                            <Badge variant="outline" className="h-5 text-[10px] font-mono">
-                              {s.confidence.toFixed(2)}
-                            </Badge>
-                            <Badge variant="secondary" className="h-5 text-[10px]">
-                              {s.threadType === "dm" ? "DM" : "Group"}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            Matched: {s.matchedAttendee.displayName || s.matchedAttendee.email}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">{s.reason}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            // Accept this as a thread suggestion
-                            handleAcceptSuggestion({
-                              threadId: s.threadId as Id<"lifeos_beeperThreads">,
-                              contactName: s.threadName,
-                              confidence: s.confidence,
-                              reason: `Calendar attendee match: ${s.matchedAttendee.displayName || s.matchedAttendee.email}`,
-                            });
-                          }}
-                          disabled={acceptingThreadId === (s.threadId as Id<"lifeos_beeperThreads">)}
-                          className="text-cyan-600 hover:bg-cyan-500/20"
-                        >
-                          {acceptingThreadId === (s.threadId as Id<"lifeos_beeperThreads">) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Link2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 {/* No suggestions */}
-                {!isLoadingSuggestions && !hasSuggestions && !hasCalendarSuggestions && !suggestionsError && hasFetchedSuggestions && !beeperFromCalendarResult?.suggestions?.length && (
+                {!isLoadingSuggestions && !hasSuggestions && !hasCalendarSuggestions && !suggestionsError && hasFetchedSuggestions && (
                   <div className="text-center py-4 text-sm text-muted-foreground">
                     <UserCircle className="h-6 w-6 mx-auto mb-1.5 opacity-50" />
                     No matching contacts or calendar events found
