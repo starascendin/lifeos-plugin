@@ -262,6 +262,36 @@ func (c *Client) DeleteSkill(id string) error {
 	return c.doRequest("DELETE", "/controlplane/skill?id="+url.QueryEscape(id), nil, nil)
 }
 
+// GetSkillByName gets a skill by name
+func (c *Client) GetSkillByName(name string) (*Skill, error) {
+	var skill Skill
+	err := c.doRequest("GET", "/controlplane/skill-by-name?name="+url.QueryEscape(name), nil, &skill)
+	if err != nil {
+		return nil, err
+	}
+	return &skill, nil
+}
+
+// GetMCPConfigByName gets an MCP config by name
+func (c *Client) GetMCPConfigByName(name string) (*MCPConfig, error) {
+	var config MCPConfig
+	err := c.doRequest("GET", "/controlplane/mcp-config-by-name?name="+url.QueryEscape(name), nil, &config)
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// GetConversationByThreadID gets a conversation by thread ID
+func (c *Client) GetConversationByThreadID(threadID string) (*Conversation, error) {
+	var conv Conversation
+	err := c.doRequest("GET", "/controlplane/conversation-by-thread?threadId="+url.QueryEscape(threadID), nil, &conv)
+	if err != nil {
+		return nil, err
+	}
+	return &conv, nil
+}
+
 // ==================== CONVERSATIONS ====================
 
 // Conversation represents a chat conversation from Convex

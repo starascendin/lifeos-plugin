@@ -32,7 +32,8 @@ type MCPConfig struct {
 // MCPTomlConfig represents a named TOML configuration file stored in the database
 type MCPTomlConfig struct {
 	ID        int64     `json:"id"`
-	Name      string    `json:"name"`       // e.g., "defaults", "user", "work"
+	ConvexID  string    `json:"convex_id,omitempty"` // Convex document ID
+	Name      string    `json:"name"`                // e.g., "defaults", "user", "work"
 	Content   string    `json:"content"`    // Raw TOML content
 	IsDefault bool      `json:"is_default"` // True for the built-in defaults (read-only)
 	Enabled   bool      `json:"enabled"`    // Whether this config is active

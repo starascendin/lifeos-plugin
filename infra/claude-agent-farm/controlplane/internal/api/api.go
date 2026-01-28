@@ -744,6 +744,33 @@ func (a *API) ChatSend(c echo.Context) error {
 		threadID = uuid.New().String()
 	}
 
+	// Convex conversation tracking
+	var convexConversationID string
+	if a.useConvex() {
+		// Try to find existing conversation by thread ID, or create new one
+		existing, err := a.convex.GetConversationByThreadID(threadID)
+		if err == nil && existing != nil {
+			convexConversationID = existing.ID
+		} else if isNewThread {
+			// Create new conversation
+			convexID, createErr := a.convex.CreateConversation(&convex.CreateConversationRequest{
+				ThreadID: threadID,
+				Title:    truncateString(message, 50), // Use first 50 chars of message as title
+			})
+			if createErr == nil {
+				convexConversationID = convexID
+			}
+		}
+
+		// Save user message
+		if convexConversationID != "" {
+			a.convex.AddMessage(convexConversationID, &convex.AddMessageRequest{
+				Role:    "user",
+				Content: message,
+			})
+		}
+	}
+
 	var podName string
 	var err error
 	var agentConfig *models.AgentConfig
@@ -857,6 +884,9 @@ func (a *API) ChatSend(c echo.Context) error {
 		close(outputChan)
 	}()
 
+	// Track assistant response for Convex
+	var assistantResponse strings.Builder
+
 	// Stream output
 	for {
 		select {
@@ -864,6 +894,14 @@ func (a *API) ChatSend(c echo.Context) error {
 			if !ok {
 				// Channel closed, send done
 				sendSSEEvent(c, map[string]string{"type": "done"})
+
+				// Save assistant response to Convex
+				if a.useConvex() && convexConversationID != "" && assistantResponse.Len() > 0 {
+					a.convex.AddMessage(convexConversationID, &convex.AddMessageRequest{
+						Role:    "assistant",
+						Content: assistantResponse.String(),
+					})
+				}
 				return nil
 			}
 
@@ -888,6 +926,7 @@ func (a *API) ChatSend(c echo.Context) error {
 									if itemMap, ok := item.(map[string]interface{}); ok {
 										if text, ok := itemMap["text"].(string); ok {
 											sendSSEEvent(c, map[string]string{"type": "content", "content": text})
+											assistantResponse.WriteString(text)
 										}
 									}
 								}
@@ -897,10 +936,12 @@ func (a *API) ChatSend(c echo.Context) error {
 				} else {
 					// Not JSON, send as content
 					sendSSEEvent(c, map[string]string{"type": "content", "content": output})
+					assistantResponse.WriteString(output)
 				}
 			} else {
 				// Plain text mode
 				sendSSEEvent(c, map[string]string{"type": "content", "content": output})
+				assistantResponse.WriteString(output)
 			}
 
 		case <-ctx.Done():
@@ -908,6 +949,14 @@ func (a *API) ChatSend(c echo.Context) error {
 			return nil
 		}
 	}
+}
+
+// truncateString truncates a string to maxLen characters
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // sendSSEEvent sends a Server-Sent Event
@@ -1119,6 +1168,27 @@ func (a *API) ConvertJSONToTOML(c echo.Context) error {
 
 // ListTomlConfigs returns all saved TOML configurations
 func (a *API) ListTomlConfigs(c echo.Context) error {
+	if a.useConvex() {
+		convexConfigs, err := a.convex.ListMCPConfigs()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to list TOML configs",
+			})
+		}
+		// Convert to models.MCPTomlConfig for compatibility
+		configs := make([]models.MCPTomlConfig, len(convexConfigs))
+		for i, cfg := range convexConfigs {
+			configs[i] = models.MCPTomlConfig{
+				ConvexID:  cfg.ID,
+				Name:      cfg.Name,
+				Content:   cfg.Content,
+				IsDefault: cfg.IsDefault,
+				Enabled:   cfg.Enabled,
+			}
+		}
+		return c.JSON(http.StatusOK, configs)
+	}
+
 	configs, err := a.store.ListTomlConfigs()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -1134,6 +1204,23 @@ func (a *API) ListTomlConfigs(c echo.Context) error {
 // GetTomlConfig returns a specific TOML config by name
 func (a *API) GetTomlConfig(c echo.Context) error {
 	name := c.Param("name")
+
+	if a.useConvex() {
+		cfg, err := a.convex.GetMCPConfigByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "TOML config not found",
+			})
+		}
+		return c.JSON(http.StatusOK, models.MCPTomlConfig{
+			ConvexID:  cfg.ID,
+			Name:      cfg.Name,
+			Content:   cfg.Content,
+			IsDefault: cfg.IsDefault,
+			Enabled:   cfg.Enabled,
+		})
+	}
+
 	config, err := a.store.GetTomlConfig(name)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
@@ -1161,6 +1248,26 @@ func (a *API) CreateTomlConfig(c echo.Context) error {
 	if req.Name == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Name is required",
+		})
+	}
+
+	if a.useConvex() {
+		convexReq := &convex.CreateMCPConfigRequest{
+			Name:    req.Name,
+			Content: req.Content,
+			Enabled: true, // Default to enabled
+		}
+		convexID, err := a.convex.CreateMCPConfig(convexReq)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to create TOML config",
+			})
+		}
+		return c.JSON(http.StatusCreated, models.MCPTomlConfig{
+			ConvexID: convexID,
+			Name:     req.Name,
+			Content:  req.Content,
+			Enabled:  true,
 		})
 	}
 
@@ -1196,6 +1303,34 @@ func (a *API) UpdateTomlConfig(c echo.Context) error {
 		})
 	}
 
+	if a.useConvex() {
+		// Get the config by name to find its ID
+		cfg, err := a.convex.GetMCPConfigByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "TOML config not found",
+			})
+		}
+		// Update via Convex
+		convexReq := &convex.UpdateMCPConfigRequest{
+			Content: req.Content,
+		}
+		if err := a.convex.UpdateMCPConfig(cfg.ID, convexReq); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to update TOML config",
+			})
+		}
+		// Fetch updated config
+		updated, _ := a.convex.GetMCPConfigByName(name)
+		return c.JSON(http.StatusOK, models.MCPTomlConfig{
+			ConvexID:  updated.ID,
+			Name:      updated.Name,
+			Content:   updated.Content,
+			IsDefault: updated.IsDefault,
+			Enabled:   updated.Enabled,
+		})
+	}
+
 	if err := a.store.UpdateTomlConfig(name, req.Content); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update TOML config",
@@ -1210,6 +1345,22 @@ func (a *API) UpdateTomlConfig(c echo.Context) error {
 // DeleteTomlConfig deletes a TOML config
 func (a *API) DeleteTomlConfig(c echo.Context) error {
 	name := c.Param("name")
+
+	if a.useConvex() {
+		// Get the config by name to find its ID
+		cfg, err := a.convex.GetMCPConfigByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "TOML config not found",
+			})
+		}
+		if err := a.convex.DeleteMCPConfig(cfg.ID); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to delete TOML config",
+			})
+		}
+		return c.NoContent(http.StatusNoContent)
+	}
 
 	if err := a.store.DeleteTomlConfig(name); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -1275,6 +1426,24 @@ func (a *API) ToggleTomlConfig(c echo.Context) error {
 		})
 	}
 
+	if a.useConvex() {
+		// Get the config by name to find its ID
+		cfg, err := a.convex.GetMCPConfigByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "TOML config not found",
+			})
+		}
+		if err := a.convex.ToggleMCPConfig(cfg.ID, req.Enabled); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to toggle TOML config",
+			})
+		}
+		return c.JSON(http.StatusOK, map[string]string{
+			"message": fmt.Sprintf("Config %s %s", name, map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
+		})
+	}
+
 	if err := a.store.ToggleTomlConfig(name, req.Enabled); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to toggle TOML config",
@@ -1288,17 +1457,34 @@ func (a *API) ToggleTomlConfig(c echo.Context) error {
 
 // GetActiveServers returns all servers from enabled TOML configs (merged)
 func (a *API) GetActiveServers(c echo.Context) error {
-	configs, err := a.store.GetEnabledTomlConfigs()
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to get enabled configs",
-		})
+	var configContents []string
+
+	if a.useConvex() {
+		convexConfigs, err := a.convex.GetEnabledMCPConfigs()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to get enabled configs",
+			})
+		}
+		for _, cfg := range convexConfigs {
+			configContents = append(configContents, cfg.Content)
+		}
+	} else {
+		configs, err := a.store.GetEnabledTomlConfigs()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to get enabled configs",
+			})
+		}
+		for _, cfg := range configs {
+			configContents = append(configContents, cfg.Content)
+		}
 	}
 
 	// Parse all enabled configs and merge servers
 	serverMap := make(map[string]models.MCPServer)
-	for _, config := range configs {
-		servers, err := mcp.ParseTOML(config.Content)
+	for _, content := range configContents {
+		servers, err := mcp.ParseTOML(content)
 		if err != nil {
 			continue // Skip invalid configs
 		}
@@ -1378,6 +1564,29 @@ func (a *API) ListGitHubRepos(c echo.Context) error {
 
 // ListSkills returns all skills
 func (a *API) ListSkills(c echo.Context) error {
+	if a.useConvex() {
+		convexSkills, err := a.convex.ListSkills()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "Failed to list skills",
+			})
+		}
+		// Convert to models.Skill for compatibility
+		skills := make([]models.Skill, len(convexSkills))
+		for i, s := range convexSkills {
+			skills[i] = models.Skill{
+				ConvexID:       s.ID,
+				Name:           s.Name,
+				InstallCommand: s.InstallCommand,
+				Description:    s.Description,
+				Category:       s.Category,
+				IsBuiltin:      s.IsBuiltin,
+				Enabled:        s.Enabled,
+			}
+		}
+		return c.JSON(http.StatusOK, skills)
+	}
+
 	skills, err := a.store.ListSkills()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -1393,6 +1602,25 @@ func (a *API) ListSkills(c echo.Context) error {
 // GetSkill returns a skill by name
 func (a *API) GetSkill(c echo.Context) error {
 	name := c.Param("name")
+
+	if a.useConvex() {
+		skill, err := a.convex.GetSkillByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Skill not found",
+			})
+		}
+		return c.JSON(http.StatusOK, models.Skill{
+			ConvexID:       skill.ID,
+			Name:           skill.Name,
+			InstallCommand: skill.InstallCommand,
+			Description:    skill.Description,
+			Category:       skill.Category,
+			IsBuiltin:      skill.IsBuiltin,
+			Enabled:        skill.Enabled,
+		})
+	}
+
 	skill, err := a.store.GetSkill(name)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
@@ -1431,17 +1659,44 @@ func (a *API) CreateSkill(c echo.Context) error {
 		})
 	}
 
+	category := req.Category
+	if category == "" {
+		category = "other"
+	}
+
+	if a.useConvex() {
+		convexReq := &convex.CreateSkillRequest{
+			Name:           req.Name,
+			InstallCommand: req.InstallCommand,
+			Description:    req.Description,
+			Category:       category,
+			IsBuiltin:      false,
+			Enabled:        true,
+		}
+		convexID, err := a.convex.CreateSkill(convexReq)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to create skill: %v", err),
+			})
+		}
+		return c.JSON(http.StatusCreated, models.Skill{
+			ConvexID:       convexID,
+			Name:           req.Name,
+			InstallCommand: req.InstallCommand,
+			Description:    req.Description,
+			Category:       category,
+			IsBuiltin:      false,
+			Enabled:        true,
+		})
+	}
+
 	skill := &models.Skill{
 		Name:           req.Name,
 		InstallCommand: req.InstallCommand,
 		Description:    req.Description,
-		Category:       req.Category,
+		Category:       category,
 		IsBuiltin:      false,
 		Enabled:        true,
-	}
-
-	if skill.Category == "" {
-		skill.Category = "other"
 	}
 
 	id, err := a.store.CreateSkill(skill)
@@ -1470,6 +1725,39 @@ func (a *API) UpdateSkill(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid request body",
+		})
+	}
+
+	if a.useConvex() {
+		// Get existing skill to get its ID
+		existing, err := a.convex.GetSkillByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Skill not found",
+			})
+		}
+
+		convexReq := &convex.UpdateSkillRequest{
+			InstallCommand: req.InstallCommand,
+			Description:    req.Description,
+			Category:       req.Category,
+		}
+		if err := a.convex.UpdateSkill(existing.ID, convexReq); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to update skill: %v", err),
+			})
+		}
+
+		// Return updated skill
+		updated, _ := a.convex.GetSkillByName(name)
+		return c.JSON(http.StatusOK, models.Skill{
+			ConvexID:       updated.ID,
+			Name:           updated.Name,
+			InstallCommand: updated.InstallCommand,
+			Description:    updated.Description,
+			Category:       updated.Category,
+			IsBuiltin:      updated.IsBuiltin,
+			Enabled:        updated.Enabled,
 		})
 	}
 
@@ -1504,6 +1792,29 @@ func (a *API) UpdateSkill(c echo.Context) error {
 // DeleteSkill deletes a skill
 func (a *API) DeleteSkill(c echo.Context) error {
 	name := c.Param("name")
+
+	if a.useConvex() {
+		// Get skill to check if it's builtin
+		skill, err := a.convex.GetSkillByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Skill not found",
+			})
+		}
+
+		if skill.IsBuiltin {
+			return c.JSON(http.StatusForbidden, map[string]string{
+				"error": "Cannot delete builtin skills",
+			})
+		}
+
+		if err := a.convex.DeleteSkill(skill.ID); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to delete skill: %v", err),
+			})
+		}
+		return c.NoContent(http.StatusNoContent)
+	}
 
 	// Check if skill exists and is not builtin
 	skill, err := a.store.GetSkill(name)
@@ -1541,6 +1852,25 @@ func (a *API) ToggleSkill(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": "Invalid request body",
+		})
+	}
+
+	if a.useConvex() {
+		skill, err := a.convex.GetSkillByName(name)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{
+				"error": "Skill not found",
+			})
+		}
+
+		if err := a.convex.ToggleSkill(skill.ID, req.Enabled); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to toggle skill: %v", err),
+			})
+		}
+
+		return c.JSON(http.StatusOK, map[string]string{
+			"message": fmt.Sprintf("Skill %s %s", name, map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
 		})
 	}
 

@@ -53,6 +53,7 @@ type AgentLog struct {
 // Skill represents a Claude skill that can be installed
 type Skill struct {
 	ID             int64     `json:"id"`
+	ConvexID       string    `json:"convex_id,omitempty"` // Convex document ID
 	Name           string    `json:"name"`
 	InstallCommand string    `json:"install_command"`
 	Description    string    `json:"description"`

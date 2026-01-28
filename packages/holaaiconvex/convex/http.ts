@@ -2801,6 +2801,175 @@ http.route({
   }),
 });
 
+/**
+ * GET /controlplane/skill-by-name?name=xxx - Get a skill by name
+ */
+http.route({
+  path: "/controlplane/skill-by-name",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const auth = await authenticateControlplane(ctx, request);
+    if (!auth.authenticated) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: 401,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(request.url);
+      const name = url.searchParams.get("name");
+
+      if (!name) {
+        return new Response(JSON.stringify({ error: "name is required" }), {
+          status: 400,
+          headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      const skill = await ctx.runQuery(api.lifeos.controlplane.getSkillByName, { name });
+      if (!skill) {
+        return new Response(JSON.stringify({ error: "Skill not found" }), {
+          status: 404,
+          headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify(skill), {
+        status: 200,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Internal server error";
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+http.route({
+  path: "/controlplane/skill-by-name",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, { status: 204, headers: CONTROLPLANE_CORS_HEADERS });
+  }),
+});
+
+/**
+ * GET /controlplane/mcp-config-by-name?name=xxx - Get an MCP config by name
+ */
+http.route({
+  path: "/controlplane/mcp-config-by-name",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const auth = await authenticateControlplane(ctx, request);
+    if (!auth.authenticated) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: 401,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(request.url);
+      const name = url.searchParams.get("name");
+
+      if (!name) {
+        return new Response(JSON.stringify({ error: "name is required" }), {
+          status: 400,
+          headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      const config = await ctx.runQuery(api.lifeos.controlplane.getMcpConfigByName, { name });
+      if (!config) {
+        return new Response(JSON.stringify({ error: "MCP config not found" }), {
+          status: 404,
+          headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify(config), {
+        status: 200,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Internal server error";
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+http.route({
+  path: "/controlplane/mcp-config-by-name",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, { status: 204, headers: CONTROLPLANE_CORS_HEADERS });
+  }),
+});
+
+/**
+ * GET /controlplane/conversation-by-thread?threadId=xxx - Get conversation by thread ID
+ * POST /controlplane/conversation-by-thread?threadId=xxx - Get or create conversation by thread ID
+ */
+http.route({
+  path: "/controlplane/conversation-by-thread",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const auth = await authenticateControlplane(ctx, request);
+    if (!auth.authenticated) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: 401,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+
+    try {
+      const url = new URL(request.url);
+      const threadId = url.searchParams.get("threadId");
+
+      if (!threadId) {
+        return new Response(JSON.stringify({ error: "threadId is required" }), {
+          status: 400,
+          headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      const conversation = await ctx.runQuery(api.lifeos.controlplane.getConversationByThreadId, { threadId });
+      if (!conversation) {
+        return new Response(JSON.stringify({ error: "Conversation not found" }), {
+          status: 404,
+          headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify(conversation), {
+        status: 200,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Internal server error";
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { ...CONTROLPLANE_CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
+  }),
+});
+
+http.route({
+  path: "/controlplane/conversation-by-thread",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, { status: 204, headers: CONTROLPLANE_CORS_HEADERS });
+  }),
+});
+
 // --- Conversations ---
 
 /**
