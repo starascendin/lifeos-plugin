@@ -74,18 +74,18 @@ if [ -n "${ALLOWED_TOOLS:-}" ]; then
     done
 fi
 
-# Add the task prompt
-if [ -n "${TASK_PROMPT:-}" ]; then
+# Add the task prompt if provided
+if [ -n "${TASK_PROMPT:-}" ] && [ "${TASK_PROMPT}" != "null" ]; then
     CLAUDE_CMD="$CLAUDE_CMD --print \"$TASK_PROMPT\""
+    echo "Executing: $CLAUDE_CMD"
+    echo "==="
+    # Execute Claude with task
+    eval $CLAUDE_CMD
+    echo "=== Claude Agent Completed ==="
 else
-    echo "ERROR: TASK_PROMPT is required"
-    exit 1
+    echo "No task specified - running in chat mode (sleep infinity)"
+    echo "Use kubectl exec or Chat tab to interact with this agent"
+    echo "==="
+    # Keep pod alive for interactive chat via kubectl exec
+    exec sleep infinity
 fi
-
-echo "Executing: $CLAUDE_CMD"
-echo "==="
-
-# Execute Claude
-eval $CLAUDE_CMD
-
-echo "=== Claude Agent Completed ==="
