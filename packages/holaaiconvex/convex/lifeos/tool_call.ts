@@ -494,6 +494,22 @@ export const TOOL_DEFINITIONS = {
       beeperThreadId: "required - the Beeper thread Convex ID",
     },
   },
+  // Beeper → FRM Sync tools
+  sync_beeper_contacts_to_frm: {
+    description: "Bulk sync unlinked business DM Beeper threads to FRM people",
+    params: {
+      dryRun: "optional - preview without changes (default: false)",
+    },
+  },
+  link_beeper_thread_to_person: {
+    description: "Link a Beeper thread to an existing or new FRM person",
+    params: {
+      threadId: "required - Beeper thread ID string",
+      personId: "optional - existing person ID (omit to create new)",
+      personName: "optional - name for new person (defaults to threadName)",
+      relationshipType: "optional - colleague/friend/family/etc (default: colleague)",
+    },
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOL_DEFINITIONS;
@@ -5744,6 +5760,255 @@ export const getMeetingCalendarLinksInternal = internalQuery({
       meetingTitle: meeting.title,
       calendarEvents: validEvents,
       count: validEvents.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== Beeper → FRM Sync Tools ====================
+
+/**
+ * Helper: cascade Granola meeting links from a Beeper thread to a person.
+ * For every `life_granolaMeetingLinks` row that references the thread,
+ * creates a corresponding `life_granolaMeetingPersonLinks` row (if not already linked).
+ */
+async function cascadeGranolaMeetingLinks(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  beeperThreadConvexId: Id<"lifeos_beeperThreads">,
+  personId: Id<"lifeos_frmPeople">,
+): Promise<number> {
+  const meetingLinks = await ctx.db
+    .query("life_granolaMeetingLinks")
+    .withIndex("by_beeperThread", (q) => q.eq("beeperThreadId", beeperThreadConvexId))
+    .collect();
+
+  let created = 0;
+  const now = Date.now();
+
+  for (const link of meetingLinks) {
+    // Check if person link already exists for this meeting
+    const existing = await ctx.db
+      .query("life_granolaMeetingPersonLinks")
+      .withIndex("by_meeting", (q) => q.eq("meetingId", link.meetingId))
+      .filter((q) => q.eq(q.field("personId"), personId))
+      .first();
+
+    if (!existing) {
+      await ctx.db.insert("life_granolaMeetingPersonLinks", {
+        userId,
+        meetingId: link.meetingId,
+        personId,
+        linkSource: "manual",
+        aiReason: "Auto-linked from Beeper thread sync",
+        createdAt: now,
+      });
+      created++;
+    }
+  }
+
+  return created;
+}
+
+/**
+ * Bulk sync all unlinked business DM Beeper threads to FRM people.
+ * Creates a new FRM person for each unlinked DM thread and cascades Granola meeting links.
+ */
+export const syncBeeperContactsToFrmInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    dryRun: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const dryRun = args.dryRun ?? false;
+
+    // Get all business DM threads for this user that are NOT linked to a person
+    const allThreads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_business", (q) =>
+        q.eq("userId", userId).eq("isBusinessChat", true)
+      )
+      .collect();
+
+    const unlinkedDmThreads = allThreads.filter(
+      (t) => t.threadType === "dm" && !t.linkedPersonId
+    );
+
+    if (unlinkedDmThreads.length === 0) {
+      return {
+        success: true,
+        message: "No unlinked DM threads found",
+        createdCount: 0,
+        meetingLinksCreated: 0,
+        results: [],
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (dryRun) {
+      return {
+        success: true,
+        dryRun: true,
+        message: `Found ${unlinkedDmThreads.length} unlinked DM thread(s) that would be synced`,
+        wouldCreate: unlinkedDmThreads.map((t) => ({
+          threadId: t.threadId,
+          threadName: t.threadName,
+          messageCount: t.messageCount,
+          lastMessageAt: t.lastMessageAt,
+        })),
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const now = Date.now();
+    const results: Array<{
+      threadId: string;
+      threadName: string;
+      personId: string;
+      meetingLinksCreated: number;
+    }> = [];
+    let totalMeetingLinks = 0;
+
+    for (const thread of unlinkedDmThreads) {
+      // Create FRM person
+      const personId = await ctx.db.insert("lifeos_frmPeople", {
+        userId,
+        name: thread.threadName,
+        relationshipType: "colleague",
+        memoCount: 0,
+        lastInteractionAt: thread.lastMessageAt || undefined,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Link thread to person
+      await ctx.db.patch(thread._id, { linkedPersonId: personId, updatedAt: now });
+
+      // Cascade Granola meeting links
+      const meetingLinksCreated = await cascadeGranolaMeetingLinks(
+        ctx,
+        userId,
+        thread._id,
+        personId,
+      );
+      totalMeetingLinks += meetingLinksCreated;
+
+      results.push({
+        threadId: thread.threadId,
+        threadName: thread.threadName,
+        personId: personId as string,
+        meetingLinksCreated,
+      });
+    }
+
+    return {
+      success: true,
+      message: `Synced ${results.length} Beeper thread(s) to FRM people`,
+      createdCount: results.length,
+      meetingLinksCreated: totalMeetingLinks,
+      results,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Link a single Beeper thread to an existing or new FRM person.
+ */
+export const linkBeeperThreadToPersonInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    threadId: v.string(),
+    personId: v.optional(v.string()),
+    personName: v.optional(v.string()),
+    relationshipType: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    // Find the thread by (userId, threadId)
+    const thread = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_threadId", (q) =>
+        q.eq("userId", userId).eq("threadId", args.threadId)
+      )
+      .first();
+
+    if (!thread) {
+      return {
+        success: false,
+        error: `Beeper thread not found: ${args.threadId}`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (thread.linkedPersonId) {
+      return {
+        success: false,
+        error: `Thread "${thread.threadName}" is already linked to a person`,
+        linkedPersonId: thread.linkedPersonId as string,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const now = Date.now();
+    let personId: Id<"lifeos_frmPeople">;
+
+    if (args.personId) {
+      // Link to existing person — verify ownership
+      const existingPerson = await ctx.db.get(
+        args.personId as Id<"lifeos_frmPeople">
+      );
+      if (!existingPerson || existingPerson.userId !== userId) {
+        return {
+          success: false,
+          error: "Person not found or access denied",
+          generatedAt: new Date().toISOString(),
+        };
+      }
+      personId = existingPerson._id;
+    } else {
+      // Create new person
+      const validTypes = ["family", "friend", "colleague", "acquaintance", "mentor", "other"];
+      const relationshipType =
+        args.relationshipType && validTypes.includes(args.relationshipType)
+          ? (args.relationshipType as "family" | "friend" | "colleague" | "acquaintance" | "mentor" | "other")
+          : "colleague";
+
+      const name = args.personName?.trim() || thread.threadName;
+      personId = await ctx.db.insert("lifeos_frmPeople", {
+        userId,
+        name,
+        relationshipType,
+        memoCount: 0,
+        lastInteractionAt: thread.lastMessageAt || undefined,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // Link thread to person
+    await ctx.db.patch(thread._id, { linkedPersonId: personId, updatedAt: now });
+
+    // Cascade Granola meeting links
+    const meetingLinksCreated = await cascadeGranolaMeetingLinks(
+      ctx,
+      userId,
+      thread._id,
+      personId,
+    );
+
+    return {
+      success: true,
+      threadId: thread.threadId,
+      threadName: thread.threadName,
+      personId: personId as string,
+      personName: args.personId
+        ? (await ctx.db.get(personId))?.name
+        : (args.personName?.trim() || thread.threadName),
+      meetingLinksCreated,
+      confirmationMessage: `Linked thread "${thread.threadName}" to ${args.personId ? "existing" : "new"} contact${meetingLinksCreated > 0 ? ` (${meetingLinksCreated} Granola meeting link(s) cascaded)` : ""}`,
       generatedAt: new Date().toISOString(),
     };
   },

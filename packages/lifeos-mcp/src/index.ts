@@ -1588,6 +1588,61 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // Beeper → FRM Sync tools
+  {
+    name: "sync_beeper_contacts_to_frm",
+    description:
+      "Bulk sync all unlinked business DM Beeper threads to FRM people. Creates a new contact for each unlinked thread and cascades Granola meeting links.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        dryRun: {
+          type: "boolean",
+          description:
+            "Preview without making changes (default: false)",
+        },
+      },
+    },
+  },
+  {
+    name: "link_beeper_thread_to_person",
+    description:
+      "Link a single Beeper thread to an existing or new FRM person. If personId is provided, links to that existing person. Otherwise creates a new person.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        threadId: {
+          type: "string",
+          description: "The Beeper thread ID string (required)",
+        },
+        personId: {
+          type: "string",
+          description:
+            "Existing person ID to link to (optional - omit to create new person)",
+        },
+        personName: {
+          type: "string",
+          description:
+            "Name for the new person (optional - defaults to thread name)",
+        },
+        relationshipType: {
+          type: "string",
+          description:
+            "Relationship type: family, friend, colleague, acquaintance, mentor, other (default: colleague)",
+        },
+      },
+      required: ["threadId"],
+    },
+  },
+
   // MCP Server Info
   {
     name: "get_version",

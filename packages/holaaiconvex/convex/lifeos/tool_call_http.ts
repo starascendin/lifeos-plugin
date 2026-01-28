@@ -88,6 +88,9 @@ export const AVAILABLE_TOOLS = [
   // Composite tools
   "get_contact_dossier",
   "get_meeting_calendar_links",
+  // Beeper → FRM Sync tools
+  "sync_beeper_contacts_to_frm",
+  "link_beeper_thread_to_person",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -702,6 +705,30 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
           userId: auth.userId,
           meetingId: params?.meetingId as string,
         });
+        break;
+
+      // Beeper → FRM Sync tools
+      case "sync_beeper_contacts_to_frm":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.syncBeeperContactsToFrmInternal,
+          {
+            userId: auth.userId,
+            dryRun: params?.dryRun as boolean | undefined,
+          }
+        );
+        break;
+
+      case "link_beeper_thread_to_person":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.linkBeeperThreadToPersonInternal,
+          {
+            userId: auth.userId,
+            threadId: params?.threadId as string,
+            personId: params?.personId as string | undefined,
+            personName: params?.personName as string | undefined,
+            relationshipType: params?.relationshipType as string | undefined,
+          }
+        );
         break;
     }
 
