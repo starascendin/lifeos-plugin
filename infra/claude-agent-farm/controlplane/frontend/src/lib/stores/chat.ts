@@ -17,7 +17,7 @@ const messages = writable<ChatMessage[]>([])
 const threadId = writable<string | null>(null)
 const podName = writable<string | null>(null)
 const selectedAgent = writable<string | null>(null) // Selected agent pod name (for display)
-const selectedAgentId = writable<number | null>(null) // Selected agent config ID (for API)
+const selectedAgentId = writable<string | number | null>(null) // Selected agent config ID (for API) - supports Convex string IDs
 const isStreaming = writable(false)
 const streamingContent = writable('')
 const streamingToolCalls = writable<ToolCall[]>([])
@@ -306,7 +306,7 @@ function clearAllThreads() {
   newThread()
 }
 
-function selectAgent(agentName: string | null, agentId: number | null = null) {
+function selectAgent(agentName: string | null, agentId: string | number | null = null) {
   const currentAgentId = get(selectedAgentId)
   selectedAgent.set(agentName)
   selectedAgentId.set(agentId)

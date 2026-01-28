@@ -194,7 +194,7 @@ function streamSSE<T>(
 export function sendChatMessage(
   message: string,
   threadId: string | null,
-  options: { skipPermissions?: boolean; streamJson?: boolean; podName?: string; agentId?: number } = {},
+  options: { skipPermissions?: boolean; streamJson?: boolean; podName?: string; agentId?: string | number } = {},
   onEvent: (event: ChatEvent) => void
 ): () => void {
   const params = new URLSearchParams({

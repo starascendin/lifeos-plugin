@@ -206,10 +206,10 @@
 								<div class="border-t" />
 								{#each $configs as config}
 									<button
-										on:click={() => { chatActions.selectAgent(config.name, config.id); showAgentSelector = false; }}
+										on:click={() => { chatActions.selectAgent(config.name, config.convex_id || config.id); showAgentSelector = false; }}
 										class={cn(
 											'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent',
-											$chat.selectedAgentId === config.id && 'bg-accent'
+											($chat.selectedAgentId === config.convex_id || $chat.selectedAgentId === config.id) && 'bg-accent'
 										)}
 									>
 										<Bot class="h-4 w-4 text-blue-400" />
