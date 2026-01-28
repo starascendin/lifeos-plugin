@@ -87,7 +87,7 @@ export async function getAgents(): Promise<RunningAgent[]> {
   return fetchJson<RunningAgent[]>('/agents')
 }
 
-export async function launchAgent(configId: number, taskPrompt: string): Promise<{ pod_name: string }> {
+export async function launchAgent(configId: string | number, taskPrompt: string): Promise<{ pod_name: string }> {
   return fetchJson<{ pod_name: string }>(`/agents/launch/${configId}`, {
     method: 'POST',
     body: JSON.stringify({ task_prompt: taskPrompt }),

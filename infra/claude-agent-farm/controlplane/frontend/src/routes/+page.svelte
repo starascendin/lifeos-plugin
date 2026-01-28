@@ -91,7 +91,7 @@
 		if (!selectedConfig) return;
 		launching = true;
 		try {
-			await launchAgent(selectedConfig.id, taskPrompt);
+			await launchAgent(selectedConfig.convex_id || selectedConfig.id, taskPrompt);
 			launchModalOpen = false;
 			agents.refresh();
 		} catch (err) {

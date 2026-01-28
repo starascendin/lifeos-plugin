@@ -1,6 +1,7 @@
 // Agent Configuration
 export interface AgentConfig {
   id: number
+  convex_id?: string  // Convex document ID (used when migrated to Convex)
   name: string
   repos: string
   task_prompt: string
@@ -101,7 +102,7 @@ export interface RunningAgent {
   pod_name: string
   pod_type: 'chat' | 'agent' | 'job'
   persistent: boolean
-  config_id: number
+  config_id: string | number  // Convex ID (string) or SQLite ID (number)
   config_name: string
   task_prompt: string
   status: 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown'

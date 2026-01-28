@@ -28,7 +28,7 @@ type RunningAgent struct {
 	PodName      string    `json:"pod_name"`
 	PodType      string    `json:"pod_type"`   // "chat", "agent", "job"
 	Persistent   bool      `json:"persistent"` // true if persistent pod (sleep infinity)
-	ConfigID     int64     `json:"config_id"`
+	ConfigID     string    `json:"config_id"`  // Convex ID (string) or SQLite ID
 	ConfigName   string    `json:"config_name"`
 	TaskPrompt   string    `json:"task_prompt"`
 	Status       string    `json:"status"` // Pending, Running, Succeeded, Failed

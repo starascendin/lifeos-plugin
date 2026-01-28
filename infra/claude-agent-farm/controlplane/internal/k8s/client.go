@@ -31,6 +31,14 @@ func getRuntimeClassName() string {
 	return os.Getenv("AGENT_RUNTIME_CLASS")
 }
 
+// getConfigID returns the config ID to use in pod labels (prefers ConvexID over numeric ID)
+func getConfigID(config *models.AgentConfig) string {
+	if config.ConvexID != "" {
+		return config.ConvexID
+	}
+	return fmt.Sprintf("%d", config.ID)
+}
+
 // waitForPodDeletion waits for a pod to be fully deleted (up to timeout)
 func (c *Client) waitForPodDeletion(podName string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -106,8 +114,8 @@ func (c *Client) LaunchAgent(config *models.AgentConfig, taskPrompt string) (str
 			Name:      podName,
 			Namespace: agentNamespace,
 			Labels: map[string]string{
-				"app":        "claude-agent",
-				"config-id":  fmt.Sprintf("%d", config.ID),
+				"app":         "claude-agent",
+				"config-id":   getConfigID(config),
 				"config-name": config.Name,
 			},
 		},
@@ -245,11 +253,8 @@ func (c *Client) ListRunningAgents() ([]models.RunningAgent, error) {
 			}
 		}
 
-		// Parse config ID from label
-		var configID int64
-		if idStr := pod.Labels["config-id"]; idStr != "" {
-			fmt.Sscanf(idStr, "%d", &configID)
-		}
+		// Get config ID from label (now supports both Convex string IDs and legacy numeric IDs)
+		configID := pod.Labels["config-id"]
 
 		agent := models.RunningAgent{
 			PodName:      pod.Name,
@@ -608,7 +613,7 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error)
 			Labels: map[string]string{
 				"app":         "claude-agent",
 				"agent-name":  config.Name,
-				"config-id":   fmt.Sprintf("%d", config.ID),
+				"config-id":   getConfigID(config),
 				"persistent":  "true",
 			},
 		},
@@ -819,7 +824,7 @@ func (c *Client) LaunchAgentWithMCP(config *models.AgentConfig, taskPrompt strin
 			Namespace: agentNamespace,
 			Labels: map[string]string{
 				"app":         "claude-agent",
-				"config-id":   fmt.Sprintf("%d", config.ID),
+				"config-id":   getConfigID(config),
 				"config-name": config.Name,
 				"has-mcp":     fmt.Sprintf("%t", hasMCP),
 			},
