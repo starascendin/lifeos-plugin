@@ -1,10 +1,15 @@
 import { useState, useRef, useEffect } from "react";
-import { useMutation, useAction } from "convex/react";
+import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { useFRM } from "@/lib/contexts/FRMContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Search,
   Users,
@@ -13,12 +18,14 @@ import {
   Square,
   Loader2,
   ChevronRight,
+  ChevronDown,
   X,
   MessageSquare,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { AddPersonDialog } from "./AddPersonDialog";
 import { VoiceMemosPanel, type ProcessingMemo, type ProcessingStage } from "./VoiceMemosPanel";
+import { BeeperContactsPanel } from "./BeeperContactsPanel";
 import { cn } from "@/lib/utils";
 
 // Detect if running in Tauri
@@ -61,6 +68,11 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
 
   const [showAddPersonDialog, setShowAddPersonDialog] = useState(false);
   const [showMobileMemosPanel, setShowMobileMemosPanel] = useState(false);
+  const [memosOpen, setMemosOpen] = useState(false);
+
+  // Fetch memo count for collapsible badge
+  const memos = useQuery(api.lifeos.frm_memos.getAllMemosWithLinks, { limit: 50 });
+  const memoCount = memos?.length ?? 0;
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -408,6 +420,31 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
           </div>
         </div>
 
+        {/* Collapsible Voice Memos (desktop only) */}
+        <div className="hidden lg:block border-b">
+          <Collapsible open={memosOpen} onOpenChange={setMemosOpen}>
+            <CollapsibleTrigger className="flex items-center gap-2 w-full px-3 py-2 hover:bg-muted/50 transition-colors text-left">
+              {memosOpen ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+              <Mic className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Voice Memos</span>
+              {memoCount > 0 && (
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                  {memoCount}
+                </span>
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="max-h-64 overflow-y-auto">
+                <VoiceMemosPanel processingMemo={processingMemo} hideHeader />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+
         {/* People List */}
         <ScrollArea className="flex-1">
           <div className="p-2">
@@ -487,9 +524,9 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
         </ScrollArea>
       </div>
 
-      {/* Right Panel - Voice Memos (desktop only) */}
+      {/* Right Panel - Beeper Business Contacts (desktop only) */}
       <div className="hidden lg:block w-80 shrink-0">
-        <VoiceMemosPanel processingMemo={processingMemo} />
+        <BeeperContactsPanel />
       </div>
 
       {/* Mobile Memos Panel (as a slide-over) */}
