@@ -792,6 +792,34 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
   const linkMeetingToCalendarEvent = useMutation(api.lifeos.granola.linkMeetingToCalendarEvent);
   const deleteMeetingCalendarLink = useMutation(api.lifeos.granola.deleteMeetingCalendarLink);
 
+  // Get the first linked calendar event ID for Beeper suggestions
+  const firstLinkedCalendarEventId = meetingCalendarLinks?.[0]?.calendarEventId;
+
+  // Query for Beeper contact suggestions based on calendar event attendees
+  const beeperFromCalendarResult = useQuery(
+    api.lifeos.granola.suggestBeeperContactsFromCalendarEvent,
+    firstLinkedCalendarEventId
+      ? { calendarEventId: firstLinkedCalendarEventId, meetingId: convexMeetingId }
+      : "skip"
+  ) as {
+    event: {
+      title: string;
+      startTime: number;
+      endTime: number;
+      attendeesCount: number;
+      isOneOnOne: boolean;
+      isGroupMeeting: boolean;
+    };
+    suggestions: Array<{
+      threadId: string;
+      threadName: string;
+      threadType: "dm" | "group";
+      matchedAttendee: { email: string; displayName?: string };
+      confidence: number;
+      reason: string;
+    }>;
+  } | undefined;
+
   // Get AI suggestions for linking (both thread and person)
   const handleGetSuggestions = useCallback(async () => {
     if (!convexMeetingId) return;
@@ -1203,22 +1231,33 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                           </button>
                         </Badge>
                       ))}
-                      {meetingCalendarLinks?.map((link) => (
-                        <Badge
-                          key={link._id}
-                          variant="secondary"
-                          className="gap-1 pr-1 bg-purple-500/10 text-purple-700 dark:text-purple-400"
-                        >
-                          <Calendar className="h-3 w-3" />
-                          <span className="text-xs truncate max-w-[150px]">{link.eventTitle}</span>
-                          <button
-                            onClick={() => handleDeleteCalendarLink(link._id)}
-                            className="ml-0.5 hover:bg-red-500/20 rounded p-0.5"
+                      {meetingCalendarLinks?.map((link) => {
+                        const extAttendees = link.eventAttendees?.filter((a) => !a.self) || [];
+                        const isOneOnOne = extAttendees.length === 1;
+                        return (
+                          <Badge
+                            key={link._id}
+                            variant="secondary"
+                            className="gap-1 pr-1 bg-purple-500/10 text-purple-700 dark:text-purple-400"
                           >
-                            <X className="h-2.5 w-2.5" />
-                          </button>
-                        </Badge>
-                      ))}
+                            <Calendar className="h-3 w-3" />
+                            <span className="text-xs truncate max-w-[120px]">{link.eventTitle}</span>
+                            {isOneOnOne ? (
+                              <span className="text-[10px] bg-blue-500/20 px-1 rounded">1:1</span>
+                            ) : extAttendees.length > 1 && (
+                              <span className="text-[10px] bg-orange-500/20 px-1 rounded">
+                                {extAttendees.length + 1}p
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleDeleteCalendarLink(link._id)}
+                              className="ml-0.5 hover:bg-red-500/20 rounded p-0.5"
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1254,9 +1293,9 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{s.contactName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(s.confidence * 100)}%
-                            </span>
+                            <Badge variant="outline" className="h-5 text-[10px] font-mono">
+                              {s.confidence.toFixed(2)}
+                            </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">{s.reason}</p>
                         </div>
@@ -1286,9 +1325,9 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{s.contactName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(s.confidence * 100)}%
-                            </span>
+                            <Badge variant="outline" className="h-5 text-[10px] font-mono">
+                              {s.confidence.toFixed(2)}
+                            </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">{s.reason}</p>
                         </div>
@@ -1309,41 +1348,108 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                     ))}
 
                     {/* Calendar suggestions */}
-                    {linkedCalendarCount === 0 && calendarSuggestions.map((s) => (
-                      <div
-                        key={s.event._id}
-                        className="flex items-center gap-3 p-2 rounded-lg bg-purple-500/5 hover:bg-purple-500/10"
-                      >
-                        <Calendar className="h-5 w-5 text-purple-600 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{s.event.title}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {Math.round(s.confidence * 100)}%
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(s.event.startTime).toLocaleString()}
-                          </p>
-                          {s.event.attendees && s.event.attendees.length > 0 && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {s.event.attendees
-                                .filter((a) => !a.self)
-                                .map((a) => a.displayName || a.email)
-                                .slice(0, 3)
-                                .join(", ")}
+                    {linkedCalendarCount === 0 && calendarSuggestions.map((s) => {
+                      const extAttendees = s.event.attendees?.filter((a) => !a.self) || [];
+                      const isOneOnOne = extAttendees.length === 1;
+                      return (
+                        <div
+                          key={s.event._id}
+                          className="flex items-center gap-3 p-2 rounded-lg bg-purple-500/5 hover:bg-purple-500/10"
+                        >
+                          <Calendar className="h-5 w-5 text-purple-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium truncate">{s.event.title}</span>
+                              <Badge variant="outline" className="h-5 text-[10px] font-mono">
+                                {s.confidence.toFixed(2)}
+                              </Badge>
+                              {isOneOnOne ? (
+                                <Badge variant="secondary" className="h-5 text-[10px] bg-blue-500/10 text-blue-700">
+                                  1-on-1
+                                </Badge>
+                              ) : extAttendees.length > 1 && (
+                                <Badge variant="secondary" className="h-5 text-[10px] bg-orange-500/10 text-orange-700">
+                                  Group ({extAttendees.length + 1})
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(s.event.startTime).toLocaleString()}
                             </p>
-                          )}
+                            {extAttendees.length > 0 && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {extAttendees
+                                  .map((a) => a.displayName || a.email)
+                                  .slice(0, 3)
+                                  .join(", ")}
+                                {extAttendees.length > 3 && "..."}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleAcceptCalendarSuggestion(s)}
+                            disabled={acceptingCalendarEventId === s.event._id}
+                            className="text-purple-600 hover:bg-purple-500/20"
+                          >
+                            {acceptingCalendarEventId === s.event._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Link2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Beeper contacts from calendar attendees */}
+                {beeperFromCalendarResult && beeperFromCalendarResult.suggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      Beeper contacts from calendar attendees
+                    </span>
+                    {beeperFromCalendarResult.suggestions.map((s) => (
+                      <div
+                        key={s.threadId}
+                        className="flex items-center gap-3 p-2 rounded-lg bg-cyan-500/5 hover:bg-cyan-500/10"
+                      >
+                        <MessageSquare className="h-5 w-5 text-cyan-600 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{s.threadName}</span>
+                            <Badge variant="outline" className="h-5 text-[10px] font-mono">
+                              {s.confidence.toFixed(2)}
+                            </Badge>
+                            <Badge variant="secondary" className="h-5 text-[10px]">
+                              {s.threadType === "dm" ? "DM" : "Group"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            Matched: {s.matchedAttendee.displayName || s.matchedAttendee.email}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{s.reason}</p>
                         </div>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleAcceptCalendarSuggestion(s)}
-                          disabled={acceptingCalendarEventId === s.event._id}
-                          className="text-purple-600 hover:bg-purple-500/20"
+                          onClick={() => {
+                            // Accept this as a thread suggestion
+                            handleAcceptSuggestion({
+                              threadId: s.threadId as Id<"lifeos_beeperThreads">,
+                              contactName: s.threadName,
+                              confidence: s.confidence,
+                              reason: `Calendar attendee match: ${s.matchedAttendee.displayName || s.matchedAttendee.email}`,
+                            });
+                          }}
+                          disabled={acceptingThreadId === (s.threadId as Id<"lifeos_beeperThreads">)}
+                          className="text-cyan-600 hover:bg-cyan-500/20"
                         >
-                          {acceptingCalendarEventId === s.event._id ? (
+                          {acceptingThreadId === (s.threadId as Id<"lifeos_beeperThreads">) ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Link2 className="h-4 w-4" />
@@ -1355,7 +1461,7 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                 )}
 
                 {/* No suggestions */}
-                {!isLoadingSuggestions && !hasSuggestions && !hasCalendarSuggestions && !suggestionsError && hasFetchedSuggestions && (
+                {!isLoadingSuggestions && !hasSuggestions && !hasCalendarSuggestions && !suggestionsError && hasFetchedSuggestions && !beeperFromCalendarResult?.suggestions?.length && (
                   <div className="text-center py-4 text-sm text-muted-foreground">
                     <UserCircle className="h-6 w-6 mx-auto mb-1.5 opacity-50" />
                     No matching contacts or calendar events found

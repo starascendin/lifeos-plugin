@@ -1042,3 +1042,162 @@ export const deleteMeetingCalendarLink = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Suggest Beeper contacts based on calendar event attendees
+ * Matches attendee emails/names against Beeper thread names
+ */
+export const suggestBeeperContactsFromCalendarEvent = query({
+  args: {
+    calendarEventId: v.id("lifeos_calendarEvents"),
+    meetingId: v.optional(v.id("life_granolaMeetings")), // Optional: to filter out already linked
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Get the calendar event
+    const event = await ctx.db.get(args.calendarEventId);
+    if (!event || event.userId !== user._id) {
+      throw new Error("Calendar event not found or access denied");
+    }
+
+    // Get event details
+    const attendees = event.attendees || [];
+    const attendeesCount = event.attendeesCount || attendees.length;
+    const isOneOnOne = attendeesCount <= 2; // Including self
+    const isGroupMeeting = attendeesCount > 2;
+
+    // Get external attendees (not self)
+    const externalAttendees = attendees.filter((a) => !a.self);
+
+    if (externalAttendees.length === 0) {
+      return {
+        event: {
+          title: event.title,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          attendeesCount,
+          isOneOnOne,
+          isGroupMeeting,
+        },
+        suggestions: [],
+      };
+    }
+
+    // Get all business Beeper threads for the user
+    const beeperThreads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_business", (q) =>
+        q.eq("userId", user._id).eq("isBusinessChat", true)
+      )
+      .collect();
+
+    // Get existing meeting links if meetingId provided
+    let linkedThreadIds = new Set<string>();
+    const meetingId = args.meetingId;
+    if (meetingId) {
+      const existingLinks = await ctx.db
+        .query("life_granolaMeetingLinks")
+        .withIndex("by_user_meeting", (q) =>
+          q.eq("userId", user._id).eq("meetingId", meetingId)
+        )
+        .collect();
+      linkedThreadIds = new Set(existingLinks.map((l) => l.beeperThreadId.toString()));
+    }
+
+    // Match attendees to Beeper threads
+    const suggestions: Array<{
+      threadId: string;
+      threadName: string;
+      threadType: "dm" | "group";
+      matchedAttendee: {
+        email: string;
+        displayName?: string;
+      };
+      confidence: number;
+      reason: string;
+    }> = [];
+
+    for (const attendee of externalAttendees) {
+      const attendeeEmail = attendee.email.toLowerCase();
+      const attendeeName = attendee.displayName?.toLowerCase() || "";
+      // Extract username from email (part before @)
+      const emailUsername = attendeeEmail.split("@")[0];
+
+      for (const thread of beeperThreads) {
+        // Skip already linked threads
+        if (linkedThreadIds.has(thread._id.toString())) continue;
+
+        const threadNameLower = thread.threadName.toLowerCase();
+
+        let confidence = 0;
+        let reason = "";
+
+        // Exact name match
+        if (attendeeName && threadNameLower === attendeeName) {
+          confidence = 0.95;
+          reason = `Exact name match: "${attendee.displayName}"`;
+        }
+        // Name contains match
+        else if (attendeeName && threadNameLower.includes(attendeeName)) {
+          confidence = 0.8;
+          reason = `Thread name contains "${attendee.displayName}"`;
+        }
+        // Thread name contains attendee name
+        else if (attendeeName && attendeeName.includes(threadNameLower)) {
+          confidence = 0.75;
+          reason = `"${attendee.displayName}" contains thread name`;
+        }
+        // Email username matches thread name
+        else if (threadNameLower.includes(emailUsername) && emailUsername.length > 3) {
+          confidence = 0.6;
+          reason = `Thread matches email username: ${emailUsername}`;
+        }
+        // First name match (if display name has multiple words)
+        else if (attendeeName) {
+          const firstName = attendeeName.split(" ")[0];
+          if (firstName.length > 2 && threadNameLower.includes(firstName)) {
+            confidence = 0.5;
+            reason = `First name match: "${firstName}"`;
+          }
+        }
+
+        if (confidence > 0) {
+          // Check if we already have this thread in suggestions
+          const existingIdx = suggestions.findIndex((s) => s.threadId === thread._id.toString());
+          if (existingIdx === -1 || suggestions[existingIdx].confidence < confidence) {
+            if (existingIdx !== -1) {
+              suggestions.splice(existingIdx, 1);
+            }
+            suggestions.push({
+              threadId: thread._id.toString(),
+              threadName: thread.threadName,
+              threadType: thread.threadType as "dm" | "group",
+              matchedAttendee: {
+                email: attendee.email,
+                displayName: attendee.displayName,
+              },
+              confidence,
+              reason,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by confidence and return top results
+    suggestions.sort((a, b) => b.confidence - a.confidence);
+
+    return {
+      event: {
+        title: event.title,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        attendeesCount,
+        isOneOnOne,
+        isGroupMeeting,
+      },
+      suggestions: suggestions.slice(0, 10),
+    };
+  },
+});
