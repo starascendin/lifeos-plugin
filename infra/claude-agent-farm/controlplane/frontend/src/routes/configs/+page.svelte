@@ -14,7 +14,7 @@
 
 	async function handleDelete(config: AgentConfig) {
 		if (confirm(`Delete config "${config.name}"?`)) {
-			await configs.remove(config.id);
+			await configs.remove(config.convex_id || config.id);
 		}
 	}
 </script>
@@ -55,11 +55,11 @@
 		</Card.Root>
 	{:else}
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-			{#each $configs as config (config.id)}
+			{#each $configs as config (config.convex_id || config.id)}
 				<ConfigCard
 					{config}
-					on:launch={() => goto('/?launch=' + config.id)}
-					on:edit={() => goto('/configs/' + config.id)}
+					on:launch={() => goto('/?launch=' + (config.convex_id || config.id))}
+					on:edit={() => goto('/configs/' + (config.convex_id || config.id))}
 					on:delete={() => handleDelete(config)}
 				/>
 			{/each}

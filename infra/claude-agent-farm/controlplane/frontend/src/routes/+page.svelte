@@ -115,7 +115,7 @@
 		}
 	}
 
-	async function handleRelaunch(e: CustomEvent<{ podName: string; configId: number; taskPrompt: string }>) {
+	async function handleRelaunch(e: CustomEvent<{ podName: string; configId: string | number; taskPrompt: string }>) {
 		const { podName, configId, taskPrompt: prompt } = e.detail;
 		relaunchingPods = new Set([...relaunchingPods, podName]);
 		try {
@@ -278,14 +278,14 @@
 			</Card.Root>
 		{:else}
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{#each $configs as config (config.id)}
+				{#each $configs as config (config.convex_id || config.id)}
 					<ConfigCard
 						{config}
 						on:launch={handleLaunchConfig}
-						on:edit={() => goto('/configs?edit=' + config.id)}
+						on:edit={() => goto('/configs?edit=' + (config.convex_id || config.id))}
 						on:delete={async () => {
 							if (confirm(`Delete config "${config.name}"?`)) {
-								await configs.remove(config.id);
+								await configs.remove(config.convex_id || config.id);
 							}
 						}}
 					/>
