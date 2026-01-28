@@ -1,6 +1,14 @@
 // Granola Integration
 // Syncs meeting notes from the Granola app using the Granola CLI
+//
+// Auth Flow (as of 2024):
+// - The CLI reads tokens directly from the Granola desktop app's storage
+// - Location: ~/Library/Application Support/Granola/supabase.json
+// - Running `granola auth` imports fresh tokens from the app
+// - Access tokens are valid for ~4-6 hours
+// - Both CLI and Granola app can work simultaneously
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -87,12 +95,133 @@ pub struct GranolaWorkspace {
     pub created_at: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GranolaConfig {
+    #[serde(default)]
+    pub access_token: Option<String>,
+    #[serde(default)]
+    pub token_expiry: Option<String>,
+    #[serde(default)]
+    pub refresh_token: Option<String>,
+    #[serde(default)]
+    pub client_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GranolaTokenStatus {
+    pub has_token: bool,
+    pub is_valid: bool,
+    pub expires_at: Option<String>,
+    pub minutes_remaining: Option<i64>,
+    pub message: String,
+}
+
 /// Check if Granola CLI is available and configured
 #[tauri::command]
 pub fn check_granola_available() -> bool {
     let cli_exists = PathBuf::from(GRANOLA_CLI_PATH).exists();
     let config_exists = PathBuf::from(GRANOLA_CONFIG_PATH).exists();
     cli_exists && config_exists
+}
+
+/// Check Granola token status - whether we have a valid, non-expired token
+#[tauri::command]
+pub fn check_granola_token_status() -> GranolaTokenStatus {
+    let config_path = PathBuf::from(GRANOLA_CONFIG_PATH);
+
+    // Check if config exists
+    if !config_path.exists() {
+        return GranolaTokenStatus {
+            has_token: false,
+            is_valid: false,
+            expires_at: None,
+            minutes_remaining: None,
+            message: "No config found. Run auth to import tokens from Granola app.".to_string(),
+        };
+    }
+
+    // Read and parse config
+    let config_content = match fs::read_to_string(&config_path) {
+        Ok(content) => content,
+        Err(_) => {
+            return GranolaTokenStatus {
+                has_token: false,
+                is_valid: false,
+                expires_at: None,
+                minutes_remaining: None,
+                message: "Failed to read config file.".to_string(),
+            };
+        }
+    };
+
+    let config: GranolaConfig = match serde_json::from_str(&config_content) {
+        Ok(c) => c,
+        Err(_) => {
+            return GranolaTokenStatus {
+                has_token: false,
+                is_valid: false,
+                expires_at: None,
+                minutes_remaining: None,
+                message: "Failed to parse config file.".to_string(),
+            };
+        }
+    };
+
+    // Check if we have an access token
+    if config.access_token.is_none() || config.access_token.as_ref().map(|t| t.is_empty()).unwrap_or(true) {
+        return GranolaTokenStatus {
+            has_token: false,
+            is_valid: false,
+            expires_at: None,
+            minutes_remaining: None,
+            message: "No access token. Run auth to import tokens from Granola app.".to_string(),
+        };
+    }
+
+    // Check token expiry
+    if let Some(expiry_str) = &config.token_expiry {
+        if let Ok(expiry) = DateTime::parse_from_rfc3339(expiry_str) {
+            let now = Utc::now();
+            let expiry_utc = expiry.with_timezone(&Utc);
+            let duration = expiry_utc.signed_duration_since(now);
+            let minutes = duration.num_minutes();
+
+            if minutes <= 0 {
+                return GranolaTokenStatus {
+                    has_token: true,
+                    is_valid: false,
+                    expires_at: Some(expiry_str.clone()),
+                    minutes_remaining: Some(0),
+                    message: "Token expired. Open Granola app, then run auth to import fresh tokens.".to_string(),
+                };
+            }
+
+            let hours = minutes / 60;
+            let remaining_mins = minutes % 60;
+            let time_str = if hours > 0 {
+                format!("{}h {}m", hours, remaining_mins)
+            } else {
+                format!("{}m", remaining_mins)
+            };
+
+            return GranolaTokenStatus {
+                has_token: true,
+                is_valid: true,
+                expires_at: Some(expiry_str.clone()),
+                minutes_remaining: Some(minutes),
+                message: format!("Token valid for {}", time_str),
+            };
+        }
+    }
+
+    // Has token but no expiry info - assume it's valid
+    GranolaTokenStatus {
+        has_token: true,
+        is_valid: true,
+        expires_at: None,
+        minutes_remaining: None,
+        message: "Token present (expiry unknown)".to_string(),
+    }
 }
 
 /// Run the Granola CLI sync command
@@ -279,7 +408,8 @@ pub fn get_granola_sync_settings() -> serde_json::Value {
     })
 }
 
-/// Run Granola auth command to re-authenticate
+/// Run Granola auth command to import fresh tokens from the Granola desktop app
+/// Prerequisite: Granola app must be open and logged in
 #[tauri::command]
 pub async fn run_granola_auth() -> GranolaSyncResult {
     // Check CLI exists
@@ -292,7 +422,8 @@ pub async fn run_granola_auth() -> GranolaSyncResult {
         };
     }
 
-    // Run the auth command - this will open browser for OAuth
+    // Run the auth command - imports tokens from Granola app's storage
+    // (~/Library/Application Support/Granola/supabase.json)
     let output = Command::new(GRANOLA_CLI_PATH)
         .args(["auth"])
         .current_dir(
@@ -305,17 +436,34 @@ pub async fn run_granola_auth() -> GranolaSyncResult {
     match output {
         Ok(result) => {
             if result.status.success() {
+                // Check the new token status
+                let token_status = check_granola_token_status();
+                let message = if token_status.is_valid {
+                    format!("Tokens imported successfully! {}", token_status.message)
+                } else {
+                    "Tokens imported. Please try syncing.".to_string()
+                };
+
                 GranolaSyncResult {
                     success: true,
                     error: None,
-                    message: Some("Authentication successful".to_string()),
+                    message: Some(message),
                     meetings_count: None,
                 }
             } else {
                 let stderr = String::from_utf8_lossy(&result.stderr);
+                let stdout = String::from_utf8_lossy(&result.stdout);
+
+                // Check for common error: Granola app not found
+                let error_msg = if stderr.contains("not found") || stdout.contains("not found") {
+                    "Granola app data not found. Make sure Granola app is open and logged in, then try again.".to_string()
+                } else {
+                    format!("Auth failed: {} {}", stderr, stdout)
+                };
+
                 GranolaSyncResult {
                     success: false,
-                    error: Some(format!("Auth failed: {}", stderr)),
+                    error: Some(error_msg),
                     message: None,
                     meetings_count: None,
                 }

@@ -4,6 +4,7 @@ import { api } from "@holaai/convex";
 import { Id, Doc } from "@holaai/convex/convex/_generated/dataModel";
 import {
   checkGranolaAvailable,
+  checkGranolaTokenStatus,
   runGranolaSync,
   runGranolaAuth,
   readSyncedMeetings,
@@ -20,6 +21,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type GranolaMeeting,
   type GranolaSyncProgress,
+  type GranolaTokenStatus,
   initialSyncProgress,
 } from "@/lib/services/granola";
 import { Button } from "@/components/ui/button";
@@ -99,6 +101,7 @@ export function GranolaTab() {
   // Auth state
   const [needsAuth, setNeedsAuth] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState<GranolaTokenStatus | null>(null);
 
   // Timer refs
   const autoSyncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -124,7 +127,7 @@ export function GranolaTab() {
   // Calculate interval in milliseconds
   const autoSyncInterval = syncIntervalMinutes * 60 * 1000;
 
-  // Check availability on mount
+  // Check availability and token status on mount
   useEffect(() => {
     async function checkAvailability() {
       const available = await checkGranolaAvailable();
@@ -132,6 +135,13 @@ export function GranolaTab() {
 
       if (available) {
         await loadLocalMeetings();
+        // Check token status
+        const status = await checkGranolaTokenStatus();
+        setTokenStatus(status);
+        // If token is expired/missing, show auth prompt
+        if (!status.is_valid && status.has_token) {
+          setNeedsAuth(true);
+        }
       }
     }
     checkAvailability();
@@ -247,6 +257,9 @@ export function GranolaTab() {
         // Check if this is an auth error
         if (isAuthError(result.error)) {
           setNeedsAuth(true);
+          // Refresh token status to show current state
+          const status = await checkGranolaTokenStatus();
+          setTokenStatus(status);
         }
 
         setSyncProgress({
@@ -280,9 +293,12 @@ export function GranolaTab() {
 
     if (result.success) {
       setNeedsAuth(false);
+      // Refresh token status
+      const status = await checkGranolaTokenStatus();
+      setTokenStatus(status);
       setSyncProgress({
         status: "complete",
-        currentStep: "Authentication successful! Starting sync...",
+        currentStep: result.message || "Tokens imported successfully! Starting sync...",
       });
       // Auto-sync after successful auth
       setTimeout(() => handleSync(false), 1000);
@@ -381,6 +397,25 @@ export function GranolaTab() {
               <span title={lastSyncTime.toLocaleString()}>
                 Synced {formatTimeAgo(lastSyncTime)}
               </span>
+            )}
+            {/* Token status indicator */}
+            {tokenStatus && (
+              <>
+                <span>·</span>
+                <span
+                  className={`flex items-center gap-1 ${
+                    tokenStatus.is_valid
+                      ? tokenStatus.minutes_remaining && tokenStatus.minutes_remaining < 30
+                        ? "text-orange-500"
+                        : "text-green-600"
+                      : "text-red-500"
+                  }`}
+                  title={tokenStatus.expires_at ? `Expires: ${tokenStatus.expires_at}` : ""}
+                >
+                  <KeyRound className="h-3 w-3" />
+                  {tokenStatus.is_valid ? tokenStatus.message : "Token expired"}
+                </span>
+              </>
             )}
             {autoSyncEnabled && nextSyncIn !== null && nextSyncIn > 0 && !isSyncing && (
               <>

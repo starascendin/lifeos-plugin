@@ -40,6 +40,14 @@ export interface GranolaSyncResult {
   meetings_count?: number;
 }
 
+export interface GranolaTokenStatus {
+  has_token: boolean;
+  is_valid: boolean;
+  expires_at?: string;
+  minutes_remaining?: number;
+  message: string;
+}
+
 export interface GranolaSyncProgress {
   status: "idle" | "checking" | "syncing" | "error" | "complete";
   currentStep: string;
@@ -134,6 +142,33 @@ export async function checkGranolaAvailable(): Promise<boolean> {
 }
 
 /**
+ * Check Granola token status - whether we have a valid, non-expired token
+ * The CLI uses access tokens imported from the Granola desktop app
+ * Tokens are valid for ~4-6 hours
+ */
+export async function checkGranolaTokenStatus(): Promise<GranolaTokenStatus> {
+  if (!isTauri) {
+    return {
+      has_token: false,
+      is_valid: false,
+      message: "Not running in Tauri",
+    };
+  }
+
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke<GranolaTokenStatus>("check_granola_token_status");
+  } catch (error) {
+    console.error("Failed to check token status:", error);
+    return {
+      has_token: false,
+      is_valid: false,
+      message: String(error),
+    };
+  }
+}
+
+/**
  * Run the Granola CLI sync command via Rust backend
  */
 export async function runGranolaSync(
@@ -224,7 +259,9 @@ export function isAuthError(error: string | undefined): boolean {
 }
 
 /**
- * Run Granola auth to re-authenticate (opens browser for OAuth)
+ * Run Granola auth to import fresh tokens from the Granola desktop app
+ * Prerequisite: Granola app must be open and logged in
+ * Tokens are valid for ~4-6 hours
  */
 export async function runGranolaAuth(): Promise<GranolaSyncResult> {
   if (!isTauri) {
