@@ -3,8 +3,11 @@ package k8s
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -559,20 +562,65 @@ func (c *Client) GetOrCreateCouncilPod() (string, error) {
 	return "", fmt.Errorf("timeout waiting for council pod to start")
 }
 
+// computeConfigSignature creates a hash of the config parameters that affect pod behavior
+// This is used to detect when a pod needs to be recreated due to config changes
+func computeConfigSignature(config *models.AgentConfig, mcpJSON []byte, skillInstallCommands []string) string {
+	// Build a string of all config values that matter for the pod
+	sigParts := []string{
+		fmt.Sprintf("mcps=%s", config.EnabledMCPs),
+		fmt.Sprintf("skills=%s", config.EnabledSkills),
+		fmt.Sprintf("system=%s", config.SystemPrompt),
+		fmt.Sprintf("maxturns=%d", config.MaxTurns),
+		fmt.Sprintf("tools=%s", config.AllowedTools),
+		fmt.Sprintf("cpu=%s", config.CPULimit),
+		fmt.Sprintf("mem=%s", config.MemoryLimit),
+		fmt.Sprintf("mcpjson_len=%d", len(mcpJSON)),
+		fmt.Sprintf("skillcmds=%d", len(skillInstallCommands)),
+	}
+	sigString := strings.Join(sigParts, ";")
+
+	// Hash it to keep the annotation value short
+	hash := sha256.Sum256([]byte(sigString))
+	return hex.EncodeToString(hash[:8]) // First 8 bytes = 16 hex chars
+}
+
 // GetOrCreateAgentPod ensures an agent pod exists and is running for the given config
 // Unlike LaunchAgent which runs a single task, this creates a persistent pod for interactive chat
-func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error) {
+// mcpJSON and skillInstallCommands are optional - if provided, they configure the pod's MCP servers and skills
+func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte, skillInstallCommands []string) (string, error) {
 	podName := fmt.Sprintf("agent-%s-pod", config.Name)
+
+	// Compute config signature to detect config changes
+	configSignature := computeConfigSignature(config, mcpJSON, skillInstallCommands)
+	log.Printf("[GetOrCreateAgentPod] Pod %s: computed config signature=%s", podName, configSignature)
 
 	// Check if pod exists
 	pod, err := c.clientset.CoreV1().Pods(agentNamespace).Get(context.Background(), podName, metav1.GetOptions{})
 	if err == nil {
 		// Pod exists, check if running
 		if pod.Status.Phase == corev1.PodRunning {
-			return podName, nil
+			// Check if config has changed by comparing signatures
+			existingSignature := ""
+			if pod.Annotations != nil {
+				existingSignature = pod.Annotations["claude-agent/config-signature"]
+			}
+			log.Printf("[GetOrCreateAgentPod] Pod %s exists and running: existingSignature=%s, newSignature=%s",
+				podName, existingSignature, configSignature)
+
+			if existingSignature == configSignature {
+				// Same config, reuse the pod
+				log.Printf("[GetOrCreateAgentPod] Pod %s: config unchanged, reusing existing pod", podName)
+				return podName, nil
+			}
+
+			// Config changed! Delete and recreate
+			log.Printf("[GetOrCreateAgentPod] Pod %s: config changed, deleting and recreating pod", podName)
 		}
-		// Pod exists but not running (Failed, Succeeded, Pending, or Terminating), delete and wait
+
+		// Pod exists but not running OR config changed - delete and wait
 		_ = c.clientset.CoreV1().Pods(agentNamespace).Delete(context.Background(), podName, metav1.DeleteOptions{})
+		// Also clean up any existing MCP ConfigMap for this pod
+		_ = c.DeleteMCPConfigMap(podName)
 		if err := c.waitForPodDeletion(podName, 30*time.Second); err != nil {
 			// Force delete if normal delete times out
 			gracePeriod := int64(0)
@@ -580,6 +628,14 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error)
 				GracePeriodSeconds: &gracePeriod,
 			})
 			_ = c.waitForPodDeletion(podName, 10*time.Second)
+		}
+	}
+
+	// Create MCP ConfigMap if MCP JSON is provided
+	hasMCP := len(mcpJSON) > 0 && string(mcpJSON) != "{\"mcpServers\":{}}"
+	if hasMCP {
+		if err := c.CreateMCPConfigMap(podName, mcpJSON); err != nil {
+			return "", fmt.Errorf("failed to create MCP ConfigMap: %w", err)
 		}
 	}
 
@@ -605,16 +661,77 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error)
 		},
 	})
 
+	// Add skill install commands (newline-separated shell commands to run)
+	if len(skillInstallCommands) > 0 {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "SKILL_INSTALL_COMMANDS",
+			Value: strings.Join(skillInstallCommands, "\n"),
+		})
+	}
+
+	// Build volume mounts - start with credential mounts
+	volumeMounts := getCredentialVolumeMounts()
+
+	// Build volumes
+	volumes := []corev1.Volume{
+		{
+			Name: "claude-credentials",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: credentialsPVC,
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+	// Always add MCP volume mount
+	volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		Name:      "mcp-config",
+		MountPath: "/home/node/.mcp.json",
+		SubPath:   "mcp.json",
+	})
+
+	// Add MCP volume - from ConfigMap if custom MCP provided, otherwise from Secret
+	if hasMCP {
+		configMapName := fmt.Sprintf("mcp-%s", podName)
+		volumes = append(volumes, corev1.Volume{
+			Name: "mcp-config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: configMapName,
+					},
+				},
+			},
+		})
+	} else {
+		// Use default MCP config from secret
+		volumes = append(volumes, corev1.Volume{
+			Name: "mcp-config",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "mcp-config",
+					Optional:   boolPtr(true),
+				},
+			},
+		})
+	}
+
 	// Create agent pod with sleep infinity (persistent)
 	agentPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Namespace: agentNamespace,
 			Labels: map[string]string{
-				"app":         "claude-agent",
-				"agent-name":  config.Name,
-				"config-id":   getConfigID(config),
-				"persistent":  "true",
+				"app":        "claude-agent",
+				"agent-name": config.Name,
+				"config-id":  getConfigID(config),
+				"persistent": "true",
+				"has-mcp":    fmt.Sprintf("%t", hasMCP),
+			},
+			Annotations: map[string]string{
+				"claude-agent/config-signature": configSignature,
 			},
 		},
 		Spec: corev1.PodSpec{
@@ -635,33 +752,10 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error)
 							corev1.ResourceMemory: resource.MustParse("1Gi"),
 						},
 					},
-					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
-						Name:      "mcp-config",
-						MountPath: "/home/node/.mcp.json",
-						SubPath:   "mcp.json",
-					}),
+					VolumeMounts: volumeMounts,
 				},
 			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "claude-credentials",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: credentialsPVC,
-							ReadOnly:  false,
-						},
-					},
-				},
-				{
-					Name: "mcp-config",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: "mcp-config",
-							Optional:   boolPtr(true),
-						},
-					},
-				},
-			},
+			Volumes: volumes,
 			ImagePullSecrets: []corev1.LocalObjectReference{
 				{Name: "ghcr-credentials"},
 			},
@@ -675,6 +769,10 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig) (string, error)
 
 	_, err = c.clientset.CoreV1().Pods(agentNamespace).Create(context.Background(), agentPod, metav1.CreateOptions{})
 	if err != nil {
+		// Clean up ConfigMap if pod creation failed
+		if hasMCP {
+			_ = c.DeleteMCPConfigMap(podName)
+		}
 		return "", fmt.Errorf("failed to create agent pod: %w", err)
 	}
 

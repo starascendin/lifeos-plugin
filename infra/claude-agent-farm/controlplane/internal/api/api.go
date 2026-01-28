@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -612,13 +613,102 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 
 	// Delete existing persistent pod if it exists (name pattern: agent-{config.Name}-pod)
 	existingPodName := fmt.Sprintf("agent-%s-pod", config.Name)
-	_ = a.k8sClient.StopAgent(existingPodName) // Ignore error if doesn't exist
+	_ = a.k8sClient.StopAgentWithCleanup(existingPodName) // Ignore error if doesn't exist, also cleans up MCP ConfigMap
 
 	// Wait a moment for deletion to process
 	time.Sleep(500 * time.Millisecond)
 
-	// Create new persistent pod
-	podName, err := a.k8sClient.GetOrCreateAgentPod(config)
+	// Build MCP JSON from config.EnabledMCPs (same logic as LaunchAgent)
+	var mcpJSON []byte
+	if config.EnabledMCPs != "" {
+		mcpNames := mcp.ParseEnabledMCPs(config.EnabledMCPs)
+		if len(mcpNames) > 0 {
+			// Get servers from enabled TOML configs
+			var enabledConfigContents []string
+
+			if a.useConvex() {
+				convexConfigs, err := a.convex.GetEnabledMCPConfigs()
+				if err != nil {
+					return c.JSON(http.StatusInternalServerError, map[string]string{
+						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
+					})
+				}
+				for _, cfg := range convexConfigs {
+					enabledConfigContents = append(enabledConfigContents, cfg.Content)
+				}
+			} else {
+				// Legacy SQLite path
+				enabledConfigs, err := a.store.GetEnabledTomlConfigs()
+				if err != nil {
+					return c.JSON(http.StatusInternalServerError, map[string]string{
+						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
+					})
+				}
+				for _, cfg := range enabledConfigs {
+					enabledConfigContents = append(enabledConfigContents, cfg.Content)
+				}
+			}
+
+			// Parse all enabled configs and build server map
+			serverMap := make(map[string]models.MCPServer)
+			for _, tomlContent := range enabledConfigContents {
+				servers, err := mcp.ParseTOML(tomlContent)
+				if err != nil {
+					continue // Skip invalid configs
+				}
+				for _, server := range servers {
+					serverMap[server.Name] = server
+				}
+			}
+
+			// Filter to only requested MCP servers
+			var mcpServers []models.MCPServer
+			for _, name := range mcpNames {
+				if server, ok := serverMap[name]; ok {
+					mcpServers = append(mcpServers, server)
+				}
+			}
+
+			if len(mcpServers) > 0 {
+				// Build env values from k8s secrets (placeholders resolved at runtime)
+				envValues := map[string]string{}
+
+				var mcpErr error
+				mcpJSON, mcpErr = mcp.GenerateMCPConfig(mcpServers, envValues)
+				if mcpErr != nil {
+					return c.JSON(http.StatusInternalServerError, map[string]string{
+						"error": fmt.Sprintf("Failed to generate MCP config: %v", mcpErr),
+					})
+				}
+			}
+		}
+	}
+
+	// Get skill install commands from database (same logic as LaunchAgent)
+	var skillInstallCommands []string
+	if config.EnabledSkills != "" {
+		if a.useConvex() {
+			commands, err := a.convex.GetSkillInstallCommands(config.EnabledSkills)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
+				})
+			}
+			skillInstallCommands = commands
+		} else {
+			// Legacy SQLite path
+			commands, err := a.store.GetSkillInstallCommands(config.EnabledSkills)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, map[string]string{
+					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
+				})
+			}
+			skillInstallCommands = commands
+		}
+	}
+
+	// Create new persistent pod with MCP and skills
+	podName, err := a.k8sClient.GetOrCreateAgentPod(config, mcpJSON, skillInstallCommands)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": fmt.Sprintf("Failed to create pod: %v", err),
@@ -803,7 +893,105 @@ func (a *API) ChatSend(c echo.Context) error {
 				return nil
 			}
 		}
-		podName, err = a.k8sClient.GetOrCreateAgentPod(agentConfig)
+
+		// Build MCP JSON from config.EnabledMCPs (same logic as LaunchAgent)
+		var mcpJSON []byte
+		log.Printf("[ChatSend] Agent config loaded: name=%s, EnabledMCPs=%q", agentConfig.Name, agentConfig.EnabledMCPs)
+		if agentConfig.EnabledMCPs != "" {
+			mcpNames := mcp.ParseEnabledMCPs(agentConfig.EnabledMCPs)
+			log.Printf("[ChatSend] Parsed MCP names: %v", mcpNames)
+			if len(mcpNames) > 0 {
+				// Get servers from enabled TOML configs
+				var enabledConfigContents []string
+
+				if a.useConvex() {
+					convexConfigs, convexErr := a.convex.GetEnabledMCPConfigs()
+					if convexErr != nil {
+						sendSSEError(c, fmt.Sprintf("Failed to get enabled TOML configs: %v", convexErr))
+						return nil
+					}
+					for _, cfg := range convexConfigs {
+						enabledConfigContents = append(enabledConfigContents, cfg.Content)
+					}
+				} else {
+					// Legacy SQLite path
+					enabledConfigs, storeErr := a.store.GetEnabledTomlConfigs()
+					if storeErr != nil {
+						sendSSEError(c, fmt.Sprintf("Failed to get enabled TOML configs: %v", storeErr))
+						return nil
+					}
+					for _, cfg := range enabledConfigs {
+						enabledConfigContents = append(enabledConfigContents, cfg.Content)
+					}
+				}
+
+				// Parse all enabled configs and build server map
+				serverMap := make(map[string]models.MCPServer)
+				for _, tomlContent := range enabledConfigContents {
+					servers, parseErr := mcp.ParseTOML(tomlContent)
+					if parseErr != nil {
+						continue // Skip invalid configs
+					}
+					for _, server := range servers {
+						serverMap[server.Name] = server
+					}
+				}
+
+				// Log available servers
+				availableServers := make([]string, 0, len(serverMap))
+				for name := range serverMap {
+					availableServers = append(availableServers, name)
+				}
+				log.Printf("[ChatSend] Available servers in TOML configs: %v", availableServers)
+
+				// Filter to only requested MCP servers
+				var mcpServers []models.MCPServer
+				for _, name := range mcpNames {
+					if server, ok := serverMap[name]; ok {
+						mcpServers = append(mcpServers, server)
+					}
+				}
+				log.Printf("[ChatSend] Matched MCP servers: %d", len(mcpServers))
+
+				if len(mcpServers) > 0 {
+					// Build env values from k8s secrets (placeholders resolved at runtime)
+					envValues := map[string]string{}
+
+					var mcpErr error
+					mcpJSON, mcpErr = mcp.GenerateMCPConfig(mcpServers, envValues)
+					if mcpErr != nil {
+						sendSSEError(c, fmt.Sprintf("Failed to generate MCP config: %v", mcpErr))
+						return nil
+					}
+					log.Printf("[ChatSend] Generated MCP JSON (%d bytes)", len(mcpJSON))
+				}
+			}
+		} else {
+			log.Printf("[ChatSend] No EnabledMCPs configured for agent %s", agentConfig.Name)
+		}
+
+		// Get skill install commands from database (same logic as LaunchAgent)
+		var skillInstallCommands []string
+		if agentConfig.EnabledSkills != "" {
+			if a.useConvex() {
+				commands, convexErr := a.convex.GetSkillInstallCommands(agentConfig.EnabledSkills)
+				if convexErr != nil {
+					sendSSEError(c, fmt.Sprintf("Failed to get skill install commands: %v", convexErr))
+					return nil
+				}
+				skillInstallCommands = commands
+			} else {
+				// Legacy SQLite path
+				commands, storeErr := a.store.GetSkillInstallCommands(agentConfig.EnabledSkills)
+				if storeErr != nil {
+					sendSSEError(c, fmt.Sprintf("Failed to get skill install commands: %v", storeErr))
+					return nil
+				}
+				skillInstallCommands = commands
+			}
+		}
+
+		podName, err = a.k8sClient.GetOrCreateAgentPod(agentConfig, mcpJSON, skillInstallCommands)
 		if err != nil {
 			sendSSEError(c, fmt.Sprintf("Failed to get agent pod: %v", err))
 			return nil
