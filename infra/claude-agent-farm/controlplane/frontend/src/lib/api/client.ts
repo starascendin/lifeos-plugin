@@ -60,7 +60,7 @@ export async function getConfigs(): Promise<AgentConfig[]> {
   return fetchJson<AgentConfig[]>('/configs')
 }
 
-export async function getConfig(id: number): Promise<AgentConfig> {
+export async function getConfig(id: string | number): Promise<AgentConfig> {
   return fetchJson<AgentConfig>(`/configs/${id}`)
 }
 
@@ -71,14 +71,14 @@ export async function createConfig(config: AgentConfigCreate): Promise<AgentConf
   })
 }
 
-export async function updateConfig(id: number, config: Partial<AgentConfigCreate>): Promise<AgentConfig> {
+export async function updateConfig(id: string | number, config: Partial<AgentConfigCreate>): Promise<AgentConfig> {
   return fetchJson<AgentConfig>(`/configs/${id}`, {
     method: 'PUT',
     body: JSON.stringify(config),
   })
 }
 
-export async function deleteConfig(id: number): Promise<void> {
+export async function deleteConfig(id: string | number): Promise<void> {
   await fetchJson<void>(`/configs/${id}`, { method: 'DELETE' })
 }
 
@@ -94,7 +94,7 @@ export async function launchAgent(configId: string | number, taskPrompt: string)
   })
 }
 
-export async function recreateAgentPod(configId: number): Promise<{ pod_name: string }> {
+export async function recreateAgentPod(configId: string | number): Promise<{ pod_name: string }> {
   return fetchJson<{ pod_name: string }>(`/agents/recreate/${configId}`, {
     method: 'POST',
   })

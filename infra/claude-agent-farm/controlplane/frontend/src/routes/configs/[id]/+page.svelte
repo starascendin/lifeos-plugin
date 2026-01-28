@@ -33,7 +33,8 @@
 		enabled_skills: ''
 	};
 
-	$: configId = parseInt($page.params.id || '0');
+	// Support both numeric SQLite IDs and string Convex IDs
+	$: configId = $page.params.id || '';
 
 	onMount(async () => {
 		await loadConfig();

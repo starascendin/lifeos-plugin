@@ -477,7 +477,7 @@
 	// Configs Functions
 	async function handleDeleteConfig(config: AgentConfig) {
 		if (confirm(`Delete config "${config.name}"?`)) {
-			await configs.remove(config.id);
+			await configs.remove(config.convex_id || config.id);
 		}
 	}
 

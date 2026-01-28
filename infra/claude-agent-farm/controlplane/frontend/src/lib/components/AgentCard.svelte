@@ -14,7 +14,7 @@
 		stop: { podName: string };
 		delete: { podName: string };
 		logs: { podName: string };
-		relaunch: { podName: string; configId: number; taskPrompt: string };
+		relaunch: { podName: string; configId: string | number; taskPrompt: string };
 	}>();
 
 	const statusColors: Record<string, string> = {
