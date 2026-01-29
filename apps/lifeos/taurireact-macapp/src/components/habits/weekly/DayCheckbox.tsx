@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, SkipForward, X, MessageSquare, Circle } from "lucide-react";
+import { Check, SkipForward, X, MessageSquare, Circle, Timer } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -26,6 +26,8 @@ interface DayCheckboxProps {
   onMarkIncomplete?: () => void;
   onSkip?: () => void;
   onSkipWithReason?: () => void;
+  onStartPomodoro?: () => void;
+  pomodoroDisabled?: boolean;
 }
 
 export function DayCheckbox({
@@ -39,6 +41,8 @@ export function DayCheckbox({
   onMarkIncomplete,
   onSkip,
   onSkipWithReason,
+  onStartPomodoro,
+  pomodoroDisabled,
 }: DayCheckboxProps) {
   if (!scheduled) {
     // Render a disabled/greyed out circle for non-scheduled days
@@ -81,7 +85,7 @@ export function DayCheckbox({
   );
 
   // If no context menu handlers provided, just return the button
-  if (!onCheck && !onUncheck && !onMarkIncomplete && !onSkip && !onSkipWithReason) {
+  if (!onCheck && !onUncheck && !onMarkIncomplete && !onSkip && !onSkipWithReason && !onStartPomodoro) {
     return buttonContent;
   }
 
@@ -91,6 +95,16 @@ export function DayCheckbox({
         {buttonContent}
       </ContextMenuTrigger>
       <ContextMenuContent>
+        {onStartPomodoro && (
+          <ContextMenuItem
+            onSelect={(e) => { e.preventDefault(); onStartPomodoro(); }}
+            disabled={pomodoroDisabled}
+          >
+            <Timer className="h-4 w-4 mr-2 text-red-500" />
+            {pomodoroDisabled ? "Pomodoro active" : "Start Pomodoro"}
+          </ContextMenuItem>
+        )}
+        {onStartPomodoro && (onCheck || onMarkIncomplete || onUncheck) && <ContextMenuSeparator />}
         {onCheck && (
           <ContextMenuItem onSelect={(e) => { e.preventDefault(); onCheck(); }}>
             <Check className="h-4 w-4 mr-2 text-green-600" />

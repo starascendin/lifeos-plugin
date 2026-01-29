@@ -18,6 +18,7 @@ import { LifeOSLLMCouncilAPI } from "./components/lifeos/LLMCouncilAPIPage";
 import { LifeOSPM } from "./components/lifeos/PM";
 import { LifeOSPMAI } from "./components/lifeos/PMAI";
 import { LifeOSHabits } from "./components/lifeos/Habits";
+import { LifeOSFocus } from "./components/lifeos/Focus";
 import { LifeOSAvatar } from "./components/lifeos/Avatar";
 import { LifeOSVoiceAgent } from "./components/lifeos/VoiceAgent";
 import { LifeOSVoiceNotes } from "./components/lifeos/VoiceNotes";
@@ -114,6 +115,7 @@ export default function LifeOSApp() {
                   <Route path="pm/clients" element={<LifeOSClientProjects />} />
                   <Route path="pm/clients/:view" element={<LifeOSClientProjects />} />
                   <Route path="habits" element={<LifeOSHabits />} />
+                  <Route path="focus" element={<LifeOSFocus />} />
                   <Route path="frm" element={<LifeOSFRM />} />
                   <Route path="frm/:tab" element={<LifeOSFRM />} />
                   <Route path="frm/:tab/:id" element={<LifeOSFRM />} />

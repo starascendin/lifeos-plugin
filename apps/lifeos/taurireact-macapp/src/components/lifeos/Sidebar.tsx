@@ -46,6 +46,7 @@ import {
   Sparkles,
   Target,
   Terminal,
+  Timer,
   User,
   UserCircle,
   Users,
@@ -125,6 +126,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
       },
       { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
       { name: "Habits", href: "/lifeos/habits", icon: Target },
+      { name: "Focus", href: "/lifeos/focus", icon: Timer },
       {
         name: "FRM",
         href: "/lifeos/frm",

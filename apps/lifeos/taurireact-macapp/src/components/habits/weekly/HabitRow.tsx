@@ -206,6 +206,14 @@ export function HabitRow({ habit, onClick }: HabitRowProps) {
                 onMarkIncomplete={() => handleMarkIncompleteForDate(date)}
                 onSkip={() => handleQuickSkipForDate(date)}
                 onSkipWithReason={() => handleOpenSkipWithReason(date)}
+                onStartPomodoro={pomodoroIdle ? async () => {
+                  try {
+                    await startPomodoro({ habitId: habit._id });
+                  } catch (error) {
+                    console.error("[Pomodoro] Failed to start for habit:", error);
+                  }
+                } : undefined}
+                pomodoroDisabled={!pomodoroIdle || pomodoroLoading}
               />
             </div>
           );
