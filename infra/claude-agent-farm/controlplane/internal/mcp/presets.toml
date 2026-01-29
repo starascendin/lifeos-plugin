@@ -45,9 +45,52 @@ description = "Persistent memory storage"
 category = "standard"
 
 # Claude Skills
-# These are installed via claude plugin marketplace
+# These are installed via claude plugin marketplace or file copy
 
 [skills.worktrunk]
 install_command = "claude plugin marketplace add max-sixty/worktrunk"
 description = "Git worktree management for parallel AI workflows"
 category = "git"
+
+# LifeOS Skills - workflow slash commands that chain MCP tools
+# Installed by copying bundled .md files to ~/.claude/commands/
+
+[skills.lifeos-daily-standup]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/daily-standup.md ~/.claude/commands/daily-standup.md"
+description = "Daily standup briefing: agenda, tasks due today, sprint progress"
+category = "lifeos"
+
+[skills.lifeos-weekly-review]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/weekly-review.md ~/.claude/commands/weekly-review.md"
+description = "Weekly review: completed work, in-progress, sprint health, blockers"
+category = "lifeos"
+
+[skills.lifeos-sprint-plan]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/sprint-plan.md ~/.claude/commands/sprint-plan.md"
+description = "Sprint planning: review backlog, assign tasks, check capacity"
+category = "lifeos"
+
+[skills.lifeos-contact-lookup]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/contact-lookup.md ~/.claude/commands/contact-lookup.md"
+description = "Full contact dossier: profile, AI insights, meetings, messages"
+category = "lifeos"
+
+[skills.lifeos-client-brief]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/client-brief.md ~/.claude/commands/client-brief.md"
+description = "Client briefing: projects, phases, completion stats, comms"
+category = "lifeos"
+
+[skills.lifeos-project-status]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/project-status.md ~/.claude/commands/project-status.md"
+description = "Project status report: phases, task breakdown, blockers"
+category = "lifeos"
+
+[skills.lifeos-capture]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/capture.md ~/.claude/commands/capture.md"
+description = "Quick capture: auto-routes input to task or note"
+category = "lifeos"
+
+[skills.lifeos-meeting-prep]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/meeting-prep.md ~/.claude/commands/meeting-prep.md"
+description = "Meeting prep: contact dossier, past meetings, open items"
+category = "lifeos"

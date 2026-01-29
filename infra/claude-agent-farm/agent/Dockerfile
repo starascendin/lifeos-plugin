@@ -46,6 +46,9 @@ COPY --chown=node:node scripts/clone-repos.sh /home/node/clone-repos.sh
 
 RUN chmod +x /home/node/entrypoint.sh /home/node/clone-repos.sh
 
+# Bundle LifeOS skills (Claude Code slash commands)
+COPY --chown=node:node skills/ /opt/lifeos-skills/
+
 # Environment variables (overridden at runtime)
 ENV TASK_PROMPT=""
 ENV SYSTEM_PROMPT=""
