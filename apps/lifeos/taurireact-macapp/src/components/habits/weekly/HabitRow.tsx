@@ -1,8 +1,16 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useHabits } from "@/lib/contexts/HabitsContext";
+import { usePomodoro } from "@/lib/contexts/PomodoroContext";
 import { DayCheckbox } from "./DayCheckbox";
 import { cn } from "@/lib/utils";
-import { Zap, Flame } from "lucide-react";
+import { Zap, Flame, Play, Timer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Doc } from "@holaai/convex";
 import { SkipHabitDialog } from "../SkipHabitDialog";
 
@@ -25,9 +33,30 @@ export function HabitRow({ habit, onClick }: HabitRowProps) {
     isHabitScheduledForDate,
     selectedHabitId,
   } = useHabits();
+  const { state: pomodoroState, startPomodoro, isLoading: pomodoroLoading } = usePomodoro();
 
   const [skipDialogOpen, setSkipDialogOpen] = useState(false);
   const [selectedDateForSkip, setSelectedDateForSkip] = useState<string>("");
+
+  const isThisHabitActive = pomodoroState.habitId === habit._id;
+  const hasOtherPomodoroActive =
+    (pomodoroState.status === "active" || pomodoroState.status === "paused") &&
+    !isThisHabitActive;
+  const pomodoroIdle = pomodoroState.status === "idle";
+
+  const handleStartPomodoro = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (pomodoroIdle && !pomodoroLoading) {
+        try {
+          await startPomodoro({ habitId: habit._id });
+        } catch (error) {
+          console.error("[Pomodoro] Failed to start for habit:", error);
+        }
+      }
+    },
+    [pomodoroIdle, pomodoroLoading, startPomodoro, habit._id]
+  );
   const weekDates = getWeekDates();
   const isSelected = selectedHabitId === habit._id;
 
@@ -117,6 +146,39 @@ export function HabitRow({ habit, onClick }: HabitRowProps) {
       >
         {/* Habit info */}
         <div className="flex items-center gap-2 pl-6 min-w-0">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-6 w-6 flex-shrink-0",
+                    isThisHabitActive && "bg-red-500/20 text-red-500",
+                    (hasOtherPomodoroActive || pomodoroLoading) && "opacity-50"
+                  )}
+                  onClick={handleStartPomodoro}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  disabled={hasOtherPomodoroActive || pomodoroLoading}
+                >
+                  {isThisHabitActive ? (
+                    <Timer className="h-3 w-3 animate-pulse" />
+                  ) : (
+                    <Play className="h-3 w-3" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {pomodoroLoading
+                  ? "Loading..."
+                  : isThisHabitActive
+                    ? "Pomodoro in progress"
+                    : hasOtherPomodoroActive
+                      ? "Another pomodoro is active"
+                      : "Start Pomodoro"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <span className="text-lg flex-shrink-0">{habit.icon || "✅"}</span>
           <span className="text-sm font-medium truncate">{habit.name}</span>
         </div>

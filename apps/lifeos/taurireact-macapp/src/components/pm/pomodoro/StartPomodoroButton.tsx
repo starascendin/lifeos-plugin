@@ -43,7 +43,7 @@ export const StartPomodoroButton = React.memo(function StartPomodoroButton({
       e.stopPropagation(); // Prevent card click
       if (isIdle && !isLoading) {
         try {
-          await startPomodoro(issueId);
+          await startPomodoro({ issueId });
         } catch (error) {
           console.error("[Pomodoro] Failed to start:", error);
         }
@@ -108,7 +108,7 @@ export function QuickStartButton({ className }: { className?: string }) {
 
   const handleClick = async () => {
     if (!isActive) {
-      await startPomodoro();
+      await startPomodoro({});
     }
   };
 

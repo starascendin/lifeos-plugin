@@ -98,19 +98,25 @@ export function PomodoroWidget() {
           </div>
         </div>
 
-        {/* Issue/Label */}
+        {/* Issue/Habit/Label */}
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="max-w-[100px] truncate text-xs text-muted-foreground">
               {isBreak
                 ? "Break"
-                : state.issue?.identifier ?? state.issue?.title ?? "Focus"}
+                : state.issue?.identifier ??
+                  state.issue?.title ??
+                  (state.habit
+                    ? `${state.habit.icon || "✅"} ${state.habit.name}`
+                    : "Focus")}
             </span>
           </TooltipTrigger>
           <TooltipContent>
             {isBreak
               ? "Take a break! You've earned it."
-              : state.issue?.title ?? "Free focus session"}
+              : state.issue?.title ??
+                state.habit?.name ??
+                "Free focus session"}
           </TooltipContent>
         </Tooltip>
 

@@ -226,6 +226,7 @@ export const pmTables = {
   lifeos_pmPomodoroSessions: defineTable({
     userId: v.id("users"),
     issueId: v.optional(v.id("lifeos_pmIssues")), // Optional: can have "free" pomodoros
+    habitId: v.optional(v.id("lifeos_habits")), // Optional: pomodoro linked to a habit
     projectId: v.optional(v.id("lifeos_pmProjects")), // Denormalized for easier queries
     // Session configuration
     durationMinutes: v.number(), // Default 25
@@ -244,6 +245,7 @@ export const pmTables = {
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
     .index("by_issue", ["issueId"])
+    .index("by_habit", ["habitId"])
     .index("by_user_date", ["userId", "startedAt"])
     .index("by_project", ["projectId"]),
 
@@ -265,6 +267,18 @@ export const pmTables = {
         completedCount: v.number(),
         totalFocusTimeMs: v.number(),
       }),
+    ),
+    // Breakdown by habit (habits worked on with pomodoro)
+    habitBreakdown: v.optional(
+      v.array(
+        v.object({
+          habitId: v.id("lifeos_habits"),
+          habitName: v.string(), // Denormalized for display
+          habitIcon: v.optional(v.string()),
+          completedCount: v.number(),
+          totalFocusTimeMs: v.number(),
+        }),
+      ),
     ),
     // Timestamps
     createdAt: v.number(),

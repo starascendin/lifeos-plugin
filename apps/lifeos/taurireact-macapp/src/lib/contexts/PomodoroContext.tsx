@@ -24,6 +24,8 @@ export interface PomodoroState {
   issueId: Id<"lifeos_pmIssues"> | null;
   issue: Doc<"lifeos_pmIssues"> | null;
   project: Doc<"lifeos_pmProjects"> | null;
+  habitId: Id<"lifeos_habits"> | null;
+  habit: Doc<"lifeos_habits"> | null;
   // Timer state (calculated client-side)
   remainingMs: number;
   totalDurationMs: number;
@@ -34,11 +36,16 @@ export interface PomodoroState {
   breakMinutes: number;
 }
 
+interface StartPomodoroOptions {
+  issueId?: Id<"lifeos_pmIssues">;
+  habitId?: Id<"lifeos_habits">;
+}
+
 interface PomodoroContextValue {
   state: PomodoroState;
 
   // Actions
-  startPomodoro: (issueId?: Id<"lifeos_pmIssues">) => Promise<void>;
+  startPomodoro: (options?: StartPomodoroOptions) => Promise<void>;
   pausePomodoro: () => Promise<void>;
   resumePomodoro: () => Promise<void>;
   abandonPomodoro: () => Promise<void>;
@@ -114,6 +121,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const session = activePomodoroData?.session;
   const issue = activePomodoroData?.issue ?? null;
   const project = activePomodoroData?.project ?? null;
+  const habit = activePomodoroData?.habit ?? null;
 
   // Calculate remaining time based on server state
   const calculateRemainingMs = useCallback(() => {
@@ -262,11 +270,12 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
   // Actions
   const startPomodoro = useCallback(
-    async (issueId?: Id<"lifeos_pmIssues">) => {
-      console.log("[PomodoroContext] Starting pomodoro", { issueId, durationMinutes, breakMinutes });
+    async (options?: StartPomodoroOptions) => {
+      console.log("[PomodoroContext] Starting pomodoro", { options, durationMinutes, breakMinutes });
       try {
         const sessionId = await startPomodoroMutation({
-          issueId,
+          issueId: options?.issueId,
+          habitId: options?.habitId,
           durationMinutes,
           breakMinutes,
         });
@@ -325,6 +334,8 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       issueId: session?.issueId ?? null,
       issue: issue ?? null,
       project: project ?? null,
+      habitId: session?.habitId ?? null,
+      habit: habit ?? null,
       remainingMs: remainingMs ?? 0,
       totalDurationMs: sessionDurationMinutes * 60 * 1000,
       breakRemainingMs: breakRemainingMs ?? 0,
@@ -335,8 +346,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       status,
       session?._id,
       session?.issueId,
+      session?.habitId,
       issue,
       project,
+      habit,
       remainingMs,
       breakRemainingMs,
       sessionDurationMinutes,
@@ -390,6 +403,8 @@ export function usePomodoro(): PomodoroContextValue {
         issueId: null,
         issue: null,
         project: null,
+        habitId: null,
+        habit: null,
         remainingMs: 0,
         totalDurationMs: 25 * 60 * 1000,
         breakRemainingMs: 0,

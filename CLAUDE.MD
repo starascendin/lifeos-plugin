@@ -5,7 +5,7 @@ Context:
 - I am the sole user of this stack.
 - I just want a SEAMLESS dev exp, where:
     - i just run everything on prod urls, since im the only user.
-    - i just deploy everything to prod w/ `pnpm deploy:prod:isolated --yes`
+    - when u finish developing a feature in dev, just deploy everything to prod w/ `pnpm deploy:prod:isolated --yes`
 
 Goal:
 - I want 1 place where:

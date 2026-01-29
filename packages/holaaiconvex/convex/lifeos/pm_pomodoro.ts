@@ -41,7 +41,7 @@ export const getActivePomodoro = query({
 });
 
 /**
- * Get active pomodoro with issue details
+ * Get active pomodoro with issue/habit details
  */
 export const getActivePomodoroWithIssue = query({
   args: {},
@@ -74,8 +74,9 @@ export const getActivePomodoroWithIssue = query({
     const project = session.projectId
       ? await ctx.db.get(session.projectId)
       : null;
+    const habit = session.habitId ? await ctx.db.get(session.habitId) : null;
 
-    return { session, issue, project };
+    return { session, issue, project, habit };
   },
 });
 
@@ -141,6 +142,26 @@ export const getIssuePomodoroHistory = query({
 });
 
 /**
+ * Get pomodoro history for a habit
+ */
+export const getHabitPomodoroHistory = query({
+  args: {
+    habitId: v.id("lifeos_habits"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const sessions = await ctx.db
+      .query("lifeos_pmPomodoroSessions")
+      .withIndex("by_habit", (q) => q.eq("habitId", args.habitId))
+      .order("desc")
+      .take(50);
+
+    return sessions.filter((s) => s.userId === user._id);
+  },
+});
+
+/**
  * Get recent pomodoro sessions
  */
 export const getRecentSessions = query({
@@ -157,13 +178,16 @@ export const getRecentSessions = query({
       .order("desc")
       .take(limit);
 
-    // Enrich with issue data
+    // Enrich with issue and habit data
     const enriched = await Promise.all(
       sessions.map(async (session) => {
         const issue = session.issueId
           ? await ctx.db.get(session.issueId)
           : null;
-        return { ...session, issue };
+        const habit = session.habitId
+          ? await ctx.db.get(session.habitId)
+          : null;
+        return { ...session, issue, habit };
       })
     );
 
@@ -174,11 +198,12 @@ export const getRecentSessions = query({
 // ==================== MUTATIONS ====================
 
 /**
- * Start a new pomodoro
+ * Start a new pomodoro (can be linked to an issue, a habit, or free-form)
  */
 export const startPomodoro = mutation({
   args: {
     issueId: v.optional(v.id("lifeos_pmIssues")),
+    habitId: v.optional(v.id("lifeos_habits")),
     durationMinutes: v.optional(v.number()),
     breakMinutes: v.optional(v.number()),
   },
@@ -223,9 +248,18 @@ export const startPomodoro = mutation({
       }
     }
 
+    // Validate habit if provided
+    if (args.habitId) {
+      const habit = await ctx.db.get(args.habitId);
+      if (!habit || habit.userId !== user._id) {
+        throw new Error("Habit not found or access denied");
+      }
+    }
+
     const sessionId = await ctx.db.insert("lifeos_pmPomodoroSessions", {
       userId: user._id,
       issueId: args.issueId,
+      habitId: args.habitId,
       projectId,
       durationMinutes: args.durationMinutes ?? 25,
       breakMinutes: args.breakMinutes ?? 5,
@@ -411,6 +445,7 @@ async function updateDailyStats(
   if (existing) {
     // Update existing stats
     const issueBreakdown = [...existing.issueBreakdown];
+    const habitBreakdown = [...(existing.habitBreakdown ?? [])];
 
     if (session.issueId) {
       const issue = await ctx.db.get(session.issueId);
@@ -437,6 +472,31 @@ async function updateDailyStats(
       }
     }
 
+    if (session.habitId) {
+      const habit = await ctx.db.get(session.habitId);
+      const idx = habitBreakdown.findIndex(
+        (h) => h.habitId === session.habitId
+      );
+
+      if (idx >= 0) {
+        habitBreakdown[idx] = {
+          ...habitBreakdown[idx],
+          completedCount:
+            habitBreakdown[idx].completedCount +
+            (outcome === "completed" ? 1 : 0),
+          totalFocusTimeMs: habitBreakdown[idx].totalFocusTimeMs + focusTimeMs,
+        };
+      } else if (habit) {
+        habitBreakdown.push({
+          habitId: session.habitId,
+          habitName: habit.name,
+          habitIcon: habit.icon,
+          completedCount: outcome === "completed" ? 1 : 0,
+          totalFocusTimeMs: focusTimeMs,
+        });
+      }
+    }
+
     await ctx.db.patch(existing._id, {
       completedCount:
         existing.completedCount + (outcome === "completed" ? 1 : 0),
@@ -444,11 +504,14 @@ async function updateDailyStats(
         existing.abandonedCount + (outcome === "abandoned" ? 1 : 0),
       totalFocusTimeMs: existing.totalFocusTimeMs + focusTimeMs,
       issueBreakdown,
+      habitBreakdown,
       updatedAt: now,
     });
   } else {
     // Create new stats
     const issueBreakdown: Doc<"lifeos_pmPomodoroDailyStats">["issueBreakdown"] =
+      [];
+    const habitBreakdown: NonNullable<Doc<"lifeos_pmPomodoroDailyStats">["habitBreakdown"]> =
       [];
 
     if (session.issueId) {
@@ -464,6 +527,19 @@ async function updateDailyStats(
       }
     }
 
+    if (session.habitId) {
+      const habit = await ctx.db.get(session.habitId);
+      if (habit) {
+        habitBreakdown.push({
+          habitId: session.habitId,
+          habitName: habit.name,
+          habitIcon: habit.icon,
+          completedCount: outcome === "completed" ? 1 : 0,
+          totalFocusTimeMs: focusTimeMs,
+        });
+      }
+    }
+
     await ctx.db.insert("lifeos_pmPomodoroDailyStats", {
       userId,
       date,
@@ -471,6 +547,7 @@ async function updateDailyStats(
       abandonedCount: outcome === "abandoned" ? 1 : 0,
       totalFocusTimeMs: focusTimeMs,
       issueBreakdown,
+      habitBreakdown,
       createdAt: now,
       updatedAt: now,
     });

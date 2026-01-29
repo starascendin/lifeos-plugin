@@ -18,6 +18,7 @@ export function PomodoroStatsPanel({ className }: { className?: string }) {
   const completedCount = todayStats?.completedCount ?? 0;
   const totalFocusTimeMs = todayStats?.totalFocusTimeMs ?? 0;
   const issueBreakdown = todayStats?.issueBreakdown ?? [];
+  const habitBreakdown = todayStats?.habitBreakdown ?? [];
 
   return (
     <Card className={cn("", className)}>
@@ -93,6 +94,38 @@ export function PomodoroStatsPanel({ className }: { className?: string }) {
                       {item.issueIdentifier}
                     </span>
                     <span className="truncate">{item.issueTitle}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-muted-foreground">
+                      {item.completedCount}x
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDuration(item.totalFocusTimeMs)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Habit Breakdown */}
+        {habitBreakdown.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              Habits focused on
+            </p>
+            <div className="space-y-1">
+              {habitBreakdown.slice(0, 5).map((item) => (
+                <div
+                  key={item.habitId}
+                  className="flex items-center justify-between text-sm"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="text-sm">
+                      {item.habitIcon || "✅"}
+                    </span>
+                    <span className="truncate">{item.habitName}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-muted-foreground">
