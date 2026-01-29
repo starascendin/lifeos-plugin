@@ -516,15 +516,13 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
                             <span>{person.memoCount} memos</span>
                           </>
                         )}
-                        {person.lastInteractionAt && (
-                          <>
-                            <span>•</span>
-                            <span>{formatRelativeTime(person.lastInteractionAt)}</span>
-                          </>
-                        )}
                       </div>
                     </div>
 
+                    {/* Updated at */}
+                    <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                      {formatRelativeTime(person.updatedAt)}
+                    </span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 ))}

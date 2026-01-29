@@ -134,7 +134,7 @@ export const getContactEmails = query({
 
 /**
  * Get all meetings linked to a person from the unified meeting system.
- * Returns enriched meeting data from both Fathom and Granola sources.
+ * Currently returns Fathom meetings only.
  */
 export const getPersonMeetings = query({
   args: {
@@ -145,7 +145,7 @@ export const getPersonMeetings = query({
 
     const person = await ctx.db.get(args.personId);
     if (!person || person.userId !== user._id) {
-      return { fathom: [], granola: [] };
+      return [];
     }
 
     const links = await ctx.db
@@ -153,12 +153,9 @@ export const getPersonMeetings = query({
       .withIndex("by_person", (q) => q.eq("personId", args.personId))
       .collect();
 
-    // Separate by source
     const fathomLinks = links.filter((l) => l.meetingSource === "fathom");
-    const granolaLinks = links.filter((l) => l.meetingSource === "granola");
 
-    // Enrich Fathom meetings
-    const fathomMeetings = await Promise.all(
+    const meetings = await Promise.all(
       fathomLinks.map(async (link) => {
         try {
           const meeting = await ctx.db.get(
@@ -180,30 +177,7 @@ export const getPersonMeetings = query({
       })
     );
 
-    // Enrich Granola meetings
-    const granolaMeetings = await Promise.all(
-      granolaLinks.map(async (link) => {
-        try {
-          const meeting = await ctx.db.get(
-            link.meetingId as Id<"life_granolaMeetings">
-          );
-          if (!meeting) return null;
-          return {
-            meetingId: meeting._id,
-            title: meeting.title,
-            granolaCreatedAt: meeting.granolaCreatedAt,
-            resumeMarkdown: meeting.resumeMarkdown?.slice(0, 500),
-          };
-        } catch {
-          return null;
-        }
-      })
-    );
-
-    return {
-      fathom: fathomMeetings.filter(Boolean),
-      granola: granolaMeetings.filter(Boolean),
-    };
+    return meetings.filter(Boolean);
   },
 });
 

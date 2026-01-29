@@ -11,6 +11,7 @@
     "convex:deploy": "dotenv -e .env.local -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (DEV)\" && convex deploy'",
     "convex:deploy:prod": "dotenv -e .env.production -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (PROD)\" && convex deploy'",
     "deploy:prod": "dotenv -e .env.production -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (PROD)\" && convex deploy'",
+    "deploy:prod:yes": "dotenv -e .env.production -- bash -c 'echo \"=> Deploying to: $CONVEX_URL (PROD)\" && convex deploy --yes'",
     "typecheck": "tsc --noEmit",
     "seed:prod": "./scripts/seed-prod.sh",
     "seed:dev": "./scripts/seed-prod.sh --dev",

@@ -287,7 +287,7 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
     personId,
   });
 
-  // Query linked meetings (Fathom + Granola from unified system)
+  // Query linked meetings (Fathom from unified system)
   const personMeetings = useQuery(api.lifeos.frm_people.getPersonMeetings, {
     personId,
   });
@@ -1116,17 +1116,16 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                 )}
               </div>
 
-              {/* Meetings (Fathom + Granola) */}
-              {personMeetings && (personMeetings.fathom.length > 0 || personMeetings.granola.length > 0) && (
+              {/* Meetings (Fathom) */}
+              {personMeetings && personMeetings.length > 0 && (
                 <div className="rounded-xl border border-border bg-card p-5">
                   <SectionHeader
                     icon={Video}
                     title="Meetings"
-                    classification={`${personMeetings.fathom.length + personMeetings.granola.length} MEETINGS`}
+                    classification={`${personMeetings.length} MEETINGS`}
                   />
                   <div className="space-y-2">
-                    {/* Fathom meetings */}
-                    {personMeetings.fathom.map((meeting) => {
+                    {personMeetings.map((meeting) => {
                       if (!meeting) return null;
                       return (
                         <div
@@ -1172,42 +1171,6 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </a>
                             )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {/* Granola meetings */}
-                    {personMeetings.granola.map((meeting) => {
-                      if (!meeting) return null;
-                      return (
-                        <div
-                          key={meeting.meetingId}
-                          className="rounded-lg bg-muted/50 p-3 hover:bg-muted/80 transition-colors"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 shrink-0">
-                              <Video className="h-4 w-4 text-emerald-500" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-sm truncate flex-1">
-                                  {meeting.title}
-                                </p>
-                                <Badge variant="outline" className="text-[10px] h-5 shrink-0">
-                                  Granola
-                                </Badge>
-                              </div>
-                              {meeting.granolaCreatedAt && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {format(new Date(meeting.granolaCreatedAt), "MMM d, yyyy")}
-                                </p>
-                              )}
-                              {meeting.resumeMarkdown && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                  {meeting.resumeMarkdown.replace(/[#*_`]/g, "").slice(0, 150)}...
-                                </p>
-                              )}
-                            </div>
                           </div>
                         </div>
                       );
