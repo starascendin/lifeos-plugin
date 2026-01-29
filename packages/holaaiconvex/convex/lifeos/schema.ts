@@ -7,6 +7,7 @@ import { chatnexusTables } from "./chatnexus_schema";
 import { controlplaneTables } from "./controlplane_schema";
 import { dailyFieldsTables } from "./daily_fields_schema";
 import { demoAgentTables } from "./demo_agent_schema";
+import { fathomTables } from "./fathom_schema";
 import { frmTables } from "./frm_schema";
 import { granolaTables } from "./granola_schema";
 import { habitsTables } from "./habits_schema";
@@ -38,6 +39,8 @@ export const lifeosTables = {
   ...dailyFieldsTables,
   // Demo Agent tables
   ...demoAgentTables,
+  // Fathom AI (Meeting Notes via API) tables
+  ...fathomTables,
   // FRM (Friend Relationship Management) tables
   ...frmTables,
   // Granola (Meeting Notes) tables
