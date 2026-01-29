@@ -91,40 +91,16 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-# Function to extract CONVEX_URL from env file
-get_convex_url() {
-  local env_file="$1"
-  if [ ! -f "$env_file" ]; then
-    echo ""
-    return
-  fi
-  grep -E "^CONVEX_URL=" "$env_file" | cut -d'=' -f2- | tr -d '"' | tr -d "'"
-}
-
-# Get project URLs
-DEV_PROJECT_URL=$(get_convex_url ".env.local")
-PROD_PROJECT_URL=$(get_convex_url ".env.production")
-
-if [ -z "$DEV_PROJECT_URL" ]; then
-  echo -e "${RED}Error: Could not find CONVEX_URL in .env.local${NC}"
-  exit 1
-fi
-
-if [ -z "$PROD_PROJECT_URL" ]; then
-  echo -e "${RED}Error: Could not find CONVEX_URL in .env.production${NC}"
-  exit 1
-fi
-
-# Determine convex command based on target
+# Determine the --prod flag for npx convex env commands
+# Dev deployment is the default (no flag needed)
+# Prod deployment requires --prod flag
 case $TARGET in
   dev)
-    CONVEX_CMD="npx convex env"
-    CONVEX_URL="$DEV_PROJECT_URL"
+    CONVEX_FLAG=""
     TARGET_DESC="DEV (keen-nightingale-310)"
     ;;
   prod)
-    CONVEX_CMD="npx convex env"
-    CONVEX_URL="$PROD_PROJECT_URL"
+    CONVEX_FLAG="--prod"
     TARGET_DESC="PROD (agreeable-ibex-949)"
     ;;
   *)
@@ -149,7 +125,7 @@ echo ""
 
 # Get existing env vars
 echo -e "${BLUE}Fetching existing env vars...${NC}"
-EXISTING_VARS=$($CONVEX_CMD list --url "$CONVEX_URL" 2>/dev/null | grep -E "^[A-Z_][A-Z0-9_]*=" | cut -d'=' -f1 || echo "")
+EXISTING_VARS=$(npx convex env list $CONVEX_FLAG 2>/dev/null | grep -E "^[A-Z_][A-Z0-9_]*=" | cut -d'=' -f1 || echo "")
 
 # Function to check if var exists
 var_exists() {
@@ -182,11 +158,21 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     VAR_VALUE="${VAR_VALUE%\'}"
     VAR_VALUE="${VAR_VALUE#\'}"
 
+    # Strip inline comments (e.g. "value # comment")
+    VAR_VALUE=$(echo "$VAR_VALUE" | sed 's/ *#.*//')
+
+    # Skip CONVEX_DEPLOYMENT and CONVEX_URL — these are local-only, not Convex env vars
+    if [[ "$VAR_NAME" == "CONVEX_DEPLOYMENT" || "$VAR_NAME" == "CONVEX_URL" ]]; then
+      echo -e "${BLUE}Skipping (local-only): $VAR_NAME${NC}"
+      ((SKIPPED++))
+      continue
+    fi
+
     # Check if var already exists
     if var_exists "$VAR_NAME"; then
       if [ "$SYNC_ALL" = true ]; then
         echo -e "${YELLOW}Updating: $VAR_NAME${NC}"
-        if $CONVEX_CMD set --url "$CONVEX_URL" "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
+        if npx convex env set $CONVEX_FLAG "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
           ((UPDATED++))
         else
           echo -e "${RED}  Failed to update $VAR_NAME${NC}"
@@ -198,7 +184,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       fi
     else
       echo -e "${GREEN}Adding: $VAR_NAME${NC}"
-      if $CONVEX_CMD set --url "$CONVEX_URL" "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
+      if npx convex env set $CONVEX_FLAG "$VAR_NAME" "$VAR_VALUE" 2>/dev/null; then
         ((ADDED++))
       else
         echo -e "${RED}  Failed to add $VAR_NAME${NC}"

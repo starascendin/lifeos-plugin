@@ -151,6 +151,16 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     VAR_VALUE="${VAR_VALUE%\'}"
     VAR_VALUE="${VAR_VALUE#\'}"
 
+    # Strip inline comments (e.g. "value # comment")
+    VAR_VALUE=$(echo "$VAR_VALUE" | sed 's/ *#.*//')
+
+    # Skip CONVEX_DEPLOYMENT and CONVEX_URL — these are local-only, not Convex env vars
+    if [[ "$VAR_NAME" == "CONVEX_DEPLOYMENT" || "$VAR_NAME" == "CONVEX_URL" ]]; then
+      echo -e "${BLUE}Skipping (local-only): $VAR_NAME${NC}"
+      ((SKIPPED++))
+      continue
+    fi
+
     # Check if var already exists
     if var_exists "$VAR_NAME"; then
       if [ "$SYNC_ALL" = true ]; then

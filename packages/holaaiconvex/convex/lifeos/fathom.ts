@@ -373,17 +373,29 @@ interface FathomTranscriptItem {
 }
 
 interface FathomActionItem {
-  text: string;
+  description: string;
+  user_generated?: boolean;
+  completed?: boolean;
+  recording_timestamp?: string;
+  recording_playback_url?: string;
+  assignee?: {
+    name?: string;
+    email?: string;
+    team?: string;
+  };
 }
 
 interface FathomCalendarInvitee {
-  email: string;
+  email?: string;
   name?: string;
+  email_domain?: string;
+  is_external?: boolean;
+  matched_speaker_display_name?: string;
 }
 
 interface FathomSummary {
-  template_name: string;
-  markdown_formatted: string;
+  template_name?: string;
+  markdown_formatted?: string;
 }
 
 interface FathomMeeting {
@@ -398,7 +410,7 @@ interface FathomMeeting {
   recording_start_time?: string;
   recording_end_time?: string;
   transcript_language?: string;
-  recorded_by?: { email?: string };
+  recorded_by?: { name?: string; email?: string; email_domain?: string; team?: string };
   calendar_invitees?: FathomCalendarInvitee[];
   transcript?: FathomTranscriptItem[];
   default_summary?: FathomSummary;
@@ -406,8 +418,9 @@ interface FathomMeeting {
 }
 
 interface FathomListResponse {
-  meetings: FathomMeeting[];
-  cursor?: string;
+  items: FathomMeeting[];
+  next_cursor?: string | null;
+  limit?: number | null;
 }
 
 // ==================== SYNC ACTION ====================
@@ -525,7 +538,7 @@ export const syncFathomMeetings = action({
         }
 
         const data: FathomListResponse = await response.json();
-        const meetings = data.meetings || [];
+        const meetings = data.items || [];
 
         if (meetings.length === 0) {
           console.log("[fathom:sync] No more meetings to process");
@@ -556,13 +569,15 @@ export const syncFathomMeetings = action({
             shareUrl: m.share_url,
             recordedByEmail: m.recorded_by?.email,
             transcriptLanguage: m.transcript_language,
-            calendarInvitees: m.calendar_invitees?.map((i) => ({
-              email: i.email,
-              name: i.name,
-            })),
+            calendarInvitees: m.calendar_invitees
+              ?.filter((i): i is typeof i & { email: string } => !!i.email)
+              .map((i) => ({
+                email: i.email,
+                name: i.name,
+              })),
             summaryMarkdown: m.default_summary?.markdown_formatted,
             summaryTemplateName: m.default_summary?.template_name,
-            actionItems: m.action_items?.map((item) => item.text),
+            actionItems: m.action_items?.map((item) => item.description),
             hasTranscript: !!(m.transcript && m.transcript.length > 0),
             scheduledStartTime: m.scheduled_start_time,
             scheduledEndTime: m.scheduled_end_time,
@@ -621,7 +636,7 @@ export const syncFathomMeetings = action({
           );
         }
 
-        cursor = data.cursor;
+        cursor = data.next_cursor ?? undefined;
       } while (cursor);
 
       // Update sync status on success

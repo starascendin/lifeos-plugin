@@ -28,6 +28,7 @@ import {
   Clock,
   Cpu,
   FileAudio,
+  FlaskConical,
   Globe,
   Headphones,
   Heart,
@@ -35,6 +36,7 @@ import {
   Mic,
   Network,
   LayoutDashboard,
+  LifeBuoy,
   ListTodo,
   LogOut,
   MessageSquare,
@@ -81,7 +83,8 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const { connectionState, connect, disconnect, isConfigured } =
     useVoiceAgent();
   const [expandedSections, setExpandedSections] = useState<string[]>([
-    "Projects",
+    "LifeOS",
+    "CRM",
   ]);
 
   const signOutToLifeOS = async () => {
@@ -112,10 +115,22 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   const navigation: NavItem[] = useMemo(() => {
     const items: NavItem[] = [
       { name: "Dashboard", href: "/lifeos", icon: LayoutDashboard },
-      { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
-      { name: "Initiatives", href: "/lifeos/initiatives", icon: Rocket },
       {
-        name: "Projects",
+        name: "LifeOS",
+        href: "/lifeos/agenda",
+        icon: LifeBuoy,
+        children: [
+          { name: "Agenda", href: "/lifeos/agenda", icon: Calendar },
+          { name: "Initiatives", href: "/lifeos/initiatives", icon: Rocket },
+          { name: "Habits", href: "/lifeos/habits", icon: Target },
+          { name: "Focus", href: "/lifeos/focus", icon: Timer },
+          { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
+          { name: "Voice AI", href: "/lifeos/voiceagent", icon: Headphones },
+          { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
+        ],
+      },
+      {
+        name: "CRM",
         href: "/lifeos/pm",
         icon: Kanban,
         children: [
@@ -123,11 +138,12 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           { name: "Projects", href: "/lifeos/pm/projects", icon: FolderKanban },
           { name: "Cycles", href: "/lifeos/pm/cycles", icon: RefreshCw },
           { name: "Clients", href: "/lifeos/pm/clients", icon: Briefcase },
+          { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
+          { name: "Beeper", href: "/lifeos/beeper", icon: MessageSquare },
+          { name: "GranolaAI", href: "/lifeos/granola", icon: NotebookPen },
+          { name: "FathomAI", href: "/lifeos/fathom", icon: Video },
         ],
       },
-      { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
-      { name: "Habits", href: "/lifeos/habits", icon: Target },
-      { name: "Focus", href: "/lifeos/focus", icon: Timer },
       {
         name: "FRM",
         href: "/lifeos/frm",
@@ -138,19 +154,12 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
         ],
       },
       {
-        name: "3D Views",
+        name: "Experiments",
         href: "/lifeos/atlas",
-        icon: Box,
+        icon: FlaskConical,
         children: [
           { name: "Atlas", href: "/lifeos/atlas", icon: Globe },
           { name: "Avatar", href: "/lifeos/avatar", icon: UserCircle },
-        ],
-      },
-      {
-        name: "LLM Councils",
-        href: "/lifeos/proxy-council",
-        icon: Users,
-        children: [
           {
             name: "Proxy Council",
             href: "/lifeos/proxy-council",
@@ -163,29 +172,9 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
             icon: MessageSquare,
           },
           { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
+          { name: "ClaudeCode", href: "/lifeos/claudecode", icon: Terminal },
         ],
       },
-      {
-        name: "Voice AI",
-        href: "/lifeos/voiceagent",
-        icon: Headphones,
-        children: [
-          { name: "Voice Agent", href: "/lifeos/voiceagent", icon: Headphones },
-          { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
-        ],
-      },
-      {
-        name: "Voice Notes",
-        href: "/lifeos/voicenotes",
-        icon: Mic,
-        children: [
-          { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
-        ],
-      },
-      { name: "GranolaAI", href: "/lifeos/granola", icon: NotebookPen },
-      { name: "FathomAI", href: "/lifeos/fathom", icon: Video },
-      { name: "Beeper", href: "/lifeos/beeper", icon: MessageSquare },
-      { name: "ClaudeCode", href: "/lifeos/claudecode", icon: Terminal },
       { name: "Settings", href: "/lifeos/settings", icon: Settings },
       {
         name: "Logout",
