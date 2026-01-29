@@ -104,6 +104,7 @@ export const skillsByCategory = derived(skills, ($skills) => {
 
 // Category labels for display
 export const categoryLabels: Record<string, string> = {
+  lifeos: 'LifeOS',
   git: 'Git Tools',
   productivity: 'Productivity',
   other: 'Other',
