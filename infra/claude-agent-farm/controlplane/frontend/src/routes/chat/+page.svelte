@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, afterUpdate, onDestroy } from 'svelte';
+	import { page } from '$app/stores';
 	import {
 		Send,
 		Plus,
@@ -40,9 +41,20 @@
 		}
 	});
 
-	onMount(() => {
-		configs.refresh();
+	onMount(async () => {
+		await configs.refresh();
 		agents.startAutoRefresh(5000);
+
+		// Auto-select agent from ?agent= query param
+		const agentParam = $page.url.searchParams.get('agent');
+		if (agentParam) {
+			const config = $configs.find(
+				(c) => (c.convex_id || String(c.id)) === agentParam
+			);
+			if (config) {
+				chatActions.selectAgent(config.name, config.convex_id || config.id);
+			}
+		}
 	});
 
 	onDestroy(() => {

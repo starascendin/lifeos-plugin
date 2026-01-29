@@ -99,12 +99,10 @@ func main() {
 
 		// Agents
 		apiGroup.GET("/agents", apiHandler.ListAgents)
-		apiGroup.POST("/agents/launch/:id", apiHandler.LaunchAgent)
 		apiGroup.POST("/agents/recreate/:id", apiHandler.RecreateAgentPod)
 		apiGroup.DELETE("/agents/:name", apiHandler.StopAgent)
 		apiGroup.GET("/agents/:name/logs", apiHandler.GetAgentLogs)
 		apiGroup.GET("/agents/:name/logs/stream", apiHandler.StreamAgentLogs)
-		apiGroup.POST("/agents/cleanup", apiHandler.CleanupPods)
 
 		// Chat
 		apiGroup.GET("/chat/send", apiHandler.ChatSend)

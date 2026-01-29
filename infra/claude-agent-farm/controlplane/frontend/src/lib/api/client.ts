@@ -87,13 +87,6 @@ export async function getAgents(): Promise<RunningAgent[]> {
   return fetchJson<RunningAgent[]>('/agents')
 }
 
-export async function launchAgent(configId: string | number, taskPrompt: string): Promise<{ pod_name: string }> {
-  return fetchJson<{ pod_name: string }>(`/agents/launch/${configId}`, {
-    method: 'POST',
-    body: JSON.stringify({ task_prompt: taskPrompt }),
-  })
-}
-
 export async function recreateAgentPod(configId: string | number): Promise<{ pod_name: string }> {
   return fetchJson<{ pod_name: string }>(`/agents/recreate/${configId}`, {
     method: 'POST',
@@ -285,13 +278,6 @@ export async function getActiveServers(): Promise<MCPServer[]> {
 // GitHub Repos
 export async function getGitHubRepos(): Promise<GitHubRepo[]> {
   return fetchJson<GitHubRepo[]>('/github/repos')
-}
-
-// Cleanup
-export async function cleanupPods(minutes = 30): Promise<{ cleaned: number; message: string }> {
-  return fetchJson<{ cleaned: number; message: string }>(`/agents/cleanup?minutes=${minutes}`, {
-    method: 'POST',
-  })
 }
 
 // Skills

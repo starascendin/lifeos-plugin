@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { Play, Edit2, Trash2, Cpu, DollarSign, RotateCcw } from 'lucide-svelte';
+	import { MessageSquare, Edit2, Trash2, Cpu, DollarSign, RotateCcw } from 'lucide-svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -9,7 +9,7 @@
 	export let config: AgentConfig;
 
 	const dispatch = createEventDispatcher<{
-		launch: { config: AgentConfig };
+		chat: { config: AgentConfig };
 		edit: { config: AgentConfig };
 		delete: { config: AgentConfig };
 	}>();
@@ -46,10 +46,10 @@
 			variant="default"
 			size="sm"
 			class="flex-1"
-			on:click={() => dispatch('launch', { config })}
+			on:click={() => dispatch('chat', { config })}
 		>
-			<Play class="h-4 w-4" />
-			Launch
+			<MessageSquare class="h-4 w-4" />
+			Chat
 		</Button>
 		<Button
 			variant="secondary"

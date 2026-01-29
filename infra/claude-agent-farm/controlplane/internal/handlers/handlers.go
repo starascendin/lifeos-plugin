@@ -144,43 +144,6 @@ func (h *Handler) DeleteConfig(c echo.Context) error {
 	return c.String(http.StatusOK, "")
 }
 
-// LaunchForm returns the launch form for a config
-func (h *Handler) LaunchForm(c echo.Context) error {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		return c.String(http.StatusBadRequest, "Invalid ID")
-	}
-
-	config, err := h.store.GetConfig(id)
-	if err != nil {
-		return c.String(http.StatusNotFound, "Config not found")
-	}
-
-	return c.Render(http.StatusOK, "launch-form", config)
-}
-
-// LaunchAgent launches a new agent pod
-func (h *Handler) LaunchAgent(c echo.Context) error {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		return c.String(http.StatusBadRequest, "Invalid ID")
-	}
-
-	config, err := h.store.GetConfig(id)
-	if err != nil {
-		return c.String(http.StatusNotFound, "Config not found")
-	}
-
-	taskPrompt := c.FormValue("task_prompt")
-	podName, err := h.k8sClient.LaunchAgent(config, taskPrompt)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, fmt.Sprintf("Failed to launch: %v", err))
-	}
-
-	c.Response().Header().Set("HX-Trigger", "agentLaunched")
-	return c.String(http.StatusOK, fmt.Sprintf("Launched: %s", podName))
-}
-
 // StopAgent stops a running agent
 func (h *Handler) StopAgent(c echo.Context) error {
 	podName := c.Param("name")

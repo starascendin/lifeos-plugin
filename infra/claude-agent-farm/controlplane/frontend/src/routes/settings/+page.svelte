@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import {
 		Download,
 		Trash2,
@@ -8,25 +7,19 @@
 		ChevronDown,
 		ChevronRight,
 		Save,
-		FileText,
 		Check,
 		RefreshCw,
 		Sparkles,
 		Plus,
 		Pencil,
-		Square,
-		RotateCw,
-		Smartphone,
-		Container
+		Smartphone
 	} from 'lucide-svelte';
 	import Button from '$lib/components/Button.svelte';
-	import ConfigCard from '$lib/components/ConfigCard.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Card from '$lib/components/ui/card';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { cn } from '$lib/utils';
 	import {
 		getTomlConfigs,
@@ -35,17 +28,11 @@
 		updateTomlConfig,
 		deleteTomlConfig,
 		getActiveServers,
-		stopAgent,
-		launchAgent,
-		recreateAgentPod,
-		cleanupPods,
 		getSystemInfo,
 		type SystemInfo
 	} from '$lib/api/client';
-	import type { MCPTomlConfig, MCPServer, Skill, AgentConfig, RunningAgent } from '$lib/api/types';
+	import type { MCPTomlConfig, MCPServer, Skill } from '$lib/api/types';
 	import { skills, skillsByCategory, categoryLabels } from '$lib/stores/skills';
-	import { configs } from '$lib/stores/configs';
-	import { agents } from '$lib/stores/agents';
 	import {
 		isNative,
 		getCurrentBundle,
@@ -56,7 +43,7 @@
 	} from '$lib/capacitor/updater';
 
 	// Tab state - show App first on mobile (native), MCP first on web
-	type Tab = 'app' | 'mcp' | 'skills' | 'pods' | 'configs';
+	type Tab = 'app' | 'mcp' | 'skills';
 	let activeTab: Tab = isNative ? 'app' : 'mcp';
 
 	// App/Update state
@@ -99,29 +86,8 @@
 	let skillError = '';
 	let skillSuccess = '';
 
-	// Pods state
-	let selectedPods: Set<string> = new Set();
-	let deleting = false;
-	let cleaning = false;
-	let relaunchingPods: Set<string> = new Set();
-	type StatusFilter = 'all' | 'running' | 'completed' | 'failed';
-	let statusFilter: StatusFilter = 'all';
-
-	$: filteredAgents = ($agents || []).filter((agent: RunningAgent) => {
-		if (statusFilter === 'all') return true;
-		if (statusFilter === 'running') return agent.status === 'Running' || agent.status === 'Pending';
-		if (statusFilter === 'completed') return agent.status === 'Succeeded';
-		if (statusFilter === 'failed') return agent.status === 'Failed';
-		return true;
-	});
-
-	$: runningCount = ($agents || []).filter((a: RunningAgent) => a.status === 'Running' || a.status === 'Pending').length;
-	$: completedCount = ($agents || []).filter((a: RunningAgent) => a.status === 'Succeeded').length;
-	$: failedCount = ($agents || []).filter((a: RunningAgent) => a.status === 'Failed').length;
-
 	// App/Update functions
 	async function loadAppInfo() {
-		// Always load system info
 		try {
 			systemInfo = await getSystemInfo();
 			systemInfoError = '';
@@ -160,7 +126,6 @@
 			if (!result.success) {
 				updateError = result.error || 'Update failed';
 			}
-			// If successful, app will reload automatically
 		} catch (e) {
 			updateError = e instanceof Error ? e.message : 'Update failed';
 		} finally {
@@ -376,131 +341,18 @@
 		}
 	}
 
-	// Pods Functions
-	function toggleSelect(podName: string) {
-		const newSet = new Set(selectedPods);
-		if (newSet.has(podName)) {
-			newSet.delete(podName);
-		} else {
-			newSet.add(podName);
-		}
-		selectedPods = newSet;
-	}
-
-	async function deleteSelectedPods() {
-		if (selectedPods.size === 0) return;
-		if (!confirm(`Delete ${selectedPods.size} pod(s)?`)) return;
-
-		deleting = true;
-		try {
-			for (const podName of selectedPods) {
-				await stopAgent(podName);
-				agents.removeAgent(podName);
-			}
-			selectedPods = new Set();
-		} catch (err) {
-			alert('Failed to delete pods: ' + (err as Error).message);
-		} finally {
-			deleting = false;
-			agents.refresh();
-		}
-	}
-
-	async function stopPod(podName: string) {
-		try {
-			await stopAgent(podName);
-			agents.removeAgent(podName);
-			selectedPods.delete(podName);
-			selectedPods = selectedPods;
-		} catch (err) {
-			alert('Failed to stop pod: ' + (err as Error).message);
-		}
-	}
-
-	async function relaunchPod(agent: RunningAgent) {
-		relaunchingPods = new Set([...relaunchingPods, agent.pod_name]);
-		try {
-			await stopAgent(agent.pod_name);
-			agents.removeAgent(agent.pod_name);
-			if (agent.persistent) {
-				await recreateAgentPod(agent.config_id);
-			} else {
-				await launchAgent(agent.config_id, agent.task_prompt);
-			}
-			agents.refresh();
-		} catch (err) {
-			alert('Failed to relaunch: ' + (err as Error).message);
-		} finally {
-			relaunchingPods = new Set([...relaunchingPods].filter(p => p !== agent.pod_name));
-		}
-	}
-
-	async function handleCleanup() {
-		if (!confirm('Delete all completed/failed pods older than 5 minutes?')) return;
-		cleaning = true;
-		try {
-			const result = await cleanupPods(5);
-			alert(result.message);
-			agents.refresh();
-		} catch (err) {
-			alert('Failed to cleanup: ' + (err as Error).message);
-		} finally {
-			cleaning = false;
-		}
-	}
-
-	function formatTime(dateStr: string) {
-		const date = new Date(dateStr);
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffMins = Math.floor(diffMs / 60000);
-		if (diffMins < 1) return 'Just now';
-		if (diffMins < 60) return `${diffMins}m ago`;
-		const diffHours = Math.floor(diffMins / 60);
-		if (diffHours < 24) return `${diffHours}h ago`;
-		return `${Math.floor(diffHours / 24)}d ago`;
-	}
-
-	const statusColors: Record<string, string> = {
-		Running: 'bg-green-500',
-		Pending: 'bg-yellow-500',
-		Succeeded: 'bg-blue-500',
-		Failed: 'bg-red-500',
-		Unknown: 'bg-gray-500'
-	};
-
-	function setStatusFilter(key: string) {
-		statusFilter = key as StatusFilter;
-		selectedPods = new Set();
-	}
-
-	// Configs Functions
-	async function handleDeleteConfig(config: AgentConfig) {
-		if (confirm(`Delete config "${config.name}"?`)) {
-			await configs.remove(config.convex_id || config.id);
-		}
-	}
-
 	onMount(() => {
 		loadSavedConfigs();
 		loadActiveServers();
 		skills.refresh();
-		configs.refresh();
-		agents.startAutoRefresh(5000);
 		loadAppInfo();
-	});
-
-	onDestroy(() => {
-		agents.stopAutoRefresh();
 	});
 
 	// Tab definitions - conditionally show App tab only on native
 	$: tabs = [
 		...(isNative ? [{ key: 'app' as Tab, label: 'App', icon: Smartphone }] : []),
 		{ key: 'mcp' as Tab, label: 'MCP', icon: Server },
-		{ key: 'skills' as Tab, label: 'Skills', icon: Sparkles },
-		{ key: 'pods' as Tab, label: 'Pods', icon: Container },
-		{ key: 'configs' as Tab, label: 'Configs', icon: FileText }
+		{ key: 'skills' as Tab, label: 'Skills', icon: Sparkles }
 	];
 </script>
 
@@ -579,7 +431,6 @@
 	<!-- App Tab (OTA Updates) -->
 	{#if activeTab === 'app'}
 		<div class="space-y-4">
-			<!-- System Info -->
 			{#if systemInfo}
 				<Card.Root>
 					<Card.Header class="pb-3">
@@ -965,122 +816,6 @@
 						{/each}
 					</div>
 				{/each}
-			{/if}
-		</div>
-	{/if}
-
-	<!-- Pods Tab -->
-	{#if activeTab === 'pods'}
-		<div class="space-y-4">
-			<!-- Quick Stats -->
-			<div class="flex gap-2 overflow-x-auto">
-				{#each [
-					{ key: 'all', label: 'All', count: $agents.length, color: 'bg-secondary' },
-					{ key: 'running', label: 'Running', count: runningCount, color: 'bg-green-600/20 text-green-400' },
-					{ key: 'completed', label: 'Done', count: completedCount, color: 'bg-blue-600/20 text-blue-400' },
-					{ key: 'failed', label: 'Failed', count: failedCount, color: 'bg-red-600/20 text-red-400' }
-				] as btn}
-					<button
-						on:click={() => setStatusFilter(btn.key)}
-						class={cn('whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium', statusFilter === btn.key ? btn.color : 'bg-muted/30 text-muted-foreground')}
-					>
-						{btn.label} ({btn.count})
-					</button>
-				{/each}
-			</div>
-
-			<!-- Bulk Actions -->
-			{#if selectedPods.size > 0 || completedCount + failedCount > 0}
-				<div class="flex gap-2">
-					{#if selectedPods.size > 0}
-						<Button variant="destructive" size="sm" on:click={deleteSelectedPods} loading={deleting}>
-							<Trash2 class="h-4 w-4" />
-							Delete ({selectedPods.size})
-						</Button>
-					{/if}
-					{#if completedCount + failedCount > 0}
-						<Button variant="outline" size="sm" on:click={handleCleanup} loading={cleaning}>
-							<Trash2 class="h-4 w-4" />
-							Cleanup
-						</Button>
-					{/if}
-				</div>
-			{/if}
-
-			<!-- Pods List -->
-			{#if $agents.length === 0}
-				<Card.Root>
-					<Card.Content class="py-8 text-center">
-						<Container class="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-						<p class="text-sm text-muted-foreground">No pods running</p>
-					</Card.Content>
-				</Card.Root>
-			{:else if filteredAgents.length === 0}
-				<Card.Root>
-					<Card.Content class="py-6 text-center">
-						<p class="text-sm text-muted-foreground">No pods match filter</p>
-					</Card.Content>
-				</Card.Root>
-			{:else}
-				<div class="space-y-2">
-					{#each filteredAgents as agent (agent.pod_name)}
-						{@const isSelected = selectedPods.has(agent.pod_name)}
-						{@const isTerminated = agent.status === 'Succeeded' || agent.status === 'Failed'}
-						{@const isRelaunching = relaunchingPods.has(agent.pod_name)}
-						<div class={cn('flex items-center gap-2 rounded-lg bg-muted/30 p-2', isSelected && 'bg-muted/50')}>
-							<Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(agent.pod_name)} />
-							<div class={cn('h-2 w-2 rounded-full', statusColors[agent.status])} />
-							<div class="min-w-0 flex-1">
-								<div class="truncate text-sm font-medium">{agent.pod_name}</div>
-								<div class="flex gap-2 text-xs text-muted-foreground">
-									<span>{agent.config_name}</span>
-									<span>{formatTime(agent.started_at)}</span>
-								</div>
-							</div>
-							<Button variant="ghost" size="sm" class="h-7 w-7 p-0" disabled={isRelaunching} on:click={() => relaunchPod(agent)}>
-								<RotateCw class={cn('h-3.5 w-3.5', isRelaunching && 'animate-spin')} />
-							</Button>
-							<Button variant="ghost" size="sm" class="h-7 w-7 p-0 text-destructive" on:click={() => stopPod(agent.pod_name)}>
-								{#if isTerminated}<Trash2 class="h-3.5 w-3.5" />{:else}<Square class="h-3.5 w-3.5" />{/if}
-							</Button>
-						</div>
-					{/each}
-				</div>
-			{/if}
-
-			<Button variant="outline" size="sm" on:click={() => agents.refresh()} class="w-full">
-				<RefreshCw class="h-4 w-4" />
-				Refresh
-			</Button>
-		</div>
-	{/if}
-
-	<!-- Configs Tab -->
-	{#if activeTab === 'configs'}
-		<div class="space-y-4">
-			<Button on:click={() => goto('/configs/new')} class="w-full">
-				<Plus class="h-4 w-4" />
-				New Config
-			</Button>
-
-			{#if $configs.length === 0}
-				<Card.Root>
-					<Card.Content class="py-8 text-center">
-						<FileText class="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-						<p class="text-sm text-muted-foreground">No configs yet</p>
-					</Card.Content>
-				</Card.Root>
-			{:else}
-				<div class="grid grid-cols-1 gap-3">
-					{#each $configs as config (config.id)}
-						<ConfigCard
-							{config}
-							on:launch={() => goto('/?launch=' + config.id)}
-							on:edit={() => goto('/configs/' + config.id)}
-							on:delete={() => handleDeleteConfig(config)}
-						/>
-					{/each}
-				</div>
 			{/if}
 		</div>
 	{/if}

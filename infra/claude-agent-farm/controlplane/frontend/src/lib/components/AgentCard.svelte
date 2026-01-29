@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import { FileText, Clock, Cpu, Server, MessageSquare, Bot, Zap, Trash2, Square, RotateCw } from 'lucide-svelte';
+	import { FileText, Clock, Cpu, Server, Bot, Trash2, Square, RotateCw } from 'lucide-svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -33,20 +33,7 @@
 		Unknown: 'text-muted-foreground',
 	};
 
-	const podTypeIcons: Record<string, typeof MessageSquare> = {
-		chat: MessageSquare,
-		agent: Bot,
-		job: Zap,
-	};
-
-	const podTypeColors: Record<string, string> = {
-		chat: 'text-blue-400 bg-blue-400/10',
-		agent: 'text-green-400 bg-green-400/10',
-		job: 'text-orange-400 bg-orange-400/10',
-	};
-
 	$: isTerminated = agent.status === 'Succeeded' || agent.status === 'Failed';
-	$: PodIcon = podTypeIcons[agent.pod_type] || Zap;
 
 	function formatTime(dateStr: string) {
 		const date = new Date(dateStr);
@@ -67,10 +54,7 @@
 		<div class="flex items-start justify-between">
 			<div class="flex-1 min-w-0 space-y-1">
 				<div class="flex items-center gap-2">
-					<Badge variant="outline" class={cn('gap-1 rounded-md text-xs font-medium', podTypeColors[agent.pod_type] || 'text-muted-foreground bg-muted')}>
-						<svelte:component this={PodIcon} class="h-3 w-3" />
-						{agent.pod_type}
-					</Badge>
+					<Bot class="h-4 w-4 text-muted-foreground" />
 					{#if agent.persistent}
 						<Badge variant="outline" class="rounded-md text-xs bg-purple-400/10 text-purple-400 border-purple-400/20">
 							persistent
@@ -90,10 +74,6 @@
 	</Card.Header>
 
 	<Card.Content class="space-y-4">
-		<p class="text-sm text-muted-foreground line-clamp-2">
-			{agent.task_prompt || 'No task prompt'}
-		</p>
-
 		<div class="flex flex-wrap gap-3 text-xs text-muted-foreground">
 			<div class="flex items-center gap-1">
 				<Clock class="h-3.5 w-3.5" />

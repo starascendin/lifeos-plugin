@@ -6,11 +6,17 @@
 	import Button from '$lib/components/Button.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { configs } from '$lib/stores/configs';
+	import { chatActions } from '$lib/stores/chat';
 	import type { AgentConfig } from '$lib/api/types';
 
 	onMount(() => {
 		configs.refresh();
 	});
+
+	function handleChat(config: AgentConfig) {
+		chatActions.selectAgent(config.name, config.convex_id || config.id);
+		goto('/chat');
+	}
 
 	async function handleDelete(config: AgentConfig) {
 		if (confirm(`Delete config "${config.name}"?`)) {
@@ -58,7 +64,7 @@
 			{#each $configs as config (config.convex_id || config.id)}
 				<ConfigCard
 					{config}
-					on:launch={() => goto('/?launch=' + (config.convex_id || config.id))}
+					on:chat={() => handleChat(config)}
 					on:edit={() => goto('/configs/' + (config.convex_id || config.id))}
 					on:delete={() => handleDelete(config)}
 				/>

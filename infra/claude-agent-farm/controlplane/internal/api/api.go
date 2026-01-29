@@ -415,164 +415,6 @@ func (a *API) ListAgents(c echo.Context) error {
 	return c.JSON(http.StatusOK, agents)
 }
 
-// LaunchAgentRequest is the request body for launching an agent
-type LaunchAgentRequest struct {
-	TaskPrompt string `json:"task_prompt"`
-}
-
-// LaunchAgent launches a new agent pod
-func (a *API) LaunchAgent(c echo.Context) error {
-	if a.k8sClient == nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{
-			"error": "Kubernetes not available",
-		})
-	}
-
-	idParam := c.Param("id")
-	var config *models.AgentConfig
-
-	if a.useConvex() {
-		// Convex uses string IDs
-		convexConfig, err := a.convex.GetAgentConfig(idParam)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Config not found",
-			})
-		}
-		modelConfig := convexToModelConfig(convexConfig)
-		config = &modelConfig
-	} else {
-		// Legacy SQLite path - parse as int64
-		id, err := strconv.ParseInt(idParam, 10, 64)
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{
-				"error": "Invalid ID",
-			})
-		}
-		config, err = a.store.GetConfig(id)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Config not found",
-			})
-		}
-	}
-
-	var req LaunchAgentRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request body",
-		})
-	}
-
-	taskPrompt := req.TaskPrompt
-	if taskPrompt == "" {
-		taskPrompt = config.TaskPrompt
-	}
-	// Task prompt is optional - main interaction is via Chat tab or claude -p
-
-	// Generate MCP configuration from enabled TOML configs
-	var mcpJSON []byte
-	if config.EnabledMCPs != "" {
-		mcpNames := mcp.ParseEnabledMCPs(config.EnabledMCPs)
-		if len(mcpNames) > 0 {
-			// Get servers from enabled TOML configs
-			var enabledConfigContents []string
-
-			if a.useConvex() {
-				convexConfigs, err := a.convex.GetEnabledMCPConfigs()
-				if err != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
-					})
-				}
-				for _, cfg := range convexConfigs {
-					enabledConfigContents = append(enabledConfigContents, cfg.Content)
-				}
-			} else {
-				// Legacy SQLite path
-				enabledConfigs, err := a.store.GetEnabledTomlConfigs()
-				if err != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
-					})
-				}
-				for _, cfg := range enabledConfigs {
-					enabledConfigContents = append(enabledConfigContents, cfg.Content)
-				}
-			}
-
-			// Parse all enabled configs and build server map
-			serverMap := make(map[string]models.MCPServer)
-			for _, tomlContent := range enabledConfigContents {
-				servers, err := mcp.ParseTOML(tomlContent)
-				if err != nil {
-					continue // Skip invalid configs
-				}
-				for _, server := range servers {
-					serverMap[server.Name] = server
-				}
-			}
-
-			// Filter to only requested MCP servers
-			var mcpServers []models.MCPServer
-			for _, name := range mcpNames {
-				if server, ok := serverMap[name]; ok {
-					mcpServers = append(mcpServers, server)
-				}
-			}
-
-			if len(mcpServers) > 0 {
-				// Build env values from k8s secrets (these would typically come from the cluster)
-				// For now, we'll leave placeholders that the pod can resolve at runtime
-				envValues := map[string]string{}
-
-				var mcpErr error
-				mcpJSON, mcpErr = mcp.GenerateMCPConfig(mcpServers, envValues)
-				if mcpErr != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": fmt.Sprintf("Failed to generate MCP config: %v", mcpErr),
-					})
-				}
-			}
-		}
-	}
-
-	// Get skill install commands from database
-	var skillInstallCommands []string
-	if config.EnabledSkills != "" {
-		if a.useConvex() {
-			commands, err := a.convex.GetSkillInstallCommands(config.EnabledSkills)
-			if err != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
-				})
-			}
-			skillInstallCommands = commands
-		} else {
-			// Legacy SQLite path
-			commands, err := a.store.GetSkillInstallCommands(config.EnabledSkills)
-			if err != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
-				})
-			}
-			skillInstallCommands = commands
-		}
-	}
-
-	podName, err := a.k8sClient.LaunchAgentWithMCP(config, taskPrompt, mcpJSON, skillInstallCommands)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to launch: %v", err),
-		})
-	}
-
-	return c.JSON(http.StatusCreated, map[string]string{
-		"pod_name": podName,
-		"status":   "Pending",
-	})
-}
-
 // RecreateAgentPod recreates a persistent agent pod with the latest config
 // This is used for "relaunch" of persistent pods (not task jobs)
 func (a *API) RecreateAgentPod(c echo.Context) error {
@@ -618,7 +460,7 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 	// Wait a moment for deletion to process
 	time.Sleep(500 * time.Millisecond)
 
-	// Build MCP JSON from config.EnabledMCPs (same logic as LaunchAgent)
+	// Build MCP JSON from config.EnabledMCPs (builds MCP config from enabled MCPs)
 	var mcpJSON []byte
 	if config.EnabledMCPs != "" {
 		mcpNames := mcp.ParseEnabledMCPs(config.EnabledMCPs)
@@ -684,7 +526,7 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 		}
 	}
 
-	// Get skill install commands from database (same logic as LaunchAgent)
+	// Get skill install commands from database (builds MCP config from enabled MCPs)
 	var skillInstallCommands []string
 	if config.EnabledSkills != "" {
 		if a.useConvex() {
@@ -894,7 +736,7 @@ func (a *API) ChatSend(c echo.Context) error {
 			}
 		}
 
-		// Build MCP JSON from config.EnabledMCPs (same logic as LaunchAgent)
+		// Build MCP JSON from config.EnabledMCPs (builds MCP config from enabled MCPs)
 		var mcpJSON []byte
 		log.Printf("[ChatSend] Agent config loaded: name=%s, EnabledMCPs=%q", agentConfig.Name, agentConfig.EnabledMCPs)
 		if agentConfig.EnabledMCPs != "" {
@@ -970,7 +812,7 @@ func (a *API) ChatSend(c echo.Context) error {
 			log.Printf("[ChatSend] No EnabledMCPs configured for agent %s", agentConfig.Name)
 		}
 
-		// Get skill install commands from database (same logic as LaunchAgent)
+		// Get skill install commands from database (builds MCP config from enabled MCPs)
 		var skillInstallCommands []string
 		if agentConfig.EnabledSkills != "" {
 			if a.useConvex() {
@@ -1565,34 +1407,6 @@ func (a *API) GetActiveServers(c echo.Context) error {
 // --- Cleanup Endpoints ---
 
 // CleanupPods deletes completed/failed pods older than specified minutes
-func (a *API) CleanupPods(c echo.Context) error {
-	if a.k8sClient == nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{
-			"error": "Kubernetes not available",
-		})
-	}
-
-	minutesStr := c.QueryParam("minutes")
-	minutes := 30 // Default: 30 minutes
-	if minutesStr != "" {
-		if parsed, err := strconv.Atoi(minutesStr); err == nil && parsed > 0 {
-			minutes = parsed
-		}
-	}
-
-	cleaned, err := a.k8sClient.CleanupCompletedPods(time.Duration(minutes) * time.Minute)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to cleanup pods: %v", err),
-		})
-	}
-
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"cleaned": cleaned,
-		"message": fmt.Sprintf("Cleaned up %d completed pods older than %d minutes", cleaned, minutes),
-	})
-}
-
 // --- GitHub Endpoints ---
 
 // ListGitHubRepos returns the user's GitHub repos

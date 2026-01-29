@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { Home, MessageSquare, Settings, Bot, FileText, Download, Container, Users } from 'lucide-svelte';
+	import { Home, MessageSquare, Settings, Bot, FileText, Download, Users } from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import { initUpdater, onUpdateStatus, initAppState, onAppStateChange, type UpdateInfo } from '$lib/capacitor';
 
@@ -17,7 +17,6 @@
 	// Desktop nav - all items
 	const desktopNavItems = [
 		{ path: '/', label: 'Home', icon: Home },
-		{ path: '/pods', label: 'Pods', icon: Container },
 		{ path: '/chat', label: 'Chat', icon: MessageSquare },
 		{ path: '/council', label: 'Council', icon: Users },
 		{ path: '/configs', label: 'Configs', icon: FileText },
