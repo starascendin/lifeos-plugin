@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/starascendin/claude-agent-farm/controlplane/internal/mcp"
 )
 
 // Client is an HTTP client for Convex controlplane API
@@ -477,6 +479,48 @@ func (c *Client) doRequest(method, path string, body interface{}, result interfa
 		if err := json.Unmarshal(respBody, result); err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
+	}
+
+	return nil
+}
+
+// SeedSkillsFromPresets seeds skills from presets.toml into Convex if they don't already exist
+func (c *Client) SeedSkillsFromPresets() error {
+	presets, err := mcp.LoadPresets()
+	if err != nil {
+		return fmt.Errorf("failed to load presets: %w", err)
+	}
+
+	// Get existing skills
+	existing, err := c.ListSkills()
+	if err != nil {
+		return fmt.Errorf("failed to list existing skills: %w", err)
+	}
+
+	// Build a set of existing skill names
+	existingNames := make(map[string]bool)
+	for _, s := range existing {
+		existingNames[s.Name] = true
+	}
+
+	// Create any missing preset skills
+	for _, preset := range presets.Skills {
+		if existingNames[preset.Name] {
+			continue
+		}
+		_, err := c.CreateSkill(&CreateSkillRequest{
+			Name:           preset.Name,
+			InstallCommand: preset.InstallCommand,
+			Description:    preset.Description,
+			Category:       preset.Category,
+			IsBuiltin:      true,
+			Enabled:        true,
+		})
+		if err != nil {
+			fmt.Printf("Warning: failed to seed skill %q: %v\n", preset.Name, err)
+			continue
+		}
+		fmt.Printf("Seeded skill: %s\n", preset.Name)
 	}
 
 	return nil

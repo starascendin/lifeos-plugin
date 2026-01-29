@@ -60,6 +60,11 @@ func main() {
 	if convexURL != "" {
 		convexClient = convex.NewClient(convexURL, convexAPIKey)
 		log.Printf("Convex integration enabled (CONVEX_URL configured)")
+
+		// Seed preset skills into Convex (idempotent - skips existing)
+		if err := convexClient.SeedSkillsFromPresets(); err != nil {
+			log.Printf("Warning: Failed to seed skills to Convex: %v", err)
+		}
 	} else {
 		log.Printf("Convex integration disabled (CONVEX_URL not set, using SQLite)")
 	}
