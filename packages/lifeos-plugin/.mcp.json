@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lifeos": {
+      "command": "npx",
+      "args": ["@starascendin/lifeos-mcp@latest"]
+    }
+  }
+}

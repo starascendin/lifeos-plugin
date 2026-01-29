@@ -1,0 +1,8 @@
+{
+  "name": "lifeos",
+  "description": "LifeOS productivity suite - project management, contacts, agendas, and workflow automation via MCP",
+  "version": "1.0.0",
+  "author": { "name": "starascendin" },
+  "repository": "https://github.com/starascendin/hola-monorepo",
+  "keywords": ["lifeos", "productivity", "project-management", "mcp"]
+}
