@@ -43,6 +43,10 @@ interface FRMContextValue {
   setSearchQuery: (query: string) => void;
   searchResults: Doc<"lifeos_frmPeople">[] | undefined;
   isSearching: boolean;
+
+  // Archive filter
+  showArchived: boolean;
+  setShowArchived: (show: boolean) => void;
 }
 
 const FRMContext = createContext<FRMContextValue | null>(null);
@@ -58,9 +62,12 @@ export function FRMProvider({ children }: { children: React.ReactNode }) {
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Archive filter state
+  const [showArchived, setShowArchived] = useState(false);
+
   // Queries
   const people = useQuery(api.lifeos.frm_people.getPeople, {
-    includeArchived: false,
+    includeArchived: showArchived,
   });
 
   const selectedPerson = useQuery(
@@ -103,6 +110,10 @@ export function FRMProvider({ children }: { children: React.ReactNode }) {
     setSearchQuery(query);
   }, []);
 
+  const handleSetShowArchived = useCallback((show: boolean) => {
+    setShowArchived(show);
+  }, []);
+
   const value: FRMContextValue = {
     // Tab
     activeTab,
@@ -130,6 +141,10 @@ export function FRMProvider({ children }: { children: React.ReactNode }) {
     setSearchQuery: handleSetSearchQuery,
     searchResults,
     isSearching,
+
+    // Archive filter
+    showArchived,
+    setShowArchived: handleSetShowArchived,
   };
 
   return <FRMContext.Provider value={value}>{children}</FRMContext.Provider>;

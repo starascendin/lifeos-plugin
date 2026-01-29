@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { useFRM } from "@/lib/contexts/FRMContext";
@@ -22,12 +22,33 @@ import {
   X,
   MessageSquare,
   Bot,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  MoreHorizontal,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { AddPersonDialog } from "./AddPersonDialog";
 import { VoiceMemosPanel, type ProcessingMemo, type ProcessingStage } from "./VoiceMemosPanel";
 import { BeeperContactsPanel } from "./BeeperContactsPanel";
-import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -65,6 +86,10 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
     setSearchQuery,
     searchResults,
     isSearching,
+    showArchived,
+    setShowArchived,
+    archivePerson,
+    restorePerson,
   } = useFRM();
 
   const [showAddPersonDialog, setShowAddPersonDialog] = useState(false);
@@ -97,6 +122,64 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
   // Use search results if searching, otherwise use all people
   const displayPeople = searchQuery.trim() ? searchResults : people;
   const isLoading = searchQuery.trim() ? isSearching : isLoadingPeople;
+
+  // Sort state
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        // Clear sort, revert to default
+        setSortKey(null);
+        setSortDir("desc");
+      }
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedPeople = useMemo(() => {
+    if (!displayPeople) return [];
+    const list = [...displayPeople];
+    const key = sortKey ?? "updatedAt";
+    const dir = sortKey ? sortDir : "desc";
+
+    list.sort((a, b) => {
+      let aVal: string | number | undefined;
+      let bVal: string | number | undefined;
+
+      switch (key) {
+        case "name":
+          aVal = a.name.toLowerCase();
+          bVal = b.name.toLowerCase();
+          break;
+        case "relationshipType":
+          aVal = a.relationshipType?.toLowerCase() ?? "";
+          bVal = b.relationshipType?.toLowerCase() ?? "";
+          break;
+        case "memoCount":
+          aVal = a.memoCount ?? 0;
+          bVal = b.memoCount ?? 0;
+          break;
+        case "updatedAt":
+          aVal = a.updatedAt ?? 0;
+          bVal = b.updatedAt ?? 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return dir === "asc" ? -1 : 1;
+      if (aVal > bVal) return dir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [displayPeople, sortKey, sortDir]);
 
   // Auto-dismiss complete state after 3 seconds
   useEffect(() => {
@@ -364,6 +447,19 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
               />
             </div>
 
+            {/* Show archived toggle */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Switch
+                id="show-archived"
+                checked={showArchived}
+                onCheckedChange={setShowArchived}
+                className="scale-75"
+              />
+              <Label htmlFor="show-archived" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+                Archived
+              </Label>
+            </div>
+
             {/* Recording UI */}
             {isRecording ? (
               <div className="flex items-center gap-1 sm:gap-2">
@@ -468,65 +564,159 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
                 </p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {displayPeople.map((person) => (
-                  <button
-                    key={person._id}
-                    onClick={() => onPersonSelect(person._id)}
-                    className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors text-left"
-                  >
-                    {/* Avatar */}
-                    <div
-                      className="h-10 w-10 rounded-full flex items-center justify-center text-lg shrink-0"
-                      style={{
-                        backgroundColor: person.color
-                          ? `${person.color}20`
-                          : "hsl(var(--muted))",
-                      }}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort("name")}
                     >
-                      {person.avatarEmoji || person.name.charAt(0).toUpperCase()}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{person.name}</span>
-                        {person.nickname && (
-                          <span className="text-xs text-muted-foreground truncate">
-                            ({person.nickname})
-                          </span>
+                      <span className="inline-flex items-center gap-1">
+                        Name
+                        {sortKey === "name" ? (
+                          sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
                         )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {person.relationshipType && (
-                          <span className="capitalize">{person.relationshipType}</span>
+                      </span>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort("relationshipType")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Type
+                        {sortKey === "relationshipType" ? (
+                          sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
                         )}
-                        {person.autoCreatedFrom && (
-                          <>
-                            <span>•</span>
-                            <span className="inline-flex items-center gap-0.5">
-                              <Bot className="h-3 w-3" />
+                      </span>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort("memoCount")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Memos
+                        {sortKey === "memoCount" ? (
+                          sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                        )}
+                      </span>
+                    </TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => handleSort("updatedAt")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Updated
+                        {sortKey === "updatedAt" ? (
+                          sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                        ) : !sortKey ? (
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                        )}
+                      </span>
+                    </TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedPeople.map((person) => {
+                    const isArchived = !!person.archivedAt;
+                    return (
+                      <TableRow
+                        key={person._id}
+                        className={`cursor-pointer ${isArchived ? "opacity-50" : ""}`}
+                        onClick={() => onPersonSelect(person._id)}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="h-8 w-8 rounded-full flex items-center justify-center text-sm shrink-0"
+                              style={{
+                                backgroundColor: person.color
+                                  ? `${person.color}20`
+                                  : "hsl(var(--muted))",
+                              }}
+                            >
+                              {person.avatarEmoji || person.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-medium truncate block">{person.name}</span>
+                              {person.nickname && (
+                                <span className="text-xs text-muted-foreground truncate block">
+                                  {person.nickname}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground capitalize">
+                          {person.relationshipType ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
+                          {person.memoCount > 0 ? person.memoCount : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {person.autoCreatedFrom ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Bot className="h-3.5 w-3.5" />
                               {person.autoCreatedFrom}
                             </span>
-                          </>
-                        )}
-                        {person.memoCount > 0 && (
-                          <>
-                            <span>•</span>
-                            <span>{person.memoCount} memos</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Updated at */}
-                    <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                      {formatRelativeTime(person.updatedAt)}
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </button>
-                ))}
-              </div>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
+                          {formatRelativeTime(person.updatedAt)}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {isArchived ? (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    restorePerson({ personId: person._id });
+                                  }}
+                                >
+                                  <ArchiveRestore className="h-4 w-4 mr-2" />
+                                  Restore
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    archivePerson({ personId: person._id });
+                                  }}
+                                >
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archive
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             )}
           </div>
         </ScrollArea>
