@@ -19,7 +19,7 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "submodule:update": "git add packages/livekit-voice-agent && git commit -m 'chore: update livekit-voice-agent submodule' && git push",
-    "deploy:prod": "bash scripts/deploy-prod.sh",
+    "deploy:prod": "pnpm --filter @holaai/convex deploy:prod:yes",
     "deploy:prod:isolated": "bash scripts/deploy-prod-isolated.sh",
     "pull:all": "git fetch origin && git checkout dev && git pull origin dev && git checkout staging && git pull origin staging && git checkout main && git pull origin main && git checkout dev",
     "dev:controlplane-ui": "pnpm --filter @holaai/controlplane-ui dev",
