@@ -21,6 +21,7 @@ import {
   ChevronDown,
   X,
   MessageSquare,
+  Bot,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { AddPersonDialog } from "./AddPersonDialog";
@@ -499,6 +500,15 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {person.relationshipType && (
                           <span className="capitalize">{person.relationshipType}</span>
+                        )}
+                        {person.autoCreatedFrom && (
+                          <>
+                            <span>•</span>
+                            <span className="inline-flex items-center gap-0.5">
+                              <Bot className="h-3 w-3" />
+                              {person.autoCreatedFrom}
+                            </span>
+                          </>
                         )}
                         {person.memoCount > 0 && (
                           <>

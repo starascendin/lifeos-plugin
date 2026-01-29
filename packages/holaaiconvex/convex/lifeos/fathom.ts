@@ -565,24 +565,26 @@ export const syncFathomMeetings = action({
           return {
             fathomRecordingId: recordingId,
             title,
-            fathomUrl: m.url,
-            shareUrl: m.share_url,
-            recordedByEmail: m.recorded_by?.email,
-            transcriptLanguage: m.transcript_language,
+            fathomUrl: m.url || undefined,
+            shareUrl: m.share_url || undefined,
+            recordedByEmail: m.recorded_by?.email || undefined,
+            transcriptLanguage: m.transcript_language || undefined,
             calendarInvitees: m.calendar_invitees
               ?.filter((i): i is typeof i & { email: string } => !!i.email)
               .map((i) => ({
                 email: i.email,
-                name: i.name,
+                name: i.name || undefined,
               })),
-            summaryMarkdown: m.default_summary?.markdown_formatted,
-            summaryTemplateName: m.default_summary?.template_name,
-            actionItems: m.action_items?.map((item) => item.description),
+            summaryMarkdown: m.default_summary?.markdown_formatted || undefined,
+            summaryTemplateName: m.default_summary?.template_name || undefined,
+            actionItems: m.action_items
+              ?.map((item) => item.description)
+              .filter((d): d is string => !!d),
             hasTranscript: !!(m.transcript && m.transcript.length > 0),
-            scheduledStartTime: m.scheduled_start_time,
-            scheduledEndTime: m.scheduled_end_time,
-            recordingStartTime: m.recording_start_time,
-            recordingEndTime: m.recording_end_time,
+            scheduledStartTime: m.scheduled_start_time || undefined,
+            scheduledEndTime: m.scheduled_end_time || undefined,
+            recordingStartTime: m.recording_start_time || undefined,
+            recordingEndTime: m.recording_end_time || undefined,
             fathomCreatedAt: m.created_at,
           };
         });
@@ -599,10 +601,8 @@ export const syncFathomMeetings = action({
         totalUpdated += result.updatedCount;
         totalMeetings += meetings.length;
 
-        // Upsert transcripts for meetings that have them
+        // Upsert transcripts and auto-match attendees
         for (const m of meetings) {
-          if (!m.transcript || m.transcript.length === 0) continue;
-
           const recordingId = String(m.recording_id);
 
           // Look up the meeting to get its Convex ID
@@ -613,27 +613,59 @@ export const syncFathomMeetings = action({
 
           if (!existingMeeting) continue;
 
-          const utterances = m.transcript.map((t) => ({
-            speakerName: t.speaker.display_name,
-            speakerEmail: t.speaker.matched_calendar_invitee_email,
-            text: t.text,
-            timestamp: t.timestamp,
-          }));
+          // Upsert transcript if available
+          if (m.transcript && m.transcript.length > 0) {
+            const utterances = m.transcript.map((t) => ({
+              speakerName: t.speaker.display_name || "Unknown",
+              speakerEmail:
+                t.speaker.matched_calendar_invitee_email || undefined,
+              text: t.text,
+              timestamp: t.timestamp,
+            }));
 
-          const transcriptText = utterances
-            .map((u) => `${u.speakerName}: ${u.text}`)
-            .join("\n");
+            const transcriptText = utterances
+              .map((u) => `${u.speakerName}: ${u.text}`)
+              .join("\n");
 
-          await ctx.runMutation(
-            internal.lifeos.fathom.upsertTranscriptInternal,
-            {
-              userId,
-              meetingId: existingMeeting._id,
-              fathomRecordingId: recordingId,
-              transcriptText,
-              utterances,
-            }
+            await ctx.runMutation(
+              internal.lifeos.fathom.upsertTranscriptInternal,
+              {
+                userId,
+                meetingId: existingMeeting._id,
+                fathomRecordingId: recordingId,
+                transcriptText,
+                utterances,
+              }
+            );
+          }
+
+          // Auto-match calendar invitees to contacts
+          const invitees = m.calendar_invitees?.filter(
+            (i): i is typeof i & { email: string } => !!i.email
           );
+          if (invitees && invitees.length > 0) {
+            try {
+              await ctx.runMutation(
+                internal.lifeos.contact_matching
+                  .autoMatchMeetingAttendees,
+                {
+                  userId,
+                  userEmail: m.recorded_by?.email,
+                  meetingSource: "fathom",
+                  meetingId: existingMeeting._id as string,
+                  attendees: invitees.map((i) => ({
+                    email: i.email,
+                    name: i.name || undefined,
+                  })),
+                }
+              );
+            } catch (e) {
+              console.warn(
+                `[fathom:sync] Failed to auto-match attendees for meeting ${recordingId}:`,
+                e
+              );
+            }
+          }
         }
 
         cursor = data.next_cursor ?? undefined;

@@ -5549,39 +5549,55 @@ export const getContactDossierInternal = internalQuery({
     }
 
     // Fetch all related data in parallel
-    const [latestProfile, beeperThreads, meetingPersonLinks, memoLinks] =
-      await Promise.all([
-        // Latest AI profile
-        ctx.db
-          .query("lifeos_frmProfiles")
-          .withIndex("by_person_version", (q) => q.eq("personId", person!._id))
-          .order("desc")
-          .take(1)
-          .then((r) => r[0] ?? null),
+    const [
+      latestProfile,
+      beeperThreads,
+      meetingPersonLinks,
+      memoLinks,
+      contactEmails,
+      unifiedMeetingLinks,
+    ] = await Promise.all([
+      // Latest AI profile
+      ctx.db
+        .query("lifeos_frmProfiles")
+        .withIndex("by_person_version", (q) => q.eq("personId", person!._id))
+        .order("desc")
+        .take(1)
+        .then((r) => r[0] ?? null),
 
-        // Beeper threads linked to this person
-        ctx.db
-          .query("lifeos_beeperThreads")
-          .withIndex("by_linkedPerson", (q) =>
-            q.eq("linkedPersonId", person!._id)
-          )
-          .collect(),
+      // Beeper threads linked to this person
+      ctx.db
+        .query("lifeos_beeperThreads")
+        .withIndex("by_linkedPerson", (q) =>
+          q.eq("linkedPersonId", person!._id)
+        )
+        .collect(),
 
-        // Granola meeting person links
-        ctx.db
-          .query("life_granolaMeetingPersonLinks")
-          .withIndex("by_person", (q) => q.eq("personId", person!._id))
-          .collect(),
+      // Granola meeting person links (legacy)
+      ctx.db
+        .query("life_granolaMeetingPersonLinks")
+        .withIndex("by_person", (q) => q.eq("personId", person!._id))
+        .collect(),
 
-        // Voice memo links (most recent 20)
-        ctx.db
-          .query("lifeos_frmPersonMemos")
-          .withIndex("by_person_created", (q) =>
-            q.eq("personId", person!._id)
-          )
-          .order("desc")
-          .take(20),
-      ]);
+      // Voice memo links (most recent 20)
+      ctx.db
+        .query("lifeos_frmPersonMemos")
+        .withIndex("by_person_created", (q) => q.eq("personId", person!._id))
+        .order("desc")
+        .take(20),
+
+      // Contact emails
+      ctx.db
+        .query("lifeos_contactEmails")
+        .withIndex("by_person", (q) => q.eq("personId", person!._id))
+        .collect(),
+
+      // Unified meeting-person links (includes Fathom, Granola, etc.)
+      ctx.db
+        .query("lifeos_meetingPersonLinks")
+        .withIndex("by_person", (q) => q.eq("personId", person!._id))
+        .collect(),
+    ]);
 
     // Enrich granola meetings with calendar events
     const granolaMeetings = await Promise.all(
@@ -5642,6 +5658,34 @@ export const getContactDossierInternal = internalQuery({
       })
     );
 
+    // Enrich Fathom meetings from unified links
+    const fathomLinks = unifiedMeetingLinks.filter(
+      (l) => l.meetingSource === "fathom"
+    );
+    const fathomMeetings = await Promise.all(
+      fathomLinks.map(async (link) => {
+        const meetingId = link.meetingId as Id<"life_fathomMeetings">;
+        const meeting = await ctx.db.get(meetingId);
+        if (!meeting) return null;
+
+        // Truncate summary for response size
+        const summaryMarkdown = meeting.summaryMarkdown
+          ? meeting.summaryMarkdown.substring(0, 1000) +
+            (meeting.summaryMarkdown.length > 1000 ? "..." : "")
+          : undefined;
+
+        return {
+          meetingId: meeting._id,
+          title: meeting.title,
+          fathomCreatedAt: meeting.fathomCreatedAt,
+          summaryMarkdown,
+          actionItems: meeting.actionItems,
+          calendarInvitees: meeting.calendarInvitees,
+          fathomUrl: meeting.fathomUrl,
+        };
+      })
+    );
+
     // Enrich voice memos
     const voiceMemos = await Promise.all(
       memoLinks.map(async (link) => {
@@ -5674,7 +5718,13 @@ export const getContactDossierInternal = internalQuery({
         notes: person.notes,
         memoCount: person.memoCount,
         lastInteractionAt: person.lastInteractionAt,
+        autoCreatedFrom: person.autoCreatedFrom,
       },
+      emails: contactEmails.map((e) => ({
+        email: e.email,
+        source: e.source,
+        isPrimary: e.isPrimary,
+      })),
       profile: latestProfile
         ? {
             confidence: latestProfile.confidence,
@@ -5692,6 +5742,9 @@ export const getContactDossierInternal = internalQuery({
         lastMessageAt: t.lastMessageAt,
       })),
       granolaMeetings: granolaMeetings.filter(
+        (m): m is NonNullable<typeof m> => m !== null
+      ),
+      fathomMeetings: fathomMeetings.filter(
         (m): m is NonNullable<typeof m> => m !== null
       ),
       voiceMemos: voiceMemos.filter(

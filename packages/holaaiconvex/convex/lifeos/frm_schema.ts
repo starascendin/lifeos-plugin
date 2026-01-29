@@ -53,6 +53,15 @@ export const frmTables = {
     // Optional contact info
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
+    // Tracks origin if auto-created by contact matching system
+    autoCreatedFrom: v.optional(
+      v.union(
+        v.literal("beeper"),
+        v.literal("fathom"),
+        v.literal("granola"),
+        v.literal("calendar")
+      )
+    ),
     // Visual customization
     avatarEmoji: v.optional(v.string()),
     color: v.optional(v.string()),
@@ -69,6 +78,7 @@ export const frmTables = {
     .index("by_user", ["userId"])
     .index("by_user_archived", ["userId", "archivedAt"])
     .index("by_user_last_interaction", ["userId", "lastInteractionAt"])
+    .index("by_user_email", ["userId", "email"])
     .searchIndex("search_name", {
       searchField: "name",
       filterFields: ["userId"],

@@ -4,6 +4,7 @@ import { avatarTables } from "./avatar_schema";
 import { beeperTables } from "./beeper_schema";
 import { calendarTables } from "./calendar_schema";
 import { chatnexusTables } from "./chatnexus_schema";
+import { contactTables } from "./contact_schema";
 import { controlplaneTables } from "./controlplane_schema";
 import { dailyFieldsTables } from "./daily_fields_schema";
 import { demoAgentTables } from "./demo_agent_schema";
@@ -33,6 +34,8 @@ export const lifeosTables = {
   ...calendarTables,
   // Chat Nexus tables
   ...chatnexusTables,
+  // Unified Contact System tables (email lookup + meeting-person links)
+  ...contactTables,
   // Controlplane (Claude Agent Farm) tables
   ...controlplaneTables,
   // Daily Fields tables

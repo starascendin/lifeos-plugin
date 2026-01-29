@@ -1549,7 +1549,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_contact_dossier",
     description:
-      "Get everything about a contact in one call: person info, AI profile, Beeper threads, Granola meetings (with AI notes and calendar events), and voice memos. Supports lookup by personId OR fuzzy name search.",
+      "Get everything about a contact in one call: person info, AI profile, Beeper threads, Granola meetings (with AI notes and calendar events), Fathom meetings (with summaries and action items), all known email addresses, and voice memos. Supports lookup by personId OR fuzzy name search.",
     inputSchema: {
       type: "object" as const,
       properties: {

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { Id } from "../_generated/dataModel";
 import { requireUser } from "../_lib/auth";
 import { relationshipTypeValidator } from "./frm_schema";
 
@@ -100,6 +101,109 @@ export const searchPeople = query({
 
     // Filter out archived
     return results.filter((p) => !p.archivedAt);
+  },
+});
+
+/**
+ * Get all known email addresses for a person (from unified contact system)
+ */
+export const getContactEmails = query({
+  args: {
+    personId: v.id("lifeos_frmPeople"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const person = await ctx.db.get(args.personId);
+    if (!person || person.userId !== user._id) {
+      return [];
+    }
+
+    const emails = await ctx.db
+      .query("lifeos_contactEmails")
+      .withIndex("by_person", (q) => q.eq("personId", args.personId))
+      .collect();
+
+    return emails.map((e) => ({
+      email: e.email,
+      source: e.source,
+      isPrimary: e.isPrimary,
+    }));
+  },
+});
+
+/**
+ * Get all meetings linked to a person from the unified meeting system.
+ * Returns enriched meeting data from both Fathom and Granola sources.
+ */
+export const getPersonMeetings = query({
+  args: {
+    personId: v.id("lifeos_frmPeople"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const person = await ctx.db.get(args.personId);
+    if (!person || person.userId !== user._id) {
+      return { fathom: [], granola: [] };
+    }
+
+    const links = await ctx.db
+      .query("lifeos_meetingPersonLinks")
+      .withIndex("by_person", (q) => q.eq("personId", args.personId))
+      .collect();
+
+    // Separate by source
+    const fathomLinks = links.filter((l) => l.meetingSource === "fathom");
+    const granolaLinks = links.filter((l) => l.meetingSource === "granola");
+
+    // Enrich Fathom meetings
+    const fathomMeetings = await Promise.all(
+      fathomLinks.map(async (link) => {
+        try {
+          const meeting = await ctx.db.get(
+            link.meetingId as Id<"life_fathomMeetings">
+          );
+          if (!meeting) return null;
+          return {
+            meetingId: meeting._id,
+            title: meeting.title,
+            fathomCreatedAt: meeting.fathomCreatedAt,
+            fathomUrl: meeting.fathomUrl,
+            summaryMarkdown: meeting.summaryMarkdown?.slice(0, 500),
+            actionItems: meeting.actionItems,
+            attendeeCount: meeting.calendarInvitees?.length ?? 0,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    // Enrich Granola meetings
+    const granolaMeetings = await Promise.all(
+      granolaLinks.map(async (link) => {
+        try {
+          const meeting = await ctx.db.get(
+            link.meetingId as Id<"life_granolaMeetings">
+          );
+          if (!meeting) return null;
+          return {
+            meetingId: meeting._id,
+            title: meeting.title,
+            granolaCreatedAt: meeting.granolaCreatedAt,
+            resumeMarkdown: meeting.resumeMarkdown?.slice(0, 500),
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return {
+      fathom: fathomMeetings.filter(Boolean),
+      granola: granolaMeetings.filter(Boolean),
+    };
   },
 });
 

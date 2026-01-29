@@ -44,6 +44,10 @@ import {
   Sparkles,
   History,
   Quote,
+  Mail,
+  Video,
+  ExternalLink,
+  Bot,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { formatDistanceToNow, format } from "date-fns";
@@ -275,6 +279,16 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
 
   // Query profile history
   const profileHistory = useQuery(api.lifeos.frm_profiles.getProfileHistory, {
+    personId,
+  });
+
+  // Query contact emails (unified contact system)
+  const contactEmails = useQuery(api.lifeos.frm_people.getContactEmails, {
+    personId,
+  });
+
+  // Query linked meetings (Fathom + Granola from unified system)
+  const personMeetings = useQuery(api.lifeos.frm_people.getPersonMeetings, {
     personId,
   });
 
@@ -760,6 +774,15 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                   <RelIcon className="h-3 w-3" />
                   {relConfig.label}
                 </Badge>
+                {person.autoCreatedFrom && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 text-xs"
+                  >
+                    <Bot className="h-3 w-3" />
+                    via {person.autoCreatedFrom}
+                  </Badge>
+                )}
               </div>
 
               {person.nickname && (
@@ -1092,6 +1115,106 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                   </Button>
                 )}
               </div>
+
+              {/* Meetings (Fathom + Granola) */}
+              {personMeetings && (personMeetings.fathom.length > 0 || personMeetings.granola.length > 0) && (
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <SectionHeader
+                    icon={Video}
+                    title="Meetings"
+                    classification={`${personMeetings.fathom.length + personMeetings.granola.length} MEETINGS`}
+                  />
+                  <div className="space-y-2">
+                    {/* Fathom meetings */}
+                    {personMeetings.fathom.map((meeting) => {
+                      if (!meeting) return null;
+                      return (
+                        <div
+                          key={meeting.meetingId}
+                          className="rounded-lg bg-muted/50 p-3 hover:bg-muted/80 transition-colors"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 shrink-0">
+                              <Video className="h-4 w-4 text-violet-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-sm truncate flex-1">
+                                  {meeting.title}
+                                </p>
+                                <Badge variant="outline" className="text-[10px] h-5 shrink-0">
+                                  Fathom
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {format(new Date(meeting.fathomCreatedAt), "MMM d, yyyy")}
+                                {meeting.attendeeCount > 0 && ` · ${meeting.attendeeCount} attendees`}
+                              </p>
+                              {meeting.summaryMarkdown && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                  {meeting.summaryMarkdown.replace(/[#*_`]/g, "").slice(0, 150)}...
+                                </p>
+                              )}
+                              {meeting.actionItems && meeting.actionItems.length > 0 && (
+                                <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-600">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  {meeting.actionItems.length} action item{meeting.actionItems.length !== 1 ? "s" : ""}
+                                </div>
+                              )}
+                            </div>
+                            {meeting.fathomUrl && (
+                              <a
+                                href={meeting.fathomUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 text-muted-foreground hover:text-primary"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {/* Granola meetings */}
+                    {personMeetings.granola.map((meeting) => {
+                      if (!meeting) return null;
+                      return (
+                        <div
+                          key={meeting.meetingId}
+                          className="rounded-lg bg-muted/50 p-3 hover:bg-muted/80 transition-colors"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 shrink-0">
+                              <Video className="h-4 w-4 text-emerald-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-sm truncate flex-1">
+                                  {meeting.title}
+                                </p>
+                                <Badge variant="outline" className="text-[10px] h-5 shrink-0">
+                                  Granola
+                                </Badge>
+                              </div>
+                              {meeting.granolaCreatedAt && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {format(new Date(meeting.granolaCreatedAt), "MMM d, yyyy")}
+                                </p>
+                              )}
+                              {meeting.resumeMarkdown && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                  {meeting.resumeMarkdown.replace(/[#*_`]/g, "").slice(0, 150)}...
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sidebar - 1 column */}
@@ -1299,20 +1422,45 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
               )}
 
               {/* Contact Info */}
-              {(person.email || person.phone) && (
+              {(person.email || person.phone || (contactEmails && contactEmails.length > 0)) && (
                 <div className="rounded-xl border border-border bg-card p-5">
-                  <h3 className="text-sm font-semibold mb-4">Contact Intel</h3>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                      <Mail className="h-4 w-4 text-primary" />
+                    </div>
+                    <h3 className="text-sm font-semibold tracking-wide uppercase">Contact Intel</h3>
+                  </div>
                   <div className="space-y-3 text-sm">
-                    {person.email && (
+                    {/* Show unified contact emails if available */}
+                    {contactEmails && contactEmails.length > 0 ? (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-2">EMAILS</div>
+                        <div className="space-y-1.5">
+                          {contactEmails.map((ce, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <p className="font-mono text-xs flex-1">{ce.email}</p>
+                              <Badge variant="outline" className="text-[10px] h-5">
+                                {ce.source}
+                              </Badge>
+                              {ce.isPrimary && (
+                                <Badge variant="secondary" className="text-[10px] h-5">
+                                  primary
+                                </Badge>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : person.email ? (
                       <div>
                         <div className="text-xs text-muted-foreground">EMAIL</div>
-                        <p className="font-mono">{person.email}</p>
+                        <p className="font-mono text-xs">{person.email}</p>
                       </div>
-                    )}
+                    ) : null}
                     {person.phone && (
                       <div>
                         <div className="text-xs text-muted-foreground">PHONE</div>
-                        <p className="font-mono">{person.phone}</p>
+                        <p className="font-mono text-xs">{person.phone}</p>
                       </div>
                     )}
                   </div>
