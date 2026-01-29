@@ -24,7 +24,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
   type Tool,
+  type Prompt,
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Parse CLI arguments
@@ -1655,6 +1658,276 @@ const TOOLS: Tool[] = [
   },
 ];
 
+// Prompt definitions — workflow-level skills that chain multiple tools
+const PROMPTS: Prompt[] = [
+  {
+    name: "daily-standup",
+    description: "Get daily standup briefing: agenda, tasks due today, sprint progress.",
+    arguments: [
+      {
+        name: "date",
+        description: "Specific date in ISO format (optional, defaults to today)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "weekly-review",
+    description: "Run weekly review: completed work, in-progress items, sprint health, blockers.",
+    arguments: [
+      {
+        name: "date",
+        description: "Week start date in ISO format (optional, defaults to this week)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "sprint-plan",
+    description: "Plan the current sprint: review backlog, assign tasks to cycle, check capacity.",
+    arguments: [
+      {
+        name: "notes",
+        description: "Additional context or specific tasks to include (optional)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "contact-lookup",
+    description: "Full contact dossier: profile, AI insights, meetings, messages, voice memos.",
+    arguments: [
+      {
+        name: "name",
+        description: "Person's name to look up (required)",
+        required: true,
+      },
+    ],
+  },
+  {
+    name: "client-brief",
+    description: "Full client briefing: projects, phases, completion stats, recent communications.",
+    arguments: [
+      {
+        name: "client",
+        description: "Client name or ID (required)",
+        required: true,
+      },
+    ],
+  },
+  {
+    name: "project-status",
+    description: "Project status report: phases, task breakdown, blockers, urgent items.",
+    arguments: [
+      {
+        name: "project",
+        description: "Project key like 'ACME' or project name (required)",
+        required: true,
+      },
+    ],
+  },
+  {
+    name: "capture",
+    description: "Quick capture a thought, task, or note. Auto-routes to task or note based on content.",
+    arguments: [
+      {
+        name: "input",
+        description: "What to capture — a task, idea, or note (required)",
+        required: true,
+      },
+    ],
+  },
+  {
+    name: "meeting-prep",
+    description: "Prepare for a meeting: contact dossier, past meetings, recent messages, open items.",
+    arguments: [
+      {
+        name: "name",
+        description: "Person's name to prep for (required)",
+        required: true,
+      },
+    ],
+  },
+];
+
+// Prompt message templates keyed by prompt name
+const PROMPT_MESSAGES: Record<string, (args: Record<string, string>) => { role: "user"; content: { type: "text"; text: string } }[]> = {
+  "daily-standup": (args) => {
+    const dateClause = args.date ? `Use date: ${args.date}` : "Use today's date.";
+    return [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `Get my daily standup briefing. Use the LifeOS MCP tools to gather:
+
+1. Call get_daily_agenda for today's agenda (tasks due today, calendar events, top priorities)
+2. Call get_todays_tasks for today's task list
+3. Call get_current_cycle for current sprint progress and stats
+
+${dateClause}
+
+Summarize in a concise standup format:
+- **Today's Focus**: Top 3 things to focus on
+- **Tasks Due**: List tasks due today with priority
+- **Sprint Progress**: Cycle completion % and key stats
+- **Calendar**: Any meetings or events today
+
+Keep it short and actionable.`,
+      },
+    }];
+  },
+  "weekly-review": (args) => {
+    const dateClause = args.date ? `Use week start date: ${args.date}` : "Use this week.";
+    return [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `Run my weekly review. Use the LifeOS MCP tools to gather:
+
+1. Call get_weekly_agenda for this week's agenda and AI summary
+2. Call get_current_cycle for sprint progress
+3. Call get_tasks with status "done" to see what was completed
+4. Call get_tasks with status "in_progress" to see what's still in flight
+5. Call get_tasks with status "todo" to see upcoming work
+
+${dateClause}
+
+Present a weekly review:
+- **Completed**: What got done this week
+- **In Progress**: What's still being worked on
+- **Sprint Health**: Cycle progress, burndown status
+- **Blockers**: Anything overdue or stuck
+- **Next Week**: Key items to tackle`,
+      },
+    }];
+  },
+  "sprint-plan": (args) => {
+    const notesClause = args.notes ? `Additional context: ${args.notes}` : "";
+    return [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `Help me plan my sprint. Use the LifeOS MCP tools:
+
+1. Call get_current_cycle to see the active sprint and its current state
+2. Call get_tasks with status "backlog" to see unplanned work
+3. Call get_tasks with status "todo" to see already planned work
+4. Call get_projects with status "in_progress" to see active projects
+
+${notesClause}
+
+Then help me plan:
+- Show current sprint capacity (what's already assigned vs. remaining)
+- List backlog items by priority, grouped by project
+- Suggest which backlog items to pull into the sprint based on priority
+- If I provide specific tasks, create issues and assign them to the current cycle
+
+Ask me to confirm before creating or assigning any issues.`,
+      },
+    }];
+  },
+  "contact-lookup": (args) => [{
+    role: "user",
+    content: {
+      type: "text",
+      text: `Look up everything about a contact. Use the LifeOS MCP tools:
+
+1. Call get_contact_dossier with nameQuery "${args.name}" to get the full profile
+   - This returns: person info, AI profile, Beeper threads, Granola meetings (with AI notes and calendar events), and voice memos
+
+Present the dossier in a structured format:
+- **Profile**: Name, relationship type, contact info, notes
+- **AI Insights**: Communication style, personality, relationship tips (if available)
+- **Recent Interactions**: Last few voice memos, meetings, and messages — sorted by recency
+- **Meeting History**: Granola/Fathom meetings with key takeaways
+- **Chat Threads**: Beeper conversation threads linked to this person`,
+    },
+  }],
+  "client-brief": (args) => [{
+    role: "user",
+    content: {
+      type: "text",
+      text: `Get a full client briefing for "${args.client}". Use the LifeOS MCP tools:
+
+1. Call get_clients to find the matching client
+2. Call get_client with the client ID for full details
+3. Call get_projects_for_client to see all their projects and completion stats
+4. Call get_beeper_threads_for_client to see linked chat threads
+
+For each active project, also call get_phases to see phase breakdown.
+
+Present as a client brief:
+- **Client Overview**: Name, status, description
+- **Projects**: Each project with status, health, priority, and phase breakdown
+- **Completion Stats**: Issues done vs total across all projects
+- **Recent Comms**: Latest Beeper thread activity
+- **Action Items**: Any overdue or urgent tasks for this client`,
+    },
+  }],
+  "project-status": (args) => [{
+    role: "user",
+    content: {
+      type: "text",
+      text: `Get project status for "${args.project}". Use the LifeOS MCP tools:
+
+1. Call get_project with the project key/ID
+2. Call get_phases for the project to see phase breakdown
+3. Call get_tasks filtered by the project ID to see all issues
+
+Present a project status report:
+- **Overview**: Name, status, health, priority, client (if linked)
+- **Phases**: Each phase with status and issue counts
+- **Task Breakdown**: Count by status (backlog / todo / in_progress / in_review / done)
+- **Urgent/Overdue**: Any urgent or overdue tasks
+- **In Progress**: What's actively being worked on
+- **Blockers**: Anything that looks stuck`,
+    },
+  }],
+  "capture": (args) => [{
+    role: "user",
+    content: {
+      type: "text",
+      text: `Quick capture: "${args.input}"
+
+Analyze the input and determine what type of capture this is:
+
+**If it's a task/action item** (contains action verbs, deadlines, assignments):
+- Use create_issue from LifeOS MCP tools
+- Infer priority from urgency cues (e.g., "urgent", "ASAP" = urgent; "soon" = high; default = medium)
+- If a project is mentioned, look it up with get_projects and assign it
+- If a due date is mentioned, parse and set it
+
+**If it's a thought/note** (observations, ideas, reminders):
+- Use create_quick_note from LifeOS MCP tools
+- Extract tags from context (e.g., topic keywords)
+
+**If ambiguous**, default to creating a quick note.
+
+After creating, confirm what was captured with the ID/identifier.`,
+    },
+  }],
+  "meeting-prep": (args) => [{
+    role: "user",
+    content: {
+      type: "text",
+      text: `Prepare for a meeting with "${args.name}". Use the LifeOS MCP tools:
+
+1. Call get_contact_dossier with nameQuery "${args.name}" for full context
+2. Call get_granola_meetings_for_person for past meeting notes
+3. If person is linked to a client, call get_projects_for_client for project status
+4. Call get_beeper_threads_for_person and for the most recent thread, call get_beeper_thread_messages to see latest messages
+
+Compile a meeting prep brief:
+- **About**: Who they are, relationship type, communication style (from AI profile)
+- **Last Interaction**: When you last met/talked and what was discussed
+- **Open Items**: Any action items or tasks related to them or their projects
+- **Recent Messages**: Key points from recent Beeper conversations
+- **Past Meetings**: Summary of last 3 meetings with key decisions/takeaways
+- **Suggested Talking Points**: Based on open items and recent context`,
+    },
+  }],
+};
+
 // Configuration: CLI flags take precedence over env vars
 // NOTE: HTTP routes are served from .convex.site, NOT .convex.cloud
 const CONVEX_URL = options.url || process.env.CONVEX_URL;
@@ -1728,6 +2001,7 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
+      prompts: {},
     },
   },
 );
@@ -1735,6 +2009,29 @@ const server = new Server(
 // Handle list tools request
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: TOOLS };
+});
+
+// Handle list prompts request
+server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  return { prompts: PROMPTS };
+});
+
+// Handle get prompt request
+server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  const messageBuilder = PROMPT_MESSAGES[name];
+  if (!messageBuilder) {
+    throw new Error(`Unknown prompt: ${name}`);
+  }
+
+  const prompt = PROMPTS.find((p) => p.name === name);
+  const messages = messageBuilder((args as Record<string, string>) || {});
+
+  return {
+    description: prompt?.description,
+    messages,
+  };
 });
 
 // Handle tool calls

@@ -1,6 +1,6 @@
 {
   "name": "@starascendin/lifeos-mcp",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "MCP server for LifeOS Project Management - manage projects, tasks, notes, and contacts via AI assistants",
   "type": "module",
   "main": "dist/index.js",
