@@ -29,8 +29,8 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # Add Claude to PATH
 ENV PATH="/home/node/.local/bin:${PATH}"
 
-# Install OpenCode CLI
-RUN curl -fsSL https://opencode.ai/install | bash
+# Install OpenCode CLI (non-fatal — their API can be flaky)
+RUN curl -fsSL https://opencode.ai/install | bash || echo "WARNING: OpenCode install failed, skipping"
 
 # Add OpenCode to PATH
 ENV PATH="/home/node/.opencode/bin:${PATH}"
