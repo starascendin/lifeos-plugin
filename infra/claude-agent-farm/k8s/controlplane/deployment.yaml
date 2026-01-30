@@ -41,6 +41,12 @@ spec:
                   name: convex-credentials
                   key: CONTROLPLANE_API_KEY
                   optional: true
+            - name: LIFEOS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: convex-credentials
+                  key: LIFEOS_API_KEY
+                  optional: true
           resources:
             requests:
               cpu: "100m"
