@@ -123,6 +123,9 @@ func main() {
 		apiGroup.DELETE("/skills/:name", apiHandler.DeleteSkill)
 		apiGroup.POST("/skills/:name/toggle", apiHandler.ToggleSkill)
 
+		// Env Vars
+		apiGroup.GET("/env-vars/defaults", apiHandler.GetEnvVarDefaults)
+
 		// GitHub
 		apiGroup.GET("/github/repos", apiHandler.ListGitHubRepos)
 

@@ -5,6 +5,7 @@
 	import FormSection from '$lib/components/FormSection.svelte';
 	import MCPPresetSelector from '$lib/components/MCPPresetSelector.svelte';
 	import SkillToggle from '$lib/components/SkillToggle.svelte';
+	import EnvVarEditor from '$lib/components/EnvVarEditor.svelte';
 	import GitHubRepoSelector from '$lib/components/GitHubRepoSelector.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -24,7 +25,8 @@
 		memory_limit: '2Gi',
 		allowed_tools: 'Read,Write,Edit,Bash,Glob,Grep',
 		enabled_mcps: '',
-		enabled_skills: ''
+		enabled_skills: '',
+		env_vars: ''
 	};
 
 	async function handleSubmit() {
@@ -139,6 +141,11 @@
 		<!-- Claude Skills -->
 		<FormSection title="Claude Skills" description="Additional capabilities for the agent">
 			<SkillToggle bind:value={formData.enabled_skills} />
+		</FormSection>
+
+		<!-- Environment Variables -->
+		<FormSection title="Environment Variables" description="Pod environment variable overrides" defaultOpen={false}>
+			<EnvVarEditor bind:value={formData.env_vars} />
 		</FormSection>
 
 		<!-- Resource Limits -->

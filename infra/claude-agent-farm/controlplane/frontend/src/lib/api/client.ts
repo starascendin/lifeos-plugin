@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPPresets, MCPTomlConfig, GitHubRepo, Skill, SkillCreate } from './types'
+import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPPresets, MCPTomlConfig, GitHubRepo, Skill, SkillCreate, EnvVarDefault } from './types'
 import { API_BASE } from '$lib/config'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
@@ -273,6 +273,11 @@ export async function deleteTomlConfig(name: string): Promise<void> {
 
 export async function getActiveServers(): Promise<MCPServer[]> {
   return fetchJson<MCPServer[]>('/mcp/active-servers')
+}
+
+// Env Var Defaults
+export async function getEnvVarDefaults(): Promise<EnvVarDefault[]> {
+  return fetchJson<EnvVarDefault[]>('/env-vars/defaults')
 }
 
 // GitHub Repos

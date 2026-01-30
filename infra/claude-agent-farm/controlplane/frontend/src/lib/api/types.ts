@@ -13,6 +13,7 @@ export interface AgentConfig {
   allowed_tools: string
   enabled_mcps: string
   enabled_skills: string
+  env_vars: string
   created_at: string
   updated_at: string
 }
@@ -29,6 +30,15 @@ export interface AgentConfigCreate {
   allowed_tools?: string
   enabled_mcps?: string
   enabled_skills?: string
+  env_vars?: string
+}
+
+// Env Var Defaults
+export interface EnvVarDefault {
+  name: string
+  value: string
+  sensitive: boolean
+  description: string
 }
 
 // MCP Preset Types

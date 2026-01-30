@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -504,6 +505,7 @@ func computeConfigSignature(config *models.AgentConfig, mcpJSON []byte, skillIns
 		fmt.Sprintf("mem=%s", config.MemoryLimit),
 		fmt.Sprintf("mcpjson_len=%d", len(mcpJSON)),
 		fmt.Sprintf("skillcmds=%d", len(skillInstallCommands)),
+		fmt.Sprintf("envvars=%s", config.EnvVars),
 	}
 	sigString := strings.Join(sigParts, ";")
 
@@ -605,6 +607,27 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte,
 			Name:  "SKILL_INSTALL_COMMANDS",
 			Value: strings.Join(skillInstallCommands, "\n"),
 		})
+	}
+
+	// Apply per-config env var overrides
+	if config.EnvVars != "" {
+		var overrides map[string]string
+		if err := json.Unmarshal([]byte(config.EnvVars), &overrides); err == nil {
+			for k, v := range overrides {
+				found := false
+				for i, ev := range envVars {
+					if ev.Name == k {
+						envVars[i].Value = v
+						envVars[i].ValueFrom = nil // clear secret ref if overriding
+						found = true
+						break
+					}
+				}
+				if !found {
+					envVars = append(envVars, corev1.EnvVar{Name: k, Value: v})
+				}
+			}
+		}
 	}
 
 	// Build volume mounts - start with credential mounts

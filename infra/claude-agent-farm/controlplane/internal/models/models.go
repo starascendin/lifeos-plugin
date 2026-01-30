@@ -19,6 +19,7 @@ type AgentConfig struct {
 	AllowedTools  string    `json:"allowed_tools"`  // Comma-separated tool names
 	EnabledMCPs   string    `json:"enabled_mcps"`   // Comma-separated MCP server names
 	EnabledSkills string    `json:"enabled_skills"` // Comma-separated Claude skill names
+	EnvVars       string    `json:"env_vars"`       // JSON map of env var overrides
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

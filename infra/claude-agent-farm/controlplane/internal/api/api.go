@@ -106,6 +106,7 @@ func convexToModelConfig(cfg *convex.AgentConfig) models.AgentConfig {
 		AllowedTools:  cfg.AllowedTools,
 		EnabledMCPs:   cfg.EnabledMCPs,
 		EnabledSkills: cfg.EnabledSkills,
+		EnvVars:       cfg.EnvVars,
 		CreatedAt:     time.UnixMilli(cfg.CreatedAt),
 		UpdatedAt:     time.UnixMilli(cfg.UpdatedAt),
 	}
@@ -138,6 +139,7 @@ type CreateConfigRequest struct {
 	AllowedTools  string  `json:"allowed_tools"`
 	EnabledMCPs   string  `json:"enabled_mcps"`
 	EnabledSkills string  `json:"enabled_skills"`
+	EnvVars       string  `json:"env_vars"`
 }
 
 // CreateConfig creates a new config
@@ -184,6 +186,7 @@ func (a *API) CreateConfig(c echo.Context) error {
 		AllowedTools:  req.AllowedTools,
 		EnabledMCPs:   req.EnabledMCPs,
 		EnabledSkills: req.EnabledSkills,
+		EnvVars:       req.EnvVars,
 	}
 
 	convexID, err := a.convex.CreateAgentConfig(convexReq)
@@ -206,6 +209,7 @@ func (a *API) CreateConfig(c echo.Context) error {
 		AllowedTools:  req.AllowedTools,
 		EnabledMCPs:   req.EnabledMCPs,
 		EnabledSkills: req.EnabledSkills,
+		EnvVars:       req.EnvVars,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}
@@ -235,6 +239,7 @@ func (a *API) UpdateConfig(c echo.Context) error {
 		AllowedTools:  req.AllowedTools,
 		EnabledMCPs:   req.EnabledMCPs,
 		EnabledSkills: req.EnabledSkills,
+		EnvVars:       req.EnvVars,
 	}
 
 	if err := a.convex.UpdateAgentConfig(idParam, convexReq); err != nil {
@@ -256,6 +261,7 @@ func (a *API) UpdateConfig(c echo.Context) error {
 		AllowedTools:  req.AllowedTools,
 		EnabledMCPs:   req.EnabledMCPs,
 		EnabledSkills: req.EnabledSkills,
+		EnvVars:       req.EnvVars,
 		UpdatedAt:     time.Now(),
 	}
 	return c.JSON(http.StatusOK, config)
@@ -1281,6 +1287,52 @@ func (a *API) ToggleSkill(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": fmt.Sprintf("Skill %s %s", name, map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
 	})
+}
+
+// EnvVarDefault represents a configurable environment variable with its current default value
+type EnvVarDefault struct {
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Sensitive   bool   `json:"sensitive"`
+	Description string `json:"description"`
+}
+
+// maskValue returns the first 4 characters plus "***" for sensitive values
+func maskValue(val string) string {
+	if val == "" {
+		return ""
+	}
+	if len(val) <= 4 {
+		return "***"
+	}
+	return val[:4] + "***"
+}
+
+// GetEnvVarDefaults returns the list of configurable environment variables
+// with their current default values (sensitive values are masked)
+func (a *API) GetEnvVarDefaults(c echo.Context) error {
+	defaults := []EnvVarDefault{
+		// LifeOS vars
+		{Name: "CONVEX_URL", Value: os.Getenv("LIFEOS_CONVEX_URL"), Sensitive: false, Description: "Convex deployment URL for LifeOS"},
+		{Name: "LIFEOS_USER_ID", Value: os.Getenv("LIFEOS_USER_ID"), Sensitive: false, Description: "LifeOS user ID"},
+		{Name: "LIFEOS_API_KEY", Value: os.Getenv("LIFEOS_API_KEY"), Sensitive: true, Description: "LifeOS API key"},
+		// Preset allowed vars
+		{Name: "GITHUB_PAT", Value: os.Getenv("GITHUB_PAT"), Sensitive: true, Description: "GitHub personal access token"},
+		{Name: "ANTHROPIC_API_KEY", Value: os.Getenv("ANTHROPIC_API_KEY"), Sensitive: true, Description: "Anthropic API key"},
+		{Name: "OPENAI_API_KEY", Value: os.Getenv("OPENAI_API_KEY"), Sensitive: true, Description: "OpenAI API key"},
+		{Name: "NPM_TOKEN", Value: os.Getenv("NPM_TOKEN"), Sensitive: true, Description: "NPM authentication token"},
+		{Name: "AWS_ACCESS_KEY_ID", Value: os.Getenv("AWS_ACCESS_KEY_ID"), Sensitive: false, Description: "AWS access key ID"},
+		{Name: "AWS_SECRET_ACCESS_KEY", Value: os.Getenv("AWS_SECRET_ACCESS_KEY"), Sensitive: true, Description: "AWS secret access key"},
+	}
+
+	// Mask sensitive values
+	for i := range defaults {
+		if defaults[i].Sensitive {
+			defaults[i].Value = maskValue(defaults[i].Value)
+		}
+	}
+
+	return c.JSON(http.StatusOK, defaults)
 }
 
 // ClearMCPCache clears the npx cache on all running agent pods

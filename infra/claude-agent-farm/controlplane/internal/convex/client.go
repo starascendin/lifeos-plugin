@@ -52,6 +52,7 @@ type AgentConfig struct {
 	AllowedTools  string  `json:"allowedTools"`
 	EnabledMCPs   string  `json:"enabledMcps"`
 	EnabledSkills string  `json:"enabledSkills"`
+	EnvVars       string  `json:"envVars"`
 	CreatedAt     int64   `json:"createdAt"`
 	UpdatedAt     int64   `json:"updatedAt"`
 }
@@ -86,6 +87,7 @@ type CreateAgentConfigRequest struct {
 	AllowedTools  string  `json:"allowedTools,omitempty"`
 	EnabledMCPs   string  `json:"enabledMcps,omitempty"`
 	EnabledSkills string  `json:"enabledSkills,omitempty"`
+	EnvVars       string  `json:"envVars,omitempty"`
 }
 
 // CreateAgentConfig creates a new agent config
