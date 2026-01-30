@@ -3,7 +3,7 @@
 
 FROM node:20-slim
 
-LABEL org.opencontainers.image.source="https://github.com/starascendin/claude-agent-farm"
+LABEL org.opencontainers.image.source="https://github.com/starascendin/hola-monorepo"
 LABEL org.opencontainers.image.description="Claude Code CLI Agent for autonomous coding tasks"
 
 # Prevent interactive prompts

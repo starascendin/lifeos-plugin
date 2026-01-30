@@ -310,8 +310,9 @@ func (c *Client) GetOrCreateChatPod() (string, error) {
 			Containers: []corev1.Container{
 				{
 					Name:    "agent",
-					Image:   agentImage,
-					Command: []string{"sleep", "infinity"},
+					Image:           agentImage,
+					ImagePullPolicy: corev1.PullAlways,
+					Command:         []string{"sleep", "infinity"},
 					Env: []corev1.EnvVar{
 						{Name: "HOME", Value: "/home/node"},
 						{Name: "PATH", Value: agentPATH},
@@ -407,8 +408,9 @@ func (c *Client) GetOrCreateCouncilPod() (string, error) {
 			Containers: []corev1.Container{
 				{
 					Name:    "agent",
-					Image:   agentImage,
-					Command: []string{"sleep", "infinity"},
+					Image:           agentImage,
+					ImagePullPolicy: corev1.PullAlways,
+					Command:         []string{"sleep", "infinity"},
 					Env: []corev1.EnvVar{
 						{Name: "HOME", Value: "/home/node"},
 						{Name: "PATH", Value: agentPATH},
@@ -625,8 +627,9 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte,
 			Containers: []corev1.Container{
 				{
 					Name:    "agent",
-					Image:   agentImage,
-					Command: []string{"/bin/bash", "-c"},
+					Image:           agentImage,
+					ImagePullPolicy: corev1.PullAlways,
+					Command:         []string{"/bin/bash", "-c"},
 					Args: []string{`
 if [ -n "${SKILL_INSTALL_COMMANDS:-}" ]; then
     echo "Installing Claude skills..."
