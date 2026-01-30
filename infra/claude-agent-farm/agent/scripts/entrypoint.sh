@@ -30,6 +30,12 @@ if [ -d "/credentials/.config/opencode" ]; then
     ln -sf /credentials/.config/opencode ~/.config/opencode
 fi
 
+# Install LifeOS CLI if CONVEX_URL is set (needed for lifeos skills)
+if [ -n "${CONVEX_URL:-}" ]; then
+    echo "Installing LifeOS CLI..."
+    npm install -g @starascendin/lifeos-cli || echo "Warning: LifeOS CLI install failed"
+fi
+
 # Clone repositories if specified
 if [ -n "${REPOS:-}" ]; then
     echo "Cloning repositories..."

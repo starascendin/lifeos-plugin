@@ -19,9 +19,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Install LifeOS CLI for direct tool access (no MCP server needed)
-RUN npm install -g @starascendin/lifeos-cli
-
 # Use existing node user (UID 1000) which is already non-root
 USER node
 WORKDIR /home/node
