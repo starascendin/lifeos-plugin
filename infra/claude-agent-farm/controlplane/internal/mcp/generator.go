@@ -17,6 +17,7 @@ var KnownEnvVars = []string{
 	"NPM_TOKEN",
 	"AWS_ACCESS_KEY_ID",
 	"AWS_SECRET_ACCESS_KEY",
+	"LIFEOS_API_KEY",
 }
 
 // envVarPattern matches ${VAR_NAME} patterns

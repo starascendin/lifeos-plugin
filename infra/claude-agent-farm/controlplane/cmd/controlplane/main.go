@@ -61,6 +61,11 @@ func main() {
 		convexClient = convex.NewClient(convexURL, convexAPIKey)
 		log.Printf("Convex integration enabled (CONVEX_URL configured)")
 
+		// Seed preset MCP configs into Convex (idempotent - skips existing)
+		if err := convexClient.SeedMCPConfigsFromPresets(); err != nil {
+			log.Printf("Warning: Failed to seed MCP configs to Convex: %v", err)
+		}
+
 		// Seed preset skills into Convex (idempotent - skips existing)
 		if err := convexClient.SeedSkillsFromPresets(); err != nil {
 			log.Printf("Warning: Failed to seed skills to Convex: %v", err)

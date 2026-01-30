@@ -484,6 +484,82 @@ func (c *Client) doRequest(method, path string, body interface{}, result interfa
 	return nil
 }
 
+// SeedMCPConfigsFromPresets seeds MCP TOML configs from presets.toml into Convex if they don't already exist.
+// Groups preset servers by category and creates one MCP TOML config per category.
+func (c *Client) SeedMCPConfigsFromPresets() error {
+	presets, err := mcp.LoadPresets()
+	if err != nil {
+		return fmt.Errorf("failed to load presets: %w", err)
+	}
+
+	// Get existing MCP configs
+	existing, err := c.ListMCPConfigs()
+	if err != nil {
+		return fmt.Errorf("failed to list existing MCP configs: %w", err)
+	}
+
+	// Build a set of existing config names
+	existingNames := make(map[string]bool)
+	for _, cfg := range existing {
+		existingNames[cfg.Name] = true
+	}
+
+	// Group servers by category
+	categories := make(map[string][]mcp.PresetServer)
+	for _, server := range presets.Servers {
+		categories[server.Category] = append(categories[server.Category], server)
+	}
+
+	// Create one MCP TOML config per category
+	for category, servers := range categories {
+		configName := fmt.Sprintf("preset-%s", category)
+		if existingNames[configName] {
+			continue
+		}
+
+		// Build TOML content
+		tomlContent := fmt.Sprintf("# %s MCP servers (auto-seeded from presets)\n\n", category)
+		for _, server := range servers {
+			tomlContent += fmt.Sprintf("[servers.%s]\n", server.Name)
+			tomlContent += fmt.Sprintf("command = %q\n", server.Command)
+			if len(server.Args) > 0 {
+				tomlContent += "args = ["
+				for i, arg := range server.Args {
+					if i > 0 {
+						tomlContent += ", "
+					}
+					tomlContent += fmt.Sprintf("%q", arg)
+				}
+				tomlContent += "]\n"
+			}
+			if len(server.Env) > 0 {
+				tomlContent += "[servers." + server.Name + ".env]\n"
+				for k, v := range server.Env {
+					tomlContent += fmt.Sprintf("%s = %q\n", k, v)
+				}
+			}
+			if server.Description != "" {
+				tomlContent += fmt.Sprintf("description = %q\n", server.Description)
+			}
+			tomlContent += "\n"
+		}
+
+		_, err := c.CreateMCPConfig(&CreateMCPConfigRequest{
+			Name:      configName,
+			Content:   tomlContent,
+			IsDefault: true,
+			Enabled:   true,
+		})
+		if err != nil {
+			fmt.Printf("Warning: failed to seed MCP config %q: %v\n", configName, err)
+			continue
+		}
+		fmt.Printf("Seeded MCP config: %s\n", configName)
+	}
+
+	return nil
+}
+
 // SeedSkillsFromPresets seeds skills from presets.toml into Convex if they don't already exist
 func (c *Client) SeedSkillsFromPresets() error {
 	presets, err := mcp.LoadPresets()

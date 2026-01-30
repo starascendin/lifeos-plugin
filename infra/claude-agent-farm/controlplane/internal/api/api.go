@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,18 @@ import (
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/storage"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/version"
 )
+
+// getEnvValues reads known env vars from the controlplane environment
+// so they can be substituted into MCP config args (e.g., ${LIFEOS_API_KEY})
+func getEnvValues() map[string]string {
+	values := make(map[string]string)
+	for _, name := range mcp.KnownEnvVars {
+		if val := os.Getenv(name); val != "" {
+			values[name] = val
+		}
+	}
+	return values
+}
 
 type API struct {
 	store        *storage.SQLiteStore // Legacy SQLite storage (deprecated)
@@ -512,8 +525,8 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 			}
 
 			if len(mcpServers) > 0 {
-				// Build env values from k8s secrets (placeholders resolved at runtime)
-				envValues := map[string]string{}
+				// Resolve known env vars from controlplane environment
+				envValues := getEnvValues()
 
 				var mcpErr error
 				mcpJSON, mcpErr = mcp.GenerateMCPConfig(mcpServers, envValues)
