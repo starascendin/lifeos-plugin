@@ -7,12 +7,6 @@ args = ["@starascendin/lifeos-mcp@latest", "--url", "https://beaming-giraffe-300
 description = "LifeOS MCP - Development"
 category = "lifeos"
 
-[servers.lifeos-staging]
-command = "npx"
-args = ["@starascendin/lifeos-mcp@latest", "--url", "https://adorable-firefly-704.convex.site", "--user-id", "ks7a1gvd5h7674asa1ajsmm2ss7x55vm", "--api-key", "${LIFEOS_API_KEY}"]
-description = "LifeOS MCP - Staging"
-category = "lifeos"
-
 [servers.lifeos-prod]
 command = "npx"
 args = ["@starascendin/lifeos-mcp@latest", "--url", "https://agreeable-ibex-949.convex.site", "--user-id", "ks781knabdcchchddfwcaqwdn97zphqc", "--api-key", "${LIFEOS_API_KEY}"]

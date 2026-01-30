@@ -584,15 +584,13 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte,
 		},
 	}
 
-	// Always add MCP volume mount
-	volumeMounts = append(volumeMounts, corev1.VolumeMount{
-		Name:      "mcp-config",
-		MountPath: "/home/node/.mcp.json",
-		SubPath:   "mcp.json",
-	})
-
-	// Add MCP volume - from ConfigMap if custom MCP provided, otherwise from Secret
+	// Only add MCP volume mount when MCPs are configured
 	if hasMCP {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "mcp-config",
+			MountPath: "/home/node/.mcp.json",
+			SubPath:   "mcp.json",
+		})
 		configMapName := fmt.Sprintf("mcp-%s", podName)
 		volumes = append(volumes, corev1.Volume{
 			Name: "mcp-config",
@@ -601,17 +599,6 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte,
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: configMapName,
 					},
-				},
-			},
-		})
-	} else {
-		// Use default MCP config from secret
-		volumes = append(volumes, corev1.Volume{
-			Name: "mcp-config",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "mcp-config",
-					Optional:   boolPtr(true),
 				},
 			},
 		})

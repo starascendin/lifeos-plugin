@@ -498,10 +498,10 @@ func (c *Client) SeedMCPConfigsFromPresets() error {
 		return fmt.Errorf("failed to list existing MCP configs: %w", err)
 	}
 
-	// Build a set of existing config names
-	existingNames := make(map[string]bool)
+	// Build a map of existing config names to IDs
+	existingByName := make(map[string]string)
 	for _, cfg := range existing {
-		existingNames[cfg.Name] = true
+		existingByName[cfg.Name] = cfg.ID
 	}
 
 	// Group servers by category
@@ -510,12 +510,9 @@ func (c *Client) SeedMCPConfigsFromPresets() error {
 		categories[server.Category] = append(categories[server.Category], server)
 	}
 
-	// Create one MCP TOML config per category
+	// Create or update one MCP TOML config per category
 	for category, servers := range categories {
 		configName := fmt.Sprintf("preset-%s", category)
-		if existingNames[configName] {
-			continue
-		}
 
 		// Build TOML content
 		tomlContent := fmt.Sprintf("# %s MCP servers (auto-seeded from presets)\n\n", category)
@@ -544,17 +541,30 @@ func (c *Client) SeedMCPConfigsFromPresets() error {
 			tomlContent += "\n"
 		}
 
-		_, err := c.CreateMCPConfig(&CreateMCPConfigRequest{
-			Name:      configName,
-			Content:   tomlContent,
-			IsDefault: true,
-			Enabled:   true,
-		})
-		if err != nil {
-			fmt.Printf("Warning: failed to seed MCP config %q: %v\n", configName, err)
-			continue
+		if existingID, ok := existingByName[configName]; ok {
+			// Update existing preset config to match current presets.toml
+			err := c.UpdateMCPConfig(existingID, &UpdateMCPConfigRequest{
+				Content: tomlContent,
+			})
+			if err != nil {
+				fmt.Printf("Warning: failed to update MCP config %q: %v\n", configName, err)
+				continue
+			}
+			fmt.Printf("Updated MCP config: %s\n", configName)
+		} else {
+			// Create new preset config
+			_, err := c.CreateMCPConfig(&CreateMCPConfigRequest{
+				Name:      configName,
+				Content:   tomlContent,
+				IsDefault: true,
+				Enabled:   true,
+			})
+			if err != nil {
+				fmt.Printf("Warning: failed to seed MCP config %q: %v\n", configName, err)
+				continue
+			}
+			fmt.Printf("Seeded MCP config: %s\n", configName)
 		}
-		fmt.Printf("Seeded MCP config: %s\n", configName)
 	}
 
 	return nil
