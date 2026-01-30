@@ -65,6 +65,11 @@ func main() {
 		if err := convexClient.SeedSkillsFromPresets(); err != nil {
 			log.Printf("Warning: Failed to seed skills to Convex: %v", err)
 		}
+
+		// Seed preset agent configs into Convex (idempotent - skips existing)
+		if err := convexClient.SeedAgentConfigsFromPresets(); err != nil {
+			log.Printf("Warning: Failed to seed agent configs to Convex: %v", err)
+		}
 	} else {
 		log.Printf("Convex integration disabled (CONVEX_URL not set, using SQLite)")
 	}

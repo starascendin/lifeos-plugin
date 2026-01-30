@@ -526,6 +526,48 @@ func (c *Client) SeedSkillsFromPresets() error {
 	return nil
 }
 
+// SeedAgentConfigsFromPresets seeds agent configs from presets.toml into Convex if they don't already exist
+func (c *Client) SeedAgentConfigsFromPresets() error {
+	presets, err := mcp.LoadPresets()
+	if err != nil {
+		return fmt.Errorf("failed to load presets: %w", err)
+	}
+
+	// Get existing configs
+	existing, err := c.ListAgentConfigs()
+	if err != nil {
+		return fmt.Errorf("failed to list existing agent configs: %w", err)
+	}
+
+	// Build a set of existing config names
+	existingNames := make(map[string]bool)
+	for _, cfg := range existing {
+		existingNames[cfg.Name] = true
+	}
+
+	// Create any missing preset agent configs
+	for _, preset := range presets.AgentConfigs {
+		if existingNames[preset.Name] {
+			continue
+		}
+		_, err := c.CreateAgentConfig(&CreateAgentConfigRequest{
+			Name:          preset.Name,
+			SystemPrompt:  preset.SystemPrompt,
+			TaskPrompt:    preset.TaskPrompt,
+			EnabledMCPs:   preset.EnabledMCPs,
+			EnabledSkills: preset.EnabledSkills,
+			MaxTurns:      preset.MaxTurns,
+		})
+		if err != nil {
+			fmt.Printf("Warning: failed to seed agent config %q: %v\n", preset.Name, err)
+			continue
+		}
+		fmt.Printf("Seeded agent config: %s\n", preset.Name)
+	}
+
+	return nil
+}
+
 // GetSkillInstallCommands gets install commands for a comma-separated list of skill names
 func (c *Client) GetSkillInstallCommands(skillNames string) ([]string, error) {
 	if skillNames == "" {

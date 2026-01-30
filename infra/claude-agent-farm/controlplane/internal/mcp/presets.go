@@ -30,16 +30,30 @@ type PresetSkill struct {
 	Category       string `json:"category"`
 }
 
+// PresetAgentConfig represents a preset agent configuration
+type PresetAgentConfig struct {
+	Name          string `json:"name"`
+	SystemPrompt  string `json:"system_prompt"`
+	TaskPrompt    string `json:"task_prompt"`
+	EnabledMCPs   string `json:"enabled_mcps"`
+	EnabledSkills string `json:"enabled_skills"`
+	MaxTurns      int    `json:"max_turns"`
+	Description   string `json:"description"`
+	Category      string `json:"category"`
+}
+
 // PresetsConfig represents the full presets structure
 type PresetsConfig struct {
-	Servers []PresetServer `json:"servers"`
-	Skills  []PresetSkill  `json:"skills"`
+	Servers      []PresetServer      `json:"servers"`
+	Skills       []PresetSkill       `json:"skills"`
+	AgentConfigs []PresetAgentConfig `json:"agent_configs"`
 }
 
 // TOMLPresetsConfig represents the TOML structure for presets
 type TOMLPresetsConfig struct {
-	Servers map[string]TOMLPresetServer `toml:"servers"`
-	Skills  map[string]TOMLPresetSkill  `toml:"skills"`
+	Servers map[string]TOMLPresetServer      `toml:"servers"`
+	Skills  map[string]TOMLPresetSkill       `toml:"skills"`
+	Agents  map[string]TOMLPresetAgentConfig `toml:"agents"`
 }
 
 // TOMLPresetServer represents a server in the presets TOML
@@ -58,6 +72,17 @@ type TOMLPresetSkill struct {
 	Category       string `toml:"category,omitempty"`
 }
 
+// TOMLPresetAgentConfig represents an agent config in the presets TOML
+type TOMLPresetAgentConfig struct {
+	SystemPrompt  string `toml:"system_prompt,omitempty"`
+	TaskPrompt    string `toml:"task_prompt,omitempty"`
+	EnabledMCPs   string `toml:"enabled_mcps,omitempty"`
+	EnabledSkills string `toml:"enabled_skills,omitempty"`
+	MaxTurns      int    `toml:"max_turns,omitempty"`
+	Description   string `toml:"description,omitempty"`
+	Category      string `toml:"category,omitempty"`
+}
+
 // LoadPresets parses the embedded presets.toml and returns the configuration
 func LoadPresets() (*PresetsConfig, error) {
 	var config TOMLPresetsConfig
@@ -66,8 +91,9 @@ func LoadPresets() (*PresetsConfig, error) {
 	}
 
 	result := &PresetsConfig{
-		Servers: make([]PresetServer, 0, len(config.Servers)),
-		Skills:  make([]PresetSkill, 0, len(config.Skills)),
+		Servers:      make([]PresetServer, 0, len(config.Servers)),
+		Skills:       make([]PresetSkill, 0, len(config.Skills)),
+		AgentConfigs: make([]PresetAgentConfig, 0, len(config.Agents)),
 	}
 
 	// Convert servers
@@ -124,6 +150,37 @@ func LoadPresets() (*PresetsConfig, error) {
 			return result.Skills[i].Category < result.Skills[j].Category
 		}
 		return result.Skills[i].Name < result.Skills[j].Name
+	})
+
+	// Convert agent configs
+	for name, agent := range config.Agents {
+		category := agent.Category
+		if category == "" {
+			category = "other"
+		}
+		maxTurns := agent.MaxTurns
+		if maxTurns == 0 {
+			maxTurns = 50
+		}
+
+		result.AgentConfigs = append(result.AgentConfigs, PresetAgentConfig{
+			Name:          name,
+			SystemPrompt:  agent.SystemPrompt,
+			TaskPrompt:    agent.TaskPrompt,
+			EnabledMCPs:   agent.EnabledMCPs,
+			EnabledSkills: agent.EnabledSkills,
+			MaxTurns:      maxTurns,
+			Description:   agent.Description,
+			Category:      category,
+		})
+	}
+
+	// Sort agent configs by category, then by name
+	sort.Slice(result.AgentConfigs, func(i, j int) bool {
+		if result.AgentConfigs[i].Category != result.AgentConfigs[j].Category {
+			return result.AgentConfigs[i].Category < result.AgentConfigs[j].Category
+		}
+		return result.AgentConfigs[i].Name < result.AgentConfigs[j].Name
 	})
 
 	return result, nil
