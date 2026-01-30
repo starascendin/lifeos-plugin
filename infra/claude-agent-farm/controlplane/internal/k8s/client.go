@@ -626,8 +626,21 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte,
 				{
 					Name:    "agent",
 					Image:   agentImage,
-					Command: []string{"sleep", "infinity"},
-					Env:     envVars,
+					Command: []string{"/bin/bash", "-c"},
+					Args: []string{`
+if [ -n "${SKILL_INSTALL_COMMANDS:-}" ]; then
+    echo "Installing Claude skills..."
+    while IFS= read -r cmd; do
+        if [ -n "$cmd" ]; then
+            echo "Running: $cmd"
+            eval "$cmd" || echo "Warning: skill installation failed: $cmd"
+        fi
+    done <<< "$SKILL_INSTALL_COMMANDS"
+    echo "Skills installation complete."
+fi
+exec sleep infinity
+`},
+					Env: envVars,
 					Resources: corev1.ResourceRequirements{
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse(config.CPULimit),
