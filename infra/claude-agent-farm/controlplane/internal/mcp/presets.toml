@@ -59,7 +59,7 @@ category = "git"
 
 # LifeOS CLI - installed via npm when lifeos skills are enabled
 [skills.lifeos-cli]
-install_command = "npm install -g @starascendin/lifeos-cli"
+install_command = "npm install -g @starascendin/lifeos-cli --prefix ~/.local"
 description = "LifeOS CLI for direct Convex tool access"
 category = "lifeos"
 
