@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/mcp"
@@ -484,8 +485,9 @@ func (c *Client) doRequest(method, path string, body interface{}, result interfa
 	return nil
 }
 
-// SeedMCPConfigsFromPresets seeds MCP TOML configs from presets.toml into Convex if they don't already exist.
-// Groups preset servers by category and creates one MCP TOML config per category.
+// SeedMCPConfigsFromPresets seeds MCP TOML configs from presets.toml into Convex.
+// Creates one config per server (server-{name}) for direct name-based lookup.
+// Cleans up old category-grouped configs (preset-*) from prior format.
 func (c *Client) SeedMCPConfigsFromPresets() error {
 	presets, err := mcp.LoadPresets()
 	if err != nil {
@@ -504,45 +506,37 @@ func (c *Client) SeedMCPConfigsFromPresets() error {
 		existingByName[cfg.Name] = cfg.ID
 	}
 
-	// Group servers by category
-	categories := make(map[string][]mcp.PresetServer)
+	// Create or update one MCP TOML config per server
 	for _, server := range presets.Servers {
-		categories[server.Category] = append(categories[server.Category], server)
-	}
+		configName := fmt.Sprintf("server-%s", server.Name)
 
-	// Create or update one MCP TOML config per category
-	for category, servers := range categories {
-		configName := fmt.Sprintf("preset-%s", category)
-
-		// Build TOML content
-		tomlContent := fmt.Sprintf("# %s MCP servers (auto-seeded from presets)\n\n", category)
-		for _, server := range servers {
-			tomlContent += fmt.Sprintf("[servers.%s]\n", server.Name)
-			tomlContent += fmt.Sprintf("command = %q\n", server.Command)
-			if len(server.Args) > 0 {
-				tomlContent += "args = ["
-				for i, arg := range server.Args {
-					if i > 0 {
-						tomlContent += ", "
-					}
-					tomlContent += fmt.Sprintf("%q", arg)
+		// Build single-server TOML content
+		tomlContent := fmt.Sprintf("# %s (auto-seeded from presets)\n\n", server.Name)
+		tomlContent += fmt.Sprintf("[servers.%s]\n", server.Name)
+		tomlContent += fmt.Sprintf("command = %q\n", server.Command)
+		if len(server.Args) > 0 {
+			tomlContent += "args = ["
+			for i, arg := range server.Args {
+				if i > 0 {
+					tomlContent += ", "
 				}
-				tomlContent += "]\n"
+				tomlContent += fmt.Sprintf("%q", arg)
 			}
-			if len(server.Env) > 0 {
-				tomlContent += "[servers." + server.Name + ".env]\n"
-				for k, v := range server.Env {
-					tomlContent += fmt.Sprintf("%s = %q\n", k, v)
-				}
-			}
-			if server.Description != "" {
-				tomlContent += fmt.Sprintf("description = %q\n", server.Description)
-			}
-			tomlContent += "\n"
+			tomlContent += "]\n"
 		}
+		if len(server.Env) > 0 {
+			tomlContent += "[servers." + server.Name + ".env]\n"
+			for k, v := range server.Env {
+				tomlContent += fmt.Sprintf("%s = %q\n", k, v)
+			}
+		}
+		if server.Description != "" {
+			tomlContent += fmt.Sprintf("description = %q\n", server.Description)
+		}
+		tomlContent += "\n"
 
 		if existingID, ok := existingByName[configName]; ok {
-			// Update existing preset config to match current presets.toml
+			// Update existing config to match current presets.toml
 			err := c.UpdateMCPConfig(existingID, &UpdateMCPConfigRequest{
 				Content: tomlContent,
 			})
@@ -552,7 +546,7 @@ func (c *Client) SeedMCPConfigsFromPresets() error {
 			}
 			fmt.Printf("Updated MCP config: %s\n", configName)
 		} else {
-			// Create new preset config
+			// Create new per-server config
 			_, err := c.CreateMCPConfig(&CreateMCPConfigRequest{
 				Name:      configName,
 				Content:   tomlContent,
@@ -567,10 +561,21 @@ func (c *Client) SeedMCPConfigsFromPresets() error {
 		}
 	}
 
+	// Clean up old category-grouped configs (preset-* format)
+	for _, cfg := range existing {
+		if strings.HasPrefix(cfg.Name, "preset-") {
+			if err := c.DeleteMCPConfig(cfg.ID); err != nil {
+				fmt.Printf("Warning: failed to clean up old config %q: %v\n", cfg.Name, err)
+			} else {
+				fmt.Printf("Cleaned up old category config: %s\n", cfg.Name)
+			}
+		}
+	}
+
 	return nil
 }
 
-// SeedSkillsFromPresets seeds skills from presets.toml into Convex if they don't already exist
+// SeedSkillsFromPresets seeds skills from presets.toml into Convex, upserting to keep them in sync
 func (c *Client) SeedSkillsFromPresets() error {
 	presets, err := mcp.LoadPresets()
 	if err != nil {
@@ -583,36 +588,48 @@ func (c *Client) SeedSkillsFromPresets() error {
 		return fmt.Errorf("failed to list existing skills: %w", err)
 	}
 
-	// Build a set of existing skill names
-	existingNames := make(map[string]bool)
+	// Build a map of existing skill names to IDs
+	existingByName := make(map[string]string)
 	for _, s := range existing {
-		existingNames[s.Name] = true
+		existingByName[s.Name] = s.ID
 	}
 
-	// Create any missing preset skills
+	// Upsert preset skills
 	for _, preset := range presets.Skills {
-		if existingNames[preset.Name] {
-			continue
+		if existingID, ok := existingByName[preset.Name]; ok {
+			// Update existing skill to match current preset
+			err := c.UpdateSkill(existingID, &UpdateSkillRequest{
+				InstallCommand: preset.InstallCommand,
+				Description:    preset.Description,
+				Category:       preset.Category,
+			})
+			if err != nil {
+				fmt.Printf("Warning: failed to update skill %q: %v\n", preset.Name, err)
+				continue
+			}
+			fmt.Printf("Updated skill: %s\n", preset.Name)
+		} else {
+			// Create new skill
+			_, err := c.CreateSkill(&CreateSkillRequest{
+				Name:           preset.Name,
+				InstallCommand: preset.InstallCommand,
+				Description:    preset.Description,
+				Category:       preset.Category,
+				IsBuiltin:      true,
+				Enabled:        true,
+			})
+			if err != nil {
+				fmt.Printf("Warning: failed to seed skill %q: %v\n", preset.Name, err)
+				continue
+			}
+			fmt.Printf("Seeded skill: %s\n", preset.Name)
 		}
-		_, err := c.CreateSkill(&CreateSkillRequest{
-			Name:           preset.Name,
-			InstallCommand: preset.InstallCommand,
-			Description:    preset.Description,
-			Category:       preset.Category,
-			IsBuiltin:      true,
-			Enabled:        true,
-		})
-		if err != nil {
-			fmt.Printf("Warning: failed to seed skill %q: %v\n", preset.Name, err)
-			continue
-		}
-		fmt.Printf("Seeded skill: %s\n", preset.Name)
 	}
 
 	return nil
 }
 
-// SeedAgentConfigsFromPresets seeds agent configs from presets.toml into Convex if they don't already exist
+// SeedAgentConfigsFromPresets seeds agent configs from presets.toml into Convex, upserting to keep them in sync
 func (c *Client) SeedAgentConfigsFromPresets() error {
 	presets, err := mcp.LoadPresets()
 	if err != nil {
@@ -625,30 +642,45 @@ func (c *Client) SeedAgentConfigsFromPresets() error {
 		return fmt.Errorf("failed to list existing agent configs: %w", err)
 	}
 
-	// Build a set of existing config names
-	existingNames := make(map[string]bool)
+	// Build a map of existing config names to IDs
+	existingByName := make(map[string]string)
 	for _, cfg := range existing {
-		existingNames[cfg.Name] = true
+		existingByName[cfg.Name] = cfg.ID
 	}
 
-	// Create any missing preset agent configs
+	// Upsert preset agent configs
 	for _, preset := range presets.AgentConfigs {
-		if existingNames[preset.Name] {
-			continue
+		if existingID, ok := existingByName[preset.Name]; ok {
+			// Update existing agent config to match current preset
+			err := c.UpdateAgentConfig(existingID, &CreateAgentConfigRequest{
+				Name:          preset.Name,
+				SystemPrompt:  preset.SystemPrompt,
+				TaskPrompt:    preset.TaskPrompt,
+				EnabledMCPs:   preset.EnabledMCPs,
+				EnabledSkills: preset.EnabledSkills,
+				MaxTurns:      preset.MaxTurns,
+			})
+			if err != nil {
+				fmt.Printf("Warning: failed to update agent config %q: %v\n", preset.Name, err)
+				continue
+			}
+			fmt.Printf("Updated agent config: %s\n", preset.Name)
+		} else {
+			// Create new agent config
+			_, err := c.CreateAgentConfig(&CreateAgentConfigRequest{
+				Name:          preset.Name,
+				SystemPrompt:  preset.SystemPrompt,
+				TaskPrompt:    preset.TaskPrompt,
+				EnabledMCPs:   preset.EnabledMCPs,
+				EnabledSkills: preset.EnabledSkills,
+				MaxTurns:      preset.MaxTurns,
+			})
+			if err != nil {
+				fmt.Printf("Warning: failed to seed agent config %q: %v\n", preset.Name, err)
+				continue
+			}
+			fmt.Printf("Seeded agent config: %s\n", preset.Name)
 		}
-		_, err := c.CreateAgentConfig(&CreateAgentConfigRequest{
-			Name:          preset.Name,
-			SystemPrompt:  preset.SystemPrompt,
-			TaskPrompt:    preset.TaskPrompt,
-			EnabledMCPs:   preset.EnabledMCPs,
-			EnabledSkills: preset.EnabledSkills,
-			MaxTurns:      preset.MaxTurns,
-		})
-		if err != nil {
-			fmt.Printf("Warning: failed to seed agent config %q: %v\n", preset.Name, err)
-			continue
-		}
-		fmt.Printf("Seeded agent config: %s\n", preset.Name)
 	}
 
 	return nil

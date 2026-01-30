@@ -1,6 +1,17 @@
 # MCP Server Presets
 # These are embedded presets that can be selected when creating agent configs
 
+[env_vars]
+allowed = [
+    "GITHUB_PAT",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "NPM_TOKEN",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "LIFEOS_API_KEY",
+]
+
 [servers.lifeos-dev]
 command = "npx"
 args = ["@starascendin/lifeos-mcp@latest", "--url", "https://beaming-giraffe-300.convex.site", "--user-id", "j9743f41z9e999ym1xvn1v013s7wqfq8", "--api-key", "${LIFEOS_API_KEY}"]

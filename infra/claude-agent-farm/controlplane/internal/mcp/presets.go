@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -47,10 +48,17 @@ type PresetsConfig struct {
 	Servers      []PresetServer      `json:"servers"`
 	Skills       []PresetSkill       `json:"skills"`
 	AgentConfigs []PresetAgentConfig `json:"agent_configs"`
+	AllowedEnvVars []string          `json:"allowed_env_vars,omitempty"`
+}
+
+// TOMLEnvVars represents the env_vars section in presets TOML
+type TOMLEnvVars struct {
+	Allowed []string `toml:"allowed"`
 }
 
 // TOMLPresetsConfig represents the TOML structure for presets
 type TOMLPresetsConfig struct {
+	EnvVars TOMLEnvVars                      `toml:"env_vars"`
 	Servers map[string]TOMLPresetServer      `toml:"servers"`
 	Skills  map[string]TOMLPresetSkill       `toml:"skills"`
 	Agents  map[string]TOMLPresetAgentConfig `toml:"agents"`
@@ -91,9 +99,10 @@ func LoadPresets() (*PresetsConfig, error) {
 	}
 
 	result := &PresetsConfig{
-		Servers:      make([]PresetServer, 0, len(config.Servers)),
-		Skills:       make([]PresetSkill, 0, len(config.Skills)),
-		AgentConfigs: make([]PresetAgentConfig, 0, len(config.Agents)),
+		Servers:        make([]PresetServer, 0, len(config.Servers)),
+		Skills:         make([]PresetSkill, 0, len(config.Skills)),
+		AgentConfigs:   make([]PresetAgentConfig, 0, len(config.Agents)),
+		AllowedEnvVars: config.EnvVars.Allowed,
 	}
 
 	// Convert servers
@@ -278,4 +287,25 @@ func trimString(s string) string {
 		end--
 	}
 	return s[start:end]
+}
+
+// Cached allowed env vars (presets don't change at runtime)
+var (
+	allowedEnvVarsOnce sync.Once
+	allowedEnvVars     []string
+)
+
+// GetAllowedEnvVars returns the list of allowed environment variables from presets.toml.
+// The result is cached since presets are embedded and don't change at runtime.
+func GetAllowedEnvVars() []string {
+	allowedEnvVarsOnce.Do(func() {
+		presets, err := LoadPresets()
+		if err != nil || len(presets.AllowedEnvVars) == 0 {
+			// Fallback to empty list if presets can't be loaded
+			allowedEnvVars = []string{}
+			return
+		}
+		allowedEnvVars = presets.AllowedEnvVars
+	})
+	return allowedEnvVars
 }

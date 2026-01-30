@@ -14,25 +14,12 @@ import (
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/convex"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/github"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/k8s"
-	"github.com/starascendin/claude-agent-farm/controlplane/internal/storage"
 )
 
 //go:embed all:dist
 var frontendFS embed.FS
 
 func main() {
-	// Initialize storage
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		dbPath = "/data/controlplane.db"
-	}
-
-	store, err := storage.NewSQLiteStore(dbPath)
-	if err != nil {
-		log.Fatalf("Failed to initialize storage: %v", err)
-	}
-	defer store.Close()
-
 	// Initialize Kubernetes client
 	k8sClient, err := k8s.NewClient()
 	if err != nil {
@@ -49,45 +36,37 @@ func main() {
 		log.Printf("GitHub integration disabled (GITHUB_PAT not set)")
 	}
 
-	// Initialize Convex client for config storage
+	// Initialize Convex client for config storage (required)
 	convexURL := os.Getenv("CONVEX_URL")
+	if convexURL == "" {
+		log.Fatal("CONVEX_URL is required. Set CONVEX_URL environment variable to your Convex deployment URL.")
+	}
+
 	convexAPIKey := os.Getenv("CONTROLPLANE_API_KEY")
 	if convexAPIKey == "" {
 		convexAPIKey = "controlplane-api-key-2024" // Default matches http.ts
 	}
 
-	var convexClient *convex.Client
-	if convexURL != "" {
-		convexClient = convex.NewClient(convexURL, convexAPIKey)
-		log.Printf("Convex integration enabled (CONVEX_URL configured)")
+	convexClient := convex.NewClient(convexURL, convexAPIKey)
+	log.Printf("Convex integration enabled (CONVEX_URL configured)")
 
-		// Seed preset MCP configs into Convex (idempotent - skips existing)
-		if err := convexClient.SeedMCPConfigsFromPresets(); err != nil {
-			log.Printf("Warning: Failed to seed MCP configs to Convex: %v", err)
-		}
+	// Seed preset MCP configs into Convex (upserts to keep in sync)
+	if err := convexClient.SeedMCPConfigsFromPresets(); err != nil {
+		log.Printf("Warning: Failed to seed MCP configs to Convex: %v", err)
+	}
 
-		// Seed preset skills into Convex (idempotent - skips existing)
-		if err := convexClient.SeedSkillsFromPresets(); err != nil {
-			log.Printf("Warning: Failed to seed skills to Convex: %v", err)
-		}
+	// Seed preset skills into Convex (upserts to keep in sync)
+	if err := convexClient.SeedSkillsFromPresets(); err != nil {
+		log.Printf("Warning: Failed to seed skills to Convex: %v", err)
+	}
 
-		// Seed preset agent configs into Convex (idempotent - skips existing)
-		if err := convexClient.SeedAgentConfigsFromPresets(); err != nil {
-			log.Printf("Warning: Failed to seed agent configs to Convex: %v", err)
-		}
-	} else {
-		log.Printf("Convex integration disabled (CONVEX_URL not set, using SQLite)")
+	// Seed preset agent configs into Convex (upserts to keep in sync)
+	if err := convexClient.SeedAgentConfigsFromPresets(); err != nil {
+		log.Printf("Warning: Failed to seed agent configs to Convex: %v", err)
 	}
 
 	// Initialize API
-	var apiHandler *api.API
-	if convexClient != nil {
-		// Use Convex for configs, keep K8s for pod management
-		apiHandler = api.NewAPIWithConvex(convexClient, k8sClient, githubClient)
-	} else {
-		// Legacy mode: use SQLite for everything
-		apiHandler = api.NewAPI(store, k8sClient, githubClient)
-	}
+	apiHandler := api.NewAPIWithConvex(convexClient, k8sClient, githubClient)
 
 	// Initialize Echo
 	e := echo.New()

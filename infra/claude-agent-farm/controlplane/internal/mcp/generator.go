@@ -9,17 +9,6 @@ import (
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/models"
 )
 
-// KnownEnvVars lists environment variables that can be substituted
-var KnownEnvVars = []string{
-	"GITHUB_PAT",
-	"ANTHROPIC_API_KEY",
-	"OPENAI_API_KEY",
-	"NPM_TOKEN",
-	"AWS_ACCESS_KEY_ID",
-	"AWS_SECRET_ACCESS_KEY",
-	"LIFEOS_API_KEY",
-}
-
 // envVarPattern matches ${VAR_NAME} patterns
 var envVarPattern = regexp.MustCompile(`\$\{([A-Z_][A-Z0-9_]*)\}`)
 
@@ -115,9 +104,9 @@ func substituteValue(value string, envValues map[string]string) string {
 	})
 }
 
-// isKnownEnvVar checks if a variable name is in the known list
+// isKnownEnvVar checks if a variable name is in the allowed list from presets.toml
 func isKnownEnvVar(name string) bool {
-	for _, known := range KnownEnvVars {
+	for _, known := range GetAllowedEnvVars() {
 		if name == known {
 			return true
 		}

@@ -18,15 +18,14 @@ import (
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/k8s"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/mcp"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/models"
-	"github.com/starascendin/claude-agent-farm/controlplane/internal/storage"
 	"github.com/starascendin/claude-agent-farm/controlplane/internal/version"
 )
 
-// getEnvValues reads known env vars from the controlplane environment
+// getEnvValues reads allowed env vars from the controlplane environment
 // so they can be substituted into MCP config args (e.g., ${LIFEOS_API_KEY})
 func getEnvValues() map[string]string {
 	values := make(map[string]string)
-	for _, name := range mcp.KnownEnvVars {
+	for _, name := range mcp.GetAllowedEnvVars() {
 		if val := os.Getenv(name); val != "" {
 			values[name] = val
 		}
@@ -35,19 +34,9 @@ func getEnvValues() map[string]string {
 }
 
 type API struct {
-	store        *storage.SQLiteStore // Legacy SQLite storage (deprecated)
-	convex       *convex.Client       // Convex client for configs
+	convex       *convex.Client
 	k8sClient    *k8s.Client
 	githubClient *github.Client
-}
-
-// NewAPI creates a new API handler with SQLite storage (legacy)
-func NewAPI(store *storage.SQLiteStore, k8sClient *k8s.Client, githubClient *github.Client) *API {
-	return &API{
-		store:        store,
-		k8sClient:    k8sClient,
-		githubClient: githubClient,
-	}
 }
 
 // NewAPIWithConvex creates a new API handler with Convex client for configs
@@ -59,28 +48,13 @@ func NewAPIWithConvex(convexClient *convex.Client, k8sClient *k8s.Client, github
 	}
 }
 
-// SetConvexClient sets the Convex client (for gradual migration)
-func (a *API) SetConvexClient(convexClient *convex.Client) {
-	a.convex = convexClient
-}
-
-// useConvex returns true if we should use Convex instead of SQLite
-func (a *API) useConvex() bool {
-	return a.convex != nil
-}
-
 // GetSystemInfo returns system information including Convex URL and version
 func (a *API) GetSystemInfo(c echo.Context) error {
 	info := map[string]interface{}{
-		"storage_type": "sqlite",
-		"convex_url":   "",
+		"storage_type": "convex",
+		"convex_url":   a.convex.GetBaseURL(),
 		"version":      version.Version,
 		"build_time":   version.BuildTime,
-	}
-
-	if a.useConvex() {
-		info["storage_type"] = "convex"
-		info["convex_url"] = a.convex.GetBaseURL()
 	}
 
 	if a.k8sClient != nil {
@@ -102,29 +76,18 @@ func (a *API) GetSystemInfo(c echo.Context) error {
 
 // ListConfigs returns all configs as JSON
 func (a *API) ListConfigs(c echo.Context) error {
-	if a.useConvex() {
-		configs, err := a.convex.ListAgentConfigs()
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to list configs: %v", err),
-			})
-		}
-		// Convert to models.AgentConfig for compatibility
-		result := make([]models.AgentConfig, len(configs))
-		for i, cfg := range configs {
-			result[i] = convexToModelConfig(&cfg)
-		}
-		return c.JSON(http.StatusOK, result)
-	}
-
-	// Legacy SQLite path
-	configs, err := a.store.ListConfigs()
+	configs, err := a.convex.ListAgentConfigs()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to list configs",
+			"error": fmt.Sprintf("Failed to list configs: %v", err),
 		})
 	}
-	return c.JSON(http.StatusOK, configs)
+	// Convert to models.AgentConfig for compatibility
+	result := make([]models.AgentConfig, len(configs))
+	for i, cfg := range configs {
+		result[i] = convexToModelConfig(&cfg)
+	}
+	return c.JSON(http.StatusOK, result)
 }
 
 // convexToModelConfig converts a Convex AgentConfig to models.AgentConfig
@@ -152,34 +115,14 @@ func convexToModelConfig(cfg *convex.AgentConfig) models.AgentConfig {
 func (a *API) GetConfig(c echo.Context) error {
 	idParam := c.Param("id")
 
-	if a.useConvex() {
-		// Convex uses string IDs
-		config, err := a.convex.GetAgentConfig(idParam)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Config not found",
-			})
-		}
-		result := convexToModelConfig(config)
-		return c.JSON(http.StatusOK, result)
-	}
-
-	// Legacy SQLite path - parse as int64
-	id, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid ID",
-		})
-	}
-
-	config, err := a.store.GetConfig(id)
+	config, err := a.convex.GetAgentConfig(idParam)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Config not found",
 		})
 	}
-
-	return c.JSON(http.StatusOK, config)
+	result := convexToModelConfig(config)
+	return c.JSON(http.StatusOK, result)
 }
 
 // CreateConfigRequest is the request body for creating a config
@@ -229,50 +172,7 @@ func (a *API) CreateConfig(c echo.Context) error {
 		req.AllowedTools = "Read,Write,Edit,Bash,Glob,Grep"
 	}
 
-	if a.useConvex() {
-		convexReq := &convex.CreateAgentConfigRequest{
-			Name:          req.Name,
-			Repos:         req.Repos,
-			TaskPrompt:    req.TaskPrompt,
-			SystemPrompt:  req.SystemPrompt,
-			MaxTurns:      req.MaxTurns,
-			MaxBudgetUSD:  req.MaxBudgetUSD,
-			CPULimit:      req.CPULimit,
-			MemoryLimit:   req.MemoryLimit,
-			AllowedTools:  req.AllowedTools,
-			EnabledMCPs:   req.EnabledMCPs,
-			EnabledSkills: req.EnabledSkills,
-		}
-
-		convexID, err := a.convex.CreateAgentConfig(convexReq)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to create config: %v", err),
-			})
-		}
-
-		// Return the created config
-		config := models.AgentConfig{
-			ConvexID:      convexID,
-			Name:          req.Name,
-			Repos:         req.Repos,
-			TaskPrompt:    req.TaskPrompt,
-			SystemPrompt:  req.SystemPrompt,
-			MaxTurns:      req.MaxTurns,
-			MaxBudgetUSD:  req.MaxBudgetUSD,
-			CPULimit:      req.CPULimit,
-			MemoryLimit:   req.MemoryLimit,
-			AllowedTools:  req.AllowedTools,
-			EnabledMCPs:   req.EnabledMCPs,
-			EnabledSkills: req.EnabledSkills,
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
-		}
-		return c.JSON(http.StatusCreated, config)
-	}
-
-	// Legacy SQLite path
-	config := &models.AgentConfig{
+	convexReq := &convex.CreateAgentConfigRequest{
 		Name:          req.Name,
 		Repos:         req.Repos,
 		TaskPrompt:    req.TaskPrompt,
@@ -286,14 +186,29 @@ func (a *API) CreateConfig(c echo.Context) error {
 		EnabledSkills: req.EnabledSkills,
 	}
 
-	id, err := a.store.CreateConfig(config)
+	convexID, err := a.convex.CreateAgentConfig(convexReq)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create config",
+			"error": fmt.Sprintf("Failed to create config: %v", err),
 		})
 	}
 
-	config.ID = id
+	config := models.AgentConfig{
+		ConvexID:      convexID,
+		Name:          req.Name,
+		Repos:         req.Repos,
+		TaskPrompt:    req.TaskPrompt,
+		SystemPrompt:  req.SystemPrompt,
+		MaxTurns:      req.MaxTurns,
+		MaxBudgetUSD:  req.MaxBudgetUSD,
+		CPULimit:      req.CPULimit,
+		MemoryLimit:   req.MemoryLimit,
+		AllowedTools:  req.AllowedTools,
+		EnabledMCPs:   req.EnabledMCPs,
+		EnabledSkills: req.EnabledSkills,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
 	return c.JSON(http.StatusCreated, config)
 }
 
@@ -308,56 +223,7 @@ func (a *API) UpdateConfig(c echo.Context) error {
 		})
 	}
 
-	if a.useConvex() {
-		// Convex uses string IDs
-		convexReq := &convex.CreateAgentConfigRequest{
-			Name:          req.Name,
-			Repos:         req.Repos,
-			TaskPrompt:    req.TaskPrompt,
-			SystemPrompt:  req.SystemPrompt,
-			MaxTurns:      req.MaxTurns,
-			MaxBudgetUSD:  req.MaxBudgetUSD,
-			CPULimit:      req.CPULimit,
-			MemoryLimit:   req.MemoryLimit,
-			AllowedTools:  req.AllowedTools,
-			EnabledMCPs:   req.EnabledMCPs,
-			EnabledSkills: req.EnabledSkills,
-		}
-
-		if err := a.convex.UpdateAgentConfig(idParam, convexReq); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to update config: %v", err),
-			})
-		}
-
-		config := models.AgentConfig{
-			ConvexID:      idParam,
-			Name:          req.Name,
-			Repos:         req.Repos,
-			TaskPrompt:    req.TaskPrompt,
-			SystemPrompt:  req.SystemPrompt,
-			MaxTurns:      req.MaxTurns,
-			MaxBudgetUSD:  req.MaxBudgetUSD,
-			CPULimit:      req.CPULimit,
-			MemoryLimit:   req.MemoryLimit,
-			AllowedTools:  req.AllowedTools,
-			EnabledMCPs:   req.EnabledMCPs,
-			EnabledSkills: req.EnabledSkills,
-			UpdatedAt:     time.Now(),
-		}
-		return c.JSON(http.StatusOK, config)
-	}
-
-	// Legacy SQLite path - parse as int64
-	id, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid ID",
-		})
-	}
-
-	config := &models.AgentConfig{
-		ID:            id,
+	convexReq := &convex.CreateAgentConfigRequest{
 		Name:          req.Name,
 		Repos:         req.Repos,
 		TaskPrompt:    req.TaskPrompt,
@@ -371,12 +237,27 @@ func (a *API) UpdateConfig(c echo.Context) error {
 		EnabledSkills: req.EnabledSkills,
 	}
 
-	if err := a.store.UpdateConfig(config); err != nil {
+	if err := a.convex.UpdateAgentConfig(idParam, convexReq); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to update config",
+			"error": fmt.Sprintf("Failed to update config: %v", err),
 		})
 	}
 
+	config := models.AgentConfig{
+		ConvexID:      idParam,
+		Name:          req.Name,
+		Repos:         req.Repos,
+		TaskPrompt:    req.TaskPrompt,
+		SystemPrompt:  req.SystemPrompt,
+		MaxTurns:      req.MaxTurns,
+		MaxBudgetUSD:  req.MaxBudgetUSD,
+		CPULimit:      req.CPULimit,
+		MemoryLimit:   req.MemoryLimit,
+		AllowedTools:  req.AllowedTools,
+		EnabledMCPs:   req.EnabledMCPs,
+		EnabledSkills: req.EnabledSkills,
+		UpdatedAt:     time.Now(),
+	}
 	return c.JSON(http.StatusOK, config)
 }
 
@@ -384,29 +265,11 @@ func (a *API) UpdateConfig(c echo.Context) error {
 func (a *API) DeleteConfig(c echo.Context) error {
 	idParam := c.Param("id")
 
-	if a.useConvex() {
-		if err := a.convex.DeleteAgentConfig(idParam); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to delete config: %v", err),
-			})
-		}
-		return c.NoContent(http.StatusNoContent)
-	}
-
-	// Legacy SQLite path - parse as int64
-	id, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid ID",
-		})
-	}
-
-	if err := a.store.DeleteConfig(id); err != nil {
+	if err := a.convex.DeleteAgentConfig(idParam); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to delete config",
+			"error": fmt.Sprintf("Failed to delete config: %v", err),
 		})
 	}
-
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -438,33 +301,15 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 	}
 
 	idParam := c.Param("id")
-	var config *models.AgentConfig
 
-	if a.useConvex() {
-		// Convex uses string IDs
-		convexConfig, err := a.convex.GetAgentConfig(idParam)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Config not found",
-			})
-		}
-		modelConfig := convexToModelConfig(convexConfig)
-		config = &modelConfig
-	} else {
-		// Legacy SQLite path - parse as int64
-		id, err := strconv.ParseInt(idParam, 10, 64)
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{
-				"error": "Invalid ID",
-			})
-		}
-		config, err = a.store.GetConfig(id)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Config not found",
-			})
-		}
+	convexConfig, err := a.convex.GetAgentConfig(idParam)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "Config not found",
+		})
 	}
+	modelConfig := convexToModelConfig(convexConfig)
+	config := &modelConfig
 
 	// Delete existing persistent pod if it exists (name pattern: agent-{config.Name}-pod)
 	existingPodName := fmt.Sprintf("agent-%s-pod", config.Name)
@@ -473,93 +318,24 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 	// Wait a moment for deletion to process
 	time.Sleep(500 * time.Millisecond)
 
-	// Build MCP JSON from config.EnabledMCPs (builds MCP config from enabled MCPs)
-	var mcpJSON []byte
-	if config.EnabledMCPs != "" {
-		mcpNames := mcp.ParseEnabledMCPs(config.EnabledMCPs)
-		if len(mcpNames) > 0 {
-			// Get servers from enabled TOML configs
-			var enabledConfigContents []string
-
-			if a.useConvex() {
-				convexConfigs, err := a.convex.GetEnabledMCPConfigs()
-				if err != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
-					})
-				}
-				for _, cfg := range convexConfigs {
-					enabledConfigContents = append(enabledConfigContents, cfg.Content)
-				}
-			} else {
-				// Legacy SQLite path
-				enabledConfigs, err := a.store.GetEnabledTomlConfigs()
-				if err != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": fmt.Sprintf("Failed to get enabled TOML configs: %v", err),
-					})
-				}
-				for _, cfg := range enabledConfigs {
-					enabledConfigContents = append(enabledConfigContents, cfg.Content)
-				}
-			}
-
-			// Parse all enabled configs and build server map
-			serverMap := make(map[string]models.MCPServer)
-			for _, tomlContent := range enabledConfigContents {
-				servers, err := mcp.ParseTOML(tomlContent)
-				if err != nil {
-					continue // Skip invalid configs
-				}
-				for _, server := range servers {
-					serverMap[server.Name] = server
-				}
-			}
-
-			// Filter to only requested MCP servers
-			var mcpServers []models.MCPServer
-			for _, name := range mcpNames {
-				if server, ok := serverMap[name]; ok {
-					mcpServers = append(mcpServers, server)
-				}
-			}
-
-			if len(mcpServers) > 0 {
-				// Resolve known env vars from controlplane environment
-				envValues := getEnvValues()
-
-				var mcpErr error
-				mcpJSON, mcpErr = mcp.GenerateMCPConfig(mcpServers, envValues)
-				if mcpErr != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{
-						"error": fmt.Sprintf("Failed to generate MCP config: %v", mcpErr),
-					})
-				}
-			}
-		}
+	// Build MCP JSON from config.EnabledMCPs
+	mcpJSON, mcpErr := a.buildMCPJSON(config.EnabledMCPs)
+	if mcpErr != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Failed to build MCP config: %v", mcpErr),
+		})
 	}
 
-	// Get skill install commands from database (builds MCP config from enabled MCPs)
+	// Get skill install commands
 	var skillInstallCommands []string
 	if config.EnabledSkills != "" {
-		if a.useConvex() {
-			commands, err := a.convex.GetSkillInstallCommands(config.EnabledSkills)
-			if err != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
-				})
-			}
-			skillInstallCommands = commands
-		} else {
-			// Legacy SQLite path
-			commands, err := a.store.GetSkillInstallCommands(config.EnabledSkills)
-			if err != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
-				})
-			}
-			skillInstallCommands = commands
+		commands, err := a.convex.GetSkillInstallCommands(config.EnabledSkills)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to get skill install commands: %v", err),
+			})
 		}
+		skillInstallCommands = commands
 	}
 
 	// Create new persistent pod with MCP and skills
@@ -574,6 +350,40 @@ func (a *API) RecreateAgentPod(c echo.Context) error {
 		"pod_name": podName,
 		"status":   "Pending",
 	})
+}
+
+// buildMCPJSON fetches each requested MCP server config by name and generates the MCP JSON
+func (a *API) buildMCPJSON(enabledMCPs string) ([]byte, error) {
+	if enabledMCPs == "" {
+		return nil, nil
+	}
+
+	mcpNames := mcp.ParseEnabledMCPs(enabledMCPs)
+	if len(mcpNames) == 0 {
+		return nil, nil
+	}
+
+	var mcpServers []models.MCPServer
+	for _, name := range mcpNames {
+		cfg, err := a.convex.GetMCPConfigByName("server-" + name)
+		if err != nil {
+			log.Printf("[buildMCPJSON] Server config not found for %q, skipping", name)
+			continue
+		}
+		servers, err := mcp.ParseTOML(cfg.Content)
+		if err != nil {
+			log.Printf("[buildMCPJSON] Failed to parse TOML for %q, skipping: %v", name, err)
+			continue
+		}
+		mcpServers = append(mcpServers, servers...)
+	}
+
+	if len(mcpServers) == 0 {
+		return nil, nil
+	}
+
+	envValues := getEnvValues()
+	return mcp.GenerateMCPConfig(mcpServers, envValues)
 }
 
 // StopAgent stops a running agent
@@ -694,161 +504,73 @@ func (a *API) ChatSend(c echo.Context) error {
 
 	// Convex conversation tracking
 	var convexConversationID string
-	if a.useConvex() {
-		// Try to find existing conversation by thread ID, or create new one
-		existing, err := a.convex.GetConversationByThreadID(threadID)
-		if err == nil && existing != nil {
-			convexConversationID = existing.ID
-		} else if isNewThread {
-			// Create new conversation
-			convexID, createErr := a.convex.CreateConversation(&convex.CreateConversationRequest{
-				ThreadID: threadID,
-				Title:    truncateString(message, 50), // Use first 50 chars of message as title
-			})
-			if createErr == nil {
-				convexConversationID = convexID
-			}
-		}
-
-		// Save user message
-		if convexConversationID != "" {
-			a.convex.AddMessage(convexConversationID, &convex.AddMessageRequest{
-				Role:    "user",
-				Content: message,
-			})
+	existing, err := a.convex.GetConversationByThreadID(threadID)
+	if err == nil && existing != nil {
+		convexConversationID = existing.ID
+	} else if isNewThread {
+		convexID, createErr := a.convex.CreateConversation(&convex.CreateConversationRequest{
+			ThreadID: threadID,
+			Title:    truncateString(message, 50),
+		})
+		if createErr == nil {
+			convexConversationID = convexID
 		}
 	}
 
+	// Save user message
+	if convexConversationID != "" {
+		a.convex.AddMessage(convexConversationID, &convex.AddMessageRequest{
+			Role:    "user",
+			Content: message,
+		})
+	}
+
 	var podName string
-	var err error
 	var agentConfig *models.AgentConfig
 
 	// Determine which pod to use
 	if agentIDStr != "" {
 		// Agent-based chat: get or create persistent agent pod
-		if a.useConvex() {
-			// Convex uses string IDs
-			convexConfig, convexErr := a.convex.GetAgentConfig(agentIDStr)
-			if convexErr != nil {
-				sendSSEError(c, fmt.Sprintf("Agent config not found: %v", convexErr))
-				return nil
-			}
-			modelConfig := convexToModelConfig(convexConfig)
-			agentConfig = &modelConfig
-		} else {
-			// Legacy SQLite path - parse as int64
-			agentID, parseErr := strconv.ParseInt(agentIDStr, 10, 64)
-			if parseErr != nil {
-				sendSSEError(c, "Invalid agent_id")
-				return nil
-			}
-			agentConfig, err = a.store.GetConfig(agentID)
-			if err != nil {
-				sendSSEError(c, fmt.Sprintf("Agent config not found: %v", err))
-				return nil
-			}
+		convexConfig, convexErr := a.convex.GetAgentConfig(agentIDStr)
+		if convexErr != nil {
+			sendSSEError(c, fmt.Sprintf("Agent config not found: %v", convexErr))
+			return nil
 		}
+		modelConfig := convexToModelConfig(convexConfig)
+		agentConfig = &modelConfig
 
-		// Build MCP JSON from config.EnabledMCPs (builds MCP config from enabled MCPs)
+		// Build MCP JSON
 		var mcpJSON []byte
 		log.Printf("[ChatSend] Agent config loaded: name=%s, EnabledMCPs=%q", agentConfig.Name, agentConfig.EnabledMCPs)
 		if agentConfig.EnabledMCPs != "" {
-			mcpNames := mcp.ParseEnabledMCPs(agentConfig.EnabledMCPs)
-			log.Printf("[ChatSend] Parsed MCP names: %v", mcpNames)
-			if len(mcpNames) > 0 {
-				// Get servers from enabled TOML configs
-				var enabledConfigContents []string
-
-				if a.useConvex() {
-					convexConfigs, convexErr := a.convex.GetEnabledMCPConfigs()
-					if convexErr != nil {
-						sendSSEError(c, fmt.Sprintf("Failed to get enabled TOML configs: %v", convexErr))
-						return nil
-					}
-					for _, cfg := range convexConfigs {
-						enabledConfigContents = append(enabledConfigContents, cfg.Content)
-					}
-				} else {
-					// Legacy SQLite path
-					enabledConfigs, storeErr := a.store.GetEnabledTomlConfigs()
-					if storeErr != nil {
-						sendSSEError(c, fmt.Sprintf("Failed to get enabled TOML configs: %v", storeErr))
-						return nil
-					}
-					for _, cfg := range enabledConfigs {
-						enabledConfigContents = append(enabledConfigContents, cfg.Content)
-					}
-				}
-
-				// Parse all enabled configs and build server map
-				serverMap := make(map[string]models.MCPServer)
-				for _, tomlContent := range enabledConfigContents {
-					servers, parseErr := mcp.ParseTOML(tomlContent)
-					if parseErr != nil {
-						continue // Skip invalid configs
-					}
-					for _, server := range servers {
-						serverMap[server.Name] = server
-					}
-				}
-
-				// Log available servers
-				availableServers := make([]string, 0, len(serverMap))
-				for name := range serverMap {
-					availableServers = append(availableServers, name)
-				}
-				log.Printf("[ChatSend] Available servers in TOML configs: %v", availableServers)
-
-				// Filter to only requested MCP servers
-				var mcpServers []models.MCPServer
-				for _, name := range mcpNames {
-					if server, ok := serverMap[name]; ok {
-						mcpServers = append(mcpServers, server)
-					}
-				}
-				log.Printf("[ChatSend] Matched MCP servers: %d", len(mcpServers))
-
-				if len(mcpServers) > 0 {
-					// Build env values from k8s secrets (placeholders resolved at runtime)
-					envValues := map[string]string{}
-
-					var mcpErr error
-					mcpJSON, mcpErr = mcp.GenerateMCPConfig(mcpServers, envValues)
-					if mcpErr != nil {
-						sendSSEError(c, fmt.Sprintf("Failed to generate MCP config: %v", mcpErr))
-						return nil
-					}
-					log.Printf("[ChatSend] Generated MCP JSON (%d bytes)", len(mcpJSON))
-				}
+			var mcpErr error
+			mcpJSON, mcpErr = a.buildMCPJSON(agentConfig.EnabledMCPs)
+			if mcpErr != nil {
+				sendSSEError(c, fmt.Sprintf("Failed to build MCP config: %v", mcpErr))
+				return nil
+			}
+			if mcpJSON != nil {
+				log.Printf("[ChatSend] Generated MCP JSON (%d bytes)", len(mcpJSON))
 			}
 		} else {
 			log.Printf("[ChatSend] No EnabledMCPs configured for agent %s", agentConfig.Name)
 		}
 
-		// Get skill install commands from database (builds MCP config from enabled MCPs)
+		// Get skill install commands
 		var skillInstallCommands []string
 		if agentConfig.EnabledSkills != "" {
-			if a.useConvex() {
-				commands, convexErr := a.convex.GetSkillInstallCommands(agentConfig.EnabledSkills)
-				if convexErr != nil {
-					sendSSEError(c, fmt.Sprintf("Failed to get skill install commands: %v", convexErr))
-					return nil
-				}
-				skillInstallCommands = commands
-			} else {
-				// Legacy SQLite path
-				commands, storeErr := a.store.GetSkillInstallCommands(agentConfig.EnabledSkills)
-				if storeErr != nil {
-					sendSSEError(c, fmt.Sprintf("Failed to get skill install commands: %v", storeErr))
-					return nil
-				}
-				skillInstallCommands = commands
+			commands, convexErr := a.convex.GetSkillInstallCommands(agentConfig.EnabledSkills)
+			if convexErr != nil {
+				sendSSEError(c, fmt.Sprintf("Failed to get skill install commands: %v", convexErr))
+				return nil
 			}
+			skillInstallCommands = commands
 		}
 
-		podName, err = a.k8sClient.GetOrCreateAgentPod(agentConfig, mcpJSON, skillInstallCommands)
-		if err != nil {
-			sendSSEError(c, fmt.Sprintf("Failed to get agent pod: %v", err))
+		var podErr error
+		podName, podErr = a.k8sClient.GetOrCreateAgentPod(agentConfig, mcpJSON, skillInstallCommands)
+		if podErr != nil {
+			sendSSEError(c, fmt.Sprintf("Failed to get agent pod: %v", podErr))
 			return nil
 		}
 	} else if targetPodName != "" {
@@ -865,9 +587,10 @@ func (a *API) ChatSend(c echo.Context) error {
 		podName = targetPodName
 	} else {
 		// Get or create default chat pod
-		podName, err = a.k8sClient.GetOrCreateChatPod()
-		if err != nil {
-			sendSSEError(c, fmt.Sprintf("Failed to get chat pod: %v", err))
+		var podErr error
+		podName, podErr = a.k8sClient.GetOrCreateChatPod()
+		if podErr != nil {
+			sendSSEError(c, fmt.Sprintf("Failed to get chat pod: %v", podErr))
 			return nil
 		}
 	}
@@ -885,15 +608,12 @@ func (a *API) ChatSend(c echo.Context) error {
 
 	// Add agent-specific configuration
 	if agentConfig != nil {
-		// Add system prompt if configured
 		if agentConfig.SystemPrompt != "" {
 			cmd = append(cmd, "--system-prompt", agentConfig.SystemPrompt)
 		}
-		// Add max turns if configured
 		if agentConfig.MaxTurns > 0 {
 			cmd = append(cmd, "--max-turns", fmt.Sprintf("%d", agentConfig.MaxTurns))
 		}
-		// Add allowed tools if configured
 		if agentConfig.AllowedTools != "" {
 			tools := strings.Split(agentConfig.AllowedTools, ",")
 			for _, tool := range tools {
@@ -923,9 +643,9 @@ func (a *API) ChatSend(c echo.Context) error {
 
 	// Start exec in goroutine
 	go func() {
-		err := a.k8sClient.ExecCommand(ctx, podName, cmd, outputChan)
-		if err != nil {
-			outputChan <- fmt.Sprintf("__ERROR__:%v", err)
+		execErr := a.k8sClient.ExecCommand(ctx, podName, cmd, outputChan)
+		if execErr != nil {
+			outputChan <- fmt.Sprintf("__ERROR__:%v", execErr)
 		}
 		close(outputChan)
 	}()
@@ -942,7 +662,7 @@ func (a *API) ChatSend(c echo.Context) error {
 				sendSSEEvent(c, map[string]string{"type": "done"})
 
 				// Save assistant response to Convex
-				if a.useConvex() && convexConversationID != "" && assistantResponse.Len() > 0 {
+				if convexConversationID != "" && assistantResponse.Len() > 0 {
 					a.convex.AddMessage(convexConversationID, &convex.AddMessageRequest{
 						Role:    "assistant",
 						Content: assistantResponse.String(),
@@ -1020,7 +740,7 @@ func sendSSEError(c echo.Context, message string) {
 // --- MCP Endpoints ---
 
 // GetMCPPresets returns the embedded MCP server presets and skills, merged with
-// active servers from user's saved TOML configs in the database.
+// active servers from user's saved TOML configs in Convex.
 // DB servers OVERRIDE embedded presets with the same name.
 func (a *API) GetMCPPresets(c echo.Context) error {
 	presets, err := mcp.LoadPresets()
@@ -1030,12 +750,12 @@ func (a *API) GetMCPPresets(c echo.Context) error {
 		})
 	}
 
-	// Collect all DB servers into a map (DB servers override embedded presets)
-	configs, err := a.store.GetEnabledTomlConfigs()
+	// Collect all enabled config servers into a map (DB servers override embedded presets)
+	convexConfigs, err := a.convex.GetEnabledMCPConfigs()
 	if err == nil {
 		dbServers := make(map[string]mcp.PresetServer)
 
-		for _, tomlConfig := range configs {
+		for _, tomlConfig := range convexConfigs {
 			servers, err := mcp.ParseTOML(tomlConfig.Content)
 			if err != nil {
 				continue // Skip malformed configs
@@ -1067,11 +787,10 @@ func (a *API) GetMCPPresets(c echo.Context) error {
 		// Override embedded presets with DB servers, preserve category for existing ones
 		for i, preset := range presets.Servers {
 			if dbServer, exists := dbServers[preset.Name]; exists {
-				// Keep original category and description if DB doesn't have one
 				if dbServer.Description == "" {
 					dbServer.Description = preset.Description
 				}
-				dbServer.Category = preset.Category // Keep original category
+				dbServer.Category = preset.Category
 				presets.Servers[i] = dbServer
 				delete(dbServers, preset.Name)
 			}
@@ -1122,35 +841,21 @@ func (a *API) ConvertJSONToTOML(c echo.Context) error {
 
 // ListTomlConfigs returns all saved TOML configurations
 func (a *API) ListTomlConfigs(c echo.Context) error {
-	if a.useConvex() {
-		convexConfigs, err := a.convex.ListMCPConfigs()
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to list TOML configs",
-			})
-		}
-		// Convert to models.MCPTomlConfig for compatibility
-		configs := make([]models.MCPTomlConfig, len(convexConfigs))
-		for i, cfg := range convexConfigs {
-			configs[i] = models.MCPTomlConfig{
-				ConvexID:  cfg.ID,
-				Name:      cfg.Name,
-				Content:   cfg.Content,
-				IsDefault: cfg.IsDefault,
-				Enabled:   cfg.Enabled,
-			}
-		}
-		return c.JSON(http.StatusOK, configs)
-	}
-
-	configs, err := a.store.ListTomlConfigs()
+	convexConfigs, err := a.convex.ListMCPConfigs()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to list TOML configs",
 		})
 	}
-	if configs == nil {
-		configs = []models.MCPTomlConfig{}
+	configs := make([]models.MCPTomlConfig, len(convexConfigs))
+	for i, cfg := range convexConfigs {
+		configs[i] = models.MCPTomlConfig{
+			ConvexID:  cfg.ID,
+			Name:      cfg.Name,
+			Content:   cfg.Content,
+			IsDefault: cfg.IsDefault,
+			Enabled:   cfg.Enabled,
+		}
 	}
 	return c.JSON(http.StatusOK, configs)
 }
@@ -1159,29 +864,19 @@ func (a *API) ListTomlConfigs(c echo.Context) error {
 func (a *API) GetTomlConfig(c echo.Context) error {
 	name := c.Param("name")
 
-	if a.useConvex() {
-		cfg, err := a.convex.GetMCPConfigByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "TOML config not found",
-			})
-		}
-		return c.JSON(http.StatusOK, models.MCPTomlConfig{
-			ConvexID:  cfg.ID,
-			Name:      cfg.Name,
-			Content:   cfg.Content,
-			IsDefault: cfg.IsDefault,
-			Enabled:   cfg.Enabled,
-		})
-	}
-
-	config, err := a.store.GetTomlConfig(name)
+	cfg, err := a.convex.GetMCPConfigByName(name)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "TOML config not found",
 		})
 	}
-	return c.JSON(http.StatusOK, config)
+	return c.JSON(http.StatusOK, models.MCPTomlConfig{
+		ConvexID:  cfg.ID,
+		Name:      cfg.Name,
+		Content:   cfg.Content,
+		IsDefault: cfg.IsDefault,
+		Enabled:   cfg.Enabled,
+	})
 }
 
 // CreateTomlConfigRequest is the request body for creating a TOML config
@@ -1205,40 +900,23 @@ func (a *API) CreateTomlConfig(c echo.Context) error {
 		})
 	}
 
-	if a.useConvex() {
-		convexReq := &convex.CreateMCPConfigRequest{
-			Name:    req.Name,
-			Content: req.Content,
-			Enabled: true, // Default to enabled
-		}
-		convexID, err := a.convex.CreateMCPConfig(convexReq)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to create TOML config",
-			})
-		}
-		return c.JSON(http.StatusCreated, models.MCPTomlConfig{
-			ConvexID: convexID,
-			Name:     req.Name,
-			Content:  req.Content,
-			Enabled:  true,
-		})
-	}
-
-	config := &models.MCPTomlConfig{
+	convexReq := &convex.CreateMCPConfigRequest{
 		Name:    req.Name,
 		Content: req.Content,
+		Enabled: true,
 	}
-
-	id, err := a.store.CreateTomlConfig(config)
+	convexID, err := a.convex.CreateMCPConfig(convexReq)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to create TOML config",
 		})
 	}
-
-	config.ID = id
-	return c.JSON(http.StatusCreated, config)
+	return c.JSON(http.StatusCreated, models.MCPTomlConfig{
+		ConvexID: convexID,
+		Name:     req.Name,
+		Content:  req.Content,
+		Enabled:  true,
+	})
 }
 
 // UpdateTomlConfigRequest is the request body for updating a TOML config
@@ -1257,42 +935,29 @@ func (a *API) UpdateTomlConfig(c echo.Context) error {
 		})
 	}
 
-	if a.useConvex() {
-		// Get the config by name to find its ID
-		cfg, err := a.convex.GetMCPConfigByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "TOML config not found",
-			})
-		}
-		// Update via Convex
-		convexReq := &convex.UpdateMCPConfigRequest{
-			Content: req.Content,
-		}
-		if err := a.convex.UpdateMCPConfig(cfg.ID, convexReq); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to update TOML config",
-			})
-		}
-		// Fetch updated config
-		updated, _ := a.convex.GetMCPConfigByName(name)
-		return c.JSON(http.StatusOK, models.MCPTomlConfig{
-			ConvexID:  updated.ID,
-			Name:      updated.Name,
-			Content:   updated.Content,
-			IsDefault: updated.IsDefault,
-			Enabled:   updated.Enabled,
+	cfg, err := a.convex.GetMCPConfigByName(name)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "TOML config not found",
 		})
 	}
 
-	if err := a.store.UpdateTomlConfig(name, req.Content); err != nil {
+	convexReq := &convex.UpdateMCPConfigRequest{
+		Content: req.Content,
+	}
+	if err := a.convex.UpdateMCPConfig(cfg.ID, convexReq); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to update TOML config",
 		})
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"message": "TOML config updated",
+	updated, _ := a.convex.GetMCPConfigByName(name)
+	return c.JSON(http.StatusOK, models.MCPTomlConfig{
+		ConvexID:  updated.ID,
+		Name:      updated.Name,
+		Content:   updated.Content,
+		IsDefault: updated.IsDefault,
+		Enabled:   updated.Enabled,
 	})
 }
 
@@ -1300,28 +965,17 @@ func (a *API) UpdateTomlConfig(c echo.Context) error {
 func (a *API) DeleteTomlConfig(c echo.Context) error {
 	name := c.Param("name")
 
-	if a.useConvex() {
-		// Get the config by name to find its ID
-		cfg, err := a.convex.GetMCPConfigByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "TOML config not found",
-			})
-		}
-		if err := a.convex.DeleteMCPConfig(cfg.ID); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to delete TOML config",
-			})
-		}
-		return c.NoContent(http.StatusNoContent)
+	cfg, err := a.convex.GetMCPConfigByName(name)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "TOML config not found",
+		})
 	}
-
-	if err := a.store.DeleteTomlConfig(name); err != nil {
+	if err := a.convex.DeleteMCPConfig(cfg.ID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to delete TOML config",
 		})
 	}
-
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -1341,30 +995,17 @@ func (a *API) ToggleTomlConfig(c echo.Context) error {
 		})
 	}
 
-	if a.useConvex() {
-		// Get the config by name to find its ID
-		cfg, err := a.convex.GetMCPConfigByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "TOML config not found",
-			})
-		}
-		if err := a.convex.ToggleMCPConfig(cfg.ID, req.Enabled); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to toggle TOML config",
-			})
-		}
-		return c.JSON(http.StatusOK, map[string]string{
-			"message": fmt.Sprintf("Config %s %s", name, map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
+	cfg, err := a.convex.GetMCPConfigByName(name)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "TOML config not found",
 		})
 	}
-
-	if err := a.store.ToggleTomlConfig(name, req.Enabled); err != nil {
+	if err := a.convex.ToggleMCPConfig(cfg.ID, req.Enabled); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to toggle TOML config",
 		})
 	}
-
 	return c.JSON(http.StatusOK, map[string]string{
 		"message": fmt.Sprintf("Config %s %s", name, map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
 	})
@@ -1372,34 +1013,17 @@ func (a *API) ToggleTomlConfig(c echo.Context) error {
 
 // GetActiveServers returns all servers from enabled TOML configs (merged)
 func (a *API) GetActiveServers(c echo.Context) error {
-	var configContents []string
-
-	if a.useConvex() {
-		convexConfigs, err := a.convex.GetEnabledMCPConfigs()
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to get enabled configs",
-			})
-		}
-		for _, cfg := range convexConfigs {
-			configContents = append(configContents, cfg.Content)
-		}
-	} else {
-		configs, err := a.store.GetEnabledTomlConfigs()
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to get enabled configs",
-			})
-		}
-		for _, cfg := range configs {
-			configContents = append(configContents, cfg.Content)
-		}
+	convexConfigs, err := a.convex.GetEnabledMCPConfigs()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": "Failed to get enabled configs",
+		})
 	}
 
 	// Parse all enabled configs and merge servers
 	serverMap := make(map[string]models.MCPServer)
-	for _, content := range configContents {
-		servers, err := mcp.ParseTOML(content)
+	for _, cfg := range convexConfigs {
+		servers, err := mcp.ParseTOML(cfg.Content)
 		if err != nil {
 			continue // Skip invalid configs
 		}
@@ -1451,37 +1075,23 @@ func (a *API) ListGitHubRepos(c echo.Context) error {
 
 // ListSkills returns all skills
 func (a *API) ListSkills(c echo.Context) error {
-	if a.useConvex() {
-		convexSkills, err := a.convex.ListSkills()
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": "Failed to list skills",
-			})
-		}
-		// Convert to models.Skill for compatibility
-		skills := make([]models.Skill, len(convexSkills))
-		for i, s := range convexSkills {
-			skills[i] = models.Skill{
-				ConvexID:       s.ID,
-				Name:           s.Name,
-				InstallCommand: s.InstallCommand,
-				Description:    s.Description,
-				Category:       s.Category,
-				IsBuiltin:      s.IsBuiltin,
-				Enabled:        s.Enabled,
-			}
-		}
-		return c.JSON(http.StatusOK, skills)
-	}
-
-	skills, err := a.store.ListSkills()
+	convexSkills, err := a.convex.ListSkills()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": "Failed to list skills",
 		})
 	}
-	if skills == nil {
-		skills = []models.Skill{}
+	skills := make([]models.Skill, len(convexSkills))
+	for i, s := range convexSkills {
+		skills[i] = models.Skill{
+			ConvexID:       s.ID,
+			Name:           s.Name,
+			InstallCommand: s.InstallCommand,
+			Description:    s.Description,
+			Category:       s.Category,
+			IsBuiltin:      s.IsBuiltin,
+			Enabled:        s.Enabled,
+		}
 	}
 	return c.JSON(http.StatusOK, skills)
 }
@@ -1490,31 +1100,21 @@ func (a *API) ListSkills(c echo.Context) error {
 func (a *API) GetSkill(c echo.Context) error {
 	name := c.Param("name")
 
-	if a.useConvex() {
-		skill, err := a.convex.GetSkillByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Skill not found",
-			})
-		}
-		return c.JSON(http.StatusOK, models.Skill{
-			ConvexID:       skill.ID,
-			Name:           skill.Name,
-			InstallCommand: skill.InstallCommand,
-			Description:    skill.Description,
-			Category:       skill.Category,
-			IsBuiltin:      skill.IsBuiltin,
-			Enabled:        skill.Enabled,
-		})
-	}
-
-	skill, err := a.store.GetSkill(name)
+	skill, err := a.convex.GetSkillByName(name)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Skill not found",
 		})
 	}
-	return c.JSON(http.StatusOK, skill)
+	return c.JSON(http.StatusOK, models.Skill{
+		ConvexID:       skill.ID,
+		Name:           skill.Name,
+		InstallCommand: skill.InstallCommand,
+		Description:    skill.Description,
+		Category:       skill.Category,
+		IsBuiltin:      skill.IsBuiltin,
+		Enabled:        skill.Enabled,
+	})
 }
 
 // CreateSkillRequest is the request body for creating a skill
@@ -1551,33 +1151,7 @@ func (a *API) CreateSkill(c echo.Context) error {
 		category = "other"
 	}
 
-	if a.useConvex() {
-		convexReq := &convex.CreateSkillRequest{
-			Name:           req.Name,
-			InstallCommand: req.InstallCommand,
-			Description:    req.Description,
-			Category:       category,
-			IsBuiltin:      false,
-			Enabled:        true,
-		}
-		convexID, err := a.convex.CreateSkill(convexReq)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to create skill: %v", err),
-			})
-		}
-		return c.JSON(http.StatusCreated, models.Skill{
-			ConvexID:       convexID,
-			Name:           req.Name,
-			InstallCommand: req.InstallCommand,
-			Description:    req.Description,
-			Category:       category,
-			IsBuiltin:      false,
-			Enabled:        true,
-		})
-	}
-
-	skill := &models.Skill{
+	convexReq := &convex.CreateSkillRequest{
 		Name:           req.Name,
 		InstallCommand: req.InstallCommand,
 		Description:    req.Description,
@@ -1585,16 +1159,21 @@ func (a *API) CreateSkill(c echo.Context) error {
 		IsBuiltin:      false,
 		Enabled:        true,
 	}
-
-	id, err := a.store.CreateSkill(skill)
+	convexID, err := a.convex.CreateSkill(convexReq)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create skill",
+			"error": fmt.Sprintf("Failed to create skill: %v", err),
 		})
 	}
-
-	skill.ID = id
-	return c.JSON(http.StatusCreated, skill)
+	return c.JSON(http.StatusCreated, models.Skill{
+		ConvexID:       convexID,
+		Name:           req.Name,
+		InstallCommand: req.InstallCommand,
+		Description:    req.Description,
+		Category:       category,
+		IsBuiltin:      false,
+		Enabled:        true,
+	})
 }
 
 // UpdateSkillRequest is the request body for updating a skill
@@ -1615,96 +1194,41 @@ func (a *API) UpdateSkill(c echo.Context) error {
 		})
 	}
 
-	if a.useConvex() {
-		// Get existing skill to get its ID
-		existing, err := a.convex.GetSkillByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Skill not found",
-			})
-		}
-
-		convexReq := &convex.UpdateSkillRequest{
-			InstallCommand: req.InstallCommand,
-			Description:    req.Description,
-			Category:       req.Category,
-		}
-		if err := a.convex.UpdateSkill(existing.ID, convexReq); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to update skill: %v", err),
-			})
-		}
-
-		// Return updated skill
-		updated, _ := a.convex.GetSkillByName(name)
-		return c.JSON(http.StatusOK, models.Skill{
-			ConvexID:       updated.ID,
-			Name:           updated.Name,
-			InstallCommand: updated.InstallCommand,
-			Description:    updated.Description,
-			Category:       updated.Category,
-			IsBuiltin:      updated.IsBuiltin,
-			Enabled:        updated.Enabled,
-		})
-	}
-
-	// Get existing skill
-	existing, err := a.store.GetSkill(name)
+	existing, err := a.convex.GetSkillByName(name)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Skill not found",
 		})
 	}
 
-	// Update fields
-	if req.InstallCommand != "" {
-		existing.InstallCommand = req.InstallCommand
+	convexReq := &convex.UpdateSkillRequest{
+		InstallCommand: req.InstallCommand,
+		Description:    req.Description,
+		Category:       req.Category,
 	}
-	if req.Description != "" {
-		existing.Description = req.Description
-	}
-	if req.Category != "" {
-		existing.Category = req.Category
-	}
-
-	if err := a.store.UpdateSkill(existing); err != nil {
+	if err := a.convex.UpdateSkill(existing.ID, convexReq); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to update skill",
+			"error": fmt.Sprintf("Failed to update skill: %v", err),
 		})
 	}
 
-	return c.JSON(http.StatusOK, existing)
+	updated, _ := a.convex.GetSkillByName(name)
+	return c.JSON(http.StatusOK, models.Skill{
+		ConvexID:       updated.ID,
+		Name:           updated.Name,
+		InstallCommand: updated.InstallCommand,
+		Description:    updated.Description,
+		Category:       updated.Category,
+		IsBuiltin:      updated.IsBuiltin,
+		Enabled:        updated.Enabled,
+	})
 }
 
 // DeleteSkill deletes a skill
 func (a *API) DeleteSkill(c echo.Context) error {
 	name := c.Param("name")
 
-	if a.useConvex() {
-		// Get skill to check if it's builtin
-		skill, err := a.convex.GetSkillByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Skill not found",
-			})
-		}
-
-		if skill.IsBuiltin {
-			return c.JSON(http.StatusForbidden, map[string]string{
-				"error": "Cannot delete builtin skills",
-			})
-		}
-
-		if err := a.convex.DeleteSkill(skill.ID); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to delete skill: %v", err),
-			})
-		}
-		return c.NoContent(http.StatusNoContent)
-	}
-
-	// Check if skill exists and is not builtin
-	skill, err := a.store.GetSkill(name)
+	skill, err := a.convex.GetSkillByName(name)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"error": "Skill not found",
@@ -1717,12 +1241,11 @@ func (a *API) DeleteSkill(c echo.Context) error {
 		})
 	}
 
-	if err := a.store.DeleteSkill(name); err != nil {
+	if err := a.convex.DeleteSkill(skill.ID); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to delete skill",
+			"error": fmt.Sprintf("Failed to delete skill: %v", err),
 		})
 	}
-
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -1742,28 +1265,16 @@ func (a *API) ToggleSkill(c echo.Context) error {
 		})
 	}
 
-	if a.useConvex() {
-		skill, err := a.convex.GetSkillByName(name)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, map[string]string{
-				"error": "Skill not found",
-			})
-		}
-
-		if err := a.convex.ToggleSkill(skill.ID, req.Enabled); err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": fmt.Sprintf("Failed to toggle skill: %v", err),
-			})
-		}
-
-		return c.JSON(http.StatusOK, map[string]string{
-			"message": fmt.Sprintf("Skill %s %s", name, map[bool]string{true: "enabled", false: "disabled"}[req.Enabled]),
+	skill, err := a.convex.GetSkillByName(name)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{
+			"error": "Skill not found",
 		})
 	}
 
-	if err := a.store.ToggleSkill(name, req.Enabled); err != nil {
+	if err := a.convex.ToggleSkill(skill.ID, req.Enabled); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to toggle skill",
+			"error": fmt.Sprintf("Failed to toggle skill: %v", err),
 		})
 	}
 
