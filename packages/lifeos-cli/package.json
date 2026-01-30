@@ -1,11 +1,11 @@
 {
   "name": "@starascendin/lifeos-cli",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Lightweight CLI for LifeOS — call Convex tools directly from the command line",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "lifeos": "./dist/index.js"
+    "lifeos": "dist/index.js"
   },
   "files": [
     "dist",
