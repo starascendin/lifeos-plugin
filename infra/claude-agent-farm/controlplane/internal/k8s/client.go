@@ -24,7 +24,7 @@ import (
 
 const (
 	agentNamespace = "claude-agents"
-	agentImage     = "ghcr.io/starascendin/claude-agent-farm-agent:latest"
+	agentImage     = "ghcr.io/starascendin/hola-monorepo-agent:latest"
 	credentialsPVC = "claude-credentials"
 	agentPATH      = "/home/node/.opencode/bin:/home/node/.local/bin:/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 )

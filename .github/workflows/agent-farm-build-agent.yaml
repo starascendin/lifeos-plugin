@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: starascendin/claude-agent-farm-agent
+  IMAGE_NAME: ${{ github.repository }}-agent
 
 jobs:
   build:
