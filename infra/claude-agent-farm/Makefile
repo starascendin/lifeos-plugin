@@ -14,10 +14,10 @@ destroy: ## Destroy the cluster
 
 # Agent container
 agent-build: ## Build agent Docker image
-	docker build -t $(GHCR_REPO)/claude-agent:latest ./agent
+	docker build --platform linux/amd64 -t $(GHCR_REPO)/claude-agent-farm-agent:latest ./agent
 
 agent-push: agent-build ## Push agent image to GHCR
-	docker push $(GHCR_REPO)/claude-agent:latest
+	docker push $(GHCR_REPO)/claude-agent-farm-agent:latest
 
 # Control plane
 controlplane-build: ## Build control plane Docker image
