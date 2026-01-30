@@ -313,10 +313,23 @@ func (c *Client) GetOrCreateChatPod() (string, error) {
 					Image:           agentImage,
 					ImagePullPolicy: corev1.PullAlways,
 					Command:         []string{"sleep", "infinity"},
-					Env: []corev1.EnvVar{
-						{Name: "HOME", Value: "/home/node"},
-						{Name: "PATH", Value: agentPATH},
-					},
+					Env: func() []corev1.EnvVar {
+						envs := []corev1.EnvVar{
+							{Name: "HOME", Value: "/home/node"},
+							{Name: "PATH", Value: agentPATH},
+						}
+						// LifeOS CLI env vars
+						if v := os.Getenv("LIFEOS_CONVEX_URL"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "CONVEX_URL", Value: v})
+						}
+						if v := os.Getenv("LIFEOS_USER_ID"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "LIFEOS_USER_ID", Value: v})
+						}
+						if v := os.Getenv("LIFEOS_API_KEY"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "LIFEOS_API_KEY", Value: v})
+						}
+						return envs
+					}(),
 					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
 						Name:      "mcp-config",
 						MountPath: "/home/node/.mcp.json",
@@ -411,10 +424,23 @@ func (c *Client) GetOrCreateCouncilPod() (string, error) {
 					Image:           agentImage,
 					ImagePullPolicy: corev1.PullAlways,
 					Command:         []string{"sleep", "infinity"},
-					Env: []corev1.EnvVar{
-						{Name: "HOME", Value: "/home/node"},
-						{Name: "PATH", Value: agentPATH},
-					},
+					Env: func() []corev1.EnvVar {
+						envs := []corev1.EnvVar{
+							{Name: "HOME", Value: "/home/node"},
+							{Name: "PATH", Value: agentPATH},
+						}
+						// LifeOS CLI env vars
+						if v := os.Getenv("LIFEOS_CONVEX_URL"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "CONVEX_URL", Value: v})
+						}
+						if v := os.Getenv("LIFEOS_USER_ID"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "LIFEOS_USER_ID", Value: v})
+						}
+						if v := os.Getenv("LIFEOS_API_KEY"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "LIFEOS_API_KEY", Value: v})
+						}
+						return envs
+					}(),
 					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
 						Name:      "mcp-config",
 						MountPath: "/home/node/.mcp.json",
@@ -561,6 +587,17 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte,
 			},
 		},
 	})
+
+	// LifeOS CLI env vars
+	if v := os.Getenv("LIFEOS_CONVEX_URL"); v != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: "CONVEX_URL", Value: v})
+	}
+	if v := os.Getenv("LIFEOS_USER_ID"); v != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: "LIFEOS_USER_ID", Value: v})
+	}
+	if v := os.Getenv("LIFEOS_API_KEY"); v != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: "LIFEOS_API_KEY", Value: v})
+	}
 
 	// Add skill install commands (newline-separated shell commands to run)
 	if len(skillInstallCommands) > 0 {

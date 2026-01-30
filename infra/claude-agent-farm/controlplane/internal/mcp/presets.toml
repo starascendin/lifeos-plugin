@@ -57,7 +57,7 @@ install_command = "claude plugin marketplace add max-sixty/worktrunk"
 description = "Git worktree management for parallel AI workflows"
 category = "git"
 
-# LifeOS Skills - workflow slash commands that chain MCP tools
+# LifeOS Skills - workflow slash commands that use lifeos CLI
 # Installed by copying bundled .md files to ~/.claude/commands/
 
 [skills.lifeos-daily-standup]
@@ -104,18 +104,18 @@ category = "lifeos"
 # These are seeded as agent configs on startup (idempotent)
 
 [agents.lifeos-assistant]
-system_prompt = "You are a LifeOS productivity assistant. Use the LifeOS MCP tools to help manage projects, tasks, contacts, meetings, and notes. Always be concise and actionable."
+system_prompt = "You are a LifeOS productivity assistant. Use the lifeos CLI via Bash to manage projects, tasks, contacts, meetings, and notes. Always be concise and actionable."
 task_prompt = ""
-enabled_mcps = "lifeos-prod"
+enabled_mcps = ""
 enabled_skills = "lifeos-daily-standup,lifeos-weekly-review,lifeos-sprint-plan,lifeos-contact-lookup,lifeos-client-brief,lifeos-project-status,lifeos-capture,lifeos-meeting-prep"
 max_turns = 50
-description = "General LifeOS assistant with all MCP tools and workflow skills"
+description = "General LifeOS assistant with CLI tools and workflow skills"
 category = "lifeos"
 
 [agents.lifeos-standup]
 system_prompt = "You are a daily standup agent. When activated, immediately run the daily standup workflow: fetch today's agenda, tasks due, and sprint progress, then present a concise briefing."
 task_prompt = "/daily-standup"
-enabled_mcps = "lifeos-prod"
+enabled_mcps = ""
 enabled_skills = "lifeos-daily-standup"
 max_turns = 10
 description = "Automated daily standup briefing"
@@ -124,7 +124,7 @@ category = "lifeos"
 [agents.lifeos-weekly-review]
 system_prompt = "You are a weekly review agent. When activated, immediately run the weekly review workflow: gather completed work, in-progress items, sprint health, and blockers, then present a structured review."
 task_prompt = "/weekly-review"
-enabled_mcps = "lifeos-prod"
+enabled_mcps = ""
 enabled_skills = "lifeos-weekly-review"
 max_turns = 15
 description = "Automated weekly review report"
@@ -133,7 +133,7 @@ category = "lifeos"
 [agents.lifeos-sprint-planner]
 system_prompt = "You are a sprint planning agent. When activated, review the current sprint state, backlog items, and active projects. Help organize and prioritize work for the sprint. Always ask for confirmation before creating or assigning issues."
 task_prompt = "/sprint-plan"
-enabled_mcps = "lifeos-prod"
+enabled_mcps = ""
 enabled_skills = "lifeos-sprint-plan"
 max_turns = 20
 description = "Sprint planning and backlog grooming"
