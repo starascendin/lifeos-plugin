@@ -15,6 +15,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MarkdownEditor } from "@/components/shared/MarkdownEditor";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
+import { DescriptionEditor } from "@/components/shared/DescriptionEditor";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -225,8 +226,6 @@ function ProjectOverview({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) 
 function PhasesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
   const [showNewPhaseDialog, setShowNewPhaseDialog] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState("");
-  const [editingPhaseId, setEditingPhaseId] = useState<Id<"lifeos_pmPhases"> | null>(null);
-  const [editingDescription, setEditingDescription] = useState("");
 
   const phases = useQuery(api.lifeos.pm_phases.getPhases, { projectId });
   const createPhase = useMutation(api.lifeos.pm_phases.createPhase);
@@ -237,20 +236,6 @@ function PhasesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
     await createPhase({ projectId, name: newPhaseName.trim() });
     setNewPhaseName("");
     setShowNewPhaseDialog(false);
-  };
-
-  const startEditingPhase = (phaseId: Id<"lifeos_pmPhases">, description: string | undefined) => {
-    setEditingPhaseId(phaseId);
-    setEditingDescription(description ?? "");
-  };
-
-  const savePhaseDescription = async () => {
-    if (!editingPhaseId) return;
-    await updatePhase({
-      phaseId: editingPhaseId,
-      description: editingDescription || null,
-    });
-    setEditingPhaseId(null);
   };
 
   return (
@@ -279,48 +264,19 @@ function PhasesTab({ projectId }: { projectId: Id<"lifeos_pmProjects"> }) {
               >
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium">{phase.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={phase.status} />
-                    {editingPhaseId !== phase._id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => startEditingPhase(phase._id, phase.description)}
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
+                  <StatusBadge status={phase.status} />
                 </div>
 
-                {editingPhaseId === phase._id ? (
-                  <div className="space-y-2">
-                    <MarkdownEditor
-                      value={editingDescription}
-                      onChange={setEditingDescription}
-                      placeholder="Phase description..."
-                      minHeight="150px"
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={savePhaseDescription}>
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setEditingPhaseId(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : phase.description ? (
-                  <MarkdownRenderer content={phase.description} />
-                ) : (
-                  <p className="text-muted-foreground text-sm italic">
-                    No description
-                  </p>
-                )}
+                <DescriptionEditor
+                  value={phase.description ?? ""}
+                  onSave={async (value) => {
+                    await updatePhase({
+                      phaseId: phase._id,
+                      description: value || null,
+                    });
+                  }}
+                  placeholder="Click to add description..."
+                />
               </div>
             ))}
           </div>

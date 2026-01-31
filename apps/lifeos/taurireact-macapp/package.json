@@ -25,6 +25,8 @@
     "env:update:preview": "./scripts/update-vercel-env.sh --target preview --file",
     "env:update:production": "./scripts/update-vercel-env.sh --target production --file",
     "cap:ios:add": "npx cap add ios",
+    "cap:ios:dev:sync": "pnpm build && cp capacitor.config.dev.ts capacitor.config.ts && npx cap sync ios && node ./scripts/capacitor-ios-postsync.mjs",
+    "cap:ios:dev:open": "cp capacitor.config.dev.ts capacitor.config.ts && node ./scripts/capacitor-ios-postsync.mjs && npx cap open ios",
     "cap:ios:prod:sync": "pnpm build:production && cp capacitor.config.prod.ts capacitor.config.ts && npx cap sync ios --deployment && node ./scripts/capacitor-ios-postsync.mjs",
     "cap:ios:prod:open": "cp capacitor.config.prod.ts capacitor.config.ts && node ./scripts/capacitor-ios-postsync.mjs && npx cap open ios",
     "cap:ota:build": "pnpm build:production && cd dist && zip -r ../ota-update.zip . && cd .. && echo 'OTA bundle created: ota-update.zip'",
