@@ -5,7 +5,7 @@
       "args": [
         "@starascendin/lifeos-mcp@latest",
         "--url", "https://keen-nightingale-310.convex.site",
-        "--user-id", "ks71yfyekxh6yke35xqtanrzh97zwa24",
+        "--user-id", "ks76a0j1wghbs07hhympkhz3kn80a13q",
         "--api-key", "tool-call-secret-key-2024"
       ]
     },
