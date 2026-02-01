@@ -329,6 +329,10 @@ func (c *Client) GetOrCreateChatPod() (string, error) {
 						if v := os.Getenv("LIFEOS_API_KEY"); v != "" {
 							envs = append(envs, corev1.EnvVar{Name: "LIFEOS_API_KEY", Value: v})
 						}
+						// LLM provider API keys for council/opencode
+						if v := os.Getenv("GOOGLE_API_KEY"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "GOOGLE_API_KEY", Value: v})
+						}
 						return envs
 					}(),
 					VolumeMounts: append(getCredentialVolumeMounts(), corev1.VolumeMount{
@@ -439,6 +443,10 @@ func (c *Client) GetOrCreateCouncilPod() (string, error) {
 						}
 						if v := os.Getenv("LIFEOS_API_KEY"); v != "" {
 							envs = append(envs, corev1.EnvVar{Name: "LIFEOS_API_KEY", Value: v})
+						}
+						// LLM provider API keys for council/opencode
+						if v := os.Getenv("GOOGLE_API_KEY"); v != "" {
+							envs = append(envs, corev1.EnvVar{Name: "GOOGLE_API_KEY", Value: v})
 						}
 						return envs
 					}(),
@@ -599,6 +607,10 @@ func (c *Client) GetOrCreateAgentPod(config *models.AgentConfig, mcpJSON []byte,
 	}
 	if v := os.Getenv("LIFEOS_API_KEY"); v != "" {
 		envVars = append(envVars, corev1.EnvVar{Name: "LIFEOS_API_KEY", Value: v})
+	}
+	// LLM provider API keys for council/opencode
+	if v := os.Getenv("GOOGLE_API_KEY"); v != "" {
+		envVars = append(envVars, corev1.EnvVar{Name: "GOOGLE_API_KEY", Value: v})
 	}
 
 	// Add skill install commands (newline-separated shell commands to run)
