@@ -6,6 +6,7 @@ allowed = [
     "GITHUB_PAT",
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
+    "GOOGLE_API_KEY",
     "NPM_TOKEN",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
@@ -106,6 +107,11 @@ install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/meeting-
 description = "Meeting prep: contact dossier, past meetings, open items"
 category = "lifeos"
 
+[skills.llm-council]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/llm-council.md ~/.claude/commands/llm-council.md"
+description = "LLM Council: multi-model deliberation with peer review and synthesis via opencode"
+category = "council"
+
 # Agent Config Presets
 # These are seeded as agent configs on startup (idempotent)
 
@@ -144,3 +150,12 @@ enabled_skills = "lifeos-cli,lifeos-sprint-plan"
 max_turns = 20
 description = "Sprint planning and backlog grooming"
 category = "lifeos"
+
+[agents.llm-council]
+system_prompt = "You are an LLM council orchestrator. You convene multiple AI models to deliberate on questions, have them peer-review each other's answers, then synthesize the best response. Use the /llm-council skill."
+task_prompt = ""
+enabled_mcps = ""
+enabled_skills = "llm-council"
+max_turns = 30
+description = "LLM Council: multi-model deliberation and synthesis"
+category = "council"

@@ -1320,6 +1320,7 @@ func (a *API) GetEnvVarDefaults(c echo.Context) error {
 		{Name: "GITHUB_PAT", Value: os.Getenv("GITHUB_PAT"), Sensitive: true, Description: "GitHub personal access token"},
 		{Name: "ANTHROPIC_API_KEY", Value: os.Getenv("ANTHROPIC_API_KEY"), Sensitive: true, Description: "Anthropic API key"},
 		{Name: "OPENAI_API_KEY", Value: os.Getenv("OPENAI_API_KEY"), Sensitive: true, Description: "OpenAI API key"},
+		{Name: "GOOGLE_API_KEY", Value: os.Getenv("GOOGLE_API_KEY"), Sensitive: true, Description: "Google AI API key for Gemini models"},
 		{Name: "NPM_TOKEN", Value: os.Getenv("NPM_TOKEN"), Sensitive: true, Description: "NPM authentication token"},
 		{Name: "AWS_ACCESS_KEY_ID", Value: os.Getenv("AWS_ACCESS_KEY_ID"), Sensitive: false, Description: "AWS access key ID"},
 		{Name: "AWS_SECRET_ACCESS_KEY", Value: os.Getenv("AWS_SECRET_ACCESS_KEY"), Sensitive: true, Description: "AWS secret access key"},
