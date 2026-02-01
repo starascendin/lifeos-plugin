@@ -2,6 +2,10 @@ export type ClerkOAuthProvider = "google" | "apple";
 
 export interface ClerkNativeInitializeOptions {
   publishableKey: string;
+  /** Custom OAuth redirect URL (e.g. "lifeos://callback"). Overrides the default bundle-id-based scheme. */
+  redirectUrl?: string;
+  /** Custom callback URL scheme (e.g. "lifeos"). Must match the CFBundleURLSchemes in Info.plist. */
+  callbackUrlScheme?: string;
 }
 
 export interface ClerkNativeSessionInfo {

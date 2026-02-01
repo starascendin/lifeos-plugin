@@ -87,13 +87,18 @@ function updateInfoPlist() {
   );
 
   // Update CFBundleURLName and CFBundleURLSchemes
+  // Dev builds use "lifeos" scheme (Clerk dashboard rejects bundle IDs with dots as URL schemes)
+  // Production builds keep using the APP_ID as the scheme
+  const IS_DEV = APP_ID.endsWith(".dev");
+  const urlScheme = IS_DEV ? "lifeos" : APP_ID;
+
   content = content.replace(
     /<key>CFBundleURLName<\/key>\s*<string>[^<]*<\/string>/,
     `<key>CFBundleURLName</key>\n\t\t\t<string>${APP_ID}</string>`
   );
   content = content.replace(
     /(<key>CFBundleURLSchemes<\/key>\s*<array>\s*)<string>[^<]*<\/string>/,
-    `$1<string>${APP_ID}</string>`
+    `$1<string>${urlScheme}</string>`
   );
 
   if (writeIfChanged(filePath, content)) {

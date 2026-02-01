@@ -57,7 +57,23 @@ public class ClerkNativePlugin: CAPPlugin, CAPBridgedPlugin {
             do {
                 if !self.isConfigured || self.configuredPublishableKey != publishableKey {
                     let clerk = Clerk.shared
-                    clerk.configure(publishableKey: publishableKey)
+
+                    // Use custom redirect config if provided, otherwise fall back to SDK defaults.
+                    let redirectUrl = call.getString("redirectUrl")
+                    let callbackUrlScheme = call.getString("callbackUrlScheme")
+
+                    if let redirectUrl, let callbackUrlScheme {
+                        let settings = Clerk.Settings(
+                            redirectConfig: RedirectConfig(
+                                redirectUrl: redirectUrl,
+                                callbackUrlScheme: callbackUrlScheme
+                            )
+                        )
+                        clerk.configure(publishableKey: publishableKey, settings: settings)
+                    } else {
+                        clerk.configure(publishableKey: publishableKey)
+                    }
+
                     self.isConfigured = true
                     self.configuredPublishableKey = publishableKey
                     self.loadingTask = nil

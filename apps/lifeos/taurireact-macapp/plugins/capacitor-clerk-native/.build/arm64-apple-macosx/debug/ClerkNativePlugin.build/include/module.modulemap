@@ -1,0 +1,3 @@
+module ClerkNativePlugin {
+    header "/Users/bryanliu/Sync/00.Projects/holaai-convexo-monorepo/apps/lifeos/taurireact-macapp/plugins/capacitor-clerk-native/.build/arm64-apple-macosx/debug/ClerkNativePlugin.build/include/ClerkNativePlugin-Swift.h"
+}

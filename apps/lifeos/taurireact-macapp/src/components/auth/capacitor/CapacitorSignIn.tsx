@@ -18,7 +18,11 @@ export function CapacitorSignIn() {
       if (!isCapacitor) throw new Error("Not running in Capacitor");
       if (!publishableKey) throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
 
-      await ClerkNative.initialize({ publishableKey });
+      await ClerkNative.initialize({
+        publishableKey,
+        redirectUrl: "lifeos://callback",
+        callbackUrlScheme: "lifeos",
+      });
 
       const session = await ClerkNative.signInWithOAuth({
         provider: "google",
