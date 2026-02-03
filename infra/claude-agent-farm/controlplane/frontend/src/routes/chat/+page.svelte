@@ -139,7 +139,7 @@
 <div class="flex h-[calc(100vh-56px)] md:h-screen">
 	<!-- Thread History Sidebar -->
 	<Sheet.Root bind:open={showHistory}>
-		<Sheet.Content side="left" class="w-72 p-0">
+		<Sheet.Content side="left" class="w-72 p-0 pt-safe">
 			<div class="flex h-full flex-col">
 				<Sheet.Header class="border-b px-4 py-3">
 					<Sheet.Title>History</Sheet.Title>
