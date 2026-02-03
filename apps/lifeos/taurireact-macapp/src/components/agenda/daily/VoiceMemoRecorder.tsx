@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useAction, useConvex } from "convex/react";
 import { api } from "@holaai/convex";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -63,25 +62,17 @@ function formatRelativeTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString();
 }
 
-// Sync status types
-// - local: recorded in browser, saved to IndexedDB only
-// - cloud: synced to Convex with audio file
-// - synced: exists both locally and in cloud
-// - exported: macOS Voice Memo from Tauri SQLite (local only)
-// - transcript: transcript-only cloud memo (Voice Memo synced without audio)
 type SyncStatus = "local" | "cloud" | "synced" | "exported" | "transcript";
 
-// Runtime memo with object URL for playback
 interface RuntimeVoiceMemo extends StoredVoiceMemo {
-  audioUrl: string; // Object URL created from blob for playback, or empty for exported
-  syncStatus: SyncStatus; // local-only, cloud-only, synced to both, or exported from macOS
-  convexId?: string; // Convex document ID for cloud memos
-  isExported?: boolean; // True if from macOS Voice Memos export
-  exportedMemoId?: number; // ID in Tauri SQLite for exported memos
-  exportedLocalPath?: string | null; // Local file path for exported memos (needs to be loaded via readFile)
+  audioUrl: string;
+  syncStatus: SyncStatus;
+  convexId?: string;
+  isExported?: boolean;
+  exportedMemoId?: number;
+  exportedLocalPath?: string | null;
 }
 
-// Voice memo item with playback
 interface VoiceMemoItemProps {
   memo: RuntimeVoiceMemo;
   onDelete: () => void;
@@ -105,10 +96,8 @@ function VoiceMemoItem({
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Get the audio URL - either pre-loaded or needs async loading for exported memos
   const audioUrl = memo.isExported ? loadedAudioUrl : memo.audioUrl;
 
-  // Load audio for exported memos using Tauri fs plugin
   const loadExportedAudio = async () => {
     if (!memo.exportedLocalPath || loadedAudioUrl || isLoadingAudio || !isTauri) return;
 
@@ -126,7 +115,6 @@ function VoiceMemoItem({
     }
   };
 
-  // Cleanup loaded audio URL on unmount
   useEffect(() => {
     return () => {
       if (loadedAudioUrl) {
@@ -136,10 +124,9 @@ function VoiceMemoItem({
   }, [loadedAudioUrl]);
 
   const handlePlayPause = async () => {
-    // For exported memos, load audio first if not loaded
     if (memo.isExported && !loadedAudioUrl) {
       await loadExportedAudio();
-      return; // Will auto-play after loading via effect
+      return;
     }
 
     if (!audioRef.current) return;
@@ -152,14 +139,12 @@ function VoiceMemoItem({
     setIsPlaying(!isPlaying);
   };
 
-  // Auto-play when audio is first loaded for exported memos
   useEffect(() => {
     if (loadedAudioUrl && audioRef.current && memo.isExported) {
       audioRef.current.play();
     }
   }, [loadedAudioUrl, memo.isExported]);
 
-  // Re-attach event listeners when audioUrl changes (important for exported memos loaded on demand)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -183,9 +168,8 @@ function VoiceMemoItem({
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("play", handlePlay);
     };
-  }, [audioUrl]); // Re-run when audioUrl changes
+  }, [audioUrl]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -196,102 +180,92 @@ function VoiceMemoItem({
 
   const hasTranscript = Boolean(memo.transcript);
 
-  // Render sync status badge
   const renderSyncBadge = () => {
     switch (memo.syncStatus) {
       case "local":
         return (
-          <span className="text-xs px-1.5 py-0.5 bg-muted text-muted-foreground rounded flex items-center gap-1">
-            <HardDrive className="h-3 w-3" />
+          <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded flex items-center gap-0.5">
+            <HardDrive className="h-2.5 w-2.5" />
             Local
           </span>
         );
       case "cloud":
         return (
-          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded flex items-center gap-1">
-            <Cloud className="h-3 w-3" />
+          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded flex items-center gap-0.5">
+            <Cloud className="h-2.5 w-2.5" />
             Cloud
           </span>
         );
       case "synced":
-        // If this is a synced Voice Memo, show "Voice Memo ✓" to maintain the distinction
         if (memo.isExported) {
           return (
-            <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-1">
-              <Smartphone className="h-3 w-3" />
-              Voice Memo
-              <Check className="h-3 w-3" />
+            <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-0.5">
+              <Smartphone className="h-2.5 w-2.5" />
+              <Check className="h-2.5 w-2.5" />
             </span>
           );
         }
         return (
-          <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded flex items-center gap-1">
-            <Check className="h-3 w-3" />
+          <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded flex items-center gap-0.5">
+            <Check className="h-2.5 w-2.5" />
             Synced
           </span>
         );
       case "exported":
         return (
-          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-1">
-            <Smartphone className="h-3 w-3" />
-            Voice Memo
+          <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-0.5">
+            <Smartphone className="h-2.5 w-2.5" />
           </span>
         );
       case "transcript":
-        // Transcript-only cloud memo (Voice Memo synced without audio)
         return (
-          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-1">
-            <FileText className="h-3 w-3" />
-            Voice Memo
+          <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-0.5">
+            <FileText className="h-2.5 w-2.5" />
           </span>
         );
     }
   };
 
   return (
-    <div className="p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
-      {/* Audio element - always render, src may be empty for exported memos until loaded */}
+    <div className="py-2 px-1 rounded-md hover:bg-muted/30 transition-colors">
       <audio ref={audioRef} src={audioUrl || undefined} preload="metadata" />
 
-      <div className="flex items-start gap-3">
-        {/* Play/Pause Button */}
+      <div className="flex items-start gap-2.5">
+        {/* Play/Pause */}
         <Button
           variant="outline"
           size="icon"
-          className="h-10 w-10 shrink-0"
+          className="h-8 w-8 shrink-0"
           onClick={handlePlayPause}
           disabled={
             isLoadingAudio ||
             (memo.isExported && !memo.exportedLocalPath) ||
-            memo.syncStatus === "transcript" // No audio for transcript-only memos
+            memo.syncStatus === "transcript"
           }
-          title={memo.syncStatus === "transcript" ? "No audio available (transcript only)" : undefined}
+          title={memo.syncStatus === "transcript" ? "No audio (transcript only)" : undefined}
         >
           {isLoadingAudio ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : isPlaying ? (
-            <Pause className="h-4 w-4" />
+            <Pause className="h-3.5 w-3.5" />
           ) : (
-            <Play className="h-4 w-4 ml-0.5" />
+            <Play className="h-3.5 w-3.5 ml-0.5" />
           )}
         </Button>
 
-        {/* Memo info */}
+        {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium truncate">{memo.name}</span>
-            <span className="text-xs px-1.5 py-0.5 bg-muted rounded font-mono uppercase">
-              {memo.extension || "webm"}
-            </span>
-            <span className="text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm font-medium truncate">{memo.name}</span>
+            <span className="text-[10px] text-muted-foreground">
               {formatRelativeTime(memo.createdAt)}
             </span>
             {renderSyncBadge()}
           </div>
 
-          {/* Progress bar */}
+          {/* Progress */}
           <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary transition-all"
                 style={{
@@ -299,67 +273,64 @@ function VoiceMemoItem({
                 }}
               />
             </div>
-            <span className="text-xs text-muted-foreground tabular-nums">
+            <span className="text-[10px] text-muted-foreground tabular-nums">
               {formatDuration(isPlaying ? currentTime : memo.duration)}
             </span>
           </div>
 
           {/* Transcript */}
           {hasTranscript && (
-            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
               {memo.transcript}
             </p>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Transcribe button - only for local/synced memos (not exported, not cloud-only) */}
+        <div className="flex items-center gap-0.5 shrink-0">
           {!hasTranscript && !memo.isExported && memo.syncStatus !== "cloud" && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={onTranscribe}
               disabled={isTranscribing}
-              title="Transcribe with GROQ"
+              title="Transcribe"
             >
               {isTranscribing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <FileText className="h-4 w-4" />
+                <FileText className="h-3.5 w-3.5" />
               )}
             </Button>
           )}
 
-          {/* Sync button - only show for local-only memos */}
           {memo.syncStatus === "local" && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={onSync}
               disabled={isSyncing}
               title="Sync to Cloud"
             >
               {isSyncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Cloud className="h-4 w-4" />
+                <Cloud className="h-3.5 w-3.5" />
               )}
             </Button>
           )}
 
-          {/* Delete button - only for local/synced recorded memos (not exported, not cloud-only) */}
           {!memo.isExported && memo.syncStatus !== "cloud" && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={onDelete}
               title="Delete"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>
@@ -369,7 +340,7 @@ function VoiceMemoItem({
 }
 
 interface VoiceMemoRecorderProps {
-  date: string; // YYYY-MM-DD format
+  date: string;
 }
 
 export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
@@ -388,29 +359,17 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  // Track blob URLs to revoke only on unmount or when memos are removed
   const blobUrlsRef = useRef<Map<string, string>>(new Map());
 
-  // API keys for GROQ (from Tauri store for browser transcription)
   const { groqApiKey, hasGroqApiKey } = useApiKeys();
-
-  // GROQ API key from Convex (for Tauri transcription of exported memos)
   const convexGroqApiKey = useQuery(api.lifeos.voicememo.getGroqApiKey, {});
-
-  // Convex client for sync operations
   const convexClient = useConvex();
 
-  // Convex mutations for syncing
   const generateUploadUrl = useMutation(api.lifeos.voicememo.generateUploadUrl);
   const createConvexMemo = useMutation(api.lifeos.voicememo.createMemo);
-
-  // Convex action for server-side transcription (uses GROQ_API_KEY from server)
   const transcribeMemoAction = useAction(api.lifeos.voicememo.transcribeMemo);
-
-  // Fetch cloud memos from Convex
   const cloudMemos = useQuery(api.lifeos.voicememo.getMemosForDate, { date });
 
-  // Load local memos from IndexedDB for the specific date
   const loadLocalMemos = useCallback(async () => {
     setIsLoadingLocal(true);
     try {
@@ -424,7 +383,6 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
   }, [date]);
 
-  // Load exported macOS Voice Memos for the specific date (Tauri only)
   const loadExportedMemos = useCallback(async () => {
     if (!isTauri) {
       setIsLoadingExported(false);
@@ -434,8 +392,6 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setIsLoadingExported(true);
     try {
       const allExported = await getVoiceMemos();
-
-      // Filter by date
       const [year, month, day] = date.split("-").map(Number);
       const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
       const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
@@ -447,24 +403,19 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
       setExportedMemos(filteredExported);
     } catch (err) {
       console.error("Failed to load exported memos:", err);
-      // Don't show error - exported memos are optional
     } finally {
       setIsLoadingExported(false);
     }
   }, [date]);
 
-  // Load local and exported memos when date changes
   useEffect(() => {
     loadLocalMemos();
     loadExportedMemos();
   }, [loadLocalMemos, loadExportedMemos]);
 
-  // Helper to get or create blob URL (reuses existing URLs to prevent revocation issues)
   const getOrCreateBlobUrl = useCallback((memoId: string, blob: Blob): string => {
     const existing = blobUrlsRef.current.get(memoId);
-    if (existing) {
-      return existing;
-    }
+    if (existing) return existing;
     const newUrl = URL.createObjectURL(blob);
     blobUrlsRef.current.set(memoId, newUrl);
     return newUrl;
@@ -477,17 +428,13 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     const processedExportedUuids = new Set<string>();
     const currentMemoIds = new Set<string>();
 
-    // Process local recorded memos first
     for (const localMemo of localMemos) {
       currentMemoIds.add(localMemo.id);
-
-      // Check if this local memo exists in cloud
       const cloudMatch = cloudMemos?.find(
         (cm) => cm.localId === localMemo.id || cm._id === localMemo.convexMemoId
       );
 
       if (cloudMatch) {
-        // Memo exists in both - mark as synced
         processedLocalIds.add(cloudMatch.localId);
         mergedMemos.push({
           ...localMemo,
@@ -496,12 +443,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           convexId: cloudMatch._id,
           syncedToConvex: true,
           convexMemoId: cloudMatch._id,
-          // Use cloud transcript if available (it may have server-side transcription)
           transcript: cloudMatch.transcript ?? localMemo.transcript,
           transcriptLanguage: cloudMatch.language ?? localMemo.transcriptLanguage,
         });
       } else {
-        // Local only
         mergedMemos.push({
           ...localMemo,
           audioUrl: getOrCreateBlobUrl(localMemo.id, localMemo.audioBlob),
@@ -510,45 +455,32 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
       }
     }
 
-    // Add cloud-only memos (not in local storage)
     if (cloudMemos) {
       for (const cloudMemo of cloudMemos) {
         if (!processedLocalIds.has(cloudMemo.localId)) {
-          // Check if we have this locally by convexMemoId
           const hasLocal = localMemos.some(
             (lm) => lm.id === cloudMemo.localId || lm.convexMemoId === cloudMemo._id
           );
-
-          // Check if this is an exported memo that was synced to cloud (Tauri only)
           const isExportedInCloud = exportedMemos.some(
             (em) => em.uuid === cloudMemo.localId
           );
-
-          // Track exported memos that are in cloud
           if (isExportedInCloud) {
             processedExportedUuids.add(cloudMemo.localId);
           }
+          if (hasLocal || isExportedInCloud) continue;
 
-          // Skip if we have this locally (will be shown from local/exported memos)
-          if (hasLocal || isExportedInCloud) {
-            continue;
-          }
-
-          // Determine if this is a transcript-only memo (Voice Memo synced without audio)
           const isTranscriptOnly = !cloudMemo.audioUrl;
-
-          // Add cloud memo - either with audio URL or transcript-only
           mergedMemos.push({
             id: cloudMemo.localId,
             name: cloudMemo.name,
-            audioBlob: new Blob(), // Empty blob for cloud-only
+            audioBlob: new Blob(),
             mimeType: isTranscriptOnly ? "audio/m4a" : "audio/webm",
             extension: isTranscriptOnly ? "m4a" : "webm",
-            duration: cloudMemo.duration / 1000, // Convert from ms to seconds
+            duration: cloudMemo.duration / 1000,
             createdAt: cloudMemo.clientCreatedAt,
             transcript: cloudMemo.transcript,
             transcriptLanguage: cloudMemo.language,
-            audioUrl: cloudMemo.audioUrl || "", // Empty for transcript-only
+            audioUrl: cloudMemo.audioUrl || "",
             syncStatus: isTranscriptOnly ? "transcript" : "cloud",
             convexId: cloudMemo._id,
             syncedToConvex: true,
@@ -558,24 +490,20 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
       }
     }
 
-    // Add exported macOS Voice Memos
     for (const exportedMemo of exportedMemos) {
-      // Check if already processed (synced to cloud)
       const cloudMatch = cloudMemos?.find((cm) => cm.localId === exportedMemo.uuid);
-
-      // Only include exported memos that have a local audio file
       if (exportedMemo.local_path) {
         mergedMemos.push({
           id: exportedMemo.uuid,
           name: getMemoDisplayName(exportedMemo),
-          audioBlob: new Blob(), // No blob for exported memos
+          audioBlob: new Blob(),
           mimeType: "audio/m4a",
           extension: "m4a",
           duration: exportedMemo.duration,
           createdAt: exportedMemo.date,
           transcript: exportedMemo.transcription ?? undefined,
           transcriptLanguage: exportedMemo.transcription_language ?? undefined,
-          audioUrl: "", // Will be loaded on demand via readFile
+          audioUrl: "",
           syncStatus: cloudMatch ? "synced" : "exported",
           isExported: true,
           exportedMemoId: exportedMemo.id,
@@ -586,15 +514,11 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
       }
     }
 
-    // Sort by createdAt descending
     mergedMemos.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Clean up blob URLs for memos that are no longer in the list
     const urlsToRevoke: string[] = [];
     blobUrlsRef.current.forEach((url, id) => {
-      if (!currentMemoIds.has(id)) {
-        urlsToRevoke.push(id);
-      }
+      if (!currentMemoIds.has(id)) urlsToRevoke.push(id);
     });
     for (const id of urlsToRevoke) {
       const url = blobUrlsRef.current.get(id);
@@ -609,15 +533,12 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
 
   const isLoading = isLoadingLocal || isLoadingExported || cloudMemos === undefined;
 
-  // Get supported MIME type for recording - prefer Opus for best compression
   const getSupportedMimeType = (): { mimeType: string; extension: string } => {
-    // Priority order: Opus > AAC for speech compression efficiency
-    // webm+opus typically 30-50% smaller than m4a at same quality
     const types: Array<{ mime: string; ext: string }> = [
       { mime: "audio/webm;codecs=opus", ext: "webm" },
       { mime: "audio/ogg;codecs=opus", ext: "ogg" },
       { mime: "audio/webm", ext: "webm" },
-      { mime: "audio/mp4", ext: "m4a" }, // Fallback for Safari
+      { mime: "audio/mp4", ext: "m4a" },
     ];
     for (const { mime, ext } of types) {
       if (MediaRecorder.isTypeSupported(mime)) {
@@ -627,46 +548,36 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     return { mimeType: "", extension: "webm" };
   };
 
-  // Ref to store the current recording format info
   const recordingFormatRef = useRef<{ mimeType: string; extension: string }>({
     mimeType: "",
     extension: "webm",
   });
 
-  // Start recording using Web API
   const startWebRecording = async () => {
     try {
-      // Check/request macOS microphone permission in Tauri before getUserMedia
       if (isTauri) {
         try {
           const { checkMicrophonePermission, requestMicrophonePermission } =
             await import("tauri-plugin-macos-permissions-api");
-
           const hasPermission = await checkMicrophonePermission();
           if (!hasPermission) {
             const granted = await requestMicrophonePermission();
             if (!granted) {
-              setError(
-                "Microphone access denied. Please allow in System Preferences > Privacy & Security > Microphone."
-              );
+              setError("Microphone access denied.");
               return;
             }
           }
         } catch (pluginError) {
           console.warn("Could not check macOS permissions:", pluginError);
-          // Continue anyway - the getUserMedia call will handle the error
         }
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
       const format = getSupportedMimeType();
       recordingFormatRef.current = format;
-      // Use 48kbps for speech - Opus handles this very well
-      // This produces ~360KB per minute vs ~960KB at default bitrate
       const options: MediaRecorderOptions = {
         ...(format.mimeType ? { mimeType: format.mimeType } : {}),
-        audioBitsPerSecond: 48000, // 48 kbps - excellent for speech
+        audioBitsPerSecond: 48000,
       };
 
       const mediaRecorder = new MediaRecorder(stream, options);
@@ -674,12 +585,10 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
-      mediaRecorder.start(100); // Collect data more frequently for smoother recording
+      mediaRecorder.start(100);
       setIsRecording(true);
       setError(null);
 
@@ -687,12 +596,11 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
         setRecordingDuration((prev) => prev + 1);
       }, 1000);
     } catch (err) {
-      setError("Failed to access microphone. Please check permissions.");
+      setError("Failed to access microphone.");
       console.error("Recording error:", err);
     }
   };
 
-  // Stop recording and return the audio blob
   const stopWebRecording = async (): Promise<{
     blob: Blob;
     duration: number;
@@ -707,23 +615,15 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
 
     return new Promise((resolve) => {
       const mediaRecorder = mediaRecorderRef.current!;
-
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, {
           type: mimeType || "audio/webm",
         });
         mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-        resolve({
-          blob: audioBlob,
-          duration,
-          mimeType: mimeType || "audio/webm",
-          extension: extension || "webm",
-        });
+        resolve({ blob: audioBlob, duration, mimeType: mimeType || "audio/webm", extension: extension || "webm" });
       };
-
       mediaRecorder.stop();
       setIsRecording(false);
-
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -731,7 +631,6 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     });
   };
 
-  // Helper to check if a timestamp falls on the currently viewed date
   const isOnViewedDate = useCallback(
     (timestamp: number): boolean => {
       const [year, month, day] = date.split("-").map(Number);
@@ -742,80 +641,52 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     [date]
   );
 
-  // Auto-sync a memo to cloud and trigger server-side transcription
   const autoSyncMemo = async (memo: StoredVoiceMemo) => {
     try {
       setSyncingId(memo.id);
-
-      // Get upload URL from Convex
       const uploadUrl = await generateUploadUrl();
-
-      // Upload the audio file
       const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
         headers: { "Content-Type": memo.mimeType || "audio/webm" },
         body: memo.audioBlob,
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.status}`);
-      }
+      if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
       const uploadResult = await uploadResponse.json();
       const storageId = uploadResult.storageId;
+      if (!storageId) throw new Error("No storageId returned from upload");
 
-      if (!storageId) {
-        throw new Error("No storageId returned from upload");
-      }
-
-      // Create memo record in Convex
       const convexMemoId = await createConvexMemo({
         localId: memo.id,
         name: memo.name,
         storageId,
-        duration: memo.duration * 1000, // Convert to ms for Convex
+        duration: memo.duration * 1000,
         clientCreatedAt: memo.createdAt,
         clientUpdatedAt: Date.now(),
       });
 
-      // Update IndexedDB with sync status
-      await updateMemo(memo.id, {
-        syncedToConvex: true,
-        convexMemoId: String(convexMemoId),
-      });
+      await updateMemo(memo.id, { syncedToConvex: true, convexMemoId: String(convexMemoId) });
 
-      // Update local memos state to trigger re-merge
       setLocalMemos((prev) =>
         prev.map((m) =>
-          m.id === memo.id
-            ? { ...m, syncedToConvex: true, convexMemoId: String(convexMemoId) }
-            : m
+          m.id === memo.id ? { ...m, syncedToConvex: true, convexMemoId: String(convexMemoId) } : m
         )
       );
 
-      // Trigger server-side transcription with Groq (fire and forget)
-      // The transcription result will be available via the cloudMemos query
       transcribeMemoAction({ memoId: convexMemoId })
         .then((result) => {
-          if (result.success) {
-            console.log("Auto-transcription completed:", result.transcript?.slice(0, 100));
-          } else {
-            console.warn("Auto-transcription failed:", result.error);
-          }
+          if (result.success) console.log("Auto-transcription completed:", result.transcript?.slice(0, 100));
+          else console.warn("Auto-transcription failed:", result.error);
         })
-        .catch((err) => {
-          console.warn("Auto-transcription error:", err);
-        });
+        .catch((err) => console.warn("Auto-transcription error:", err));
     } catch (err) {
       console.error("Auto-sync failed:", err);
-      // Don't show error - auto-sync is best-effort
-      // User can manually sync later if needed
     } finally {
       setSyncingId(null);
     }
   };
 
-  // Handle record button click
   const handleRecordClick = async () => {
     if (isRecording) {
       setIsSaving(true);
@@ -824,7 +695,6 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
         if (result && result.duration > 0) {
           const { blob, duration, mimeType, extension } = result;
           const now = Date.now();
-
           const storedMemo: StoredVoiceMemo = {
             id: `voice_${now}`,
             name: `Voice Note ${new Date(now).toLocaleTimeString()}`,
@@ -834,16 +704,8 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
             duration,
             createdAt: now,
           };
-
-          // Save to IndexedDB
           await saveMemo(storedMemo);
-
-          // Update local memos state (will be merged with cloud memos)
-          if (isOnViewedDate(now)) {
-            setLocalMemos((prev) => [storedMemo, ...prev]);
-          }
-
-          // Auto-sync to cloud in the background
+          if (isOnViewedDate(now)) setLocalMemos((prev) => [storedMemo, ...prev]);
           autoSyncMemo(storedMemo);
         }
       } catch (err) {
@@ -858,27 +720,18 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
   };
 
-  // Handle delete
   const handleDelete = async (memoId: string) => {
     try {
       const memo = memos.find((m) => m.id === memoId);
       if (!memo) return;
-
-      // Revoke the blob URL from our ref (only for local memos)
       if (memo.syncStatus !== "cloud") {
         const blobUrl = blobUrlsRef.current.get(memoId);
         if (blobUrl) {
           URL.revokeObjectURL(blobUrl);
           blobUrlsRef.current.delete(memoId);
         }
-      }
-
-      // Delete from IndexedDB (only if local)
-      if (memo.syncStatus !== "cloud") {
         await deleteStoredMemo(memoId);
       }
-
-      // Remove from local memos state
       setLocalMemos((prev) => prev.filter((m) => m.id !== memoId));
     } catch (err) {
       console.error("Failed to delete memo:", err);
@@ -886,56 +739,30 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
   };
 
-  // Handle transcription
   const handleTranscribe = async (memoId: string) => {
     const memo = memos.find((m) => m.id === memoId);
-    if (!memo || memo.syncStatus === "cloud") return; // Can't transcribe cloud-only memos locally
+    if (!memo || memo.syncStatus === "cloud") return;
 
     setTranscribingId(memoId);
     setError(null);
 
     try {
       if (memo.isExported && memo.exportedMemoId) {
-        // Use Tauri backend for exported macOS Voice Memos
-        if (!convexGroqApiKey) {
-          throw new Error("GROQ API key not configured. Please set GROQ_API_KEY in Convex environment.");
-        }
+        if (!convexGroqApiKey) throw new Error("GROQ API key not configured.");
         const result = await transcribeExportedMemo(memo.exportedMemoId, convexGroqApiKey);
-
-        if (!result.success) {
-          throw new Error(result.error || "Transcription failed");
-        }
-
-        // Reload exported memos to get the updated transcription
+        if (!result.success) throw new Error(result.error || "Transcription failed");
         await loadExportedMemos();
       } else {
-        // Use browser-based transcription for local recorded memos
         if (!hasGroqApiKey || !groqApiKey) {
-          setError("GROQ API key not configured. Please set it in Settings > API Keys.");
+          setError("GROQ API key not configured.");
           return;
         }
-
         const filename = `audio.${getExtensionFromMimeType(memo.mimeType)}`;
         const result = await transcribeAudio(memo.audioBlob, groqApiKey, filename);
-
-        // Update IndexedDB
-        await updateMemo(memoId, {
-          transcript: result.text,
-          transcriptLanguage: result.language,
-          transcribedAt: Date.now(),
-        });
-
-        // Update local memos state
+        await updateMemo(memoId, { transcript: result.text, transcriptLanguage: result.language, transcribedAt: Date.now() });
         setLocalMemos((prev) =>
           prev.map((m) =>
-            m.id === memoId
-              ? {
-                  ...m,
-                  transcript: result.text,
-                  transcriptLanguage: result.language,
-                  transcribedAt: Date.now(),
-                }
-              : m
+            m.id === memoId ? { ...m, transcript: result.text, transcriptLanguage: result.language, transcribedAt: Date.now() } : m
           )
         );
       }
@@ -947,7 +774,6 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
   };
 
-  // Handle sync to Convex (manual sync button)
   const handleSync = async (memoId: string) => {
     const memo = memos.find((m) => m.id === memoId);
     if (!memo || memo.syncStatus !== "local") return;
@@ -956,101 +782,63 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setError(null);
 
     try {
-      // Get upload URL from Convex
       const uploadUrl = await generateUploadUrl();
-
-      // Upload the audio file with proper content type
       const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": memo.mimeType || "audio/webm",
-        },
+        headers: { "Content-Type": memo.mimeType || "audio/webm" },
         body: memo.audioBlob,
       });
 
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        throw new Error(`Upload failed: ${uploadResponse.status} - ${errorText}`);
-      }
+      if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
       const uploadResult = await uploadResponse.json();
       const storageId = uploadResult.storageId;
+      if (!storageId) throw new Error("No storageId returned");
 
-      if (!storageId) {
-        throw new Error("No storageId returned from upload");
-      }
-
-      // Create memo record in Convex
       const convexMemoId = await createConvexMemo({
         localId: memo.id,
         name: memo.name,
         storageId,
-        duration: memo.duration * 1000, // Convert to ms for Convex
+        duration: memo.duration * 1000,
         clientCreatedAt: memo.createdAt,
         clientUpdatedAt: Date.now(),
       });
 
-      // Update IndexedDB
-      await updateMemo(memoId, {
-        syncedToConvex: true,
-        convexMemoId: String(convexMemoId),
-      });
-
-      // Update local memos state
+      await updateMemo(memoId, { syncedToConvex: true, convexMemoId: String(convexMemoId) });
       setLocalMemos((prev) =>
         prev.map((m) =>
-          m.id === memoId
-            ? {
-                ...m,
-                syncedToConvex: true,
-                convexMemoId: String(convexMemoId),
-              }
-            : m
+          m.id === memoId ? { ...m, syncedToConvex: true, convexMemoId: String(convexMemoId) } : m
         )
       );
 
-      // Trigger server-side transcription with Groq (fire and forget)
-      transcribeMemoAction({ memoId: convexMemoId })
-        .then((result) => {
-          if (result.success) {
-            console.log("Transcription completed:", result.transcript?.slice(0, 100));
-          } else {
-            console.warn("Transcription failed:", result.error);
-          }
-        })
-        .catch((err) => {
-          console.warn("Transcription error:", err);
-        });
+      transcribeMemoAction({ memoId: convexMemoId }).catch((err) =>
+        console.warn(`Auto-transcription failed for ${memo.name}:`, err)
+      );
     } catch (err) {
       console.error("Sync failed:", err);
-      setError(err instanceof Error ? err.message : "Sync to Convex failed");
+      setError(err instanceof Error ? err.message : "Sync failed");
     } finally {
       setSyncingId(null);
     }
   };
 
-  // Handle transcribe all (local memos without transcripts)
+  // Bulk actions state
   const [isTranscribingAll, setIsTranscribingAll] = useState(false);
-  const [transcribeProgress, setTranscribeProgress] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
+  const [transcribeProgress, setTranscribeProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isSyncingToCloud, setIsSyncingToCloud] = useState(false);
+  const [cloudSyncProgress, setCloudSyncProgress] = useState<ConvexSyncProgress | null>(null);
 
   const handleTranscribeAll = async () => {
-    // Only transcribe memos that need it (not cloud-only, no transcript yet)
-    const memosToTranscribe = memos.filter(
-      (m) => !m.transcript && m.syncStatus !== "cloud"
-    );
+    const memosToTranscribe = memos.filter((m) => !m.transcript && m.syncStatus !== "cloud");
     if (memosToTranscribe.length === 0) return;
 
-    // Split into exported and local recorded memos
     const exportedMemos = memosToTranscribe.filter((m) => m.isExported && m.exportedMemoId);
     const localRecordedMemos = memosToTranscribe.filter((m) => !m.isExported);
 
-    // Check API key only if we have local recorded memos to transcribe
     if (localRecordedMemos.length > 0 && (!hasGroqApiKey || !groqApiKey)) {
-      setError("GROQ API key not configured. Please set it in Settings > API Keys.");
-      // Still continue with exported memos if any
+      setError("GROQ API key not configured.");
       if (exportedMemos.length === 0) return;
     }
 
@@ -1061,31 +849,21 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setTranscribeProgress({ current: 0, total });
     setError(null);
 
-    // Transcribe exported memos using Tauri backend
     for (const memo of exportedMemos) {
       try {
         current++;
         setTranscribeProgress({ current, total });
         setTranscribingId(memo.id);
-        if (!convexGroqApiKey) {
-          console.error(`Failed to transcribe ${memo.name}: GROQ API key not configured`);
-          continue;
-        }
+        if (!convexGroqApiKey) { console.error(`Failed: GROQ key missing`); continue; }
         const result = await transcribeExportedMemo(memo.exportedMemoId!, convexGroqApiKey);
-        if (!result.success) {
-          console.error(`Failed to transcribe ${memo.name}:`, result.error);
-        }
+        if (!result.success) console.error(`Failed to transcribe ${memo.name}:`, result.error);
       } catch (err) {
         console.error(`Failed to transcribe ${memo.name}:`, err);
       }
     }
 
-    // Reload exported memos if any were transcribed
-    if (exportedMemos.length > 0) {
-      await loadExportedMemos();
-    }
+    if (exportedMemos.length > 0) await loadExportedMemos();
 
-    // Transcribe local recorded memos using browser-based transcription
     if (hasGroqApiKey && groqApiKey) {
       for (const memo of localRecordedMemos) {
         try {
@@ -1094,28 +872,14 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           setTranscribingId(memo.id);
           const filename = `audio.${memo.extension || "webm"}`;
           const result = await transcribeAudio(memo.audioBlob, groqApiKey, filename);
-
-          await updateMemo(memo.id, {
-            transcript: result.text,
-            transcriptLanguage: result.language,
-            transcribedAt: Date.now(),
-          });
-
+          await updateMemo(memo.id, { transcript: result.text, transcriptLanguage: result.language, transcribedAt: Date.now() });
           setLocalMemos((prev) =>
             prev.map((m) =>
-              m.id === memo.id
-                ? {
-                    ...m,
-                    transcript: result.text,
-                    transcriptLanguage: result.language,
-                    transcribedAt: Date.now(),
-                  }
-                : m
+              m.id === memo.id ? { ...m, transcript: result.text, transcriptLanguage: result.language, transcribedAt: Date.now() } : m
             )
           );
         } catch (err) {
           console.error(`Failed to transcribe ${memo.name}:`, err);
-          // Continue with next memo
         }
       }
     }
@@ -1124,17 +888,6 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setTranscribeProgress(null);
     setIsTranscribingAll(false);
   };
-
-  // Handle sync all (local-only memos)
-  const [isSyncingAll, setIsSyncingAll] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
-
-  // Handle cloud sync for transcribed Voice Memos (transcript only)
-  const [isSyncingToCloud, setIsSyncingToCloud] = useState(false);
-  const [cloudSyncProgress, setCloudSyncProgress] = useState<ConvexSyncProgress | null>(null);
 
   const handleSyncAll = async () => {
     const memosToSync = memos.filter((m) => m.syncStatus === "local");
@@ -1159,47 +912,33 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           headers: { "Content-Type": memo.mimeType || "audio/webm" },
           body: memo.audioBlob,
         });
-
-        if (!uploadResponse.ok) {
-          throw new Error(`Upload failed: ${uploadResponse.status}`);
-        }
+        if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
         const uploadResult = await uploadResponse.json();
         const storageId = uploadResult.storageId;
-
-        if (!storageId) {
-          throw new Error("No storageId returned");
-        }
+        if (!storageId) throw new Error("No storageId returned");
 
         const convexMemoId = await createConvexMemo({
           localId: memo.id,
           name: memo.name,
           storageId,
-          duration: memo.duration * 1000, // Convert to ms for Convex
+          duration: memo.duration * 1000,
           clientCreatedAt: memo.createdAt,
           clientUpdatedAt: Date.now(),
         });
 
-        await updateMemo(memo.id, {
-          syncedToConvex: true,
-          convexMemoId: String(convexMemoId),
-        });
-
+        await updateMemo(memo.id, { syncedToConvex: true, convexMemoId: String(convexMemoId) });
         setLocalMemos((prev) =>
           prev.map((m) =>
-            m.id === memo.id
-              ? { ...m, syncedToConvex: true, convexMemoId: String(convexMemoId) }
-              : m
+            m.id === memo.id ? { ...m, syncedToConvex: true, convexMemoId: String(convexMemoId) } : m
           )
         );
 
-        // Trigger server-side transcription (fire and forget)
-        transcribeMemoAction({ memoId: convexMemoId }).catch((err) => {
-          console.warn(`Auto-transcription failed for ${memo.name}:`, err);
-        });
+        transcribeMemoAction({ memoId: convexMemoId }).catch((err) =>
+          console.warn(`Auto-transcription failed for ${memo.name}:`, err)
+        );
       } catch (err) {
         console.error(`Failed to sync ${memo.name}:`, err);
-        // Continue with next memo
       }
     }
 
@@ -1208,27 +947,16 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     setIsSyncingAll(false);
   };
 
-  // Handle cloud sync for transcribed Voice Memos (transcript only, no audio)
   const handleSyncTranscriptsToCloud = async () => {
-    if (!isTauri) {
-      setError("Cloud sync is only available in the Tauri app");
-      return;
-    }
-
+    if (!isTauri) { setError("Cloud sync is only available in the Tauri app"); return; }
     setIsSyncingToCloud(true);
     setError(null);
-
     try {
       const result = await syncTranscriptsToConvex(convexClient, (progress) => {
         setCloudSyncProgress(progress);
       });
-
-      if (result.error) {
-        setError(result.error);
-      } else {
-        // Reload exported memos to update sync status badges
-        await loadExportedMemos();
-      }
+      if (result.error) setError(result.error);
+      else await loadExportedMemos();
     } catch (err) {
       console.error("Cloud sync failed:", err);
       setError(err instanceof Error ? err.message : "Cloud sync failed");
@@ -1238,189 +966,146 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
     }
   };
 
-  // Count memos needing actions (only local memos)
-  const memosNeedingTranscription = memos.filter(
-    (m) => !m.transcript && m.syncStatus !== "cloud"
-  ).length;
+  const memosNeedingTranscription = memos.filter((m) => !m.transcript && m.syncStatus !== "cloud").length;
   const memosNeedingSync = memos.filter((m) => m.syncStatus === "local").length;
-  // Count transcribed Voice Memos that need cloud sync (exported with transcript but not synced)
-  const memosNeedingCloudSync = memos.filter(
-    (m) => m.isExported && m.transcript && m.syncStatus === "exported"
-  ).length;
+  const memosNeedingCloudSync = memos.filter((m) => m.isExported && m.transcript && m.syncStatus === "exported").length;
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
       if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stream
-          .getTracks()
-          .forEach((track) => track.stop());
+        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
       }
-      // Revoke all blob URLs
-      blobUrlsRef.current.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       blobUrlsRef.current.clear();
     };
   }, []);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Mic className="h-5 w-5" />
-            Voice Notes
-          </CardTitle>
-
-          {/* Record and bulk action buttons */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant={isRecording ? "destructive" : "default"}
-              size="sm"
-              onClick={handleRecordClick}
-              disabled={isSaving}
-              className="gap-1.5"
-            >
-              {isSaving ? (
-                <>Saving...</>
-              ) : isRecording ? (
-                <>
-                  <Square className="h-3.5 w-3.5" />
-                  Stop ({formatDuration(recordingDuration)})
-                </>
-              ) : (
-                <>
-                  <Mic className="h-3.5 w-3.5" />
-                  Record
-                </>
-              )}
-            </Button>
-
-            {memosNeedingTranscription > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTranscribeAll}
-                disabled={isTranscribingAll}
-                className="gap-1.5"
-              >
-                {isTranscribingAll ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    {transcribeProgress
-                      ? `${transcribeProgress.current}/${transcribeProgress.total}`
-                      : "..."}
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-3.5 w-3.5" />
-                    Transcribe ({memosNeedingTranscription})
-                  </>
-                )}
-              </Button>
-            )}
-
-            {memosNeedingSync > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncAll}
-                disabled={isSyncingAll}
-                className="gap-1.5"
-              >
-                {isSyncingAll ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    {syncProgress
-                      ? `${syncProgress.current}/${syncProgress.total}`
-                      : "..."}
-                  </>
-                ) : (
-                  <>
-                    <Cloud className="h-3.5 w-3.5" />
-                    Sync ({memosNeedingSync})
-                  </>
-                )}
-              </Button>
-            )}
-
-            {/* Cloud sync for transcribed Voice Memos (Tauri only) */}
-            {isTauri && memosNeedingCloudSync > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncTranscriptsToCloud}
-                disabled={isSyncingToCloud}
-                className="gap-1.5"
-              >
-                {isSyncingToCloud ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    {cloudSyncProgress
-                      ? `${cloudSyncProgress.current}/${cloudSyncProgress.total}`
-                      : "..."}
-                  </>
-                ) : (
-                  <>
-                    <Cloud className="h-3.5 w-3.5" />
-                    Cloud ({memosNeedingCloudSync})
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {isRecording && (
-          <div className="flex items-center gap-2 mt-2">
-            <div className="h-2.5 w-2.5 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-xs text-muted-foreground">Recording...</span>
-          </div>
+    <div className="rounded-lg border bg-card/50 p-3">
+      {/* Section header */}
+      <div className="flex items-center gap-2 mb-2">
+        <Mic className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-medium">Voice Notes</h3>
+        {memos.length > 0 && (
+          <span className="text-xs text-muted-foreground">
+            ({memos.length})
+          </span>
         )}
-      </CardHeader>
-      <CardContent className="pt-0 space-y-4">
-        {error && (
-          <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
-            {error}
-          </div>
-        )}
+      </div>
 
-        {/* Memos list */}
-        <div className="space-y-2">
-          {isLoading ? (
+      {/* Actions bar */}
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <Button
+          variant={isRecording ? "destructive" : "default"}
+          size="sm"
+          onClick={handleRecordClick}
+          disabled={isSaving}
+          className="h-7 gap-1.5 text-xs"
+        >
+          {isSaving ? (
+            <>Saving...</>
+          ) : isRecording ? (
             <>
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
+              <Square className="h-3 w-3" />
+              Stop ({formatDuration(recordingDuration)})
             </>
-          ) : memos.length > 0 ? (
-            memos.map((memo) => (
-              <VoiceMemoItem
-                key={memo.id}
-                memo={memo}
-                onDelete={() => handleDelete(memo.id)}
-                onTranscribe={() => handleTranscribe(memo.id)}
-                onSync={() => handleSync(memo.id)}
-                isTranscribing={transcribingId === memo.id}
-                isSyncing={syncingId === memo.id}
-              />
-            ))
           ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No voice notes yet</p>
-              <p className="text-xs mt-1">Record a quick note to get started</p>
-            </div>
+            <>
+              <Mic className="h-3 w-3" />
+              Record
+            </>
           )}
-        </div>
+        </Button>
 
-        <p className="text-xs text-muted-foreground">
-          Voice notes are automatically synced to the cloud.
-        </p>
-      </CardContent>
-    </Card>
+        {memosNeedingTranscription > 0 && (
+          <Button variant="outline" size="sm" onClick={handleTranscribeAll} disabled={isTranscribingAll} className="h-7 gap-1.5 text-xs">
+            {isTranscribingAll ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {transcribeProgress ? `${transcribeProgress.current}/${transcribeProgress.total}` : "..."}
+              </>
+            ) : (
+              <>
+                <FileText className="h-3 w-3" />
+                Transcribe ({memosNeedingTranscription})
+              </>
+            )}
+          </Button>
+        )}
+
+        {memosNeedingSync > 0 && (
+          <Button variant="outline" size="sm" onClick={handleSyncAll} disabled={isSyncingAll} className="h-7 gap-1.5 text-xs">
+            {isSyncingAll ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {syncProgress ? `${syncProgress.current}/${syncProgress.total}` : "..."}
+              </>
+            ) : (
+              <>
+                <Cloud className="h-3 w-3" />
+                Sync ({memosNeedingSync})
+              </>
+            )}
+          </Button>
+        )}
+
+        {isTauri && memosNeedingCloudSync > 0 && (
+          <Button variant="outline" size="sm" onClick={handleSyncTranscriptsToCloud} disabled={isSyncingToCloud} className="h-7 gap-1.5 text-xs">
+            {isSyncingToCloud ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {cloudSyncProgress ? `${cloudSyncProgress.current}/${cloudSyncProgress.total}` : "..."}
+              </>
+            ) : (
+              <>
+                <Cloud className="h-3 w-3" />
+                Cloud ({memosNeedingCloudSync})
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+
+      {isRecording && (
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+          <span className="text-xs text-muted-foreground">Recording...</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-2 bg-destructive/10 text-destructive rounded-md text-xs mb-2">
+          {error}
+        </div>
+      )}
+
+      {/* Memos list */}
+      <div className="space-y-0.5">
+        {isLoading ? (
+          <>
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </>
+        ) : memos.length > 0 ? (
+          memos.map((memo) => (
+            <VoiceMemoItem
+              key={memo.id}
+              memo={memo}
+              onDelete={() => handleDelete(memo.id)}
+              onTranscribe={() => handleTranscribe(memo.id)}
+              onSync={() => handleSync(memo.id)}
+              isTranscribing={transcribingId === memo.id}
+              isSyncing={syncingId === memo.id}
+            />
+          ))
+        ) : (
+          <div className="text-center py-4 text-muted-foreground">
+            <Clock className="h-5 w-5 mx-auto mb-1 opacity-40" />
+            <p className="text-xs">No voice notes yet</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

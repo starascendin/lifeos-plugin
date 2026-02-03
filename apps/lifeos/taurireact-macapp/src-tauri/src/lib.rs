@@ -97,11 +97,11 @@ pub fn run() {
             // Shortcuts differ by build mode (detected via app identifier):
             // - Production (com.bryanliu.lifeos-nexus): Ctrl+Shift+1/2
             // - Staging (com.bryanliu.lifeos-nexus-staging): Ctrl+Shift+1/2
-            // - Dev (com.bryanliu.lifeos-nexus-dev): Ctrl+Shift+3/4 (to avoid conflicts)
+            // - Dev (com.bryanliu.lifeos-nexus-dev): Ctrl+Option+3/4 (to avoid conflicts)
             let identifier = &app.config().identifier;
             let is_dev = identifier.contains("-dev");
             let (shortcut_hint_1, shortcut_hint_2) = if is_dev {
-                ("⌃⇧3", "⌃⇧4")
+                ("⌃⌥3", "⌃⌥4")
             } else {
                 // Production and Staging both use Ctrl+Shift+1/2
                 ("⌃⇧1", "⌃⇧2")
@@ -157,9 +157,9 @@ pub fn run() {
                 .build(app)?;
 
             // Register global keyboard shortcuts
-            // Production & Staging: Ctrl+Shift+1/2, Dev: Ctrl+Shift+3/4
+            // Production & Staging: Ctrl+Shift+1/2, Dev: Ctrl+Option+3/4
             let (modifiers, key_1, key_2) = if is_dev {
-                (Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit3, Code::Digit4)
+                (Some(Modifiers::CONTROL | Modifiers::ALT), Code::Digit3, Code::Digit4)
             } else {
                 // Production and Staging both use Ctrl+Shift+1/2
                 (Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::Digit1, Code::Digit2)

@@ -48,6 +48,8 @@ import {
   Video,
   ExternalLink,
   Bot,
+  Link2,
+  MessageCircle,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { formatDistanceToNow, format } from "date-fns";
@@ -289,6 +291,11 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
 
   // Query linked meetings (Fathom from unified system)
   const personMeetings = useQuery(api.lifeos.frm_people.getPersonMeetings, {
+    personId,
+  });
+
+  // Query all linked sources (unified view)
+  const linkedSources = useQuery(api.lifeos.frm_people.getPersonLinkedSources, {
     personId,
   });
 
@@ -1381,6 +1388,116 @@ export function PersonDetail({ personId, onBack }: PersonDetailProps) {
                   <p className="text-sm whitespace-pre-wrap leading-relaxed">
                     {person.notes}
                   </p>
+                </div>
+              )}
+
+              {/* Linked Sources - Unified Contact View */}
+              {linkedSources && (linkedSources.sources.length > 0 || linkedSources.beeperThreads.length > 0 || linkedSources.granolaMeetings.length > 0) && (
+                <div className="rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                      <Link2 className="h-4 w-4 text-primary" />
+                    </div>
+                    <h3 className="text-sm font-semibold tracking-wide uppercase">Linked Sources</h3>
+                  </div>
+
+                  {/* Sources Badges */}
+                  {linkedSources.sources.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-xs text-muted-foreground mb-2">DATA SOURCES</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {linkedSources.sources.map((source) => (
+                          <Badge key={source} variant="outline" className="text-xs capitalize">
+                            {source === "fathom" && <Video className="h-3 w-3 mr-1" />}
+                            {source === "beeper" && <MessageCircle className="h-3 w-3 mr-1" />}
+                            {source === "granola" && <FileText className="h-3 w-3 mr-1" />}
+                            {source === "calendar" && <Clock className="h-3 w-3 mr-1" />}
+                            {source === "manual" && <User className="h-3 w-3 mr-1" />}
+                            {source}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Beeper Threads */}
+                  {linkedSources.beeperThreads.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                        <MessageCircle className="h-3 w-3" />
+                        BEEPER CHATS ({linkedSources.beeperThreads.length})
+                      </div>
+                      <div className="space-y-2">
+                        {linkedSources.beeperThreads.map((thread) => (
+                          <div
+                            key={thread._id}
+                            className="rounded-lg bg-muted/50 p-2.5 text-xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium truncate flex-1">
+                                {thread.threadName}
+                              </span>
+                              <Badge variant="secondary" className="text-[10px] h-5 ml-2">
+                                {thread.threadType}
+                              </Badge>
+                            </div>
+                            {thread.messageCount > 0 && (
+                              <div className="text-muted-foreground mt-1">
+                                {thread.messageCount} messages
+                                {thread.lastMessageAt && (
+                                  <span> · {formatDistanceToNow(new Date(thread.lastMessageAt), { addSuffix: true })}</span>
+                                )}
+                              </div>
+                            )}
+                            {thread.businessNote && (
+                              <p className="text-muted-foreground mt-1 italic">
+                                {thread.businessNote}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Granola Meetings */}
+                  {linkedSources.granolaMeetings.filter((m): m is NonNullable<typeof m> => m !== null).length > 0 && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        GRANOLA MEETINGS ({linkedSources.granolaMeetings.filter(Boolean).length})
+                      </div>
+                      <div className="space-y-2">
+                        {linkedSources.granolaMeetings.filter((m): m is NonNullable<typeof m> => m !== null).map((meeting) => (
+                          <div
+                            key={meeting.meetingId}
+                            className="rounded-lg bg-muted/50 p-2.5 text-xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium truncate flex-1">
+                                {meeting.title}
+                              </span>
+                              {meeting.aiConfidence !== undefined && meeting.aiConfidence < 1 && (
+                                <Badge variant="outline" className="text-[10px] h-5 ml-2">
+                                  {Math.round(meeting.aiConfidence * 100)}% match
+                                </Badge>
+                              )}
+                            </div>
+                            {meeting.granolaCreatedAt && (
+                              <div className="text-muted-foreground mt-1">
+                                {format(new Date(meeting.granolaCreatedAt), "MMM d, yyyy")}
+                              </div>
+                            )}
+                            {meeting.resumeMarkdown && (
+                              <p className="text-muted-foreground mt-1 line-clamp-2">
+                                {meeting.resumeMarkdown}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

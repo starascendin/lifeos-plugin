@@ -321,6 +321,10 @@ export const pmTables = {
   lifeos_dailySummaries: defineTable({
     userId: v.id("users"),
     date: v.string(), // YYYY-MM-DD format
+    // User's daily note (persisted per day)
+    userNote: v.optional(v.string()),
+    // Custom prompt template override (persistent per-day)
+    customPrompt: v.optional(v.string()),
     // AI-generated summary
     aiSummary: v.optional(v.string()),
     generatedAt: v.optional(v.number()),

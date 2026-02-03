@@ -1,5 +1,4 @@
 import { useAgenda } from "@/lib/contexts/AgendaContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -26,14 +25,13 @@ function formatTimeRange(startTime: number, endTime: number): string {
 }
 
 function EventItem({ event, isAllDay }: EventItemProps) {
-  // Get external attendees (not self)
   const externalAttendees = event.attendees?.filter((a) => !a.self) ?? [];
   const isOneOnOne = externalAttendees.length === 1;
   const isGroupMeeting = externalAttendees.length > 1;
 
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-      <div className="flex-shrink-0 w-16 text-xs text-muted-foreground pt-0.5">
+    <div className="flex items-start gap-3 py-2 px-1 rounded-md hover:bg-muted/50 transition-colors">
+      <div className="flex-shrink-0 w-14 text-xs text-muted-foreground pt-0.5">
         {isAllDay ? (
           <span className="text-purple-500 font-medium">All day</span>
         ) : (
@@ -45,17 +43,17 @@ function EventItem({ event, isAllDay }: EventItemProps) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-medium truncate">{event.title}</p>
+          <p className="text-sm font-medium truncate">{event.title}</p>
           {isOneOnOne && (
-            <Badge variant="secondary" className="h-5 text-[10px] bg-blue-500/10 text-blue-700 flex items-center gap-1">
+            <Badge variant="secondary" className="h-5 text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 flex items-center gap-1">
               <User className="h-3 w-3" />
-              1-on-1
+              1:1
             </Badge>
           )}
           {isGroupMeeting && (
-            <Badge variant="secondary" className="h-5 text-[10px] bg-orange-500/10 text-orange-700 flex items-center gap-1">
+            <Badge variant="secondary" className="h-5 text-[10px] bg-orange-500/10 text-orange-700 dark:text-orange-400 flex items-center gap-1">
               <Users className="h-3 w-3" />
-              Group ({externalAttendees.length + 1})
+              {externalAttendees.length + 1}
             </Badge>
           )}
         </div>
@@ -65,15 +63,14 @@ function EventItem({ event, isAllDay }: EventItemProps) {
           </p>
         )}
         {event.location && (
-          <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-1">
+          <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
             <MapPin className="h-3 w-3" />
             {event.location}
           </p>
         )}
-        {/* Display attendees */}
         {externalAttendees.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {externalAttendees.slice(0, 4).map((attendee, idx) => (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {externalAttendees.slice(0, 3).map((attendee, idx) => (
               <span
                 key={attendee.email || idx}
                 className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
@@ -82,9 +79,9 @@ function EventItem({ event, isAllDay }: EventItemProps) {
                 {attendee.displayName || attendee.email.split("@")[0]}
               </span>
             ))}
-            {externalAttendees.length > 4 && (
+            {externalAttendees.length > 3 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                +{externalAttendees.length - 4} more
+                +{externalAttendees.length - 3}
               </span>
             )}
           </div>
@@ -99,34 +96,23 @@ function EmptyState({ hasNeverSynced }: { hasNeverSynced: boolean }) {
 
   return (
     <div className="text-center py-6 text-muted-foreground">
-      <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
+      <CalendarDays className="h-6 w-6 mx-auto mb-2 opacity-40" />
       {hasNeverSynced ? (
         <>
-          <p className="text-sm">Sync your Google Calendar</p>
-          <p className="text-xs mt-1 mb-3">
-            Connect to see your events here
-          </p>
+          <p className="text-xs">Sync your Google Calendar</p>
           <Button
             variant="outline"
             size="sm"
             onClick={syncCalendar}
             disabled={isSyncingCalendar}
+            className="mt-2 h-7 text-xs"
           >
-            {isSyncingCalendar ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Sync Calendar
-              </>
-            )}
+            <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", isSyncingCalendar && "animate-spin")} />
+            {isSyncingCalendar ? "Syncing..." : "Sync"}
           </Button>
         </>
       ) : (
-        <p className="text-sm">No events scheduled for today</p>
+        <p className="text-xs">No events today</p>
       )}
     </div>
   );
@@ -141,83 +127,80 @@ export function CalendarEventsSection() {
     calendarSyncStatus,
   } = useAgenda();
 
-  // Separate all-day events from timed events
   const allDayEvents = todaysEvents?.filter((e) => e.isAllDay) ?? [];
   const timedEvents = todaysEvents?.filter((e) => !e.isAllDay) ?? [];
-
-  // Check if user has never synced
   const hasNeverSynced = calendarSyncStatus === null;
 
-  // Format last sync time
   const lastSyncText = calendarSyncStatus?.lastSyncAt
-    ? `Last synced ${new Date(calendarSyncStatus.lastSyncAt).toLocaleTimeString([], {
+    ? new Date(calendarSyncStatus.lastSyncAt).toLocaleTimeString([], {
         hour: "numeric",
         minute: "2-digit",
-      })}`
+      })
     : null;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <CalendarDays className="h-5 w-5" />
-            Calendar
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            {lastSyncText && (
-              <span className="text-xs text-muted-foreground hidden sm:inline">
-                {lastSyncText}
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={syncCalendar}
-              disabled={isSyncingCalendar}
-              title="Sync calendar"
-            >
-              <RefreshCw
-                className={cn("h-4 w-4", isSyncingCalendar && "animate-spin")}
-              />
-            </Button>
-          </div>
+    <div className="p-4 md:p-5">
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium">Calendar</h3>
+          {todaysEvents && todaysEvents.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              ({todaysEvents.length})
+            </span>
+          )}
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {isLoadingEvents ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : todaysEvents && todaysEvents.length > 0 ? (
-          <div className="space-y-1">
-            {/* All-day events first */}
-            {allDayEvents.length > 0 && (
-              <div className="mb-2 pb-2 border-b border-purple-500/20">
-                {allDayEvents.map((event) => (
-                  <EventItem key={event._id} event={event} isAllDay />
-                ))}
-              </div>
-            )}
-            {/* Timed events */}
-            {timedEvents.map((event) => (
-              <EventItem key={event._id} event={event} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState hasNeverSynced={hasNeverSynced} />
-        )}
+        <div className="flex items-center gap-2">
+          {lastSyncText && (
+            <span className="text-[10px] text-muted-foreground hidden sm:inline">
+              {lastSyncText}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={syncCalendar}
+            disabled={isSyncingCalendar}
+            title="Sync calendar"
+          >
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", isSyncingCalendar && "animate-spin")}
+            />
+          </Button>
+        </div>
+      </div>
 
-        {/* Show sync error if any */}
-        {calendarSyncStatus?.lastSyncError && (
-          <div className="mt-3 p-2 rounded-md bg-red-500/10 text-red-500 text-xs">
-            {calendarSyncStatus.lastSyncError}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Content */}
+      {isLoadingEvents ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : todaysEvents && todaysEvents.length > 0 ? (
+        <div className="space-y-0.5">
+          {allDayEvents.length > 0 && (
+            <div className="mb-1 pb-1 border-b border-purple-500/20">
+              {allDayEvents.map((event) => (
+                <EventItem key={event._id} event={event} isAllDay />
+              ))}
+            </div>
+          )}
+          {timedEvents.map((event) => (
+            <EventItem key={event._id} event={event} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState hasNeverSynced={hasNeverSynced} />
+      )}
+
+      {calendarSyncStatus?.lastSyncError && (
+        <div className="mt-2 p-2 rounded-md bg-red-500/10 text-red-500 text-xs">
+          {calendarSyncStatus.lastSyncError}
+        </div>
+      )}
+    </div>
   );
 }

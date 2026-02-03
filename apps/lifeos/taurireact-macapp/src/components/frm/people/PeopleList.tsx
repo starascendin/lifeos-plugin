@@ -28,11 +28,13 @@ import {
   MoreHorizontal,
   Archive,
   ArchiveRestore,
+  GitMerge,
 } from "lucide-react";
 import type { Id } from "@holaai/convex";
 import { AddPersonDialog } from "./AddPersonDialog";
 import { VoiceMemosPanel, type ProcessingMemo, type ProcessingStage } from "./VoiceMemosPanel";
 import { BeeperContactsPanel } from "./BeeperContactsPanel";
+import { MergeSuggestionsPanel } from "./MergeSuggestionsPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,6 +97,11 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
   const [showAddPersonDialog, setShowAddPersonDialog] = useState(false);
   const [showMobileMemosPanel, setShowMobileMemosPanel] = useState(false);
   const [memosOpen, setMemosOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+
+  // Query merge suggestions count for badge
+  const mergeSuggestions = useQuery(api.lifeos.frm_contact_merge.getMergeSuggestions);
+  const mergeCount = mergeSuggestions?.filter(Boolean).length ?? 0;
 
   // Fetch memo count for collapsible badge
   const memos = useQuery(api.lifeos.frm_memos.getAllMemosWithLinks, { limit: 50 });
@@ -537,6 +544,31 @@ export function PeopleList({ onPersonSelect }: PeopleListProps) {
             <CollapsibleContent>
               <div className="max-h-64 overflow-y-auto">
                 <VoiceMemosPanel processingMemo={processingMemo} hideHeader />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+
+        {/* Collapsible Merge Suggestions (desktop only) */}
+        <div className="hidden lg:block border-b">
+          <Collapsible open={mergeOpen} onOpenChange={setMergeOpen}>
+            <CollapsibleTrigger className="flex items-center gap-2 w-full px-3 py-2 hover:bg-muted/50 transition-colors text-left">
+              {mergeOpen ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+              <GitMerge className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Unify Contacts</span>
+              {mergeCount > 0 && (
+                <span className="text-xs text-white bg-primary px-1.5 py-0.5 rounded-full">
+                  {mergeCount}
+                </span>
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="max-h-80 overflow-y-auto">
+                <MergeSuggestionsPanel hideHeader />
               </div>
             </CollapsibleContent>
           </Collapsible>

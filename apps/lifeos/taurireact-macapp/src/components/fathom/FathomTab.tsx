@@ -22,6 +22,7 @@ import {
   ListChecks,
   Users,
 } from "lucide-react";
+import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 
 type FathomMeeting = Doc<"life_fathomMeetings">;
 type FathomTranscript = Doc<"life_fathomTranscripts">;
@@ -401,9 +402,7 @@ function MeetingDetailPanel({ meeting }: MeetingDetailPanelProps) {
                           {meeting.summaryTemplateName}
                         </Badge>
                       )}
-                      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                        {meeting.summaryMarkdown}
-                      </pre>
+                      <MarkdownRenderer content={meeting.summaryMarkdown!} />
                     </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">

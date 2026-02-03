@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAgenda } from "@/lib/contexts/AgendaContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,16 +56,16 @@ function NumberFieldItem({
   const displayValue = value?.numberValue ?? "-";
 
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors group">
+    <div className="flex items-center justify-between py-1.5 px-1 rounded-md hover:bg-muted/50 transition-colors group">
       <div className="flex flex-col">
-        <span className="font-medium">{definition.name}</span>
+        <span className="text-sm">{definition.name}</span>
         {definition.description && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground">
             {definition.description}
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {isEditing ? (
           <>
             <Input
@@ -76,27 +75,22 @@ function NumberFieldItem({
               onKeyDown={handleKeyDown}
               min={definition.minValue}
               max={definition.maxValue}
-              className="w-20 h-8"
+              className="w-16 h-7 text-sm"
               autoFocus
             />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={handleSave}
-            >
-              <Check className="h-4 w-4" />
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave}>
+              <Check className="h-3.5 w-3.5" />
             </Button>
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={() => {
                 setIsEditing(false);
                 setInputValue(value?.numberValue?.toString() ?? "");
               }}
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           </>
         ) : (
@@ -105,7 +99,7 @@ function NumberFieldItem({
               variant="outline"
               size="sm"
               onClick={() => setIsEditing(true)}
-              className="min-w-16"
+              className="h-7 min-w-12 text-xs"
             >
               {displayValue}
               {definition.maxValue && `/${definition.maxValue}`}
@@ -114,10 +108,10 @@ function NumberFieldItem({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
                 onClick={onArchive}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </>
@@ -149,16 +143,12 @@ function TextFieldItem({
   };
 
   return (
-    <div className="flex flex-col p-3 rounded-lg hover:bg-muted/50 transition-colors gap-2 group">
+    <div className="flex flex-col py-1.5 px-1 rounded-md hover:bg-muted/50 transition-colors gap-1.5 group">
       <div className="flex items-center justify-between">
-        <span className="font-medium">{definition.name}</span>
-        <div className="flex items-center gap-2">
+        <span className="text-sm">{definition.name}</span>
+        <div className="flex items-center gap-1.5">
           {!isEditing && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsEditing(true)}
-            >
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setIsEditing(true)}>
               Edit
             </Button>
           )}
@@ -166,29 +156,29 @@ function TextFieldItem({
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
               onClick={onArchive}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>
       </div>
       {isEditing ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={definition.placeholder ?? "Enter value..."}
+            className="h-8 text-sm"
             autoFocus
           />
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleSave}>
-              Save
-            </Button>
+          <div className="flex gap-1.5">
+            <Button size="sm" className="h-7 text-xs" onClick={handleSave}>Save</Button>
             <Button
               size="sm"
               variant="ghost"
+              className="h-7 text-xs"
               onClick={() => {
                 setIsEditing(false);
                 setInputValue(value?.textValue ?? "");
@@ -199,8 +189,8 @@ function TextFieldItem({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          {value?.textValue || <span className="italic">No value entered</span>}
+        <p className="text-xs text-muted-foreground">
+          {value?.textValue || <span className="italic">No value</span>}
         </p>
       )}
     </div>
@@ -227,8 +217,8 @@ function AddFieldDialog({ onAdd }: AddFieldDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Plus className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="h-7 w-7">
+          <Plus className="h-3.5 w-3.5" />
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -289,87 +279,70 @@ export function DailyFieldsSection() {
     fieldDefinitionId: Id<"lifeos_dailyFieldDefinitions">,
     value: number | undefined
   ) => {
-    await setFieldValue({
-      fieldDefinitionId,
-      date: dateString,
-      numberValue: value,
-    });
+    await setFieldValue({ fieldDefinitionId, date: dateString, numberValue: value });
   };
 
   const handleSaveTextValue = async (
     fieldDefinitionId: Id<"lifeos_dailyFieldDefinitions">,
     value: string | undefined
   ) => {
-    await setFieldValue({
-      fieldDefinitionId,
-      date: dateString,
-      textValue: value,
-    });
+    await setFieldValue({ fieldDefinitionId, date: dateString, textValue: value });
   };
 
   const handleAddField = async (name: string, fieldType: "text" | "number") => {
-    await createFieldDefinition({
-      name,
-      fieldType,
-    });
+    await createFieldDefinition({ name, fieldType });
   };
 
-  const handleArchiveField = async (
-    fieldId: Id<"lifeos_dailyFieldDefinitions">
-  ) => {
-    await archiveFieldDefinition({
-      fieldId,
-    });
+  const handleArchiveField = async (fieldId: Id<"lifeos_dailyFieldDefinitions">) => {
+    await archiveFieldDefinition({ fieldId });
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ClipboardList className="h-5 w-5" />
-            Daily Fields
-          </CardTitle>
-          <AddFieldDialog onAdd={handleAddField} />
+    <div className="rounded-lg border bg-card/50 p-3">
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium">Daily Fields</h3>
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {isLoadingDailyFields ? (
-          <div className="space-y-3">
-            {[1, 2].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : dailyFields && dailyFields.length > 0 ? (
-          <div className="space-y-1">
-            {dailyFields.map(({ definition, value }) =>
-              definition.fieldType === "number" ? (
-                <NumberFieldItem
-                  key={definition._id}
-                  definition={definition}
-                  value={value}
-                  onSave={(v) => handleSaveNumberValue(definition._id, v)}
-                  onArchive={() => handleArchiveField(definition._id)}
-                />
-              ) : (
-                <TextFieldItem
-                  key={definition._id}
-                  definition={definition}
-                  value={value}
-                  onSave={(v) => handleSaveTextValue(definition._id, v)}
-                  onArchive={() => handleArchiveField(definition._id)}
-                />
-              )
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No daily fields defined</p>
-            <p className="text-xs mt-1">Add fields to track daily metrics</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        <AddFieldDialog onAdd={handleAddField} />
+      </div>
+
+      {/* Content */}
+      {isLoadingDailyFields ? (
+        <div className="space-y-2">
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-8 w-full" />
+          ))}
+        </div>
+      ) : dailyFields && dailyFields.length > 0 ? (
+        <div className="space-y-0.5">
+          {dailyFields.map(({ definition, value }) =>
+            definition.fieldType === "number" ? (
+              <NumberFieldItem
+                key={definition._id}
+                definition={definition}
+                value={value}
+                onSave={(v) => handleSaveNumberValue(definition._id, v)}
+                onArchive={() => handleArchiveField(definition._id)}
+              />
+            ) : (
+              <TextFieldItem
+                key={definition._id}
+                definition={definition}
+                value={value}
+                onSave={(v) => handleSaveTextValue(definition._id, v)}
+                onArchive={() => handleArchiveField(definition._id)}
+              />
+            )
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-4 text-muted-foreground">
+          <ClipboardList className="h-5 w-5 mx-auto mb-1 opacity-40" />
+          <p className="text-xs">No daily fields defined</p>
+        </div>
+      )}
+    </div>
   );
 }

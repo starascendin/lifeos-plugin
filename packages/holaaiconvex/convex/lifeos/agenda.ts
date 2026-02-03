@@ -8,6 +8,10 @@ import {
 import { requireUser } from "../_lib/auth";
 import { Doc } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
+import { DEFAULT_DAILY_PROMPT } from "./agenda_constants";
+
+// Re-export for convenience
+export { DEFAULT_DAILY_PROMPT } from "./agenda_constants";
 
 // ==================== QUERIES ====================
 
@@ -103,6 +107,80 @@ export const saveDailySummary = mutation({
 });
 
 /**
+ * Save or update user's daily note (persisted per day)
+ */
+export const saveDailyUserNote = mutation({
+  args: {
+    date: v.string(), // YYYY-MM-DD format
+    userNote: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("lifeos_dailySummaries")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", user._id).eq("date", args.date)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        userNote: args.userNote,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      return await ctx.db.insert("lifeos_dailySummaries", {
+        userId: user._id,
+        date: args.date,
+        userNote: args.userNote,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
+ * Update custom prompt for daily summary (persistent per-day)
+ */
+export const updateDailyPrompt = mutation({
+  args: {
+    date: v.string(), // YYYY-MM-DD format
+    customPrompt: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("lifeos_dailySummaries")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", user._id).eq("date", args.date)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        customPrompt: args.customPrompt,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      return await ctx.db.insert("lifeos_dailySummaries", {
+        userId: user._id,
+        date: args.date,
+        customPrompt: args.customPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
  * Internal mutation for saving daily summary (used by actions)
  */
 export const internalSaveDailySummary = internalMutation({
@@ -170,39 +248,45 @@ export const generateDailySummary = action({
   args: {
     date: v.string(), // YYYY-MM-DD format
     model: v.optional(v.string()), // Model to use (defaults to openai/gpt-4o-mini)
+    userNote: v.optional(v.string()), // User's daily note to include in prompt
   },
   handler: async (ctx, args): Promise<GenerateSummaryResult> => {
     const selectedModel = args.model || "openai/gpt-4o-mini";
 
-    // Get today's habits
-    const habits: Doc<"lifeos_habits">[] = await ctx.runQuery(
-      api.lifeos.habits.getHabitsForDate,
-      { date: args.date }
-    );
-
-    // Get habit check-ins for today
-    const checkIns: Record<string, Doc<"lifeos_habitCheckIns">> =
-      await ctx.runQuery(api.lifeos.habits_checkins.getCheckInsForDateRange, {
+    // Fetch all daily data in parallel
+    const [
+      existingSummary,
+      habits,
+      checkIns,
+      tasks,
+      topPriorityTasks,
+      overdueTasks,
+      memos,
+      calendarEvents,
+    ] = await Promise.all([
+      ctx.runQuery(api.lifeos.agenda.getDailySummary, { date: args.date }),
+      ctx.runQuery(api.lifeos.habits.getHabitsForDate, { date: args.date }),
+      ctx.runQuery(api.lifeos.habits_checkins.getCheckInsForDateRange, {
         startDate: args.date,
         endDate: args.date,
-      });
-
-    // Get today's tasks
-    const tasks: Doc<"lifeos_pmIssues">[] = await ctx.runQuery(
-      api.lifeos.pm_issues.getTasksForDate,
-      { date: args.date }
-    );
-
-    // Get top priority tasks
-    const topPriorityTasks: Doc<"lifeos_pmIssues">[] = await ctx.runQuery(
-      api.lifeos.pm_issues.getTopPriorityTasks,
-      {}
-    );
+      }),
+      ctx.runQuery(api.lifeos.pm_issues.getTasksForDate, {
+        date: args.date,
+        includeCompleted: true,
+      }),
+      ctx.runQuery(api.lifeos.pm_issues.getTopPriorityTasks, {}),
+      ctx.runQuery(api.lifeos.pm_issues.getOverdueTasks, { date: args.date }),
+      ctx.runQuery(api.lifeos.voicememo.getMemosForDateRange, {
+        startDate: args.date,
+        endDate: args.date,
+      }),
+      ctx.runQuery(api.lifeos.calendar.getEventsForDate, { date: args.date }),
+    ]);
 
     // Calculate habit completion
     const checkInValues = Object.values(checkIns || {});
     const habitCompletionCount: number = checkInValues.filter(
-      (c) => c.completed
+      (c: Doc<"lifeos_habitCheckIns">) => c.completed
     ).length;
     const totalHabits: number = habits?.length || 0;
 
@@ -220,6 +304,14 @@ export const generateDailySummary = action({
       topPriorityTasks: topPriorityTasks || [],
       totalTasks,
       topPriorityCount,
+      overdueTasks: overdueTasks || [],
+      memos: ((memos || []) as Doc<"life_voiceMemos">[]).map((m: Doc<"life_voiceMemos">) => ({
+        name: m.name,
+        transcript: m.transcript,
+      })),
+      calendarEvents: (calendarEvents || []) as Doc<"lifeos_calendarEvents">[],
+      userNote: args.userNote,
+      customPrompt: existingSummary?.customPrompt ?? undefined,
     });
 
     // Save helper function
@@ -245,14 +337,14 @@ export const generateDailySummary = action({
             {
               role: "system",
               content:
-                "You are a helpful personal assistant that provides concise daily summaries. Keep responses brief (2-3 sentences) and actionable.",
+                "You are a helpful personal assistant that provides concise daily summaries. Keep responses brief (3-5 sentences) and actionable. Reference specific tasks, events, and notes when available.",
             },
             {
               role: "user",
               content: prompt,
             },
           ],
-          maxTokens: 200,
+          maxTokens: 400,
           temperature: 0.7,
         },
         context: {
@@ -292,6 +384,11 @@ interface SummaryContext {
   topPriorityTasks: Doc<"lifeos_pmIssues">[];
   totalTasks: number;
   topPriorityCount: number;
+  overdueTasks: Doc<"lifeos_pmIssues">[];
+  memos: Array<{ name: string; transcript: string | undefined }>;
+  calendarEvents: Doc<"lifeos_calendarEvents">[];
+  userNote?: string;
+  customPrompt?: string;
 }
 
 function formatTaskWithDescription(task: Doc<"lifeos_pmIssues">): string {
@@ -313,7 +410,14 @@ function buildSummaryPrompt(context: SummaryContext): string {
     topPriorityTasks,
     totalTasks,
     topPriorityCount,
+    overdueTasks,
+    memos,
+    calendarEvents,
+    userNote,
+    customPrompt,
   } = context;
+
+  const template = customPrompt || DEFAULT_DAILY_PROMPT;
 
   const habitNames = habits.map((h) => h.name).join(", ");
 
@@ -329,21 +433,57 @@ function buildSummaryPrompt(context: SummaryContext): string {
     .map(formatTaskWithDescription)
     .join("\n");
 
-  return `Please provide a brief, encouraging daily summary for ${date}:
+  // Format overdue tasks
+  const overdueFormatted = overdueTasks
+    .slice(0, 5)
+    .map(formatTaskWithDescription)
+    .join("\n");
 
-HABITS (${habitCompletionCount}/${totalHabits} completed):
-${habitNames || "None scheduled"}
+  // Format voice memos
+  const memosFormatted = memos
+    .filter((m) => m.transcript)
+    .slice(0, 5)
+    .map((m) => {
+      const transcript = m.transcript!.length > 200
+        ? m.transcript!.slice(0, 200) + "..."
+        : m.transcript!;
+      return `- ${m.name}: ${transcript}`;
+    })
+    .join("\n");
 
-TOP PRIORITIES (${topPriorityCount}):
-${topTasksFormatted || "None set"}
+  // Format calendar events
+  const eventsFormatted = calendarEvents
+    .slice(0, 10)
+    .map((e) => {
+      const start = new Date(e.startTime);
+      const timeStr = start.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      return `- ${timeStr}: ${e.title}`;
+    })
+    .join("\n");
 
-TASKS DUE TODAY (${totalTasks}):
-${otherTasksFormatted || "None due"}
+  // Build user note section
+  const userNoteSection = userNote
+    ? `USER'S NOTE FOR TODAY:\n${userNote}`
+    : "";
 
-Provide a 2-3 sentence summary that:
-1. Acknowledges progress on habits
-2. Highlights key priorities for the day
-3. Gives an encouraging, actionable recommendation`;
+  return template
+    .replace("{date}", date)
+    .replace("{userNote}", userNoteSection)
+    .replace("{habitCompletionCount}", String(habitCompletionCount))
+    .replace("{totalHabits}", String(totalHabits))
+    .replace("{habitNames}", habitNames || "None scheduled")
+    .replace("{topPriorityCount}", String(topPriorityCount))
+    .replace("{topTasksFormatted}", topTasksFormatted || "None set")
+    .replace("{totalTasks}", String(totalTasks))
+    .replace("{otherTasksFormatted}", otherTasksFormatted || "None due")
+    .replace("{overdueCount}", String(overdueTasks.length))
+    .replace("{overdueTasksFormatted}", overdueFormatted || "None")
+    .replace("{memosFormatted}", memosFormatted || "None recorded")
+    .replace("{eventsFormatted}", eventsFormatted || "No events");
 }
 
 // ==================== WEEKLY SUMMARY QUERIES ====================

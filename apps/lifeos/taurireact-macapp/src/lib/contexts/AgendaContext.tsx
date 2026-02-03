@@ -96,7 +96,9 @@ interface AgendaContextValue {
   dailySummary: Doc<"lifeos_dailySummaries"> | null | undefined;
   isLoadingSummary: boolean;
   isGeneratingSummary: boolean;
-  generateSummary: () => Promise<void>;
+  generateSummary: (userNote?: string) => Promise<void>;
+  saveDailyUserNote: ReturnType<typeof useMutation>;
+  updateDailyPrompt: ReturnType<typeof useMutation>;
 
   // Weekly data (only fetched when viewMode === "weekly")
   weeklyTasks: WeeklyTasksByDay | undefined;
@@ -374,6 +376,14 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     api.lifeos.agenda.generateDailySummary,
   );
 
+  // Daily summary mutations
+  const saveDailyUserNoteMutation = useMutation(
+    api.lifeos.agenda.saveDailyUserNote,
+  );
+  const updateDailyPromptMutation = useMutation(
+    api.lifeos.agenda.updateDailyPrompt,
+  );
+
   // Weekly summary mutations and action
   const updateWeeklyPromptMutation = useMutation(
     api.lifeos.agenda.updateWeeklyPrompt,
@@ -385,20 +395,21 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   // Calendar sync action
   const syncCalendarAction = useAction(api.lifeos.calendar.syncCalendarEvents);
 
-  // Generate daily summary handler
-  const generateSummary = useCallback(async () => {
+  // Generate daily summary handler — accepts userNote directly to avoid race conditions
+  const generateSummary = useCallback(async (userNote?: string) => {
     setIsGeneratingSummary(true);
     try {
       await generateDailySummaryAction({
         date: dateString,
         model: selectedModel,
+        userNote: userNote ?? dailySummary?.userNote ?? undefined,
       });
     } catch (error) {
       console.error("Failed to generate summary:", error);
     } finally {
       setIsGeneratingSummary(false);
     }
-  }, [generateDailySummaryAction, dateString, selectedModel]);
+  }, [generateDailySummaryAction, dateString, selectedModel, dailySummary?.userNote]);
 
   // Generate weekly summary handler
   const generateWeeklySummary = useCallback(async () => {
@@ -632,6 +643,8 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     isLoadingSummary: dailySummary === undefined,
     isGeneratingSummary,
     generateSummary,
+    saveDailyUserNote: saveDailyUserNoteMutation,
+    updateDailyPrompt: updateDailyPromptMutation,
 
     // Weekly data
     weeklyTasks,

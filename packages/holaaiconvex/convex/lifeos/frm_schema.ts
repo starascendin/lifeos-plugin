@@ -315,4 +315,28 @@ export const frmTables = {
     .index("by_person", ["personId"])
     .index("by_user_interaction", ["userId", "interactionAt"])
     .index("by_person_interaction", ["personId", "interactionAt"]),
+
+  // ==================== MERGE SUGGESTIONS ====================
+  // AI-generated suggestions for merging duplicate contacts
+  lifeos_frmMergeSuggestions: defineTable({
+    userId: v.id("users"),
+    // Target person (the one to keep)
+    targetPersonId: v.id("lifeos_frmPeople"),
+    // Source person (the one to merge into target)
+    sourcePersonId: v.id("lifeos_frmPeople"),
+    // Confidence score (0-1)
+    confidence: v.number(),
+    // Reasons for the suggestion
+    reasons: v.array(v.string()),
+    // Matched fields details
+    matchedFields: v.any(),
+    // Status: pending, accepted, rejected, dismissed
+    status: v.string(),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_pair", ["targetPersonId", "sourcePersonId"]),
 };

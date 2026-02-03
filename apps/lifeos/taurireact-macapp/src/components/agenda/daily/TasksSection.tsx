@@ -1,17 +1,10 @@
-import { useState } from "react";
 import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { usePM } from "@/lib/contexts/PMContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ListTodo, Star, CheckCircle2, AlertTriangle, ChevronDown } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { ListTodo, Star, CheckCircle2, AlertTriangle } from "lucide-react";
 import type { Doc, Id } from "@holaai/convex";
 
 interface TaskItemProps {
@@ -40,11 +33,11 @@ function getDaysOverdue(dueDate: number): number {
 }
 
 function formatOverdueDays(days: number): string {
-  if (days === 1) return "1 day overdue";
-  if (days < 7) return `${days} days overdue`;
-  if (days < 14) return "1 week overdue";
-  if (days < 30) return `${Math.floor(days / 7)} weeks overdue`;
-  return `${Math.floor(days / 30)} month(s) overdue`;
+  if (days === 1) return "1d overdue";
+  if (days < 7) return `${days}d overdue`;
+  if (days < 14) return "1w overdue";
+  if (days < 30) return `${Math.floor(days / 7)}w overdue`;
+  return `${Math.floor(days / 30)}mo overdue`;
 }
 
 function TaskItem({
@@ -60,44 +53,38 @@ function TaskItem({
 
   return (
     <div
-      className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
+      className="flex items-center gap-2.5 py-1.5 px-1 rounded-md hover:bg-muted/50 transition-colors group cursor-pointer"
       onClick={onClick}
     >
       <Checkbox
         checked={isDone}
-        onCheckedChange={(checked) => {
-          // Prevent opening sidebar when clicking checkbox
-          onToggleStatus();
-        }}
+        onCheckedChange={() => onToggleStatus()}
         onClick={(e) => e.stopPropagation()}
-        className="h-5 w-5"
+        className="h-4 w-4"
       />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <span
-            className={`truncate ${isDone ? "line-through text-muted-foreground" : ""}`}
+            className={`text-sm truncate ${isDone ? "line-through text-muted-foreground" : ""}`}
           >
             {task.title}
           </span>
-          {isDone && <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />}
+          {isDone && <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />}
         </div>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-1.5 mt-0.5">
           <Badge
             variant="outline"
-            className={`text-xs ${priorityColors[task.priority]}`}
+            className={`text-[10px] h-4 px-1 ${priorityColors[task.priority]}`}
           >
             {task.priority}
           </Badge>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-[10px] text-muted-foreground">
             {task.identifier}
           </span>
           {overdueDays !== undefined && overdueDays > 0 && (
-            <Badge
-              variant="destructive"
-              className="text-xs bg-red-500/10 text-red-500 border-red-500/20"
-            >
+            <span className="text-[10px] text-red-500 font-medium">
               {formatOverdueDays(overdueDays)}
-            </Badge>
+            </span>
           )}
         </div>
       </div>
@@ -105,14 +92,14 @@ function TaskItem({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => {
             e.stopPropagation();
             onToggleStar();
           }}
         >
           <Star
-            className={`h-4 w-4 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`}
+            className={`h-3.5 w-3.5 ${isStarred ? "fill-yellow-400 text-yellow-400" : ""}`}
           />
         </Button>
       )}
@@ -133,11 +120,6 @@ export function TasksSection() {
 
   const { setSelectedIssueId } = usePM();
 
-  // Collapsible state for each section
-  const [isTop3Open, setIsTop3Open] = useState(true);
-  const [isOverdueOpen, setIsOverdueOpen] = useState(true);
-  const [isOtherTasksOpen, setIsOtherTasksOpen] = useState(true);
-
   const handleToggleStatus = async (task: Doc<"lifeos_pmIssues">) => {
     const newStatus = task.status === "done" ? "todo" : "done";
     await updateIssueStatus({
@@ -150,187 +132,163 @@ export function TasksSection() {
     await toggleTopPriority({ issueId });
   };
 
-  // Get top 3 starred tasks (not completed)
   const top3Tasks =
     topPriorityTasks?.filter((t) => t.status !== "done").slice(0, 3) ?? [];
 
-  // Get other tasks (due today but not in top 3, not completed)
   const otherTasks =
     todaysTasks?.filter(
       (t) =>
         t.status !== "done" && !top3Tasks.find((top) => top._id === t._id)
     ) ?? [];
 
-  // Completed tasks for today (by completedAt, not dueDate)
   const completedTasks = completedTodayTasks ?? [];
 
-  // Calculate total points from completed tasks
   const totalCompletedPoints = completedTasks.reduce(
     (sum, task) => sum + (task.estimate ?? 0),
     0
   );
 
-  // Count active (non-completed) tasks
   const activeTaskCount = top3Tasks.length + otherTasks.length + (overdueTasks?.length ?? 0);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <ListTodo className="h-5 w-5" />
-          Today's Tasks
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 space-y-4">
-        {isLoadingTasks ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
+    <div className="p-4 md:p-5">
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <ListTodo className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium">Tasks</h3>
+          {activeTaskCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              ({activeTaskCount})
+            </span>
+          )}
+        </div>
+        {completedTasks.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+            <span className="text-xs text-muted-foreground">
+              {completedTasks.length} done
+            </span>
+            {totalCompletedPoints > 0 && (
+              <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                {totalCompletedPoints}pts
+              </Badge>
+            )}
           </div>
-        ) : (
-          <>
-            {/* Top 3 Priorities Section */}
-            <Collapsible open={isTop3Open} onOpenChange={setIsTop3Open}>
-              <CollapsibleTrigger className="flex items-center gap-2 mb-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${
-                    isTop3Open ? "" : "-rotate-90"
-                  }`}
-                />
-                <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                <h4 className="text-sm font-medium">Top 3 Priorities</h4>
-                <span className="text-xs text-muted-foreground">({top3Tasks.length})</span>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                {top3Tasks.length > 0 ? (
-                  <div className="space-y-1 bg-yellow-500/5 rounded-lg p-2">
-                    {top3Tasks.map((task) => (
-                      <TaskItem
-                        key={task._id}
-                        task={task}
-                        onToggleStatus={() => handleToggleStatus(task)}
-                        onToggleStar={() => handleToggleStar(task._id)}
-                        onClick={() => setSelectedIssueId(task._id)}
-                        showStar={true}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground text-sm bg-muted/30 rounded-lg">
-                    <Star className="h-5 w-5 mx-auto mb-1 opacity-50" />
-                    <p>Star up to 3 tasks to set priorities</p>
-                  </div>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Overdue Tasks Section */}
-            {overdueTasks && overdueTasks.length > 0 && (
-              <Collapsible open={isOverdueOpen} onOpenChange={setIsOverdueOpen}>
-                <CollapsibleTrigger className="flex items-center gap-2 mb-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
-                  <ChevronDown
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${
-                      isOverdueOpen ? "" : "-rotate-90"
-                    }`}
-                  />
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <h4 className="text-sm font-medium text-red-500">Overdue</h4>
-                  <span className="text-xs text-red-500">({overdueTasks.length})</span>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="space-y-1 bg-red-500/5 rounded-lg p-2 border border-red-500/10">
-                    {overdueTasks.map((task) => (
-                      <TaskItem
-                        key={task._id}
-                        task={task}
-                        onToggleStatus={() => handleToggleStatus(task)}
-                        onToggleStar={() => handleToggleStar(task._id)}
-                        onClick={() => setSelectedIssueId(task._id)}
-                        showStar={top3Tasks.length < 3}
-                        overdueDays={getDaysOverdue(task.dueDate!)}
-                      />
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
-            {/* Other Tasks Due Today */}
-            {otherTasks.length > 0 && (
-              <Collapsible open={isOtherTasksOpen} onOpenChange={setIsOtherTasksOpen}>
-                <CollapsibleTrigger className="flex items-center gap-2 mb-2 w-full hover:bg-muted/50 rounded-md p-1 -ml-1 transition-colors">
-                  <ChevronDown
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${
-                      isOtherTasksOpen ? "" : "-rotate-90"
-                    }`}
-                  />
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Other Tasks Due Today
-                  </h4>
-                  <span className="text-xs text-muted-foreground">({otherTasks.length})</span>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="space-y-1">
-                    {otherTasks.map((task) => (
-                      <TaskItem
-                        key={task._id}
-                        task={task}
-                        onToggleStatus={() => handleToggleStatus(task)}
-                        onToggleStar={() => handleToggleStar(task._id)}
-                        onClick={() => setSelectedIssueId(task._id)}
-                        showStar={top3Tasks.length < 3}
-                      />
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
-            {/* Empty state for active tasks */}
-            {activeTaskCount === 0 && completedTasks.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <ListTodo className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No tasks due today</p>
-                <p className="text-xs mt-1">
-                  Add due dates to your tasks to see them here
-                </p>
-              </div>
-            )}
-
-            {/* Completed Tasks Section */}
-            {completedTasks.length > 0 && (
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <h4 className="text-sm font-medium text-muted-foreground">
-                      Completed Today ({completedTasks.length})
-                    </h4>
-                  </div>
-                  {totalCompletedPoints > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      {totalCompletedPoints} pts
-                    </Badge>
-                  )}
-                </div>
-                <div className="space-y-1 opacity-75">
-                  {completedTasks.map((task) => (
-                    <TaskItem
-                      key={task._id}
-                      task={task}
-                      onToggleStatus={() => handleToggleStatus(task)}
-                      onToggleStar={() => handleToggleStar(task._id)}
-                      onClick={() => setSelectedIssueId(task._id)}
-                      showStar={false}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Content */}
+      {isLoadingTasks ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Top 3 Priorities */}
+          {top3Tasks.length > 0 ? (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
+                <span className="text-xs font-medium text-muted-foreground">Priorities</span>
+              </div>
+              <div className="space-y-0.5 bg-yellow-500/5 rounded-md p-1.5">
+                {top3Tasks.map((task) => (
+                  <TaskItem
+                    key={task._id}
+                    task={task}
+                    onToggleStatus={() => handleToggleStatus(task)}
+                    onToggleStar={() => handleToggleStar(task._id)}
+                    onClick={() => setSelectedIssueId(task._id)}
+                    showStar={true}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-3 text-muted-foreground">
+              <Star className="h-4 w-4 mx-auto mb-1 opacity-40" />
+              <p className="text-xs">Star tasks to set priorities</p>
+            </div>
+          )}
+
+          {/* Overdue */}
+          {overdueTasks && overdueTasks.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                <span className="text-xs font-medium text-red-500">
+                  Overdue ({overdueTasks.length})
+                </span>
+              </div>
+              <div className="space-y-0.5 bg-red-500/5 rounded-md p-1.5 border border-red-500/10">
+                {overdueTasks.map((task) => (
+                  <TaskItem
+                    key={task._id}
+                    task={task}
+                    onToggleStatus={() => handleToggleStatus(task)}
+                    onToggleStar={() => handleToggleStar(task._id)}
+                    onClick={() => setSelectedIssueId(task._id)}
+                    showStar={top3Tasks.length < 3}
+                    overdueDays={getDaysOverdue(task.dueDate!)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Other tasks due today */}
+          {otherTasks.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Due Today ({otherTasks.length})
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                {otherTasks.map((task) => (
+                  <TaskItem
+                    key={task._id}
+                    task={task}
+                    onToggleStatus={() => handleToggleStatus(task)}
+                    onToggleStar={() => handleToggleStar(task._id)}
+                    onClick={() => setSelectedIssueId(task._id)}
+                    showStar={top3Tasks.length < 3}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {activeTaskCount === 0 && completedTasks.length === 0 && (
+            <div className="text-center py-6 text-muted-foreground">
+              <ListTodo className="h-6 w-6 mx-auto mb-1 opacity-40" />
+              <p className="text-xs">No tasks due today</p>
+            </div>
+          )}
+
+          {/* Completed */}
+          {completedTasks.length > 0 && (
+            <div className="pt-2 border-t">
+              <div className="space-y-0.5 opacity-60">
+                {completedTasks.map((task) => (
+                  <TaskItem
+                    key={task._id}
+                    task={task}
+                    onToggleStatus={() => handleToggleStatus(task)}
+                    onToggleStar={() => handleToggleStar(task._id)}
+                    onClick={() => setSelectedIssueId(task._id)}
+                    showStar={false}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

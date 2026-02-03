@@ -1,9 +1,19 @@
-import { useAgenda, isToday } from "@/lib/contexts/AgendaContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, RefreshCw, Calendar } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Sparkles, RefreshCw, Wrench } from "lucide-react";
 import { ModelSelector, UsageDisplay } from "../ModelSelector";
+import { DEFAULT_DAILY_PROMPT } from "@holaai/convex";
 
 export function AISummarySection() {
   const {
@@ -11,117 +21,180 @@ export function AISummarySection() {
     isLoadingSummary,
     isGeneratingSummary,
     generateSummary,
-    currentDate,
     selectedModel,
     setSelectedModel,
+    saveDailyUserNote,
+    updateDailyPrompt,
+    dateString,
   } = useAgenda();
 
   const hasSummary = dailySummary?.aiSummary;
-  const isTodayView = isToday(currentDate);
 
-  // Format the generation time
-  const formatGeneratedTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
+  // User note state - local draft synced from server
+  const [noteValue, setNoteValue] = useState("");
+  const [noteDirty, setNoteDirty] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync server value into local state when it changes (and not dirty)
+  useEffect(() => {
+    if (!noteDirty) {
+      setNoteValue(dailySummary?.userNote ?? "");
+    }
+  }, [dailySummary?.userNote, noteDirty]);
+
+  // Reset dirty flag when date changes
+  useEffect(() => {
+    setNoteDirty(false);
+  }, [dateString]);
+
+  const saveNote = useCallback(
+    (value: string) => {
+      saveDailyUserNote({ date: dateString, userNote: value });
+      setNoteDirty(false);
+    },
+    [saveDailyUserNote, dateString],
+  );
+
+  const handleNoteChange = useCallback(
+    (value: string) => {
+      setNoteValue(value);
+      setNoteDirty(true);
+      // Debounce save
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => saveNote(value), 1500);
+    },
+    [saveNote],
+  );
+
+  const handleNoteBlur = useCallback(() => {
+    if (noteDirty) {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveNote(noteValue);
+    }
+  }, [noteDirty, noteValue, saveNote]);
+
+  // Debug prompt dialog
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [promptValue, setPromptValue] = useState("");
+
+  const openDebug = useCallback(() => {
+    setPromptValue(dailySummary?.customPrompt ?? DEFAULT_DAILY_PROMPT);
+    setDebugOpen(true);
+  }, [dailySummary?.customPrompt]);
+
+  const savePrompt = useCallback(() => {
+    updateDailyPrompt({ date: dateString, customPrompt: promptValue });
+    setDebugOpen(false);
+  }, [updateDailyPrompt, dateString, promptValue]);
 
   return (
-    <Card className="bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Sparkles className="h-5 w-5 text-violet-500 flex-shrink-0" />
-            <span className="truncate">{isTodayView ? "Today's Summary" : "Daily Summary"}</span>
-          </CardTitle>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="hidden sm:block">
-              <ModelSelector
-                value={selectedModel}
-                onChange={setSelectedModel}
-                disabled={isGeneratingSummary}
-              />
-            </div>
+    <>
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-violet-500 shrink-0" />
+            <h3 className="text-sm font-medium">Today's Summary</h3>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <ModelSelector
+              value={selectedModel}
+              onChange={setSelectedModel}
+              disabled={isGeneratingSummary}
+            />
             <Button
               variant="ghost"
-              size="sm"
-              onClick={generateSummary}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => generateSummary(noteValue || undefined)}
               disabled={isGeneratingSummary}
-              className="gap-2 flex-shrink-0"
+              title={hasSummary ? "Regenerate summary" : "Generate summary"}
             >
               <RefreshCw
-                className={`h-4 w-4 ${isGeneratingSummary ? "animate-spin" : ""}`}
+                className={`h-3.5 w-3.5 ${isGeneratingSummary ? "animate-spin" : ""}`}
               />
-              <span className="hidden xs:inline">
-                {isGeneratingSummary
-                  ? "Generating..."
-                  : hasSummary
-                    ? "Regenerate"
-                    : "Generate"}
-              </span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={openDebug}
+              title="Edit prompt template"
+            >
+              <Wrench className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
-        {/* Mobile model selector */}
-        <div className="sm:hidden mt-2">
-          <ModelSelector
-            value={selectedModel}
-            onChange={setSelectedModel}
-            disabled={isGeneratingSummary}
-          />
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
+
+        {/* User note textarea */}
+        <Textarea
+          placeholder="Write a note for today..."
+          value={noteValue}
+          onChange={(e) => handleNoteChange(e.target.value)}
+          onBlur={handleNoteBlur}
+          className="min-h-[60px] text-sm resize-none mb-3"
+          rows={2}
+        />
+
+        {/* AI Summary display */}
         {isLoadingSummary ? (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-3/4" />
           </div>
         ) : isGeneratingSummary ? (
-          <div className="flex items-center gap-3 py-4">
-            <div className="h-6 w-6 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
-            <span className="text-muted-foreground">
-              Generating AI summary with {selectedModel.split("/")[1]}...
-            </span>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Generating summary...
+          </p>
         ) : hasSummary ? (
-          <div>
-            <p className="text-sm leading-relaxed">{dailySummary.aiSummary}</p>
-            <div className="flex flex-col gap-2 mt-3 sm:flex-row sm:items-center sm:justify-between">
-              <UsageDisplay
-                usage={dailySummary.usage ?? null}
-                model={dailySummary.model}
-              />
-              {dailySummary.generatedAt && (
-                <p className="text-xs text-muted-foreground">
-                  Generated at {formatGeneratedTime(dailySummary.generatedAt)}
-                </p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+              {dailySummary.aiSummary}
+            </p>
+            <UsageDisplay
+              usage={dailySummary.usage ?? null}
+              model={dailySummary.model}
+            />
           </div>
         ) : (
-          <div className="text-center py-6">
-            <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-            <p className="text-muted-foreground mb-3">
-              No summary generated yet
-            </p>
-            <Button
-              onClick={generateSummary}
-              disabled={isGeneratingSummary}
-              className="gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Generate Summary
-            </Button>
-            <p className="text-xs text-muted-foreground mt-3">
-              AI will analyze your habits, tasks, and priorities
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            No summary yet — click generate to create one.
+          </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Debug prompt dialog */}
+      <Dialog open={debugOpen} onOpenChange={setDebugOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Daily Summary Prompt Template</DialogTitle>
+            <DialogDescription>
+              Edit the prompt template used to generate the daily summary.
+              Available placeholders: {"{date}"}, {"{userNote}"},{" "}
+              {"{eventsFormatted}"}, {"{topPriorityCount}"},{" "}
+              {"{topTasksFormatted}"}, {"{totalTasks}"},{" "}
+              {"{otherTasksFormatted}"}, {"{overdueCount}"},{" "}
+              {"{overdueTasksFormatted}"}, {"{habitCompletionCount}"},{" "}
+              {"{totalHabits}"}, {"{habitNames}"}, {"{memosFormatted}"}.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={promptValue}
+            onChange={(e) => setPromptValue(e.target.value)}
+            className="min-h-[300px] text-sm font-mono"
+            rows={12}
+          />
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPromptValue(DEFAULT_DAILY_PROMPT)}
+            >
+              Reset to Default
+            </Button>
+            <Button onClick={savePrompt}>Save Prompt</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

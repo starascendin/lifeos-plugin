@@ -6,32 +6,38 @@ import { TasksSection } from "./TasksSection";
 import { VoiceMemoRecorder } from "./VoiceMemoRecorder";
 import { ScreenTimeSummary } from "./ScreenTimeSummary";
 import { useAgenda } from "@/lib/contexts/AgendaContext";
+import { Card } from "@/components/ui/card";
 
 export function DailyView() {
   const { dateString } = useAgenda();
 
   return (
-    <div className="p-4 space-y-4 md:p-6 md:space-y-6">
-      {/* AI Summary at top */}
-      <AISummarySection />
+    <div className="max-w-7xl mx-auto">
+      {/* Main + Sidebar */}
+      <div className="flex flex-col lg:flex-row gap-4 p-4 md:p-6">
+        {/* Center column - cards */}
+        <div className="flex-1 min-w-0 space-y-4">
+          <Card>
+            <AISummarySection />
+          </Card>
+          <Card>
+            <CalendarEventsSection />
+          </Card>
+          <Card>
+            <TasksSection />
+          </Card>
+          <Card>
+            <HabitsSection />
+          </Card>
+        </div>
 
-      {/* Daily Fields section */}
-      <DailyFieldsSection />
-
-      {/* Calendar events section */}
-      <CalendarEventsSection />
-
-      {/* Two-column layout for habits and tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        <HabitsSection />
-        <TasksSection />
+        {/* Right panel - compact, no cards */}
+        <div className="w-full lg:w-72 xl:w-80 space-y-4">
+          <DailyFieldsSection />
+          <VoiceMemoRecorder date={dateString} />
+          <ScreenTimeSummary />
+        </div>
       </div>
-
-      {/* Voice memo recording */}
-      <VoiceMemoRecorder date={dateString} />
-
-      {/* Screen time summary */}
-      <ScreenTimeSummary />
     </div>
   );
 }

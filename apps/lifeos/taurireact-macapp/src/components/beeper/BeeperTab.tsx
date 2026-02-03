@@ -78,28 +78,32 @@ export function BeeperTab() {
     }
   }, [selectedThread]);
 
-  // Manual sync and refresh handler - actually syncs from Beeper source
+  // Manual sync and refresh handler - syncs from Beeper source + cloud
   const handleSyncAndRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // Actually sync from Beeper source (runs pnpm sync && pnpm clean)
+      // 1. Sync from Beeper source (runs pnpm sync && pnpm clean)
       const result = await syncBeeperDatabase();
       if (result.success) {
-        // Then refresh UI from the updated database
+        // 2. Refresh UI from the updated database
         await checkDatabase();
         await loadThreads();
-        const now = new Date();
-        setLastRefreshTime(now);
+        // 3. Sync business threads to cloud (if any)
+        if (businessMarks.size > 0) {
+          await syncAll();
+        }
+        setLastRefreshTime(new Date());
       } else {
         console.error("Beeper sync failed:", result.error);
         // Still try to refresh the UI even if sync failed
         await checkDatabase();
         await loadThreads();
+        setLastRefreshTime(new Date());
       }
     } finally {
       setIsRefreshing(false);
     }
-  }, [checkDatabase, loadThreads]);
+  }, [checkDatabase, loadThreads, businessMarks.size, syncAll]);
 
   // Calculate time until next refresh
   const calculateNextRefreshIn = useCallback(() => {
@@ -142,13 +146,13 @@ export function BeeperTab() {
     }
   }, [hasDatabaseSynced, loadThreads]);
 
-  // Auto-refresh timer setup
+  // Auto-refresh timer setup - performs full sync every 3 minutes
   useEffect(() => {
     if (!hasDatabaseSynced) {
       return;
     }
 
-    // Auto-refresh function
+    // Auto-refresh function - does full sync from Beeper source + cloud sync
     const performAutoRefresh = async () => {
       const now = Date.now();
       const lastRefresh = lastRefreshTimeRef.current?.getTime() || 0;
@@ -157,8 +161,21 @@ export function BeeperTab() {
       if (now - lastRefresh >= AUTO_REFRESH_INTERVAL) {
         setIsRefreshing(true);
         try {
-          await checkDatabase();
-          await loadThreads();
+          // 1. Sync from Beeper source (updates local DuckDB)
+          const result = await syncBeeperDatabase();
+          if (result.success) {
+            // 2. Refresh UI from updated database
+            await checkDatabase();
+            await loadThreads();
+            // 3. Sync business threads to cloud (if any)
+            if (businessMarks.size > 0) {
+              await syncAll();
+            }
+          } else {
+            // Still try to refresh UI even if sync failed
+            await checkDatabase();
+            await loadThreads();
+          }
           setLastRefreshTime(new Date());
         } finally {
           setIsRefreshing(false);
@@ -185,7 +202,7 @@ export function BeeperTab() {
         clearInterval(countdownTimerRef.current);
       }
     };
-  }, [hasDatabaseSynced, checkDatabase, loadThreads, calculateNextRefreshIn]);
+  }, [hasDatabaseSynced, checkDatabase, loadThreads, calculateNextRefreshIn, businessMarks.size, syncAll]);
 
   // Handle search submit
   const handleSearch = () => {
@@ -249,13 +266,25 @@ export function BeeperTab() {
       {/* Compact Header */}
       <div className="border-b px-4 py-2 flex-shrink-0">
         <div className="flex items-center gap-3">
-          {/* Title */}
+          {/* Title and sync status */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <MessageCircle className="w-4 h-4 text-muted-foreground" />
             <h1 className="text-sm font-semibold">Beeper</h1>
             {businessCount > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
                 {businessCount}
+              </span>
+            )}
+            {/* Last sync time display */}
+            {lastRefreshTime && (
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {isRefreshing ? "Syncing..." : formatTimeAgo(lastRefreshTime)}
+                {!isRefreshing && nextRefreshIn != null && nextRefreshIn > 0 && (
+                  <span className="text-muted-foreground/60">
+                    · {formatCountdown(nextRefreshIn)}
+                  </span>
+                )}
               </span>
             )}
           </div>

@@ -181,6 +181,135 @@ export const getPersonMeetings = query({
   },
 });
 
+/**
+ * Get all linked sources for a person - unified view of all data sources.
+ * Returns: Beeper threads, Granola meetings, Fathom meetings, contact emails, and origin info.
+ */
+export const getPersonLinkedSources = query({
+  args: {
+    personId: v.id("lifeos_frmPeople"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const person = await ctx.db.get(args.personId);
+    if (!person || person.userId !== user._id) {
+      return null;
+    }
+
+    // Get Beeper threads linked to this person
+    const beeperThreads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_linkedPerson", (q) => q.eq("linkedPersonId", args.personId))
+      .collect();
+    const filteredBeeperThreads = beeperThreads.filter(
+      (t) => t.userId === user._id
+    );
+
+    // Get Granola meetings linked to this person
+    const granolaPersonLinks = await ctx.db
+      .query("life_granolaMeetingPersonLinks")
+      .withIndex("by_person", (q) => q.eq("personId", args.personId))
+      .collect();
+
+    const granolaMeetings = await Promise.all(
+      granolaPersonLinks.map(async (link) => {
+        try {
+          const meeting = await ctx.db.get(link.meetingId);
+          if (!meeting) return null;
+          return {
+            meetingId: meeting._id,
+            granolaDocId: meeting.granolaDocId,
+            title: meeting.title,
+            granolaCreatedAt: meeting.granolaCreatedAt,
+            resumeMarkdown: meeting.resumeMarkdown?.slice(0, 300),
+            linkSource: link.linkSource,
+            aiConfidence: link.aiConfidence,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    // Get Fathom meetings via unified meeting links
+    const meetingLinks = await ctx.db
+      .query("lifeos_meetingPersonLinks")
+      .withIndex("by_person", (q) => q.eq("personId", args.personId))
+      .collect();
+
+    const fathomLinks = meetingLinks.filter((l) => l.meetingSource === "fathom");
+    const fathomMeetings = await Promise.all(
+      fathomLinks.map(async (link) => {
+        try {
+          const meeting = await ctx.db.get(
+            link.meetingId as Id<"life_fathomMeetings">
+          );
+          if (!meeting) return null;
+          return {
+            meetingId: meeting._id,
+            title: meeting.title,
+            fathomCreatedAt: meeting.fathomCreatedAt,
+            fathomUrl: meeting.fathomUrl,
+            attendeeCount: meeting.calendarInvitees?.length ?? 0,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    // Get contact emails
+    const emails = await ctx.db
+      .query("lifeos_contactEmails")
+      .withIndex("by_person", (q) => q.eq("personId", args.personId))
+      .collect();
+
+    // Build sources summary
+    const sources: string[] = [];
+    if (person.autoCreatedFrom) {
+      sources.push(person.autoCreatedFrom);
+    }
+    if (filteredBeeperThreads.length > 0 && !sources.includes("beeper")) {
+      sources.push("beeper");
+    }
+    if (granolaMeetings.filter(Boolean).length > 0 && !sources.includes("granola")) {
+      sources.push("granola");
+    }
+    if (fathomMeetings.filter(Boolean).length > 0 && !sources.includes("fathom")) {
+      sources.push("fathom");
+    }
+    // Check email sources
+    for (const email of emails) {
+      if (!sources.includes(email.source)) {
+        sources.push(email.source);
+      }
+    }
+
+    return {
+      personId: args.personId,
+      autoCreatedFrom: person.autoCreatedFrom,
+      sources,
+      beeperThreads: filteredBeeperThreads.map((t) => ({
+        _id: t._id,
+        threadId: t.threadId,
+        threadName: t.threadName,
+        threadType: t.threadType,
+        messageCount: t.messageCount,
+        lastMessageAt: t.lastMessageAt,
+        businessNote: t.businessNote,
+      })),
+      granolaMeetings: granolaMeetings.filter(Boolean),
+      fathomMeetings: fathomMeetings.filter(Boolean),
+      emails: emails.map((e) => ({
+        email: e.email,
+        source: e.source,
+        isPrimary: e.isPrimary,
+      })),
+    };
+  },
+});
+
 // ==================== MUTATIONS ====================
 
 /**

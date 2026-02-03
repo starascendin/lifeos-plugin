@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAgenda } from "@/lib/contexts/AgendaContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Target, CheckCircle2, SkipForward, MessageSquare, Check, X, Circle } from "lucide-react";
@@ -14,7 +13,6 @@ import {
 import { SkipHabitDialog } from "@/components/habits/SkipHabitDialog";
 import type { Doc, Id } from "@holaai/convex";
 
-// Habit states: pending, complete, incomplete, skipped
 type HabitState = "pending" | "complete" | "incomplete" | "skipped";
 
 interface HabitCheckItemProps {
@@ -30,7 +28,6 @@ interface HabitCheckItemProps {
 
 function HabitCheckItem({ habit, state, onToggle, onCheck, onUncheck, onMarkIncomplete, onSkip, onSkipWithReason }: HabitCheckItemProps) {
   const handleClick = (e: React.MouseEvent) => {
-    // Prevent double-triggering when clicking the checkbox
     e.stopPropagation();
     onToggle();
   };
@@ -43,24 +40,24 @@ function HabitCheckItem({ habit, state, onToggle, onCheck, onUncheck, onMarkInco
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
-          className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+          className="flex items-center gap-2.5 py-1.5 px-1 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
           onClick={handleClick}
         >
           <Checkbox
             checked={isChecked}
             onCheckedChange={() => onToggle()}
             onClick={(e) => e.stopPropagation()}
-            className="h-5 w-5"
+            className="h-4 w-4"
           />
-          <span className="text-lg">{habit.icon}</span>
+          <span className="text-base">{habit.icon}</span>
           <span
-            className={`flex-1 ${isChecked ? "line-through text-muted-foreground" : ""} ${isSkipped ? "line-through text-muted-foreground italic" : ""} ${isIncomplete ? "text-red-500/70" : ""}`}
+            className={`flex-1 text-sm ${isChecked ? "line-through text-muted-foreground" : ""} ${isSkipped ? "line-through text-muted-foreground italic" : ""} ${isIncomplete ? "text-red-500/70" : ""}`}
           >
             {habit.name}
           </span>
-          {isChecked && <CheckCircle2 className="h-4 w-4 text-green-500" />}
-          {isIncomplete && <X className="h-4 w-4 text-red-500" />}
-          {isSkipped && <SkipForward className="h-4 w-4 text-yellow-500" />}
+          {isChecked && <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />}
+          {isIncomplete && <X className="h-3.5 w-3.5 text-red-500" />}
+          {isSkipped && <SkipForward className="h-3.5 w-3.5 text-yellow-500" />}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
@@ -108,54 +105,23 @@ export function HabitsSection() {
   const [selectedHabitForSkip, setSelectedHabitForSkip] = useState<Doc<"lifeos_habits"> | null>(null);
 
   const handleToggle = async (habitId: Id<"lifeos_habits">) => {
-    await toggleHabitCheckIn({
-      habitId,
-      date: dateString,
-    });
+    await toggleHabitCheckIn({ habitId, date: dateString });
   };
 
   const handleCheck = async (habitId: Id<"lifeos_habits">) => {
-    try {
-      await checkHabit({
-        habitId,
-        date: dateString,
-      });
-    } catch (error) {
-      console.error("Failed to check habit:", error);
-    }
+    try { await checkHabit({ habitId, date: dateString }); } catch (error) { console.error("Failed to check habit:", error); }
   };
 
   const handleUncheck = async (habitId: Id<"lifeos_habits">) => {
-    try {
-      await uncheckHabit({
-        habitId,
-        date: dateString,
-      });
-    } catch (error) {
-      console.error("Failed to uncheck habit:", error);
-    }
+    try { await uncheckHabit({ habitId, date: dateString }); } catch (error) { console.error("Failed to uncheck habit:", error); }
   };
 
   const handleQuickSkip = async (habitId: Id<"lifeos_habits">) => {
-    try {
-      await skipHabitCheckIn({
-        habitId,
-        date: dateString,
-      });
-    } catch (error) {
-      console.error("Failed to skip habit:", error);
-    }
+    try { await skipHabitCheckIn({ habitId, date: dateString }); } catch (error) { console.error("Failed to skip habit:", error); }
   };
 
   const handleMarkIncomplete = async (habitId: Id<"lifeos_habits">) => {
-    try {
-      await markIncomplete({
-        habitId,
-        date: dateString,
-      });
-    } catch (error) {
-      console.error("Failed to mark habit incomplete:", error);
-    }
+    try { await markIncomplete({ habitId, date: dateString }); } catch (error) { console.error("Failed to mark habit incomplete:", error); }
   };
 
   const handleSkipWithReasonClick = (habit: Doc<"lifeos_habits">) => {
@@ -166,14 +132,8 @@ export function HabitsSection() {
   const handleSkipConfirm = async (reason?: string) => {
     if (!selectedHabitForSkip) return;
     try {
-      await skipHabitCheckIn({
-        habitId: selectedHabitForSkip._id,
-        date: dateString,
-        reason,
-      });
-    } catch (error) {
-      console.error("Failed to skip habit:", error);
-    }
+      await skipHabitCheckIn({ habitId: selectedHabitForSkip._id, date: dateString, reason });
+    } catch (error) { console.error("Failed to skip habit:", error); }
   };
 
   const getHabitState = (habitId: Id<"lifeos_habits">): HabitState => {
@@ -183,69 +143,65 @@ export function HabitsSection() {
     if (!checkIn) return "pending";
     if (checkIn.completed) return "complete";
     if (checkIn.skipped) return "skipped";
-    // Record exists but not completed and not skipped = incomplete
     return "incomplete";
   };
 
-  // Calculate completion stats
-  const completedCount =
-    todaysHabits?.filter((h) => isHabitCompleted(h._id)).length ?? 0;
+  const completedCount = todaysHabits?.filter((h) => isHabitCompleted(h._id)).length ?? 0;
   const totalCount = todaysHabits?.length ?? 0;
-  const completionPercentage =
-    totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Target className="h-5 w-5" />
-              Today's Habits
-            </CardTitle>
-            <div className="text-sm text-muted-foreground">
-              {completedCount}/{totalCount} ({completionPercentage}%)
-            </div>
+      <div className="p-4 md:p-5">
+        {/* Section header with progress */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-medium">Habits</h3>
           </div>
-          {/* Progress bar */}
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 transition-all duration-300"
-              style={{ width: `${completionPercentage}%` }}
-            />
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {completedCount}/{totalCount}
+          </span>
+        </div>
+
+        {/* Compact progress bar */}
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2">
+          <div
+            className="h-full bg-green-500 transition-all duration-300"
+            style={{ width: `${completionPercentage}%` }}
+          />
+        </div>
+
+        {/* Content */}
+        {isLoadingHabits ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {isLoadingHabits ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : todaysHabits && todaysHabits.length > 0 ? (
-            <div className="space-y-1">
-              {todaysHabits.map((habit) => (
-                <HabitCheckItem
-                  key={habit._id}
-                  habit={habit}
-                  state={getHabitState(habit._id)}
-                  onToggle={() => handleToggle(habit._id)}
-                  onCheck={() => handleCheck(habit._id)}
-                  onUncheck={() => handleUncheck(habit._id)}
-                  onMarkIncomplete={() => handleMarkIncomplete(habit._id)}
-                  onSkip={() => handleQuickSkip(habit._id)}
-                  onSkipWithReason={() => handleSkipWithReasonClick(habit)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No habits scheduled for today</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        ) : todaysHabits && todaysHabits.length > 0 ? (
+          <div className="space-y-0.5">
+            {todaysHabits.map((habit) => (
+              <HabitCheckItem
+                key={habit._id}
+                habit={habit}
+                state={getHabitState(habit._id)}
+                onToggle={() => handleToggle(habit._id)}
+                onCheck={() => handleCheck(habit._id)}
+                onUncheck={() => handleUncheck(habit._id)}
+                onMarkIncomplete={() => handleMarkIncomplete(habit._id)}
+                onSkip={() => handleQuickSkip(habit._id)}
+                onSkipWithReason={() => handleSkipWithReasonClick(habit)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4 text-muted-foreground">
+            <Target className="h-5 w-5 mx-auto mb-1 opacity-40" />
+            <p className="text-xs">No habits scheduled</p>
+          </div>
+        )}
+      </div>
 
       <SkipHabitDialog
         open={skipDialogOpen}
