@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, afterUpdate, onDestroy } from 'svelte';
+	import { onMount, afterUpdate, onDestroy, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import {
 		Send,
@@ -35,12 +35,27 @@
 	let skipPermissions = true;
 	let streamJson = true;
 	let selectedPreset: number | null = null;
+	let shouldAutoScroll = true;
+	let lastMessageCount = 0;
 
+	// Only auto-scroll when user is near the bottom or new messages arrive from sending
 	afterUpdate(() => {
-		if (messagesContainer) {
+		if (!messagesContainer) return;
+		const newCount = $chat.messages.length;
+		const isNewMessage = newCount > lastMessageCount;
+		lastMessageCount = newCount;
+
+		if (shouldAutoScroll || isNewMessage || $chat.isStreaming) {
 			messagesContainer.scrollTop = messagesContainer.scrollHeight;
 		}
 	});
+
+	function handleScroll() {
+		if (!messagesContainer) return;
+		const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
+		// Consider "near bottom" if within 100px of the bottom
+		shouldAutoScroll = scrollHeight - scrollTop - clientHeight < 100;
+	}
 
 	onMount(async () => {
 		await configs.refresh();
@@ -136,7 +151,7 @@
 	$: statusTooltip = `${$chat.connectionStatus}${$chat.podName ? ` • ${$chat.podName}` : ''}${$chat.systemInfo?.model ? ` • ${$chat.systemInfo.model}` : ''}`;
 </script>
 
-<div class="flex h-[calc(100vh-56px)] md:h-screen">
+<div class="chat-page-root">
 	<!-- Thread History Sidebar -->
 	<Sheet.Root bind:open={showHistory}>
 		<Sheet.Content side="left" class="w-72 p-0 pt-safe">
@@ -334,7 +349,7 @@
 		</header>
 
 		<!-- Messages -->
-		<div bind:this={messagesContainer} class="flex-1 space-y-4 overflow-y-auto p-4">
+		<div bind:this={messagesContainer} on:scroll={handleScroll} class="flex-1 space-y-4 overflow-y-auto p-4">
 			{#if $chat.messages.length === 0 && !$chat.isStreaming}
 				<div class="flex h-full flex-col items-center justify-center px-4 text-center">
 					<div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
@@ -432,3 +447,24 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.chat-page-root {
+		display: flex;
+		position: fixed;
+		top: env(safe-area-inset-top);
+		left: 0;
+		right: 0;
+		/* 4.25rem = bottom nav content height, plus safe area */
+		bottom: calc(4.25rem + env(safe-area-inset-bottom));
+		overflow: hidden;
+	}
+
+	@media (min-width: 768px) {
+		.chat-page-root {
+			top: 0;
+			left: 16rem;
+			bottom: 0;
+		}
+	}
+</style>
