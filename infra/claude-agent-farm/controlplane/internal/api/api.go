@@ -1336,6 +1336,87 @@ func (a *API) GetEnvVarDefaults(c echo.Context) error {
 	return c.JSON(http.StatusOK, defaults)
 }
 
+// --- Conversation Endpoints ---
+
+// UpdateConversationRequest is the request body for updating a conversation
+type UpdateConversationRequest struct {
+	Title      *string `json:"title,omitempty"`
+	IsArchived *bool   `json:"isArchived,omitempty"`
+}
+
+// ListConversations returns conversations from Convex
+func (a *API) ListConversations(c echo.Context) error {
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	if limit <= 0 {
+		limit = 50
+	}
+	includeArchived := c.QueryParam("include_archived") == "true"
+
+	conversations, err := a.convex.ListConversations(limit, includeArchived)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Failed to list conversations: %v", err),
+		})
+	}
+	return c.JSON(http.StatusOK, conversations)
+}
+
+// GetConversationMessages returns messages for a conversation
+func (a *API) GetConversationMessages(c echo.Context) error {
+	id := c.Param("id")
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	if limit <= 0 {
+		limit = 100
+	}
+
+	messages, err := a.convex.GetMessages(id, limit)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Failed to get messages: %v", err),
+		})
+	}
+	return c.JSON(http.StatusOK, messages)
+}
+
+// UpdateConversation updates a conversation's metadata
+func (a *API) UpdateConversation(c echo.Context) error {
+	id := c.Param("id")
+
+	var req UpdateConversationRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request body",
+		})
+	}
+
+	convexReq := &convex.UpdateConversationRequest{}
+	if req.Title != nil {
+		convexReq.Title = *req.Title
+	}
+	if req.IsArchived != nil {
+		convexReq.IsArchived = req.IsArchived
+	}
+
+	if err := a.convex.UpdateConversation(id, convexReq); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Failed to update conversation: %v", err),
+		})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// DeleteConversation deletes a conversation
+func (a *API) DeleteConversation(c echo.Context) error {
+	id := c.Param("id")
+
+	if err := a.convex.DeleteConversation(id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": fmt.Sprintf("Failed to delete conversation: %v", err),
+		})
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 // ClearMCPCache clears the npx cache on all running agent pods
 func (a *API) ClearMCPCache(c echo.Context) error {
 	if a.k8sClient == nil {

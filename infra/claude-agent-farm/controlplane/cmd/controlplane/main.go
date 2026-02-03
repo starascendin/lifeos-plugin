@@ -101,6 +101,12 @@ func main() {
 		// Chat
 		apiGroup.GET("/chat/send", apiHandler.ChatSend)
 
+		// Conversations
+		apiGroup.GET("/conversations", apiHandler.ListConversations)
+		apiGroup.GET("/conversations/:id/messages", apiHandler.GetConversationMessages)
+		apiGroup.PUT("/conversations/:id", apiHandler.UpdateConversation)
+		apiGroup.DELETE("/conversations/:id", apiHandler.DeleteConversation)
+
 		// MCP Utilities
 		apiGroup.POST("/mcp/convert-json", apiHandler.ConvertJSONToTOML)
 		apiGroup.GET("/mcp/presets", apiHandler.GetMCPPresets)

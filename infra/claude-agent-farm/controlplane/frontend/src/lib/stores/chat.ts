@@ -6,9 +6,11 @@ import type {
   ToolCall,
   StreamSystemInit,
   StreamEvent,
-  StreamToolResult
+  StreamToolResult,
+  ServerConversation,
+  ServerMessage
 } from '$lib/api/types'
-import { sendChatMessage } from '$lib/api/client'
+import { sendChatMessage, getConversations, getConversationMessages, deleteConversation as apiDeleteConversation } from '$lib/api/client'
 
 const STORAGE_KEY = 'claude-chat-threads'
 
@@ -26,6 +28,8 @@ const error = writable<string | null>(null)
 const systemInfo = writable<StreamSystemInit | null>(null)
 const threads = writable<ChatThread[]>([])
 const streamEvents = writable<StreamEvent[]>([])
+const serverConversations = writable<ServerConversation[]>([])
+const conversationsLoading = writable(false)
 
 let closeStream: (() => void) | null = null
 
@@ -306,6 +310,61 @@ function clearAllThreads() {
   newThread()
 }
 
+async function fetchConversations() {
+  conversationsLoading.set(true)
+  try {
+    const convos = await getConversations(50, false)
+    serverConversations.set(convos || [])
+  } catch (e) {
+    console.error('Failed to fetch conversations:', e)
+  } finally {
+    conversationsLoading.set(false)
+  }
+}
+
+async function loadServerConversation(convo: ServerConversation) {
+  stop()
+  try {
+    const serverMessages = await getConversationMessages(convo._id)
+    const chatMessages: ChatMessage[] = (serverMessages || []).map((m: ServerMessage) => ({
+      id: m._id,
+      role: m.role,
+      content: m.content,
+      timestamp: new Date(m.createdAt).toISOString(),
+    }))
+    messages.set(chatMessages)
+    threadId.set(convo.threadId)
+    podName.set(convo.podName || null)
+    systemInfo.set(null)
+    streamingContent.set('')
+    streamingToolCalls.set([])
+    streamEvents.set([])
+    error.set(null)
+    connectionStatus.set('disconnected')
+  } catch (e) {
+    console.error('Failed to load conversation:', e)
+    error.set('Failed to load conversation')
+  }
+}
+
+async function deleteServerConversation(id: string) {
+  try {
+    // Check if this conversation is the currently active one before deleting
+    const currentTid = get(threadId)
+    const allConvos = get(serverConversations)
+    const deletedConvo = allConvos.find(c => c._id === id)
+
+    await apiDeleteConversation(id)
+    serverConversations.update(convos => convos.filter(c => c._id !== id))
+
+    if (deletedConvo && deletedConvo.threadId === currentTid) {
+      newThread()
+    }
+  } catch (e) {
+    console.error('Failed to delete conversation:', e)
+  }
+}
+
 function selectAgent(agentName: string | null, agentId: string | number | null = null) {
   const currentAgentId = get(selectedAgentId)
   selectedAgent.set(agentName)
@@ -318,8 +377,8 @@ function selectAgent(agentName: string | null, agentId: string | number | null =
 
 // Combine into a single derived store for easy $chat access
 export const chat = derived(
-  [messages, threadId, podName, selectedAgent, selectedAgentId, isStreaming, streamingContent, streamingToolCalls, connectionStatus, error, systemInfo, threads, streamEvents],
-  ([$messages, $threadId, $podName, $selectedAgent, $selectedAgentId, $isStreaming, $streamingContent, $streamingToolCalls, $connectionStatus, $error, $systemInfo, $threads, $streamEvents]) => ({
+  [messages, threadId, podName, selectedAgent, selectedAgentId, isStreaming, streamingContent, streamingToolCalls, connectionStatus, error, systemInfo, threads, streamEvents, serverConversations, conversationsLoading],
+  ([$messages, $threadId, $podName, $selectedAgent, $selectedAgentId, $isStreaming, $streamingContent, $streamingToolCalls, $connectionStatus, $error, $systemInfo, $threads, $streamEvents, $serverConversations, $conversationsLoading]) => ({
     messages: $messages,
     threadId: $threadId,
     podName: $podName,
@@ -333,6 +392,8 @@ export const chat = derived(
     systemInfo: $systemInfo,
     threads: $threads,
     streamEvents: $streamEvents,
+    serverConversations: $serverConversations,
+    conversationsLoading: $conversationsLoading,
   })
 )
 
@@ -344,5 +405,8 @@ export const chatActions = {
   loadThread,
   deleteThread,
   clearAllThreads,
-  selectAgent
+  selectAgent,
+  fetchConversations,
+  loadServerConversation,
+  deleteServerConversation
 }

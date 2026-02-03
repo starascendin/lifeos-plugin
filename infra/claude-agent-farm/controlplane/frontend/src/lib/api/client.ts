@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPPresets, MCPTomlConfig, GitHubRepo, Skill, SkillCreate, EnvVarDefault } from './types'
+import type { AgentConfig, AgentConfigCreate, RunningAgent, ChatEvent, MCPServer, MCPPresets, MCPTomlConfig, GitHubRepo, Skill, SkillCreate, EnvVarDefault, ServerConversation, ServerMessage } from './types'
 import { API_BASE } from '$lib/config'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
@@ -317,6 +317,26 @@ export async function toggleSkill(name: string, enabled: boolean): Promise<void>
     method: 'POST',
     body: JSON.stringify({ enabled }),
   })
+}
+
+// Conversations
+export async function getConversations(limit = 50, includeArchived = false): Promise<ServerConversation[]> {
+  return fetchJson<ServerConversation[]>(`/conversations?limit=${limit}&include_archived=${includeArchived}`)
+}
+
+export async function getConversationMessages(conversationId: string, limit = 100): Promise<ServerMessage[]> {
+  return fetchJson<ServerMessage[]>(`/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}`)
+}
+
+export async function updateConversation(conversationId: string, data: { title?: string; isArchived?: boolean }): Promise<void> {
+  await fetchJson<void>(`/conversations/${encodeURIComponent(conversationId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await fetchJson<void>(`/conversations/${encodeURIComponent(conversationId)}`, { method: 'DELETE' })
 }
 
 // System Info
