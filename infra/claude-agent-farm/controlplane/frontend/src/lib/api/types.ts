@@ -236,6 +236,33 @@ export interface ChatThread {
   systemInfo?: StreamSystemInit
 }
 
+// Server-side Conversation (from Convex)
+export interface ServerConversation {
+  _id: string
+  agentConfigId?: string
+  agentConfigName?: string
+  podName?: string
+  threadId: string
+  title?: string
+  isArchived: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ServerMessage {
+  _id: string
+  conversationId: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  metadata?: {
+    toolCalls?: Array<{ name: string; input?: string; output?: string }>
+    model?: string
+    tokens?: { prompt?: number; completion?: number }
+    error?: string
+  }
+  createdAt: number
+}
+
 // GitHub Repository
 export interface GitHubRepo {
   full_name: string

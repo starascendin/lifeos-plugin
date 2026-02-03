@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, afterUpdate, onDestroy } from 'svelte';
+	import { onMount, afterUpdate, onDestroy, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import {
 		Send,
@@ -11,7 +11,8 @@
 		ChevronDown,
 		Wrench,
 		Bot,
-		Info
+		Info,
+		Loader2
 	} from 'lucide-svelte';
 	import ChatMessage from '$lib/components/ChatMessage.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -23,7 +24,7 @@
 	import { chat, chatActions } from '$lib/stores/chat';
 	import { configs } from '$lib/stores/configs';
 	import { agents } from '$lib/stores/agents';
-	import type { ChatThread, ToolCall } from '$lib/api/types';
+	import type { ChatThread, ToolCall, ServerConversation } from '$lib/api/types';
 
 	let messageInput = '';
 	let messagesContainer: HTMLElement;
@@ -34,16 +35,32 @@
 	let skipPermissions = true;
 	let streamJson = true;
 	let selectedPreset: number | null = null;
+	let shouldAutoScroll = true;
+	let lastMessageCount = 0;
 
+	// Only auto-scroll when user is near the bottom or new messages arrive from sending
 	afterUpdate(() => {
-		if (messagesContainer) {
+		if (!messagesContainer) return;
+		const newCount = $chat.messages.length;
+		const isNewMessage = newCount > lastMessageCount;
+		lastMessageCount = newCount;
+
+		if (shouldAutoScroll || isNewMessage || $chat.isStreaming) {
 			messagesContainer.scrollTop = messagesContainer.scrollHeight;
 		}
 	});
 
+	function handleScroll() {
+		if (!messagesContainer) return;
+		const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
+		// Consider "near bottom" if within 100px of the bottom
+		shouldAutoScroll = scrollHeight - scrollTop - clientHeight < 100;
+	}
+
 	onMount(async () => {
 		await configs.refresh();
 		agents.startAutoRefresh(5000);
+		chatActions.fetchConversations();
 
 		// Auto-select agent from ?agent= query param
 		const agentParam = $page.url.searchParams.get('agent');
@@ -97,6 +114,21 @@
 		chatActions.deleteThread(id);
 	}
 
+	function loadServerConvo(convo: ServerConversation) {
+		chatActions.loadServerConversation(convo);
+		showHistory = false;
+	}
+
+	function deleteServerConvo(e: Event, id: string) {
+		e.stopPropagation();
+		chatActions.deleteServerConversation(id);
+	}
+
+	// Re-fetch conversations when sidebar opens
+	$: if (showHistory) {
+		chatActions.fetchConversations();
+	}
+
 	function getToolStatusColor(status: ToolCall['status']): string {
 		switch (status) {
 			case 'completed':
@@ -119,35 +151,44 @@
 	$: statusTooltip = `${$chat.connectionStatus}${$chat.podName ? ` • ${$chat.podName}` : ''}${$chat.systemInfo?.model ? ` • ${$chat.systemInfo.model}` : ''}`;
 </script>
 
-<div class="flex h-[calc(100vh-56px)] md:h-screen">
+<div class="chat-page-root">
 	<!-- Thread History Sidebar -->
 	<Sheet.Root bind:open={showHistory}>
-		<Sheet.Content side="left" class="w-72 p-0">
+		<Sheet.Content side="left" class="w-72 p-0 pt-safe">
 			<div class="flex h-full flex-col">
 				<Sheet.Header class="border-b px-4 py-3">
 					<Sheet.Title>History</Sheet.Title>
 				</Sheet.Header>
 				<ScrollArea class="flex-1">
-					{#if $chat.threads.length === 0}
+					{#if $chat.conversationsLoading}
+						<div class="flex items-center justify-center p-4">
+							<Loader2 class="h-5 w-5 animate-spin text-muted-foreground" />
+						</div>
+					{:else if $chat.serverConversations.length === 0}
 						<div class="p-4 text-center text-sm text-muted-foreground">No history</div>
 					{:else}
-						{#each [...$chat.threads].reverse() as thread}
+						{#each $chat.serverConversations as convo}
 							<button
-								on:click={() => loadThread(thread)}
+								on:click={() => loadServerConvo(convo)}
 								class={cn(
 									'w-full border-b px-4 py-3 text-left transition-colors hover:bg-accent',
-									$chat.threadId === thread.id && 'bg-accent'
+									$chat.threadId === convo.threadId && 'bg-accent'
 								)}
 							>
 								<div class="flex items-start justify-between gap-2">
 									<div class="min-w-0 flex-1">
-										<p class="truncate text-sm">{thread.title}</p>
-										<p class="mt-1 text-xs text-muted-foreground">
-											{new Date(thread.updatedAt).toLocaleDateString()}
-										</p>
+										<p class="truncate text-sm">{convo.title || 'Untitled'}</p>
+										<div class="mt-1 flex items-center gap-2">
+											{#if convo.agentConfigName}
+												<span class="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] text-blue-400">{convo.agentConfigName}</span>
+											{/if}
+											<span class="text-xs text-muted-foreground">
+												{new Date(convo.updatedAt).toLocaleDateString()}
+											</span>
+										</div>
 									</div>
 									<button
-										on:click={(e) => deleteThread(e, thread.id)}
+										on:click={(e) => deleteServerConvo(e, convo._id)}
 										class="p-1 text-muted-foreground hover:text-destructive"
 									>
 										<Trash2 class="h-4 w-4" />
@@ -157,16 +198,6 @@
 						{/each}
 					{/if}
 				</ScrollArea>
-				{#if $chat.threads.length > 0}
-					<div class="border-t p-3">
-						<button
-							on:click={() => chatActions.clearAllThreads()}
-							class="w-full py-2 text-xs text-destructive hover:text-destructive/80"
-						>
-							Clear all
-						</button>
-					</div>
-				{/if}
 			</div>
 		</Sheet.Content>
 	</Sheet.Root>
@@ -183,7 +214,7 @@
 						'flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-accent',
 						showHistory && 'bg-accent'
 					)}
-					title="History ({$chat.threads.length})"
+					title="History ({$chat.serverConversations.length})"
 				>
 					<History class="h-4 w-4" />
 				</button>
@@ -318,19 +349,19 @@
 		</header>
 
 		<!-- Messages -->
-		<div bind:this={messagesContainer} class="flex-1 space-y-4 overflow-y-auto p-4">
+		<div bind:this={messagesContainer} on:scroll={handleScroll} class="flex-1 space-y-4 overflow-y-auto p-4">
 			{#if $chat.messages.length === 0 && !$chat.isStreaming}
 				<div class="flex h-full flex-col items-center justify-center px-4 text-center">
 					<div class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
 						<Send class="h-6 w-6 text-muted-foreground" />
 					</div>
 					<p class="text-muted-foreground">Send a message to start</p>
-					{#if $chat.threads.length > 0}
+					{#if $chat.serverConversations.length > 0}
 						<button
 							on:click={() => (showHistory = true)}
 							class="mt-3 text-sm text-blue-400 hover:text-blue-300"
 						>
-							View {$chat.threads.length} previous chat{$chat.threads.length > 1 ? 's' : ''}
+							View {$chat.serverConversations.length} previous chat{$chat.serverConversations.length > 1 ? 's' : ''}
 						</button>
 					{/if}
 				</div>
@@ -416,3 +447,24 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.chat-page-root {
+		display: flex;
+		position: fixed;
+		top: env(safe-area-inset-top);
+		left: 0;
+		right: 0;
+		/* 4.25rem = bottom nav content height, plus safe area */
+		bottom: calc(4.25rem + env(safe-area-inset-bottom));
+		overflow: hidden;
+	}
+
+	@media (min-width: 768px) {
+		.chat-page-root {
+			top: 0;
+			left: 16rem;
+			bottom: 0;
+		}
+	}
+</style>
