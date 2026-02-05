@@ -20,6 +20,7 @@ spec:
       containers:
         - name: controlplane
           image: ghcr.io/starascendin/hola-monorepo-controlplane:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               name: http
