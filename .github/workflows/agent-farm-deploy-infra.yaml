@@ -2,7 +2,7 @@ name: Deploy Agent Farm - K8s Infrastructure
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - 'infra/claude-agent-farm/k8s/base/**'
       - 'infra/claude-agent-farm/k8s/storage/**'

@@ -48,9 +48,9 @@ spec:
                   key: LIFEOS_API_KEY
                   optional: true
             - name: LIFEOS_CONVEX_URL
-              value: "https://agreeable-ibex-949.convex.site"
+              value: "https://keen-nightingale-310.convex.site"
             - name: LIFEOS_USER_ID
-              value: "ks781knabdcchchddfwcaqwdn97zphqc"
+              value: "ks76a0j1wghbs07hhympkhz3kn80a13q"
           resources:
             requests:
               cpu: "100m"
