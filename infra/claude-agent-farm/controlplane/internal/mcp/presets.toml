@@ -15,14 +15,8 @@ allowed = [
 
 [servers.lifeos-dev]
 command = "npx"
-args = ["@starascendin/lifeos-mcp@latest", "--url", "https://beaming-giraffe-300.convex.site", "--user-id", "j9743f41z9e999ym1xvn1v013s7wqfq8", "--api-key", "${LIFEOS_API_KEY}"]
+args = ["@starascendin/lifeos-mcp@latest", "--url", "https://keen-nightingale-310.convex.site", "--user-id", "ks76a0j1wghbs07hhympkhz3kn80a13q", "--api-key", "${LIFEOS_API_KEY}"]
 description = "LifeOS MCP - Development"
-category = "lifeos"
-
-[servers.lifeos-prod]
-command = "npx"
-args = ["@starascendin/lifeos-mcp@latest", "--url", "https://agreeable-ibex-949.convex.site", "--user-id", "ks781knabdcchchddfwcaqwdn97zphqc", "--api-key", "${LIFEOS_API_KEY}"]
-description = "LifeOS MCP - Production"
 category = "lifeos"
 
 [servers.filesystem]
