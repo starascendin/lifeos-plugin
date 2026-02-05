@@ -32,6 +32,25 @@ const extractionOutputSchema = v.object({
   ),
 });
 
+// ==================== HELPERS ====================
+
+/**
+ * Extract a JSON string array from a potentially truncated JSON response.
+ * Matches `"key": ["val1", "val2", ...]` and returns the strings found.
+ */
+function extractJsonArray(content: string, key: string): string[] {
+  const regex = new RegExp(`"${key}"\\s*:\\s*\\[([^\\]]*)`, "s");
+  const match = content.match(regex);
+  if (!match) return [];
+  const items: string[] = [];
+  const strRegex = /"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = strRegex.exec(match[1])) !== null) {
+    items.push(m[1].replace(/\\"/g, '"').replace(/\\n/g, "\n"));
+  }
+  return items;
+}
+
 // ==================== QUERIES ====================
 
 /**
@@ -527,9 +546,33 @@ export const runExtraction = action({
           jsonContent = jsonMatch[1].trim();
         }
 
+        // Find the first { and last } to extract JSON object even if surrounded by text
+        const firstBrace = jsonContent.indexOf("{");
+        const lastBrace = jsonContent.lastIndexOf("}");
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+          jsonContent = jsonContent.substring(firstBrace, lastBrace + 1);
+        }
+
         parsed = JSON.parse(jsonContent);
       } catch {
-        throw new Error(`Failed to parse AI response as JSON: ${result.content.substring(0, 200)}`);
+        // If JSON is truncated/malformed, attempt to salvage partial data
+        const content = result.content;
+        const summaryMatch = content.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        if (summaryMatch) {
+          parsed = {
+            summary: summaryMatch[1].replace(/\\"/g, '"').replace(/\\n/g, "\n"),
+            labels: extractJsonArray(content, "labels"),
+            actionItems: extractJsonArray(content, "actionItems"),
+            keyPoints: extractJsonArray(content, "keyPoints"),
+            sentiment: "neutral",
+          };
+          const sentimentMatch = content.match(/"sentiment"\s*:\s*"(positive|neutral|negative)"/);
+          if (sentimentMatch) {
+            parsed.sentiment = sentimentMatch[1] as "positive" | "neutral" | "negative";
+          }
+        } else {
+          throw new Error(`Failed to parse AI response as JSON: ${content.substring(0, 200)}`);
+        }
       }
 
       // Validate sentiment value

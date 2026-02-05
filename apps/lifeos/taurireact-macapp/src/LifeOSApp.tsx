@@ -9,6 +9,7 @@ import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
 import { VoiceAgentProvider } from "./lib/contexts/VoiceAgentContext";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "./components/ui/sonner";
+import { useVoiceMemoAutoSync } from "./lib/hooks/useVoiceMemoAutoSync";
 import { LifeOSDashboard } from "./components/lifeos/Dashboard";
 import { LifeOSSettings } from "./components/lifeos/Settings";
 import { LifeOSChatNexus } from "./components/lifeos/ChatNexus";
@@ -34,6 +35,11 @@ import { LifeOSGranolaAI } from "./components/lifeos/GranolaAI";
 import { LifeOSFathomAI } from "./components/lifeos/FathomAI";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+
+function VoiceMemoAutoSyncRunner() {
+  useVoiceMemoAutoSync();
+  return null;
+}
 
 export default function LifeOSApp() {
   useEffect(() => {
@@ -90,6 +96,7 @@ export default function LifeOSApp() {
         </SignedOut>
         <SignedIn>
           <AuthGate>
+            <VoiceMemoAutoSyncRunner />
             <VoiceAgentProvider>
               <PomodoroProvider>
                 <Routes>

@@ -35,3 +35,6 @@ export { useEnsureUser } from "./useEnsureUser";
 
 // Chat nexus settings (existing)
 export { useChatNexusSettings } from "./useChatNexusSettings";
+
+// Voice memo auto-sync (background pipeline)
+export { useVoiceMemoAutoSync } from "./useVoiceMemoAutoSync";

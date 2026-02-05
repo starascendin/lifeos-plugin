@@ -43,9 +43,10 @@ export async function callGateway(
       max_tokens: request.maxTokens,
       temperature: request.temperature,
       stream: false,
-      // Only OpenAI models support response_format parameter
+      // response_format is supported by OpenAI and Google models via the gateway
       ...(request.responseFormat === "json" &&
-        request.model.startsWith("openai/") && {
+        (request.model.startsWith("openai/") ||
+          request.model.startsWith("google/")) && {
           response_format: { type: "json_object" },
         }),
     }),
@@ -101,9 +102,10 @@ export async function streamGateway(
       max_tokens: request.maxTokens,
       temperature: request.temperature,
       stream: true,
-      // Only OpenAI models support response_format parameter
+      // response_format is supported by OpenAI and Google models via the gateway
       ...(request.responseFormat === "json" &&
-        request.model.startsWith("openai/") && {
+        (request.model.startsWith("openai/") ||
+          request.model.startsWith("google/")) && {
           response_format: { type: "json_object" },
         }),
     }),

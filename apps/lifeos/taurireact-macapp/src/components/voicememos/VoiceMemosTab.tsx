@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { useConvex, useQuery } from "convex/react";
+import { useConvex, useQuery, useAction } from "convex/react";
 import { api } from "@holaai/convex";
 import { Id } from "@holaai/convex/convex/_generated/dataModel";
 import {
@@ -70,6 +70,9 @@ import {
   ChevronsRight,
   ChevronDown,
   Sparkles,
+  CheckCircle2,
+  Lightbulb,
+  Zap,
 } from "lucide-react";
 import {
   Tooltip,
@@ -77,6 +80,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExtractionDialog } from "./extraction";
 
 type ViewFilter = "all" | "transcribed" | "not_transcribed" | "cloud_only";
@@ -127,6 +131,12 @@ export function VoiceMemosTab() {
   const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isRunningAllSteps, setIsRunningAllSteps] = useState(false);
+  const [allStepsProgress, setAllStepsProgress] = useState<{
+    step: "transcribe" | "sync" | "extract";
+    extractCurrent: number;
+    extractTotal: number;
+  } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const convex = useConvex();
@@ -140,6 +150,9 @@ export function VoiceMemosTab() {
 
   // Query GROQ API key from Convex
   const groqApiKey = useQuery(api.lifeos.voicememo.getGroqApiKey, {});
+
+  // Action for AI extraction
+  const extractVoiceMemo = useAction(api.lifeos.voicememo_extraction.extractVoiceMemo);
 
   // Extraction dialog state
   const [extractionDialogOpen, setExtractionDialogOpen] = useState(false);
@@ -265,6 +278,106 @@ export function VoiceMemosTab() {
     }
   };
 
+  // Run all steps: Transcribe → Sync to Cloud → Extract AI Insights
+  // Handles memos at different stages — only runs the steps each memo still needs
+  const handleRunAllSteps = async () => {
+    if (selectedIds.size === 0) return;
+
+    const selectedMemos = memos.filter((m) => selectedIds.has(m.id));
+    const selectedMemoUuids = selectedMemos.map((m) => m.uuid);
+
+    // Split selected memos by what they need
+    const needsTranscription = selectedMemos.filter(
+      (m) => m.local_path && !m.transcription && !exceedsGroqLimit(m.file_size),
+    );
+
+    if (needsTranscription.length > 0 && !groqApiKey) {
+      toast.error("GROQ API Key Not Configured", {
+        description: "Please set GROQ_API_KEY in your Convex environment variables.",
+        duration: 10000,
+      });
+      return;
+    }
+
+    setIsRunningAllSteps(true);
+    setTranscriptionProgress(null);
+    setTranscriptionErrors([]);
+
+    let transcribedCount = 0;
+
+    try {
+      // Step 1: Transcribe (only memos that need it)
+      if (needsTranscription.length > 0) {
+        setAllStepsProgress({ step: "transcribe", extractCurrent: 0, extractTotal: 0 });
+        setIsTranscribing(true);
+        const memoIds = needsTranscription.map((m) => m.id);
+        const results = await transcribeVoiceMemosBatch(memoIds, groqApiKey!, setTranscriptionProgress);
+
+        const failed = results.filter((r) => !r.success && r.error);
+        if (failed.length > 0) {
+          setTranscriptionErrors(failed);
+        }
+        transcribedCount = results.filter((r) => r.success).length;
+        await loadMemos();
+        setIsTranscribing(false);
+        setTranscriptionProgress(null);
+      }
+
+      setSelectedIds(new Set());
+
+      // Step 2: Sync to Convex (syncs all transcribed memos, not just selected)
+      setAllStepsProgress({ step: "sync", extractCurrent: 0, extractTotal: 0 });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setConvexSyncProgress({ ...initialConvexSyncProgress, status: "preparing" });
+      await syncTranscriptsToConvex(convex, setConvexSyncProgress);
+
+      // Step 3: Extract AI insights for selected memos that don't have extraction
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const freshSyncedMemos = await convex.query(api.lifeos.voicememo.getSyncedMemosWithStatus, {});
+      const freshMap = new Map(freshSyncedMemos.map((m) => [m.localId, m]));
+
+      const memosToExtract = selectedMemoUuids
+        .map((uuid) => freshMap.get(uuid))
+        .filter((m): m is NonNullable<typeof m> => !!m && !m.hasExtraction);
+
+      let extractedCount = 0;
+      if (memosToExtract.length > 0) {
+        setAllStepsProgress({ step: "extract", extractCurrent: 0, extractTotal: memosToExtract.length });
+
+        for (const memoToExtract of memosToExtract) {
+          try {
+            setAllStepsProgress({ step: "extract", extractCurrent: extractedCount + 1, extractTotal: memosToExtract.length });
+            await extractVoiceMemo({ voiceMemoId: memoToExtract.convexId });
+            extractedCount++;
+          } catch (err) {
+            console.error(`Failed to extract insights for ${memoToExtract.name}:`, err);
+          }
+        }
+      }
+
+      // Summary toast
+      const parts: string[] = [];
+      if (transcribedCount > 0) parts.push(`${transcribedCount} transcribed`);
+      if (extractedCount > 0) parts.push(`${extractedCount} AI insights extracted`);
+      if (parts.length > 0) {
+        toast.success("All Steps Complete", { description: parts.join(", ") + "." });
+      } else {
+        toast.success("Pipeline Complete", { description: "All selected memos are up to date." });
+      }
+    } catch (error) {
+      console.error("Run all steps error:", error);
+      toast.error("Pipeline Failed", {
+        description: error instanceof Error ? error.message : String(error),
+        duration: 10000,
+      });
+    } finally {
+      setIsRunningAllSteps(false);
+      setIsTranscribing(false);
+      setTranscriptionProgress(null);
+      setAllStepsProgress(null);
+    }
+  };
+
   // Toggle selection
   const toggleSelection = (id: number) => {
     const newSelected = new Set(selectedIds);
@@ -294,25 +407,35 @@ export function VoiceMemosTab() {
   const eligibleForTranscription = (memo: VoiceMemo) =>
     memo.local_path && !memo.transcription && !exceedsGroqLimit(memo.file_size);
 
-  const eligibleOnPage = paginatedMemos.filter(eligibleForTranscription);
-  const eligibleOnPageIds = new Set(eligibleOnPage.map(m => m.id));
-  const allEligible = filteredMemos.filter(eligibleForTranscription);
-  const allEligibleIds = new Set(allEligible.map(m => m.id));
+  // Memo has incomplete pipeline steps: Transcribe → AI Extract → Sync
+  const hasIncompleteSteps = (memo: VoiceMemo) => {
+    // 1. Needs transcription
+    if (memo.local_path && !memo.transcription && !exceedsGroqLimit(memo.file_size)) return true;
+    // 2. Needs AI extraction (synced to cloud but no extraction)
+    const synced = syncedMemoMap.get(memo.uuid);
+    if (synced && !synced.hasExtraction) return true;
+    // 3. Has transcript but not synced to cloud yet
+    if (memo.transcription && !syncedUuidSet.has(memo.uuid)) return true;
+    return false;
+  };
 
-  const selectedOnPage = paginatedMemos.filter(m => selectedIds.has(m.id) && eligibleForTranscription(m));
-  const isAllPageSelected = eligibleOnPage.length > 0 && eligibleOnPage.every(m => selectedIds.has(m.id));
+  const incompleteOnPage = paginatedMemos.filter(hasIncompleteSteps);
+  const allIncomplete = filteredMemos.filter(hasIncompleteSteps);
+
+  const selectedOnPage = paginatedMemos.filter(m => selectedIds.has(m.id));
+  const isAllPageSelected = incompleteOnPage.length > 0 && incompleteOnPage.every(m => selectedIds.has(m.id));
   const isSomePageSelected = selectedOnPage.length > 0 && !isAllPageSelected;
 
-  // Select all eligible on current page
+  // Select all with incomplete steps on current page
   const selectAllOnPage = () => {
     const newSelected = new Set(selectedIds);
-    eligibleOnPage.forEach(m => newSelected.add(m.id));
+    incompleteOnPage.forEach(m => newSelected.add(m.id));
     setSelectedIds(newSelected);
   };
 
-  // Select all eligible across all pages
-  const selectAllEligible = () => {
-    setSelectedIds(new Set(allEligibleIds));
+  // Select all with incomplete steps across all pages
+  const selectAllIncomplete = () => {
+    setSelectedIds(new Set(allIncomplete.map(m => m.id)));
   };
 
   // Deselect all on current page
@@ -336,6 +459,9 @@ export function VoiceMemosTab() {
     }
   };
 
+  // Check if a memo can be selected (has any incomplete step)
+  const canSelect = (memo: VoiceMemo) => hasIncompleteSteps(memo);
+
   const isSyncing = syncProgress.status === "syncing";
 
   // Calculate counts
@@ -350,7 +476,7 @@ export function VoiceMemosTab() {
   };
 
   // Check if any operation is in progress
-  const isAnyOperationInProgress = isSyncing || isTranscribing ||
+  const isAnyOperationInProgress = isSyncing || isTranscribing || isRunningAllSteps ||
     convexSyncProgress.status === "syncing" || convexSyncProgress.status === "preparing";
 
   return (
@@ -427,20 +553,20 @@ export function VoiceMemosTab() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      onClick={handleTranscribe}
+                      onClick={handleRunAllSteps}
                       disabled={!isTauri || selectedIds.size === 0 || isAnyOperationInProgress}
                       size="sm"
                     >
-                      {isTranscribing ? (
+                      {isRunningAllSteps ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <FileText className="h-4 w-4" />
+                        <Zap className="h-4 w-4" />
                       )}
-                      <span className="ml-2">Transcribe{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
+                      <span className="ml-2">Run All Steps{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Transcribe selected memos using AI</p>
+                    <p>Transcribe → AI Extract → Sync</p>
                   </TooltipContent>
                 </Tooltip>
 
@@ -469,7 +595,7 @@ export function VoiceMemosTab() {
           </div>
 
           {/* Progress indicators */}
-          {(syncProgress.status !== "idle" || transcriptionProgress || convexSyncProgress.status !== "idle" || transcriptionErrors.length > 0) && (
+          {(syncProgress.status !== "idle" || transcriptionProgress || convexSyncProgress.status !== "idle" || allStepsProgress || transcriptionErrors.length > 0) && (
             <div className="mt-3 pt-3 border-t space-y-2">
               {/* Sync progress */}
               {syncProgress.status !== "idle" && (
@@ -562,6 +688,59 @@ export function VoiceMemosTab() {
                     <div className="flex items-center gap-2 text-destructive">
                       <AlertCircle className="h-3 w-3" />
                       <span className="text-xs">Cloud error: {convexSyncProgress.error}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* All Steps pipeline indicator */}
+              {allStepsProgress && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-16">Pipeline:</span>
+                    <div className="flex items-center gap-1 flex-1">
+                      {(["transcribe", "extract", "sync"] as const).map((step, i) => {
+                        const labels = { transcribe: "Transcribe", extract: "AI Extract", sync: "Synced" };
+                        const icons = { transcribe: FileText, extract: Sparkles, sync: Cloud };
+                        const Icon = icons[step];
+                        const current = allStepsProgress.step;
+                        // Execution: transcribe → sync → extract.
+                        // Display: Transcribe → AI Extract → Synced.
+                        // Treat internal "sync" step as part of "AI Extract" visually.
+                        const isActive =
+                          (step === "transcribe" && current === "transcribe") ||
+                          (step === "extract" && (current === "sync" || current === "extract")) ||
+                          false; // "sync" display step is never independently active
+                        const isDone =
+                          (step === "transcribe" && current !== "transcribe") ||
+                          (step === "extract" && false) || // last real step
+                          (step === "sync" && false); // only green when pipeline completes
+                        return (
+                          <div key={step} className="flex items-center">
+                            {i > 0 && <div className={`w-4 h-px mx-1 ${isDone ? "bg-green-400" : "bg-border"}`} />}
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                              isActive ? "bg-primary/10 text-primary font-medium" :
+                              isDone ? "bg-green-500/10 text-green-600" :
+                              "bg-muted text-muted-foreground/50"
+                            }`}>
+                              {isActive ? <Loader2 className="h-3 w-3 animate-spin" /> : <Icon className="h-3 w-3" />}
+                              {labels[step]}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {allStepsProgress.step === "extract" && allStepsProgress.extractTotal > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-16">Extract:</span>
+                      <Progress
+                        value={(allStepsProgress.extractCurrent / allStepsProgress.extractTotal) * 100}
+                        className="h-2 flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground w-12 text-right">
+                        {allStepsProgress.extractCurrent}/{allStepsProgress.extractTotal}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -710,7 +889,7 @@ export function VoiceMemosTab() {
                               }
                             }}
                             onCheckedChange={toggleHeaderCheckbox}
-                            disabled={isTranscribing || eligibleOnPage.length === 0}
+                            disabled={isTranscribing || incompleteOnPage.length === 0}
                             aria-label="Select all"
                           />
                           <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -720,15 +899,15 @@ export function VoiceMemosTab() {
                     <DropdownMenuContent align="start">
                       <DropdownMenuItem
                         onClick={selectAllOnPage}
-                        disabled={eligibleOnPage.length === 0}
+                        disabled={incompleteOnPage.length === 0}
                       >
-                        Select page ({eligibleOnPage.length} eligible)
+                        Select page ({incompleteOnPage.length} incomplete)
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={selectAllEligible}
-                        disabled={allEligible.length === 0}
+                        onClick={selectAllIncomplete}
+                        disabled={allIncomplete.length === 0}
                       >
-                        Select all untranscribed ({allEligible.length})
+                        Select all incomplete ({allIncomplete.length})
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -750,9 +929,8 @@ export function VoiceMemosTab() {
                 <TableHead className="w-[100px]">Duration</TableHead>
                 <TableHead className="w-[120px]">Date</TableHead>
                 <TableHead className="w-[80px]">Size</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
                 <TableHead className="w-[80px]">Play</TableHead>
-                <TableHead className="w-[80px]">AI</TableHead>
+                <TableHead className="w-[180px]">Steps</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -763,6 +941,7 @@ export function VoiceMemosTab() {
                     key={memo.id}
                     memo={memo}
                     isSelected={selectedIds.has(memo.id)}
+                    canSelect={canSelect(memo)}
                     onToggleSelect={() => toggleSelection(memo.id)}
                     isTranscribing={isTranscribing}
                     isTauri={isTauri}
@@ -852,9 +1031,209 @@ export function VoiceMemosTab() {
   );
 }
 
+// Tabbed details panel shown when "Show Details" is clicked
+function MemoDetailsPanel({
+  memo,
+  convexId,
+  hasExtraction,
+  onExtract,
+}: {
+  memo: VoiceMemo;
+  convexId?: Id<"life_voiceMemos">;
+  hasExtraction: boolean;
+  onExtract?: () => void;
+}) {
+  const extraction = useQuery(
+    api.lifeos.voicememo_extraction.getLatestExtraction,
+    hasExtraction && convexId ? { voiceMemoId: convexId } : "skip",
+  );
+
+  const defaultTab = hasExtraction ? "ai-insight" : "transcript";
+
+  return (
+    <Tabs defaultValue={defaultTab} className="w-full">
+      <div className="border-b px-4 pt-2">
+        <TabsList className="h-8">
+          {memo.transcription && (
+            <TabsTrigger value="transcript" className="text-xs gap-1.5">
+              <FileText className="h-3 w-3" />
+              Raw Transcript
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="ai-insight" className="text-xs gap-1.5">
+            <Sparkles className="h-3 w-3" />
+            AI Insight
+          </TabsTrigger>
+        </TabsList>
+      </div>
+
+      {memo.transcription && (
+        <TabsContent value="transcript" className="mt-0 p-4">
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{memo.transcription}</p>
+        </TabsContent>
+      )}
+
+      <TabsContent value="ai-insight" className="mt-0 p-4">
+        {hasExtraction && extraction ? (
+          <div className="space-y-4">
+            {/* Summary */}
+            <p className="text-sm text-muted-foreground">{extraction.summary}</p>
+
+            {/* Labels */}
+            {extraction.labels.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {extraction.labels.map((label, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">
+                    {label}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {/* Action Items */}
+            {extraction.actionItems.length > 0 && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground uppercase tracking-wide">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  Action Items
+                </h4>
+                <ul className="space-y-1">
+                  {extraction.actionItems.map((item, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <span className="text-muted-foreground/50 mt-0.5">•</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Key Points */}
+            {extraction.keyPoints.length > 0 && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground uppercase tracking-wide">
+                  <Lightbulb className="h-3.5 w-3.5 text-yellow-500" />
+                  Key Points
+                </h4>
+                <ul className="space-y-1">
+                  {extraction.keyPoints.map((point, i) => (
+                    <li key={i} className="text-sm flex items-start gap-2">
+                      <span className="text-muted-foreground/50 mt-0.5">•</span>
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ) : hasExtraction && !extraction ? (
+          <div className="flex items-center gap-2 py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Loading insights...</span>
+          </div>
+        ) : onExtract ? (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <Sparkles className="h-8 w-8 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">No AI insights extracted yet.</p>
+            <Button variant="outline" size="sm" onClick={onExtract} className="gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              Extract Insights
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-6">
+            <Sparkles className="h-8 w-8 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">Transcribe this memo first to extract AI insights.</p>
+          </div>
+        )}
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+// Visual pipeline showing the 3 processing steps for each memo
+function PipelineSteps({
+  memo,
+  isCloudOnly,
+  isTooLarge,
+  isSyncedToCloud,
+  hasExtraction,
+  onExtract,
+}: {
+  memo: VoiceMemo;
+  isCloudOnly: boolean;
+  isTooLarge: boolean;
+  isSyncedToCloud: boolean;
+  hasExtraction: boolean;
+  onExtract?: () => void;
+}) {
+  if (isCloudOnly) {
+    return (
+      <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+        <Cloud className="h-3 w-3 mr-1" />
+        iCloud
+      </Badge>
+    );
+  }
+
+  if (isTooLarge) {
+    return (
+      <Badge variant="destructive" className="text-xs">
+        <AlertTriangle className="h-3 w-3 mr-1" />
+        Too Large
+      </Badge>
+    );
+  }
+
+  const hasTranscript = !!memo.transcription;
+
+  const steps = [
+    { label: "Transcribed", icon: FileText, done: hasTranscript },
+    { label: "AI Insight", icon: Sparkles, done: hasExtraction, action: onExtract },
+    { label: "Synced", icon: Cloud, done: isSyncedToCloud && hasExtraction },
+  ];
+
+  return (
+    <TooltipProvider>
+      <div className="flex items-center gap-1">
+        {steps.map((step, i) => (
+          <div key={step.label} className="flex items-center">
+            {i > 0 && (
+              <div className={`w-3 h-px mx-0.5 ${
+                steps[i - 1].done ? "bg-green-400" : "bg-border"
+              }`} />
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${
+                    step.done
+                      ? "bg-green-500/15 text-green-600"
+                      : "bg-muted text-muted-foreground/40"
+                  } ${step.action ? "cursor-pointer hover:bg-accent" : ""}`}
+                  onClick={step.action}
+                >
+                  <step.icon className="h-3 w-3" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  {step.label}: {step.done ? "Done" : "Pending"}
+                  {step.action && !step.done ? " — click to run" : ""}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ))}
+      </div>
+    </TooltipProvider>
+  );
+}
+
 interface VoiceMemoRowProps {
   memo: VoiceMemo;
   isSelected: boolean;
+  canSelect: boolean;
   onToggleSelect: () => void;
   isTranscribing: boolean;
   isTauri: boolean;
@@ -864,9 +1243,9 @@ interface VoiceMemoRowProps {
   onExtract?: () => void;
 }
 
-function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTauri, isSyncedToCloud, hasExtraction, onExtract }: VoiceMemoRowProps) {
+function VoiceMemoRow({ memo, isSelected, canSelect, onToggleSelect, isTranscribing, isTauri, isSyncedToCloud, convexId, hasExtraction, onExtract }: VoiceMemoRowProps) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -936,7 +1315,7 @@ function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTaur
     <>
       <TableRow data-state={isSelected ? "selected" : undefined}>
         <TableCell>
-          {canTranscribe ? (
+          {canSelect ? (
             <Checkbox
               checked={isSelected}
               onCheckedChange={onToggleSelect}
@@ -950,14 +1329,14 @@ function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTaur
         <TableCell>
           <div className="flex flex-col gap-1">
             <span className="font-medium truncate max-w-[300px]">{displayName}</span>
-            {memo.transcription && (
+            {(memo.transcription || hasExtraction) && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowTranscript(!showTranscript)}
+                onClick={() => setShowDetails(!showDetails)}
                 className="h-6 px-2 text-xs justify-start w-fit"
               >
-                {showTranscript ? "Hide" : "Show"} Transcript
+                {showDetails ? "Hide" : "Show"} Details
                 {memo.transcription_language && (
                   <Badge variant="outline" className="ml-2 text-xs">
                     {memo.transcription_language}
@@ -995,44 +1374,6 @@ function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTaur
           )}
         </TableCell>
         <TableCell>
-          <div className="flex items-center gap-1">
-            {isCloudOnly ? (
-              <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
-                <Cloud className="h-3 w-3 mr-1" />
-                iCloud
-              </Badge>
-            ) : memo.transcription ? (
-              <>
-                <Badge variant="secondary" className="text-xs">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Done
-                </Badge>
-                {isSyncedToCloud && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Cloud className="h-3.5 w-3.5 text-green-600" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Synced to cloud</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </>
-            ) : isTooLarge ? (
-              <Badge variant="destructive" className="text-xs">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                Too Large
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-xs">
-                Pending
-              </Badge>
-            )}
-          </div>
-        </TableCell>
-        <TableCell>
           {memo.local_path && (
             <>
               <Button
@@ -1064,44 +1405,25 @@ function VoiceMemoRow({ memo, isSelected, onToggleSelect, isTranscribing, isTaur
           )}
         </TableCell>
         <TableCell>
-          {hasExtraction ? (
-            <Badge
-              variant="secondary"
-              className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-900/50"
-              onClick={onExtract}
-            >
-              <Sparkles className="h-3 w-3 mr-1" />
-              Enhanced
-            </Badge>
-          ) : onExtract ? (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onExtract}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Extract AI insights</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          ) : (
-            <span className="text-xs text-muted-foreground">-</span>
-          )}
+          <PipelineSteps
+            memo={memo}
+            isCloudOnly={isCloudOnly}
+            isTooLarge={isTooLarge}
+            isSyncedToCloud={isSyncedToCloud}
+            hasExtraction={hasExtraction}
+            onExtract={onExtract}
+          />
         </TableCell>
       </TableRow>
-      {showTranscript && memo.transcription && (
+      {showDetails && (
         <TableRow>
-          <TableCell colSpan={8} className="bg-muted/50">
-            <div className="p-3">
-              <p className="text-sm whitespace-pre-wrap">{memo.transcription}</p>
-            </div>
+          <TableCell colSpan={7} className="bg-muted/50 p-0">
+            <MemoDetailsPanel
+              memo={memo}
+              convexId={convexId}
+              hasExtraction={hasExtraction}
+              onExtract={onExtract}
+            />
           </TableCell>
         </TableRow>
       )}

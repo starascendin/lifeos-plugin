@@ -3,10 +3,10 @@
 ## MONO repo instructions:
 Context:
 - I am the sole user of this stack.
-- I just want a SEAMLESS dev exp, where:
-    - i just run everything on prod urls, since im the only user.
-    - when u finish developing a feature in dev, just deploy everything to prod w/ `pnpm deploy:prod:isolated --yes`
-
+- at this moment, i just run everything in DEV mode.
+    - just use convex dev
+    - and pnpm tauri dev
+    
 Goal:
 - I want 1 place where:
     - all my data (professional and personal) lives in 1 place (the convex db). This is my lifeOS
@@ -28,13 +28,13 @@ A ./apps/lifeos/taurireact-macapp
             - Project management -- clients, projects, phases, issues, etc.
             - agenda -- daily, weekly, monthly, etc
             - voice notes -- where i see/sync my mac's voice memos, i can transcribe and sync them to convex
-    - i usually just run `pnpm tauri:dev:production` 
+    - i usually just run `pnpm tauri dev` 
 
 B. ./packages/holaaiconvex
     - this is the main backend (convex). Now we are using just 1 project holaconvex-prod
     - we use CLERK AUTH to go w/ it.
     - i mostly just use the PROD url + PROD clerk all the time.
-    - when a feature is done developing w/ ai, i usually just run `pnpm deploy:prod:isolated --yes   ` and deploy directly to prod
+    - when a feature is done developing w/ ai, i usually just run `npx convex dev --once` and deploy directly to dev
 
 B.1. ./packages/lifeos-mcp
     - this has MCP tools that has access to my LIFEOS convex data.

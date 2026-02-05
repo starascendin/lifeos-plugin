@@ -21,6 +21,7 @@ import {
   DollarSign,
   Sparkles,
 } from "lucide-react";
+import { MonthlyMemosSection } from "./MonthlyMemosSection";
 
 // Icon mapping
 const CategoryIcons = {
@@ -297,6 +298,9 @@ export function MonthlyView({ year, month }: MonthlyViewProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Voice Memos */}
+      <MonthlyMemosSection />
     </div>
   );
 }

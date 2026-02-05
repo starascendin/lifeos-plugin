@@ -28,6 +28,8 @@ interface WeeklyMemo extends Doc<"life_voiceMemos"> {
   audioUrl: string | null;
 }
 
+type MonthlyMemo = WeeklyMemo;
+
 // Weekly calendar events type
 type WeeklyEventsByDay = Record<string, Doc<"lifeos_calendarEvents">[]>;
 
@@ -113,6 +115,12 @@ interface AgendaContextValue {
   isGeneratingWeeklySummary: boolean;
   generateWeeklySummary: () => Promise<void>;
   updateWeeklyPrompt: ReturnType<typeof useMutation>;
+
+  // Monthly data (only fetched when viewMode === "monthly")
+  monthStartDate: string; // YYYY-MM-DD (1st of month)
+  monthEndDate: string; // YYYY-MM-DD (last of month)
+  monthlyMemos: MonthlyMemo[] | undefined;
+  isLoadingMonthlyData: boolean;
 
   // Model selection
   selectedModel: SupportedModelId;
@@ -232,6 +240,18 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     [currentWeekStart],
   );
 
+  // Monthly date strings
+  const monthStartDate = useMemo(() => {
+    const d = new Date(currentMonthYear, currentMonth - 1, 1);
+    return formatDateStr(d);
+  }, [currentMonthYear, currentMonth]);
+
+  const monthEndDate = useMemo(() => {
+    // Day 0 of next month = last day of current month
+    const d = new Date(currentMonthYear, currentMonth, 0);
+    return formatDateStr(d);
+  }, [currentMonthYear, currentMonth]);
+
   // Habits queries
   const todaysHabits = useQuery(api.lifeos.habits.getHabitsForDate, {
     date: dateString,
@@ -337,6 +357,14 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const weeklySummary = useQuery(
     api.lifeos.agenda.getWeeklySummary,
     viewMode === "weekly" ? { weekStartDate } : "skip",
+  );
+
+  // Monthly memos query (only fetch when in monthly view mode)
+  const monthlyMemos = useQuery(
+    api.lifeos.voicememo.getMemosForDateRange,
+    viewMode === "monthly"
+      ? { startDate: monthStartDate, endDate: monthEndDate }
+      : "skip",
   );
 
   // Initialize default fields on mount
@@ -665,6 +693,13 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     isGeneratingWeeklySummary,
     generateWeeklySummary,
     updateWeeklyPrompt: updateWeeklyPromptMutation,
+
+    // Monthly data
+    monthStartDate,
+    monthEndDate,
+    monthlyMemos,
+    isLoadingMonthlyData:
+      viewMode === "monthly" && monthlyMemos === undefined,
 
     // Model selection
     selectedModel,
