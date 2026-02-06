@@ -25,6 +25,14 @@ function formatMessagesForGateway(
 }
 
 /**
+ * `response_format` support is model/provider specific on gateway.
+ * Keep this conservative to avoid 400 invalid_request_error on unsupported models.
+ */
+function supportsGatewayResponseFormat(model: string): boolean {
+  return model.startsWith("openai/");
+}
+
+/**
  * Call Vercel AI Gateway with a text generation request
  */
 export async function callGateway(
@@ -43,10 +51,9 @@ export async function callGateway(
       max_tokens: request.maxTokens,
       temperature: request.temperature,
       stream: false,
-      // response_format is supported by OpenAI and Google models via the gateway
+      // response_format is only sent for models we know support it on gateway
       ...(request.responseFormat === "json" &&
-        (request.model.startsWith("openai/") ||
-          request.model.startsWith("google/")) && {
+        supportsGatewayResponseFormat(request.model) && {
           response_format: { type: "json_object" },
         }),
     }),
@@ -102,10 +109,9 @@ export async function streamGateway(
       max_tokens: request.maxTokens,
       temperature: request.temperature,
       stream: true,
-      // response_format is supported by OpenAI and Google models via the gateway
+      // response_format is only sent for models we know support it on gateway
       ...(request.responseFormat === "json" &&
-        (request.model.startsWith("openai/") ||
-          request.model.startsWith("google/")) && {
+        supportsGatewayResponseFormat(request.model) && {
           response_format: { type: "json_object" },
         }),
     }),

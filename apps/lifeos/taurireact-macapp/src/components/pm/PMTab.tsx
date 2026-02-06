@@ -7,6 +7,7 @@ import { ProjectDetailView } from "./project/ProjectDetailView";
 import { IssueDetailPanel } from "./issue/IssueDetailPanel";
 import { CycleDetailPanel } from "./cycle/CycleDetailPanel";
 import { CycleDetailView } from "./cycle/CycleDetailView";
+import { ContactsTab } from "./contacts/ContactsTab";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -15,7 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Filter, Kanban, FolderKanban, RefreshCw, Settings } from "lucide-react";
+import {
+  Plus,
+  Filter,
+  Kanban,
+  FolderKanban,
+  RefreshCw,
+  Settings,
+  ContactRound,
+} from "lucide-react";
 import { useState } from "react";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { CreateIssueDialog } from "./CreateIssueDialog";
@@ -24,7 +33,7 @@ import { CycleSettingsModal } from "./CycleSettingsModal";
 import { PomodoroWidget, PomodoroStatsMini } from "./pomodoro";
 import type { Id } from "@holaai/convex";
 
-type ViewType = "board" | "projects" | "cycles";
+type ViewType = "board" | "projects" | "cycles" | "contacts";
 
 export function PMTab() {
   const { view, id } = useParams<{ view?: string; id?: string }>();
@@ -38,7 +47,13 @@ export function PMTab() {
 
   // Determine current view from URL
   const currentView: ViewType =
-    view === "projects" ? "projects" : view === "cycles" ? "cycles" : "board";
+    view === "projects"
+      ? "projects"
+      : view === "cycles"
+        ? "cycles"
+        : view === "contacts"
+          ? "contacts"
+          : "board";
 
   // Check if we're viewing a specific project or cycle
   const isProjectDetail = view === "projects" && id;
@@ -90,6 +105,15 @@ export function PMTab() {
             >
               <RefreshCw className="h-4 w-4" />
               Cycles
+            </Button>
+            <Button
+              variant={currentView === "contacts" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => handleViewChange("contacts")}
+              className="gap-2"
+            >
+              <ContactRound className="h-4 w-4" />
+              Contacts
             </Button>
           </div>
         </div>
@@ -171,6 +195,7 @@ export function PMTab() {
             {currentView === "board" && <KanbanBoard />}
             {currentView === "projects" && <ProjectList />}
             {currentView === "cycles" && <CycleList />}
+            {currentView === "contacts" && <ContactsTab />}
           </>
         )}
       </div>

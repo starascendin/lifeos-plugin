@@ -1,7 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useBeeper } from "@/lib/contexts/BeeperContext";
 import { useBeeperSync } from "@/lib/hooks/useBeeperSync";
-import { syncBeeperDatabase } from "@/lib/services/beeper";
+import {
+  syncBeeperDatabase,
+  MESSAGE_SYNC_WINDOW_OPTIONS,
+  getMessageSyncWindowSinceTimestamp,
+  type MessageSyncWindow,
+} from "@/lib/services/beeper";
 import { ThreadsList } from "./ThreadsList";
 import { ConversationView } from "./ConversationView";
 import { ThreadDetailPanel } from "./ThreadDetailPanel";
@@ -29,6 +34,11 @@ import {
 
 // Auto-refresh interval in milliseconds (3 minutes)
 const AUTO_REFRESH_INTERVAL = 3 * 60 * 1000;
+const SYNC_WINDOW_STORAGE_KEY = "beeper_cloud_sync_window";
+
+function isValidSyncWindow(value: string): value is MessageSyncWindow {
+  return MESSAGE_SYNC_WINDOW_OPTIONS.some((option) => option.value === value);
+}
 
 export function BeeperTab() {
   const {
@@ -60,6 +70,22 @@ export function BeeperTab() {
   const [nextRefreshIn, setNextRefreshIn] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const [syncWindow, setSyncWindow] = useState<MessageSyncWindow>(() => {
+    if (typeof window === "undefined") return "since_2025";
+    const stored = localStorage.getItem(SYNC_WINDOW_STORAGE_KEY);
+    return stored && isValidSyncWindow(stored) ? stored : "since_2025";
+  });
+
+  const syncSinceTimestamp = getMessageSyncWindowSinceTimestamp(syncWindow);
+  const selectedSyncWindowLabel =
+    MESSAGE_SYNC_WINDOW_OPTIONS.find((option) => option.value === syncWindow)?.label ??
+    "Since 2025";
+  const hasAnySyncChanges = !!lastSyncResult && (
+    lastSyncResult.threadsInserted > 0 ||
+    lastSyncResult.threadsUpdated > 0 ||
+    lastSyncResult.messagesInserted > 0 ||
+    lastSyncResult.messagesUpdated > 0
+  );
 
   // Timer refs
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,6 +96,10 @@ export function BeeperTab() {
   useEffect(() => {
     lastRefreshTimeRef.current = lastRefreshTime;
   }, [lastRefreshTime]);
+
+  useEffect(() => {
+    localStorage.setItem(SYNC_WINDOW_STORAGE_KEY, syncWindow);
+  }, [syncWindow]);
 
   // Show detail panel when thread is selected
   useEffect(() => {
@@ -90,7 +120,7 @@ export function BeeperTab() {
         await loadThreads();
         // 3. Sync business threads to cloud (if any)
         if (businessMarks.size > 0) {
-          await syncAll();
+          await syncAll(syncSinceTimestamp);
         }
         setLastRefreshTime(new Date());
       } else {
@@ -103,7 +133,7 @@ export function BeeperTab() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [checkDatabase, loadThreads, businessMarks.size, syncAll]);
+  }, [checkDatabase, loadThreads, businessMarks.size, syncAll, syncSinceTimestamp]);
 
   // Calculate time until next refresh
   const calculateNextRefreshIn = useCallback(() => {
@@ -169,7 +199,7 @@ export function BeeperTab() {
             await loadThreads();
             // 3. Sync business threads to cloud (if any)
             if (businessMarks.size > 0) {
-              await syncAll();
+              await syncAll(syncSinceTimestamp);
             }
           } else {
             // Still try to refresh UI even if sync failed
@@ -202,7 +232,15 @@ export function BeeperTab() {
         clearInterval(countdownTimerRef.current);
       }
     };
-  }, [hasDatabaseSynced, checkDatabase, loadThreads, calculateNextRefreshIn, businessMarks.size, syncAll]);
+  }, [
+    hasDatabaseSynced,
+    checkDatabase,
+    loadThreads,
+    calculateNextRefreshIn,
+    businessMarks.size,
+    syncAll,
+    syncSinceTimestamp,
+  ]);
 
   // Handle search submit
   const handleSearch = () => {
@@ -345,7 +383,7 @@ export function BeeperTab() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={syncAll}
+                    onClick={() => syncAll(syncSinceTimestamp)}
                     disabled={isSyncing || businessCount === 0}
                   >
                     {isSyncing ? (
@@ -359,7 +397,7 @@ export function BeeperTab() {
                   <p>
                     {businessCount === 0
                       ? "Mark threads as business first"
-                      : `Sync ${businessCount} business thread(s) to cloud`}
+                      : `Sync ${businessCount} business thread(s) to cloud (${selectedSyncWindowLabel})`}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -408,6 +446,23 @@ export function BeeperTab() {
           </div>
         )}
 
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-[11px] text-muted-foreground">Cloud sync window:</span>
+          <div className="flex items-center gap-1">
+            {MESSAGE_SYNC_WINDOW_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant={syncWindow === option.value ? "secondary" : "ghost"}
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                onClick={() => setSyncWindow(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         {/* Sync progress */}
         {isSyncing && (
           <div className="mt-2 p-2 rounded bg-muted/50 text-xs">
@@ -426,8 +481,24 @@ export function BeeperTab() {
         )}
         {/* Sync result */}
         {lastSyncResult && !isSyncing && progress.status === "complete" && (
-          <div className="mt-2 p-2 rounded bg-green-500/10 text-xs text-green-600">
-            Synced {lastSyncResult.threadsInserted} thread(s), {lastSyncResult.messagesInserted} message(s)
+          <div
+            className={`mt-2 p-2 rounded text-xs ${
+              hasAnySyncChanges
+                ? "bg-green-500/10 text-green-600"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {hasAnySyncChanges ? (
+              <span>
+                Threads: {lastSyncResult.threadsInserted} new, {lastSyncResult.threadsUpdated} updated
+                {" · "}
+                Messages: {lastSyncResult.messagesInserted} new, {lastSyncResult.messagesUpdated} updated
+              </span>
+            ) : (
+              <span>
+                No new rows synced for {selectedSyncWindowLabel}. Data is already up to date for this range.
+              </span>
+            )}
           </div>
         )}
         {/* Sync error */}

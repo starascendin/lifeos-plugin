@@ -138,6 +138,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           { name: "Projects", href: "/lifeos/pm/projects", icon: FolderKanban },
           { name: "Cycles", href: "/lifeos/pm/cycles", icon: RefreshCw },
           { name: "Clients", href: "/lifeos/pm/clients", icon: Briefcase },
+          { name: "Contacts", href: "/lifeos/pm/contacts", icon: User },
           { name: "PM AI", href: "/lifeos/pm-ai", icon: Bot },
           { name: "Beeper", href: "/lifeos/beeper", icon: MessageSquare },
           { name: "GranolaAI", href: "/lifeos/granola", icon: NotebookPen },

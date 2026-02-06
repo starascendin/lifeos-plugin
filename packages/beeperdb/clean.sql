@@ -73,10 +73,10 @@ WHERE t.bridge_name = 'local-whatsapp'
 ORDER BY t.timestamp DESC;
 
 -- ============================================================================
--- Table 3: messages - Last 100 messages per thread
+-- Table 3: messages - All available messages per thread
 -- ============================================================================
 CREATE OR REPLACE TABLE messages AS
-WITH ranked_messages AS (
+WITH source_messages AS (
     SELECT
         m.eventID,
         m.threadID,
@@ -84,8 +84,7 @@ WITH ranked_messages AS (
         m.type AS msg_type,
         m.text,
         m.isSentByMe AS sent_by_me,
-        m.senderID,
-        ROW_NUMBER() OVER (PARTITION BY m.threadID ORDER BY m.timestamp DESC) AS rn
+        m.senderID
     FROM src.messages m
     WHERE m.threadID LIKE '%local-whatsapp%'
       AND m.type != 'HIDDEN'
@@ -94,36 +93,35 @@ thread_info AS (
     SELECT thread_id, name, type FROM threads
 )
 SELECT
-    rm.eventID AS message_id,
+    sm.eventID AS message_id,
     -- Thread info
     th.name AS thread_name,
     th.type AS thread_type,
-    rm.threadID AS thread_id,
+    sm.threadID AS thread_id,
     -- Sender info
     CASE
-        WHEN rm.sent_by_me = 1 THEN 'Me'
+        WHEN sm.sent_by_me = 1 THEN 'Me'
         ELSE COALESCE(
             (SELECT COALESCE(wc.full_name, wc.push_name, wc.redacted_phone)
              FROM src.whatsapp_contacts wc
-             WHERE rm.senderID LIKE '%' || REPLACE(wc.their_jid, '@s.whatsapp.net', '') || '%'
+             WHERE sm.senderID LIKE '%' || REPLACE(wc.their_jid, '@s.whatsapp.net', '') || '%'
              LIMIT 1),
             (SELECT p.full_name
              FROM src.participants p
-             WHERE p.threadID = rm.threadID
-               AND rm.senderID LIKE '%' || p.participant_id || '%'
+             WHERE p.threadID = sm.threadID
+               AND sm.senderID LIKE '%' || p.participant_id || '%'
              LIMIT 1),
-            rm.senderID
+            sm.senderID
         )
     END AS sender_name,
-    rm.text,
-    CAST(rm.sent_by_me AS BOOLEAN) AS sent_by_me,
-    rm.timestamp,
+    sm.text,
+    CAST(sm.sent_by_me AS BOOLEAN) AS sent_by_me,
+    sm.timestamp,
     -- Human-readable timestamp
-    strftime(to_timestamp(rm.timestamp / 1000), '%Y-%m-%d %H:%M:%S') AS timestamp_readable
-FROM ranked_messages rm
-LEFT JOIN thread_info th ON rm.threadID = th.thread_id
-WHERE rm.rn <= 100
-ORDER BY rm.threadID, rm.timestamp ASC;
+    strftime(to_timestamp(sm.timestamp / 1000), '%Y-%m-%d %H:%M:%S') AS timestamp_readable
+FROM source_messages sm
+LEFT JOIN thread_info th ON sm.threadID = th.thread_id
+ORDER BY sm.threadID, sm.timestamp ASC;
 
 -- ============================================================================
 -- Table 4: conversations - AI-ready conversation view
@@ -188,5 +186,5 @@ CREATE INDEX IF NOT EXISTS idx_threads_name ON threads(name);
 SELECT '=== Clean DB Summary ===' AS info;
 SELECT 'Contacts: ' || COUNT(*) AS info FROM contacts;
 SELECT 'Threads: ' || COUNT(*) AS info FROM threads;
-SELECT 'Messages (last 100/thread): ' || COUNT(*) AS info FROM messages;
+SELECT 'Messages (all): ' || COUNT(*) AS info FROM messages;
 SELECT 'Conversations (non-empty): ' || COUNT(*) AS info FROM conversations;

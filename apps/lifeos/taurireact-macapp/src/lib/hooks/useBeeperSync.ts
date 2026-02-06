@@ -21,7 +21,7 @@ export interface BeeperSyncHookResult {
   lastSyncResult: SyncResult | null;
 
   // Actions
-  syncAll: () => Promise<void>;
+  syncAll: (sinceTimestamp?: number) => Promise<void>;
   syncThreads: () => Promise<void>;
   syncThreadMessages: (threadId: string) => Promise<void>;
   reset: () => void;
@@ -46,14 +46,18 @@ export function useBeeperSync(): BeeperSyncHookResult {
     setIsSyncing(false);
   }, []);
 
-  const syncAll = useCallback(async () => {
+  const syncAll = useCallback(async (sinceTimestamp?: number) => {
     if (isSyncing) return;
 
     setIsSyncing(true);
     setProgress(initialSyncProgress);
 
     try {
-      const result = await syncAllBusinessDataToConvex(convex, setProgress);
+      const result = await syncAllBusinessDataToConvex(
+        convex,
+        setProgress,
+        sinceTimestamp
+      );
       setLastSyncResult({
         ...result,
         timestamp: Date.now(),

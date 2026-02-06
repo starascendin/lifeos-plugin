@@ -71,7 +71,7 @@ duckdb data/clean.duckdb "SELECT sender, text FROM conversations WHERE thread_na
 |-------|-------------|
 | `contacts` | WhatsApp contacts (name, phone, is_business, thread_id) |
 | `threads` | Threads with stats (thread_id, name, type, participant_count, message_count) |
-| `messages` | Last 100 messages per thread (thread_id, thread_name, sender_name, text, timestamp) |
+| `messages` | All available messages per thread (thread_id, thread_name, sender_name, text, timestamp) |
 | `conversations` | Same as messages but only non-empty text, good for AI |
 | `thread_summaries` | Thread overview with thread_id, name, and last message preview |
 

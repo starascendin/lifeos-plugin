@@ -346,14 +346,21 @@ pub async fn get_beeper_messages(
 
 /// Get all messages for a thread (for syncing to Convex)
 #[command]
-pub async fn get_beeper_messages_for_sync(thread_id: String) -> Result<Vec<BeeperSyncMessage>, String> {
+pub async fn get_beeper_messages_for_sync(
+    thread_id: String,
+    since_timestamp: Option<i64>,
+) -> Result<Vec<BeeperSyncMessage>, String> {
     let beeperdb_path = get_beeperdb_path();
 
-    // Build the command: bun query.ts sync-msgs "<thread_id>"
-    let output = Command::new("bun")
-        .arg("query.ts")
-        .arg("sync-msgs")
-        .arg(&thread_id)
+    // Build the command: bun query.ts sync-msgs "<thread_id>" [since_timestamp]
+    let mut cmd = Command::new("bun");
+    cmd.arg("query.ts").arg("sync-msgs").arg(&thread_id);
+
+    if let Some(ts) = since_timestamp {
+        cmd.arg(ts.to_string());
+    }
+
+    let output = cmd
         .current_dir(&beeperdb_path)
         .output()
         .map_err(|e| format!("Failed to run bun query.ts sync-msgs: {}", e))?;

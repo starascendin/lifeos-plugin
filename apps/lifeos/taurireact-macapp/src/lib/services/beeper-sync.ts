@@ -148,7 +148,8 @@ export async function syncBusinessThreadsToConvex(
 export async function syncThreadMessagesToConvex(
   client: ConvexReactClient,
   threadId: string,
-  onProgress?: (progress: SyncProgress) => void
+  onProgress?: (progress: SyncProgress) => void,
+  sinceTimestamp?: number
 ): Promise<{ insertedCount: number; updatedCount: number }> {
   const progress: SyncProgress = {
     ...initialSyncProgress,
@@ -160,7 +161,7 @@ export async function syncThreadMessagesToConvex(
 
   try {
     // Get all messages for this thread from DuckDB
-    const messages = await getBeeperMessagesForSync(threadId);
+    const messages = await getBeeperMessagesForSync(threadId, sinceTimestamp);
     progress.messagesTotal = messages.length;
     progress.currentStep = `Found ${messages.length} messages to sync...`;
     updateProgress();
@@ -238,7 +239,8 @@ export async function syncThreadMessagesToConvex(
  */
 export async function syncAllBusinessDataToConvex(
   client: ConvexReactClient,
-  onProgress?: (progress: SyncProgress) => void
+  onProgress?: (progress: SyncProgress) => void,
+  sinceTimestamp?: number
 ): Promise<{
   threadsInserted: number;
   threadsUpdated: number;
@@ -282,7 +284,8 @@ export async function syncAllBusinessDataToConvex(
           progress.messagesSynced += p.messagesSynced - progress.messagesSynced;
           progress.currentStep = `Thread ${i + 1}/${businessThreadIds.length}: ${p.currentStep}`;
           updateProgress();
-        }
+        },
+        sinceTimestamp
       );
 
       totalMessagesInserted += msgResult.insertedCount;

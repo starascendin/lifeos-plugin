@@ -69,6 +69,52 @@ export const SYNC_INTERVAL_OPTIONS = [
   { value: 30, label: "30 min" },
 ];
 
+export type MessageSyncWindow =
+  | "3m"
+  | "6m"
+  | "1y"
+  | "since_2025"
+  | "all";
+
+export const MESSAGE_SYNC_WINDOW_OPTIONS: Array<{
+  value: MessageSyncWindow;
+  label: string;
+}> = [
+  { value: "3m", label: "Last 3 months" },
+  { value: "6m", label: "Last 6 months" },
+  { value: "1y", label: "Last 1 year" },
+  { value: "since_2025", label: "Since 2025" },
+  { value: "all", label: "All time" },
+];
+
+/**
+ * Convert a sync-window selection into an epoch timestamp cutoff (milliseconds).
+ */
+export function getMessageSyncWindowSinceTimestamp(
+  window: MessageSyncWindow
+): number | undefined {
+  const now = new Date();
+
+  if (window === "all") return undefined;
+  if (window === "since_2025") {
+    return new Date(2025, 0, 1, 0, 0, 0, 0).getTime();
+  }
+
+  const cutoff = new Date(now);
+  if (window === "1y") {
+    cutoff.setFullYear(cutoff.getFullYear() - 1);
+    return cutoff.getTime();
+  }
+
+  if (window === "6m") {
+    cutoff.setMonth(cutoff.getMonth() - 6);
+    return cutoff.getTime();
+  }
+
+  cutoff.setMonth(cutoff.getMonth() - 3);
+  return cutoff.getTime();
+}
+
 /**
  * Get the Beeper sync interval setting (default 3 minutes)
  */
@@ -225,12 +271,14 @@ export async function searchBeeperMessages(
  * Get all messages for a thread (for syncing to Convex)
  */
 export async function getBeeperMessagesForSync(
-  threadId: string
+  threadId: string,
+  sinceTimestamp?: number
 ): Promise<BeeperSyncMessage[]> {
   if (!isTauri) return [];
   try {
     return await invoke<BeeperSyncMessage[]>("get_beeper_messages_for_sync", {
       threadId,
+      sinceTimestamp,
     });
   } catch (error) {
     console.error("Failed to get Beeper messages for sync:", error);
