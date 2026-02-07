@@ -6066,3 +6066,397 @@ export const linkBeeperThreadToPersonInternal = internalMutation({
     };
   },
 });
+
+// ==================== CRM / Business Contact Tools ====================
+
+/**
+ * Get enriched business contacts with linked meetings.
+ */
+export const getBusinessContactsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const threads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user_business", (q) =>
+        q.eq("userId", userId).eq("isBusinessChat", true)
+      )
+      .order("desc")
+      .collect();
+
+    // Simplified version for MCP - returns basic contact info with meeting counts
+    const contacts = await Promise.all(
+      threads.map(async (thread) => {
+        let linkedPersonName: string | undefined;
+        if (thread.linkedPersonId) {
+          const person = await ctx.db.get(thread.linkedPersonId);
+          if (person && person.userId === userId) {
+            linkedPersonName = person.name;
+          }
+        }
+
+        let linkedClientName: string | undefined;
+        if (thread.linkedClientId) {
+          const client = await ctx.db.get(thread.linkedClientId);
+          if (client && client.userId === userId) {
+            linkedClientName = client.name;
+          }
+        }
+
+        // Count linked Granola meetings
+        const granolaLinks = await ctx.db
+          .query("life_granolaMeetingLinks")
+          .withIndex("by_beeperThread", (q) => q.eq("beeperThreadId", thread._id))
+          .collect();
+
+        return {
+          threadConvexId: thread._id,
+          threadId: thread.threadId,
+          threadName: thread.threadName,
+          threadType: thread.threadType,
+          messageCount: thread.messageCount,
+          lastMessageAt: thread.lastMessageAt,
+          linkedPersonId: thread.linkedPersonId,
+          linkedPersonName,
+          linkedClientId: thread.linkedClientId,
+          linkedClientName,
+          granolaLinkCount: granolaLinks.length,
+          businessNote: thread.businessNote,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      contacts,
+      count: contacts.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get pending merge suggestions for contacts.
+ */
+export const getMergeSuggestionsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const suggestions = await ctx.db
+      .query("lifeos_frmMergeSuggestions")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", userId).eq("status", "pending")
+      )
+      .collect();
+
+    const enrichedSuggestions = await Promise.all(
+      suggestions.map(async (suggestion) => {
+        const targetPerson = await ctx.db.get(suggestion.targetPersonId);
+        const sourcePerson = await ctx.db.get(suggestion.sourcePersonId);
+
+        if (!targetPerson || !sourcePerson) {
+          return null;
+        }
+
+        return {
+          suggestionId: suggestion._id,
+          confidence: suggestion.confidence,
+          reasons: suggestion.reasons,
+          matchedFields: suggestion.matchedFields,
+          targetPerson: {
+            id: targetPerson._id,
+            name: targetPerson.name,
+            email: targetPerson.email,
+            phone: targetPerson.phone,
+            memoCount: targetPerson.memoCount,
+          },
+          sourcePerson: {
+            id: sourcePerson._id,
+            name: sourcePerson.name,
+            email: sourcePerson.email,
+            phone: sourcePerson.phone,
+            memoCount: sourcePerson.memoCount,
+          },
+          createdAt: suggestion.createdAt,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      suggestions: enrichedSuggestions.filter(Boolean),
+      count: enrichedSuggestions.filter(Boolean).length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Accept a merge suggestion - merge source contact into target.
+ */
+export const acceptMergeSuggestionInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    suggestionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const suggestionId = args.suggestionId as Id<"lifeos_frmMergeSuggestions">;
+
+    const suggestion = await ctx.db.get(suggestionId);
+    if (!suggestion || suggestion.userId !== userId) {
+      return {
+        success: false,
+        error: "Suggestion not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (suggestion.status !== "pending") {
+      return {
+        success: false,
+        error: "Suggestion already processed",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const targetPerson = await ctx.db.get(suggestion.targetPersonId);
+    const sourcePerson = await ctx.db.get(suggestion.sourcePersonId);
+
+    if (!targetPerson || !sourcePerson) {
+      return {
+        success: false,
+        error: "One or both contacts no longer exist",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const now = Date.now();
+    const updates: Record<string, unknown> = { updatedAt: now };
+
+    // Merge email/phone from source if target doesn't have them
+    if (!targetPerson.email && sourcePerson.email) {
+      updates.email = sourcePerson.email;
+    }
+    if (!targetPerson.phone && sourcePerson.phone) {
+      updates.phone = sourcePerson.phone;
+    }
+    // Merge notes
+    if (sourcePerson.notes) {
+      updates.notes = targetPerson.notes
+        ? `${targetPerson.notes}\n\n--- Merged from ${sourcePerson.name} ---\n${sourcePerson.notes}`
+        : sourcePerson.notes;
+    }
+
+    await ctx.db.patch(suggestion.targetPersonId, updates);
+
+    // Re-link memos from source to target
+    const memos = await ctx.db
+      .query("lifeos_frmPersonMemos")
+      .withIndex("by_person", (q) => q.eq("personId", suggestion.sourcePersonId))
+      .collect();
+    for (const memo of memos) {
+      await ctx.db.patch(memo._id, { personId: suggestion.targetPersonId });
+    }
+
+    // Re-link Beeper threads
+    const threads = await ctx.db
+      .query("lifeos_beeperThreads")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("linkedPersonId"), suggestion.sourcePersonId))
+      .collect();
+    for (const thread of threads) {
+      await ctx.db.patch(thread._id, { linkedPersonId: suggestion.targetPersonId, updatedAt: now });
+    }
+
+    // Archive source person
+    await ctx.db.patch(suggestion.sourcePersonId, {
+      archivedAt: now,
+      notes: `[Merged into ${targetPerson.name}]`,
+      updatedAt: now,
+    });
+
+    // Mark suggestion as accepted
+    await ctx.db.patch(suggestionId, { status: "accepted", updatedAt: now });
+
+    return {
+      success: true,
+      targetPersonId: suggestion.targetPersonId as string,
+      sourcePersonId: suggestion.sourcePersonId as string,
+      memosRelinked: memos.length,
+      threadsRelinked: threads.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Reject a merge suggestion.
+ */
+export const rejectMergeSuggestionInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    suggestionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const suggestionId = args.suggestionId as Id<"lifeos_frmMergeSuggestions">;
+
+    const suggestion = await ctx.db.get(suggestionId);
+    if (!suggestion || suggestion.userId !== userId) {
+      return {
+        success: false,
+        error: "Suggestion not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    await ctx.db.patch(suggestionId, {
+      status: "rejected",
+      updatedAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Dismiss all pending merge suggestions.
+ */
+export const dismissAllMergeSuggestionsInternal = internalMutation({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const suggestions = await ctx.db
+      .query("lifeos_frmMergeSuggestions")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", userId).eq("status", "pending")
+      )
+      .collect();
+
+    const now = Date.now();
+    for (const suggestion of suggestions) {
+      await ctx.db.patch(suggestion._id, {
+        status: "dismissed",
+        updatedAt: now,
+      });
+    }
+
+    return {
+      success: true,
+      dismissedCount: suggestions.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Unlink a meeting from a business contact.
+ */
+export const unlinkMeetingFromBusinessContactInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    threadConvexId: v.string(),
+    meetingSource: v.string(),
+    meetingId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const threadConvexId = args.threadConvexId as Id<"lifeos_beeperThreads">;
+
+    const thread = await ctx.db.get(threadConvexId);
+    if (!thread || thread.userId !== userId) {
+      return {
+        success: false,
+        error: "Business contact not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    let deletedGranolaThreadLinks = 0;
+    let deletedGranolaPersonLinks = 0;
+    let deletedUnifiedPersonLinks = 0;
+
+    if (args.meetingSource === "granola") {
+      const threadLinks = await ctx.db
+        .query("life_granolaMeetingLinks")
+        .withIndex("by_beeperThread", (q) => q.eq("beeperThreadId", thread._id))
+        .collect();
+
+      for (const link of threadLinks) {
+        if (link.userId !== userId) continue;
+        if ((link.meetingId as string) !== args.meetingId) continue;
+        await ctx.db.delete(link._id);
+        deletedGranolaThreadLinks++;
+      }
+
+      if (thread.linkedPersonId) {
+        const personLinks = await ctx.db
+          .query("life_granolaMeetingPersonLinks")
+          .withIndex("by_person", (q) => q.eq("personId", thread.linkedPersonId!))
+          .collect();
+
+        for (const link of personLinks) {
+          if (link.userId !== userId) continue;
+          if ((link.meetingId as string) !== args.meetingId) continue;
+          await ctx.db.delete(link._id);
+          deletedGranolaPersonLinks++;
+        }
+
+        const unifiedLinks = await ctx.db
+          .query("lifeos_meetingPersonLinks")
+          .withIndex("by_person_source", (q) =>
+            q.eq("personId", thread.linkedPersonId!).eq("meetingSource", "granola")
+          )
+          .collect();
+
+        for (const link of unifiedLinks) {
+          if (link.userId !== userId) continue;
+          if (link.meetingId !== args.meetingId) continue;
+          await ctx.db.delete(link._id);
+          deletedUnifiedPersonLinks++;
+        }
+      }
+    }
+
+    if (args.meetingSource === "fathom" && thread.linkedPersonId) {
+      const unifiedLinks = await ctx.db
+        .query("lifeos_meetingPersonLinks")
+        .withIndex("by_person_source", (q) =>
+          q.eq("personId", thread.linkedPersonId!).eq("meetingSource", "fathom")
+        )
+        .collect();
+
+      for (const link of unifiedLinks) {
+        if (link.userId !== userId) continue;
+        if (link.meetingId !== args.meetingId) continue;
+        await ctx.db.delete(link._id);
+        deletedUnifiedPersonLinks++;
+      }
+    }
+
+    return {
+      success: true,
+      deletedGranolaThreadLinks,
+      deletedGranolaPersonLinks,
+      deletedUnifiedPersonLinks,
+      totalDeleted:
+        deletedGranolaThreadLinks +
+        deletedGranolaPersonLinks +
+        deletedUnifiedPersonLinks,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});

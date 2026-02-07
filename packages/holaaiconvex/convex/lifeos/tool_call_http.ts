@@ -91,6 +91,13 @@ export const AVAILABLE_TOOLS = [
   // Beeper → FRM Sync tools
   "sync_beeper_contacts_to_frm",
   "link_beeper_thread_to_person",
+  // CRM / Business Contact tools
+  "get_business_contacts",
+  "get_merge_suggestions",
+  "accept_merge_suggestion",
+  "reject_merge_suggestion",
+  "dismiss_all_merge_suggestions",
+  "unlink_meeting_from_business_contact",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -727,6 +734,66 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             personId: params?.personId as string | undefined,
             personName: params?.personName as string | undefined,
             relationshipType: params?.relationshipType as string | undefined,
+          }
+        );
+        break;
+
+      // CRM / Business Contact tools
+      case "get_business_contacts":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getBusinessContactsInternal,
+          {
+            userId: auth.userId,
+          }
+        );
+        break;
+
+      case "get_merge_suggestions":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getMergeSuggestionsInternal,
+          {
+            userId: auth.userId,
+          }
+        );
+        break;
+
+      case "accept_merge_suggestion":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.acceptMergeSuggestionInternal,
+          {
+            userId: auth.userId,
+            suggestionId: params?.suggestionId as string,
+          }
+        );
+        break;
+
+      case "reject_merge_suggestion":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.rejectMergeSuggestionInternal,
+          {
+            userId: auth.userId,
+            suggestionId: params?.suggestionId as string,
+          }
+        );
+        break;
+
+      case "dismiss_all_merge_suggestions":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.dismissAllMergeSuggestionsInternal,
+          {
+            userId: auth.userId,
+          }
+        );
+        break;
+
+      case "unlink_meeting_from_business_contact":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.unlinkMeetingFromBusinessContactInternal,
+          {
+            userId: auth.userId,
+            threadConvexId: params?.threadConvexId as string,
+            meetingSource: params?.meetingSource as string,
+            meetingId: params?.meetingId as string,
           }
         );
         break;

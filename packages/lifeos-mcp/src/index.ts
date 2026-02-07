@@ -1646,6 +1646,116 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // CRM / Business Contact Tools
+  {
+    name: "get_business_contacts",
+    description:
+      "Get all business contacts (Beeper threads marked as business) with linked person/client info and meeting counts.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_merge_suggestions",
+    description:
+      "Get pending contact merge suggestions. Returns pairs of contacts that may be duplicates based on matching email, phone, or name similarity.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "accept_merge_suggestion",
+    description:
+      "Accept a merge suggestion and merge the source contact into the target contact. Re-links all memos, Beeper threads, and meetings from source to target, then archives the source contact.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        suggestionId: {
+          type: "string",
+          description: "The merge suggestion ID (required)",
+        },
+      },
+      required: ["suggestionId"],
+    },
+  },
+  {
+    name: "reject_merge_suggestion",
+    description:
+      "Reject a merge suggestion. The suggestion will be marked as rejected and won't appear again.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        suggestionId: {
+          type: "string",
+          description: "The merge suggestion ID (required)",
+        },
+      },
+      required: ["suggestionId"],
+    },
+  },
+  {
+    name: "dismiss_all_merge_suggestions",
+    description:
+      "Dismiss all pending merge suggestions at once.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "unlink_meeting_from_business_contact",
+    description:
+      "Remove the link between a meeting (Granola or Fathom) and a business contact. Deletes the thread link, person link, and unified meeting link records.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        threadConvexId: {
+          type: "string",
+          description: "The Convex ID of the Beeper thread (required)",
+        },
+        meetingSource: {
+          type: "string",
+          enum: ["granola", "fathom"],
+          description: "The meeting source: 'granola' or 'fathom' (required)",
+        },
+        meetingId: {
+          type: "string",
+          description: "The meeting ID (required)",
+        },
+      },
+      required: ["threadConvexId", "meetingSource", "meetingId"],
+    },
+  },
+
   // MCP Server Info
   {
     name: "get_version",
