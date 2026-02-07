@@ -17,6 +17,10 @@ import {
   demoAgentCreateThreadHandler,
   demoAgentSendMessageHandler,
 } from "./lifeos/demo_agent_http";
+import {
+  catgirlAgentCreateThreadHandler,
+  catgirlAgentSendMessageHandler,
+} from "./lifeos/catgirl_agent_http";
 import { toolCallHandler } from "./lifeos/tool_call_http";
 import { voiceAgentTodaysTasksHandler } from "./lifeos/voice_agent_http";
 import {
@@ -49,6 +53,14 @@ http.route({ path: "/demo-agent/create-thread", method: "OPTIONS", handler: crea
 
 http.route({ path: "/demo-agent/send-message", method: "POST", handler: demoAgentSendMessageHandler });
 http.route({ path: "/demo-agent/send-message", method: "OPTIONS", handler: createCorsPreflightHandler(GENERIC_CORS_HEADERS) });
+
+// ==================== CatGirl Agent ====================
+
+http.route({ path: "/catgirl-agent/create-thread", method: "POST", handler: catgirlAgentCreateThreadHandler });
+http.route({ path: "/catgirl-agent/create-thread", method: "OPTIONS", handler: createCorsPreflightHandler(GENERIC_CORS_HEADERS) });
+
+http.route({ path: "/catgirl-agent/send-message", method: "POST", handler: catgirlAgentSendMessageHandler });
+http.route({ path: "/catgirl-agent/send-message", method: "OPTIONS", handler: createCorsPreflightHandler(GENERIC_CORS_HEADERS) });
 
 // ==================== Tool Call ====================
 

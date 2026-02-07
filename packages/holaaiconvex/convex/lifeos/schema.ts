@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { avatarTables } from "./avatar_schema";
 import { beeperTables } from "./beeper_schema";
 import { calendarTables } from "./calendar_schema";
+import { catgirlAgentTables } from "./catgirl_agent_schema";
 import { chatnexusTables } from "./chatnexus_schema";
 import { contactTables } from "./contact_schema";
 import { controlplaneTables } from "./controlplane_schema";
@@ -32,6 +33,8 @@ export const lifeosTables = {
   ...beeperTables,
   // Calendar tables
   ...calendarTables,
+  // CatGirl Agent tables
+  ...catgirlAgentTables,
   // Chat Nexus tables
   ...chatnexusTables,
   // Unified Contact System tables (email lookup + meeting-person links)

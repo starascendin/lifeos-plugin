@@ -21,6 +21,7 @@ import {
   Box,
   Briefcase,
   Calendar,
+  Cat,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -235,6 +236,40 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
               </TooltipContent>
             </Tooltip>
           )}
+        </div>
+
+        {/* CatGirlAI Button */}
+        <div
+          className={cn(
+            "border-b border-sidebar-border",
+            effectiveCollapsed ? "px-2 py-2" : "px-4 py-3",
+          )}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to="/lifeos/catgirl">
+                <Button
+                  variant={pathname === "/lifeos/catgirl" ? "default" : "outline"}
+                  className={cn(
+                    "w-full transition-all",
+                    effectiveCollapsed
+                      ? "justify-center p-3"
+                      : "justify-start gap-3",
+                    pathname === "/lifeos/catgirl" &&
+                      "bg-pink-500 hover:bg-pink-600 text-white",
+                  )}
+                >
+                  <Cat className="h-5 w-5" />
+                  {!effectiveCollapsed && (
+                    <span className="font-medium">CatGirlAI</span>
+                  )}
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            {effectiveCollapsed && (
+              <TooltipContent side="right">CatGirlAI</TooltipContent>
+            )}
+          </Tooltip>
         </div>
 
         {/* Butler AI Button */}
