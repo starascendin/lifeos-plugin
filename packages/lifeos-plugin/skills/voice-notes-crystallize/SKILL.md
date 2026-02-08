@@ -1,5 +1,5 @@
 ---
-name: crystallize
+name: voice-notes-crystallize
 description: Save a crystallized summary of AI conversation about voice notes - preserve insights, plans, and ideas
 ---
 
