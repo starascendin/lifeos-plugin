@@ -25,6 +25,18 @@ export const AVAILABLE_TOOLS = [
   "get_recent_notes",
   "create_quick_note",
   "add_tags_to_note",
+  // Voice Notes Deep Dive tools
+  "get_voice_memo",
+  "get_voice_memos_by_date",
+  "get_voice_memos_by_labels",
+  "get_voice_memo_labels",
+  // AI Conversation Summary tools
+  "create_ai_convo_summary",
+  "get_ai_convo_summaries",
+  "get_ai_convo_summary",
+  "search_ai_convo_summaries",
+  "update_ai_convo_summary",
+  "delete_ai_convo_summary",
   // Agenda tools
   "get_daily_agenda",
   "get_weekly_agenda",
@@ -249,6 +261,96 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
           userId: auth.userId,
           noteId: params?.noteId as string,
           tags: params?.tags as string[],
+        });
+        break;
+
+      // Voice Notes Deep Dive tools
+      case "get_voice_memo":
+        result = await ctx.runQuery(internal.lifeos.tool_call.getVoiceMemoInternal, {
+          userId: auth.userId,
+          memoId: params?.memoId as string,
+        });
+        break;
+
+      case "get_voice_memos_by_date":
+        result = await ctx.runQuery(internal.lifeos.tool_call.getVoiceMemosByDateInternal, {
+          userId: auth.userId,
+          startDate: params?.startDate as string,
+          endDate: params?.endDate as string,
+          limit: params?.limit as number | undefined,
+        });
+        break;
+
+      case "get_voice_memos_by_labels":
+        result = await ctx.runQuery(internal.lifeos.tool_call.getVoiceMemosByLabelsInternal, {
+          userId: auth.userId,
+          labels: params?.labels as string[],
+          limit: params?.limit as number | undefined,
+        });
+        break;
+
+      case "get_voice_memo_labels":
+        result = await ctx.runQuery(internal.lifeos.tool_call.getVoiceMemoLabelsInternal, {
+          userId: auth.userId,
+        });
+        break;
+
+      // AI Conversation Summary tools
+      case "create_ai_convo_summary":
+        result = await ctx.runMutation(internal.lifeos.tool_call.createAiConvoSummaryInternal, {
+          userId: auth.userId,
+          title: params?.title as string,
+          summary: params?.summary as string,
+          keyInsights: params?.keyInsights as string[] | undefined,
+          actionItems: params?.actionItems as string[] | undefined,
+          ideas: params?.ideas as string[] | undefined,
+          tags: params?.tags as string[] | undefined,
+          relatedMemoIds: params?.relatedMemoIds as string[] | undefined,
+          summaryType: params?.summaryType as string | undefined,
+          conversationContext: params?.conversationContext as string | undefined,
+        });
+        break;
+
+      case "get_ai_convo_summaries":
+        result = await ctx.runQuery(internal.lifeos.tool_call.getAiConvoSummariesInternal, {
+          userId: auth.userId,
+          summaryType: params?.summaryType as string | undefined,
+          limit: params?.limit as number | undefined,
+        });
+        break;
+
+      case "get_ai_convo_summary":
+        result = await ctx.runQuery(internal.lifeos.tool_call.getAiConvoSummaryInternal, {
+          userId: auth.userId,
+          summaryId: params?.summaryId as string,
+        });
+        break;
+
+      case "search_ai_convo_summaries":
+        result = await ctx.runQuery(internal.lifeos.tool_call.searchAiConvoSummariesInternal, {
+          userId: auth.userId,
+          query: params?.query as string,
+          limit: params?.limit as number | undefined,
+        });
+        break;
+
+      case "update_ai_convo_summary":
+        result = await ctx.runMutation(internal.lifeos.tool_call.updateAiConvoSummaryInternal, {
+          userId: auth.userId,
+          summaryId: params?.summaryId as string,
+          title: params?.title as string | undefined,
+          summary: params?.summary as string | undefined,
+          keyInsights: params?.keyInsights as string[] | undefined,
+          actionItems: params?.actionItems as string[] | undefined,
+          ideas: params?.ideas as string[] | undefined,
+          tags: params?.tags as string[] | undefined,
+        });
+        break;
+
+      case "delete_ai_convo_summary":
+        result = await ctx.runMutation(internal.lifeos.tool_call.deleteAiConvoSummaryInternal, {
+          userId: auth.userId,
+          summaryId: params?.summaryId as string,
         });
         break;
 

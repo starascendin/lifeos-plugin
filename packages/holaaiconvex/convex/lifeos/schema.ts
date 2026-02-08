@@ -347,4 +347,46 @@ export const lifeosTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  // ==================== AI CONVERSATION SUMMARIES ====================
+  // Stores crystallized summaries from AI conversations about voice notes
+  life_voiceNotesAiConvoSummary: defineTable({
+    // User who owns this summary
+    userId: v.id("users"),
+    // Title for this conversation summary
+    title: v.string(),
+    // The crystallized summary/insights from the AI conversation
+    summary: v.string(),
+    // Key insights extracted from the conversation
+    keyInsights: v.optional(v.array(v.string())),
+    // Action items that emerged from the conversation
+    actionItems: v.optional(v.array(v.string())),
+    // New ideas or plans formulated
+    ideas: v.optional(v.array(v.string())),
+    // Tags for categorization
+    tags: v.optional(v.array(v.string())),
+    // References to voice memos discussed in this conversation
+    relatedMemoIds: v.optional(v.array(v.id("life_voiceMemos"))),
+    // The date range of memos discussed (for context)
+    memoDateRange: v.optional(
+      v.object({
+        start: v.number(),
+        end: v.number(),
+      })
+    ),
+    // Type of summary: reflection, planning, brainstorm, journal_review, etc.
+    summaryType: v.optional(v.string()),
+    // Optional: the conversation context/topic that led to this summary
+    conversationContext: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_type", ["userId", "summaryType"])
+    .searchIndex("search_summary", {
+      searchField: "summary",
+      filterFields: ["userId"],
+    }),
 };

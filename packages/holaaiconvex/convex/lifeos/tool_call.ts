@@ -106,6 +106,87 @@ export const TOOL_DEFINITIONS = {
       tags: "required - array of tags to add",
     },
   },
+  // Voice Notes Deep Dive tools
+  get_voice_memo: {
+    description: "Get a single voice memo with full details including AI extraction",
+    params: {
+      memoId: "required - the voice memo ID",
+    },
+  },
+  get_voice_memos_by_date: {
+    description: "Get voice memos within a date range with AI extractions",
+    params: {
+      startDate: "required - start date in ISO format (YYYY-MM-DD)",
+      endDate: "required - end date in ISO format (YYYY-MM-DD)",
+      limit: "optional - max results (default 50, max 100)",
+    },
+  },
+  get_voice_memos_by_labels: {
+    description: "Get voice memos that have specific labels/tags from AI extraction",
+    params: {
+      labels: "required - array of labels to search for",
+      limit: "optional - max results (default 50, max 100)",
+    },
+  },
+  get_voice_memo_labels: {
+    description: "Get all unique labels from voice memo extractions with counts",
+    params: {},
+  },
+  // AI Conversation Summary tools (crystallization)
+  create_ai_convo_summary: {
+    description:
+      "Save a crystallized summary from an AI conversation about voice notes",
+    params: {
+      title: "required - title for this summary",
+      summary: "required - the main summary/insights from the conversation",
+      keyInsights: "optional - array of key insights extracted",
+      actionItems: "optional - array of action items that emerged",
+      ideas: "optional - array of new ideas or plans formulated",
+      tags: "optional - array of tags for categorization",
+      relatedMemoIds: "optional - array of voice memo IDs discussed",
+      summaryType:
+        "optional - type: reflection, planning, brainstorm, journal_review",
+      conversationContext: "optional - the topic/context of the conversation",
+    },
+  },
+  get_ai_convo_summaries: {
+    description: "Get past AI conversation summaries with optional type filter",
+    params: {
+      summaryType: "optional - filter by type (reflection, planning, etc.)",
+      limit: "optional - max results (default 20, max 50)",
+    },
+  },
+  get_ai_convo_summary: {
+    description: "Get a single AI conversation summary with related memo details",
+    params: {
+      summaryId: "required - the summary ID",
+    },
+  },
+  search_ai_convo_summaries: {
+    description: "Search AI conversation summaries by content",
+    params: {
+      query: "required - search terms",
+      limit: "optional - max results (default 10, max 50)",
+    },
+  },
+  update_ai_convo_summary: {
+    description: "Update an existing AI conversation summary",
+    params: {
+      summaryId: "required - the summary ID",
+      title: "optional - updated title",
+      summary: "optional - updated summary",
+      keyInsights: "optional - updated key insights",
+      actionItems: "optional - updated action items",
+      ideas: "optional - updated ideas",
+      tags: "optional - updated tags",
+    },
+  },
+  delete_ai_convo_summary: {
+    description: "Delete an AI conversation summary",
+    params: {
+      summaryId: "required - the summary ID",
+    },
+  },
   // Agenda tools
   get_daily_agenda: {
     description:
@@ -1028,6 +1109,481 @@ export const addTagsToNoteInternal = internalMutation({
       success: true,
       noteId,
       tags: mergedTags,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== VOICE NOTES DEEP DIVE TOOLS ====================
+
+/**
+ * Get a single voice memo with full details including AI extraction
+ */
+export const getVoiceMemoInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    memoId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const memoId = args.memoId as Id<"life_voiceMemos">;
+
+    const memo = await ctx.db.get(memoId);
+    if (!memo || memo.userId !== userId) {
+      return { error: "Voice memo not found", generatedAt: new Date().toISOString() };
+    }
+
+    // Get latest extraction if available
+    const extraction = await ctx.db
+      .query("life_voiceMemoExtractions")
+      .withIndex("by_voiceMemo", (q) => q.eq("voiceMemoId", memo._id))
+      .order("desc")
+      .first();
+
+    return {
+      id: memo._id,
+      name: memo.name,
+      transcript: memo.transcript,
+      duration: memo.duration,
+      tags: memo.tags || [],
+      language: memo.language,
+      createdAt: new Date(memo.clientCreatedAt).toISOString(),
+      extraction: extraction
+        ? {
+            summary: extraction.summary,
+            labels: extraction.labels,
+            actionItems: extraction.actionItems,
+            keyPoints: extraction.keyPoints,
+            sentiment: extraction.sentiment,
+          }
+        : null,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get voice memos by date range with extractions
+ */
+export const getVoiceMemosByDateInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    startDate: v.string(),
+    endDate: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = Math.min(args.limit ?? 50, 100);
+
+    const startTs = new Date(args.startDate).getTime();
+    const endTs = new Date(args.endDate).setHours(23, 59, 59, 999);
+
+    const memos = await ctx.db
+      .query("life_voiceMemos")
+      .withIndex("by_user_created", (q) => q.eq("userId", userId))
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("clientCreatedAt"), startTs),
+          q.lte(q.field("clientCreatedAt"), endTs)
+        )
+      )
+      .order("desc")
+      .take(limit);
+
+    // Get extractions for all memos
+    const results = await Promise.all(
+      memos.map(async (memo) => {
+        const extraction = await ctx.db
+          .query("life_voiceMemoExtractions")
+          .withIndex("by_voiceMemo", (q) => q.eq("voiceMemoId", memo._id))
+          .order("desc")
+          .first();
+
+        return {
+          id: memo._id,
+          name: memo.name,
+          transcript: memo.transcript,
+          duration: memo.duration,
+          tags: memo.tags || [],
+          createdAt: new Date(memo.clientCreatedAt).toISOString(),
+          extraction: extraction
+            ? {
+                summary: extraction.summary,
+                labels: extraction.labels,
+                actionItems: extraction.actionItems,
+                keyPoints: extraction.keyPoints,
+                sentiment: extraction.sentiment,
+              }
+            : null,
+        };
+      })
+    );
+
+    return {
+      memos: results,
+      dateRange: { start: args.startDate, end: args.endDate },
+      count: results.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get voice memos by labels/tags from AI extraction
+ */
+export const getVoiceMemosByLabelsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    labels: v.array(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = Math.min(args.limit ?? 50, 100);
+
+    // Get extractions with matching labels
+    const extractions = await ctx.db
+      .query("life_voiceMemoExtractions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("status"), "completed"))
+      .collect();
+
+    // Filter extractions that have any of the requested labels
+    const matchingExtractions = extractions.filter((ext) =>
+      ext.labels?.some((label) =>
+        args.labels.some(
+          (reqLabel) =>
+            label.toLowerCase().includes(reqLabel.toLowerCase()) ||
+            reqLabel.toLowerCase().includes(label.toLowerCase())
+        )
+      )
+    );
+
+    // Get the corresponding memos
+    const results = await Promise.all(
+      matchingExtractions.slice(0, limit).map(async (extraction) => {
+        const memo = await ctx.db.get(extraction.voiceMemoId);
+        if (!memo) return null;
+
+        return {
+          id: memo._id,
+          name: memo.name,
+          transcript: memo.transcript,
+          duration: memo.duration,
+          tags: memo.tags || [],
+          createdAt: new Date(memo.clientCreatedAt).toISOString(),
+          extraction: {
+            summary: extraction.summary,
+            labels: extraction.labels,
+            actionItems: extraction.actionItems,
+            keyPoints: extraction.keyPoints,
+            sentiment: extraction.sentiment,
+          },
+        };
+      })
+    );
+
+    const filtered = results.filter(Boolean);
+
+    return {
+      memos: filtered,
+      searchedLabels: args.labels,
+      count: filtered.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get all unique labels from voice memo extractions with counts
+ */
+export const getVoiceMemoLabelsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+
+    const extractions = await ctx.db
+      .query("life_voiceMemoExtractions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("status"), "completed"))
+      .collect();
+
+    // Count labels
+    const labelCounts = new Map<string, number>();
+    for (const ext of extractions) {
+      for (const label of ext.labels ?? []) {
+        labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+      }
+    }
+
+    // Sort by count descending
+    const labels = Array.from(labelCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, count }));
+
+    return {
+      labels,
+      totalLabels: labels.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== AI CONVERSATION SUMMARY TOOLS ====================
+
+/**
+ * Create a new AI conversation summary (crystallization)
+ */
+export const createAiConvoSummaryInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    title: v.string(),
+    summary: v.string(),
+    keyInsights: v.optional(v.array(v.string())),
+    actionItems: v.optional(v.array(v.string())),
+    ideas: v.optional(v.array(v.string())),
+    tags: v.optional(v.array(v.string())),
+    relatedMemoIds: v.optional(v.array(v.string())),
+    summaryType: v.optional(v.string()),
+    conversationContext: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const now = Date.now();
+
+    const summaryId = await ctx.db.insert("life_voiceNotesAiConvoSummary", {
+      userId,
+      title: args.title,
+      summary: args.summary,
+      keyInsights: args.keyInsights,
+      actionItems: args.actionItems,
+      ideas: args.ideas,
+      tags: args.tags,
+      relatedMemoIds: args.relatedMemoIds?.map(
+        (id) => id as Id<"life_voiceMemos">
+      ),
+      summaryType: args.summaryType,
+      conversationContext: args.conversationContext,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      summaryId,
+      message: "AI conversation summary created successfully",
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get AI conversation summaries with optional filters
+ */
+export const getAiConvoSummariesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    summaryType: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = Math.min(args.limit ?? 20, 50);
+
+    const summaries = await ctx.db
+      .query("life_voiceNotesAiConvoSummary")
+      .withIndex("by_user_created", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(limit);
+
+    // Filter by type if specified
+    const filtered = args.summaryType
+      ? summaries.filter((s) => s.summaryType === args.summaryType)
+      : summaries;
+
+    return {
+      summaries: filtered.map((s) => ({
+        id: s._id,
+        title: s.title,
+        summary: s.summary,
+        keyInsights: s.keyInsights,
+        actionItems: s.actionItems,
+        ideas: s.ideas,
+        tags: s.tags,
+        summaryType: s.summaryType,
+        createdAt: new Date(s.createdAt).toISOString(),
+      })),
+      count: filtered.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single AI conversation summary by ID
+ */
+export const getAiConvoSummaryInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    summaryId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const summaryId = args.summaryId as Id<"life_voiceNotesAiConvoSummary">;
+
+    const summary = await ctx.db.get(summaryId);
+    if (!summary || summary.userId !== userId) {
+      return { error: "Summary not found", generatedAt: new Date().toISOString() };
+    }
+
+    // Get related memos if any
+    const relatedMemos = summary.relatedMemoIds
+      ? await Promise.all(
+          summary.relatedMemoIds.map(async (memoId) => {
+            const memo = await ctx.db.get(memoId);
+            return memo
+              ? {
+                  id: memo._id,
+                  name: memo.name,
+                  createdAt: new Date(memo.clientCreatedAt).toISOString(),
+                }
+              : null;
+          })
+        )
+      : [];
+
+    return {
+      id: summary._id,
+      title: summary.title,
+      summary: summary.summary,
+      keyInsights: summary.keyInsights,
+      actionItems: summary.actionItems,
+      ideas: summary.ideas,
+      tags: summary.tags,
+      summaryType: summary.summaryType,
+      conversationContext: summary.conversationContext,
+      relatedMemos: relatedMemos.filter(Boolean),
+      createdAt: new Date(summary.createdAt).toISOString(),
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Search AI conversation summaries by content
+ */
+export const searchAiConvoSummariesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const limit = Math.min(args.limit ?? 10, 50);
+
+    const results = await ctx.db
+      .query("life_voiceNotesAiConvoSummary")
+      .withSearchIndex("search_summary", (q) =>
+        q.search("summary", args.query).eq("userId", userId)
+      )
+      .take(limit);
+
+    return {
+      summaries: results.map((s) => ({
+        id: s._id,
+        title: s.title,
+        summary: s.summary,
+        keyInsights: s.keyInsights,
+        tags: s.tags,
+        summaryType: s.summaryType,
+        createdAt: new Date(s.createdAt).toISOString(),
+      })),
+      query: args.query,
+      count: results.length,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update an AI conversation summary
+ */
+export const updateAiConvoSummaryInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    summaryId: v.string(),
+    title: v.optional(v.string()),
+    summary: v.optional(v.string()),
+    keyInsights: v.optional(v.array(v.string())),
+    actionItems: v.optional(v.array(v.string())),
+    ideas: v.optional(v.array(v.string())),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const summaryId = args.summaryId as Id<"life_voiceNotesAiConvoSummary">;
+
+    const existing = await ctx.db.get(summaryId);
+    if (!existing || existing.userId !== userId) {
+      return {
+        success: false,
+        error: "Summary not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const updates: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.title !== undefined) updates.title = args.title;
+    if (args.summary !== undefined) updates.summary = args.summary;
+    if (args.keyInsights !== undefined) updates.keyInsights = args.keyInsights;
+    if (args.actionItems !== undefined) updates.actionItems = args.actionItems;
+    if (args.ideas !== undefined) updates.ideas = args.ideas;
+    if (args.tags !== undefined) updates.tags = args.tags;
+
+    await ctx.db.patch(summaryId, updates);
+
+    return {
+      success: true,
+      summaryId,
+      message: "Summary updated successfully",
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete an AI conversation summary
+ */
+export const deleteAiConvoSummaryInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    summaryId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId as Id<"users">;
+    const summaryId = args.summaryId as Id<"life_voiceNotesAiConvoSummary">;
+
+    const existing = await ctx.db.get(summaryId);
+    if (!existing || existing.userId !== userId) {
+      return {
+        success: false,
+        error: "Summary not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    await ctx.db.delete(summaryId);
+
+    return {
+      success: true,
+      message: "Summary deleted successfully",
       generatedAt: new Date().toISOString(),
     };
   },

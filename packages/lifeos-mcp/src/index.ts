@@ -801,6 +801,279 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // Voice Notes Deep Dive Tools
+  {
+    name: "get_voice_memo",
+    description:
+      "Get a single voice memo with full details including transcript and AI extraction (summary, labels, action items, key points, sentiment).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        memoId: {
+          type: "string",
+          description: "The voice memo ID (required)",
+        },
+      },
+      required: ["memoId"],
+    },
+  },
+  {
+    name: "get_voice_memos_by_date",
+    description:
+      "Get voice memos within a date range, including transcripts and AI extractions. Great for reviewing notes from a specific time period.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        startDate: {
+          type: "string",
+          description: "Start date in ISO format like '2024-01-15' (required)",
+        },
+        endDate: {
+          type: "string",
+          description: "End date in ISO format like '2024-01-22' (required)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50, max 100)",
+        },
+      },
+      required: ["startDate", "endDate"],
+    },
+  },
+  {
+    name: "get_voice_memos_by_labels",
+    description:
+      "Get voice memos that have specific labels/tags from AI extraction. Use this to find memos about specific topics.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        labels: {
+          type: "array",
+          items: { type: "string" },
+          description: "Labels to search for (required). Matches are fuzzy/partial.",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50, max 100)",
+        },
+      },
+      required: ["labels"],
+    },
+  },
+  {
+    name: "get_voice_memo_labels",
+    description:
+      "Get all unique labels from voice memo AI extractions with counts. Use this to discover what topics exist in voice notes.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
+    },
+  },
+
+  // AI Conversation Summary Tools (Crystallization)
+  {
+    name: "create_ai_convo_summary",
+    description:
+      "Save a crystallized summary from an AI conversation about voice notes. Use this to preserve insights, plans, and ideas from discussing notes with the AI.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        title: {
+          type: "string",
+          description: "Title for this summary (required)",
+        },
+        summary: {
+          type: "string",
+          description: "The main summary/insights from the conversation (required)",
+        },
+        keyInsights: {
+          type: "array",
+          items: { type: "string" },
+          description: "Key insights extracted from the conversation (optional)",
+        },
+        actionItems: {
+          type: "array",
+          items: { type: "string" },
+          description: "Action items that emerged from the conversation (optional)",
+        },
+        ideas: {
+          type: "array",
+          items: { type: "string" },
+          description: "New ideas or plans formulated (optional)",
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Tags for categorization (optional)",
+        },
+        relatedMemoIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "IDs of voice memos discussed in this conversation (optional)",
+        },
+        summaryType: {
+          type: "string",
+          description:
+            "Type of summary: reflection, planning, brainstorm, journal_review, idea_refinement (optional)",
+        },
+        conversationContext: {
+          type: "string",
+          description: "The topic/context of the conversation that led to this summary (optional)",
+        },
+      },
+      required: ["title", "summary"],
+    },
+  },
+  {
+    name: "get_ai_convo_summaries",
+    description:
+      "Get past AI conversation summaries. Use this to review previous crystallized insights from voice note discussions.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        summaryType: {
+          type: "string",
+          description:
+            "Filter by type: reflection, planning, brainstorm, journal_review (optional)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 20, max 50)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_ai_convo_summary",
+    description:
+      "Get a single AI conversation summary with full details including related memo information.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        summaryId: {
+          type: "string",
+          description: "The summary ID (required)",
+        },
+      },
+      required: ["summaryId"],
+    },
+  },
+  {
+    name: "search_ai_convo_summaries",
+    description: "Search AI conversation summaries by content.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        query: {
+          type: "string",
+          description: "Search terms to find in summaries (required)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 10, max 50)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "update_ai_convo_summary",
+    description: "Update an existing AI conversation summary.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        summaryId: {
+          type: "string",
+          description: "The summary ID (required)",
+        },
+        title: {
+          type: "string",
+          description: "Updated title (optional)",
+        },
+        summary: {
+          type: "string",
+          description: "Updated summary (optional)",
+        },
+        keyInsights: {
+          type: "array",
+          items: { type: "string" },
+          description: "Updated key insights (optional)",
+        },
+        actionItems: {
+          type: "array",
+          items: { type: "string" },
+          description: "Updated action items (optional)",
+        },
+        ideas: {
+          type: "array",
+          items: { type: "string" },
+          description: "Updated ideas (optional)",
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Updated tags (optional)",
+        },
+      },
+      required: ["summaryId"],
+    },
+  },
+  {
+    name: "delete_ai_convo_summary",
+    description: "Delete an AI conversation summary.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        summaryId: {
+          type: "string",
+          description: "The summary ID (required)",
+        },
+      },
+      required: ["summaryId"],
+    },
+  },
+
   // FRM (Friend Relationship Management) Tools
   {
     name: "get_people",
