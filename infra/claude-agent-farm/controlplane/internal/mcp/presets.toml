@@ -101,6 +101,56 @@ install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/meeting-
 description = "Meeting prep: contact dossier, past meetings, open items"
 category = "lifeos"
 
+[skills.lifeos-follow-ups]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/follow-ups.md ~/.claude/commands/follow-ups.md"
+description = "Track follow-ups needed with people and clients"
+category = "lifeos"
+
+[skills.lifeos-overdue]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/overdue.md ~/.claude/commands/overdue.md"
+description = "Show tasks, projects, and sprint items that are overdue or slipping"
+category = "lifeos"
+
+[skills.lifeos-monthly-review]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/monthly-review.md ~/.claude/commands/monthly-review.md"
+description = "Monthly review: accomplishments, project progress, next month planning"
+category = "lifeos"
+
+[skills.lifeos-inbox-triage]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/inbox-triage.md ~/.claude/commands/inbox-triage.md"
+description = "Process captured notes and triage into actionable tasks"
+category = "lifeos"
+
+[skills.lifeos-context-switch]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/context-switch.md ~/.claude/commands/context-switch.md"
+description = "Quick context loading for switching between clients/projects"
+category = "lifeos"
+
+[skills.lifeos-client-health]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/client-health.md ~/.claude/commands/client-health.md"
+description = "Health dashboard across all clients with risk indicators"
+category = "lifeos"
+
+[skills.lifeos-relationship-pulse]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/relationship-pulse.md ~/.claude/commands/relationship-pulse.md"
+description = "Check on neglected relationships and suggest reconnections"
+category = "lifeos"
+
+[skills.lifeos-end-of-day]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/end-of-day.md ~/.claude/commands/end-of-day.md"
+description = "End-of-day wrap-up: completion summary and tomorrow planning"
+category = "lifeos"
+
+[skills.lifeos-voice-notes]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/voice-notes.md ~/.claude/commands/voice-notes.md"
+description = "Interactive voice notes exploration and discussion session"
+category = "lifeos"
+
+[skills.lifeos-voice-notes-crystallize]
+install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/voice-notes-crystallize.md ~/.claude/commands/voice-notes-crystallize.md"
+description = "Save crystallized summary from AI conversation about voice notes"
+category = "lifeos"
+
 [skills.llm-council]
 install_command = "mkdir -p ~/.claude/commands && cp /opt/lifeos-skills/llm-council.md ~/.claude/commands/llm-council.md"
 description = "LLM Council: multi-model deliberation with peer review and synthesis via opencode"
@@ -113,7 +163,7 @@ category = "council"
 system_prompt = "You are a LifeOS productivity assistant. Use the lifeos CLI via Bash to manage projects, tasks, contacts, meetings, and notes. Always be concise and actionable."
 task_prompt = ""
 enabled_mcps = ""
-enabled_skills = "lifeos-cli,lifeos-daily-standup,lifeos-weekly-review,lifeos-sprint-plan,lifeos-contact-lookup,lifeos-client-brief,lifeos-project-status,lifeos-capture,lifeos-meeting-prep"
+enabled_skills = "lifeos-cli,lifeos-daily-standup,lifeos-weekly-review,lifeos-sprint-plan,lifeos-contact-lookup,lifeos-client-brief,lifeos-project-status,lifeos-capture,lifeos-meeting-prep,lifeos-follow-ups,lifeos-overdue,lifeos-monthly-review,lifeos-inbox-triage,lifeos-context-switch,lifeos-client-health,lifeos-relationship-pulse,lifeos-end-of-day,lifeos-voice-notes,lifeos-voice-notes-crystallize"
 max_turns = 50
 description = "General LifeOS assistant with CLI tools and workflow skills"
 category = "lifeos"
