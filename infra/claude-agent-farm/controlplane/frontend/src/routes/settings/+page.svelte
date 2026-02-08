@@ -354,6 +354,22 @@
 		{ key: 'mcp' as Tab, label: 'MCP', icon: Server },
 		{ key: 'skills' as Tab, label: 'Skills', icon: Sparkles }
 	];
+
+	// Build timestamp (same as sidebar)
+	function formatBuildTime(iso: string): string {
+		try {
+			const date = new Date(iso);
+			return date.toLocaleDateString('en-US', {
+				month: 'short',
+				day: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit'
+			});
+		} catch {
+			return iso.slice(0, 16).replace('T', ' ');
+		}
+	}
+	const buildTime = formatBuildTime(__BUILD_TIMESTAMP__);
 </script>
 
 <div class="space-y-4 p-4 md:p-6">
@@ -489,6 +505,10 @@
 							<div class="flex items-center justify-between">
 								<span class="text-sm text-muted-foreground">Status</span>
 								<Badge variant="secondary">{currentBundle.status}</Badge>
+							</div>
+							<div class="flex items-center justify-between">
+								<span class="text-sm text-muted-foreground">Build</span>
+								<span class="text-xs text-muted-foreground">{buildTime}</span>
 							</div>
 						</div>
 
