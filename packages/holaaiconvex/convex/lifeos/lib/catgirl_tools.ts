@@ -292,6 +292,124 @@ export const createQuickNoteTool = createTool({
   },
 });
 
+// ==================== CONTACT INTERACTION TOOLS ====================
+
+export const getMemosForPersonTool = createTool({
+  description: "Get voice memos/notes linked to a contact. Use this to see what notes are associated with a person.",
+  args: z.object({
+    personId: z.string().describe("The person's ID (required)"),
+    limit: z.number().optional().describe("Max results (default 20)"),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: async (ctx, args): Promise<any> => {
+    const userId = getUserId();
+    return await ctx.runQuery(internal.lifeos.tool_call.getMemosForPersonInternal, {
+      userId,
+      personId: args.personId,
+      limit: args.limit,
+    });
+  },
+});
+
+export const getPersonTimelineTool = createTool({
+  description: "Get chronological timeline of interactions with a contact including meetings, messages, and notes.",
+  args: z.object({
+    personId: z.string().describe("The person's ID (required)"),
+    limit: z.number().optional().describe("Max results (default 20)"),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: async (ctx, args): Promise<any> => {
+    const userId = getUserId();
+    return await ctx.runQuery(internal.lifeos.tool_call.getPersonTimelineInternal, {
+      userId,
+      personId: args.personId,
+      limit: args.limit,
+    });
+  },
+});
+
+// ==================== AI CONVERSATION SUMMARY TOOLS ====================
+
+export const getAiConvoSummariesTool = createTool({
+  description: "List past AI conversation summaries/crystallized notes. Use this to recall previous insights and decisions.",
+  args: z.object({
+    summaryType: z.string().optional().describe("Filter by summary type"),
+    limit: z.number().optional().describe("Max results (default 20)"),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: async (ctx, args): Promise<any> => {
+    const userId = getUserId();
+    return await ctx.runQuery(internal.lifeos.tool_call.getAiConvoSummariesInternal, {
+      userId,
+      summaryType: args.summaryType,
+      limit: args.limit,
+    });
+  },
+});
+
+export const searchAiConvoSummariesTool = createTool({
+  description: "Search AI conversation summaries by content. Use this to find specific past conversations or insights.",
+  args: z.object({
+    query: z.string().describe("Search terms to find in summaries (required)"),
+    limit: z.number().optional().describe("Max results (default 10)"),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: async (ctx, args): Promise<any> => {
+    const userId = getUserId();
+    return await ctx.runQuery(internal.lifeos.tool_call.searchAiConvoSummariesInternal, {
+      userId,
+      query: args.query,
+      limit: args.limit,
+    });
+  },
+});
+
+export const getAiConvoSummaryTool = createTool({
+  description: "Get a single AI conversation summary with full details including key insights and action items.",
+  args: z.object({
+    summaryId: z.string().describe("The summary ID (required)"),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: async (ctx, args): Promise<any> => {
+    const userId = getUserId();
+    return await ctx.runQuery(internal.lifeos.tool_call.getAiConvoSummaryInternal, {
+      userId,
+      summaryId: args.summaryId,
+    });
+  },
+});
+
+export const createAiConvoSummaryTool = createTool({
+  description: "Save a crystallized summary from this conversation. Use this to persist important insights, decisions, or action items.",
+  args: z.object({
+    title: z.string().describe("Title for the summary (required)"),
+    summary: z.string().describe("The summary content (required)"),
+    keyInsights: z.array(z.string()).optional().describe("Key insights from the conversation"),
+    actionItems: z.array(z.string()).optional().describe("Action items identified"),
+    ideas: z.array(z.string()).optional().describe("Ideas generated"),
+    tags: z.array(z.string()).optional().describe("Tags for categorization"),
+    relatedMemoIds: z.array(z.string()).optional().describe("IDs of related memos/notes"),
+    summaryType: z.string().optional().describe("Type of summary (e.g. 'meeting', 'brainstorm', 'decision')"),
+    conversationContext: z.string().optional().describe("Context about where this conversation took place"),
+  }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handler: async (ctx, args): Promise<any> => {
+    const userId = getUserId();
+    return await ctx.runMutation(internal.lifeos.tool_call.createAiConvoSummaryInternal, {
+      userId,
+      title: args.title,
+      summary: args.summary,
+      keyInsights: args.keyInsights,
+      actionItems: args.actionItems,
+      ideas: args.ideas,
+      tags: args.tags,
+      relatedMemoIds: args.relatedMemoIds,
+      summaryType: args.summaryType,
+      conversationContext: args.conversationContext,
+    });
+  },
+});
+
 // ==================== ALL TOOLS EXPORT ====================
 
 export const catgirlTools = {
@@ -310,4 +428,10 @@ export const catgirlTools = {
   search_notes: searchNotesTool,
   get_recent_notes: getRecentNotesTool,
   create_quick_note: createQuickNoteTool,
+  get_memos_for_person: getMemosForPersonTool,
+  get_person_timeline: getPersonTimelineTool,
+  get_ai_convo_summaries: getAiConvoSummariesTool,
+  search_ai_convo_summaries: searchAiConvoSummariesTool,
+  get_ai_convo_summary: getAiConvoSummaryTool,
+  create_ai_convo_summary: createAiConvoSummaryTool,
 };

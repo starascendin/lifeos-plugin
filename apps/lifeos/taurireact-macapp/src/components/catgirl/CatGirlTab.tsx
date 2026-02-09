@@ -1,4 +1,4 @@
-import { Cat, Plus, Trash2, AlertCircle, Coins } from "lucide-react";
+import { Cat, Plus, History, AlertCircle, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -7,6 +7,7 @@ import { CatGirlProvider, useCatGirl, CATGIRL_MODELS } from "@/lib/contexts/CatG
 import { CatGirlChat } from "./CatGirlChat";
 import { CatGirlInput } from "./CatGirlInput";
 import { CatGirlModelSelector } from "./CatGirlModelSelector";
+import { CatGirlThreadList } from "./CatGirlThreadList";
 
 function TokenUsageDisplay() {
   const { cumulativeUsage } = useCatGirl();
@@ -42,6 +43,7 @@ function CatGirlContent() {
     sendMessage,
     clearMessages,
     clearError,
+    setThreadListOpen,
   } = useCatGirl();
 
   const selectedModel = CATGIRL_MODELS.find((m) => m.id === selectedModelId);
@@ -71,13 +73,13 @@ function CatGirlContent() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={clearMessages}
+                onClick={() => setThreadListOpen(true)}
                 disabled={isLoading}
               >
-                <Plus className="h-4 w-4" />
+                <History className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>New Conversation</TooltipContent>
+            <TooltipContent>Conversation History</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -86,12 +88,12 @@ function CatGirlContent() {
                 variant="outline"
                 size="icon"
                 onClick={clearMessages}
-                disabled={messages.length === 0 || isLoading}
+                disabled={isLoading}
               >
-                <Trash2 className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Clear Messages</TooltipContent>
+            <TooltipContent>New Conversation</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -141,6 +143,9 @@ function CatGirlContent() {
           </code>
         </p>
       </div>
+
+      {/* Thread List Sidebar */}
+      <CatGirlThreadList />
     </div>
   );
 }

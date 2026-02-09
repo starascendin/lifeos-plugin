@@ -7,7 +7,7 @@
 import { Agent } from "@convex-dev/agent";
 import { gateway } from "@ai-sdk/gateway";
 import { v } from "convex/values";
-import { action, internalMutation, internalQuery } from "../_generated/server";
+import { action, internalMutation, internalQuery, query } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { catgirlTools } from "./lib/catgirl_tools";
 import { vCatgirlTokenUsage } from "./catgirl_agent_schema";
@@ -144,7 +144,7 @@ export const getThreadOwner = internalQuery({
 
 // ==================== AGENT INSTRUCTIONS ====================
 
-const AGENT_INSTRUCTIONS = `You are CatGirlAI, a helpful and friendly AI assistant for LifeOS personal productivity. You have access to the user's projects, tasks, contacts, and notes.
+const AGENT_INSTRUCTIONS = `You are CatGirlAI, a helpful and friendly AI assistant for LifeOS personal productivity. You have access to the user's projects, tasks, contacts, notes, and AI conversation summaries.
 
 Your personality:
 - Friendly, helpful, and occasionally playful
@@ -164,14 +164,23 @@ Available tools:
 - get_people: List contacts with optional filters
 - search_people: Search contacts by name
 - get_person: Get detailed info about a contact
+- get_memos_for_person: Get voice memos/notes linked to a contact
+- get_person_timeline: Get chronological timeline of interactions with a contact
 - search_notes: Search voice memos/notes
 - get_recent_notes: Get recent notes
 - create_quick_note: Create a quick note
+- get_ai_convo_summaries: List past AI conversation summaries/crystallized notes
+- search_ai_convo_summaries: Search AI conversation summaries by content
+- get_ai_convo_summary: Get a single AI conversation summary with full details
+- create_ai_convo_summary: Save a crystallized summary from this conversation
 
 Guidelines:
 - When users ask about their day, use get_daily_agenda or get_todays_tasks
 - When creating tasks, confirm what was created with the identifier (e.g., PROJ-123)
 - Use project keys (like ACME) when referencing projects
+- When users ask about interactions with a person, use get_person_timeline or get_memos_for_person
+- When users want to save insights from this conversation, use create_ai_convo_summary
+- When users reference past conversations or decisions, use search_ai_convo_summaries
 - Be concise but friendly in responses
 - If a tool returns an error, explain it helpfully
 - IMPORTANT: After using any tool, always provide a natural language response explaining the result`;
@@ -268,7 +277,10 @@ export const createThread = action({
 
     const userId = user._id as Id<"users">;
     const agent = createCatgirlAgent(DEFAULT_MODEL);
-    const { threadId } = await agent.createThread(ctx, {});
+    const { threadId } = await agent.createThread(ctx, {
+      userId: identity.subject,
+      title: "New Chat",
+    });
 
     // Register thread ownership
     await ctx.runMutation(internal.lifeos.catgirl_agent.registerThread, {
@@ -359,6 +371,29 @@ export const sendMessage = action({
     // Clear userId after request
     setCurrentUserId(null);
 
+    // Auto-title: if this is the first user message, update thread title
+    try {
+      const existingMessages = await ctx.runQuery(
+        components.agent.messages.listMessagesByThreadId,
+        {
+          threadId,
+          order: "asc",
+          statuses: ["success"],
+          paginationOpts: { numItems: 5, cursor: null },
+        }
+      );
+      // If only 2 messages (the user msg + assistant response), it's the first exchange
+      if (existingMessages.page.length <= 2) {
+        const title = message.length > 60 ? message.slice(0, 57) + "..." : message;
+        await ctx.runMutation(components.agent.threads.updateThread, {
+          threadId,
+          patch: { title },
+        });
+      }
+    } catch {
+      // Non-critical, don't fail the request
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const anyResult = result as any;
 
@@ -413,5 +448,143 @@ export const sendMessage = action({
       usage: usageData.usage,
       modelUsed: validModelId,
     };
+  },
+});
+
+// ==================== THREAD & MESSAGE QUERIES ====================
+
+/**
+ * List all CatGirl AI threads for the current user
+ * Uses the SDK's built-in thread persistence
+ */
+export const listThreads = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+    const userId = identity.subject;
+
+    const result = await ctx.runQuery(
+      components.agent.threads.listThreadsByUserId,
+      {
+        userId,
+        paginationOpts: {
+          numItems: args.limit ?? 30,
+          cursor: null,
+        },
+        order: "desc",
+      }
+    );
+
+    return result.page.filter((t) => t.status === "active");
+  },
+});
+
+/**
+ * Get messages for a specific CatGirl AI thread
+ * Returns messages in ascending order (oldest first) for chat display
+ */
+export const getThreadMessages = query({
+  args: {
+    threadId: v.string(),
+  },
+  handler: async (ctx, { threadId }) => {
+    const result = await ctx.runQuery(
+      components.agent.messages.listMessagesByThreadId,
+      {
+        threadId,
+        order: "asc",
+        statuses: ["success"],
+        paginationOpts: {
+          numItems: 100,
+          cursor: null,
+        },
+      }
+    );
+
+    return result.page
+      .map((msg) => {
+        const message = msg.message;
+        if (!message) return null;
+
+        let textContent = "";
+        const toolCalls: Array<{ name: string; args: unknown }> = [];
+        const toolResults: Array<{ name: string; result: unknown }> = [];
+
+        if (typeof message.content === "string") {
+          textContent = message.content;
+        } else if (Array.isArray(message.content)) {
+          for (const part of message.content) {
+            if (part.type === "text" && "text" in part) {
+              textContent += part.text;
+            } else if (part.type === "tool-call" && "toolName" in part) {
+              toolCalls.push({
+                name: part.toolName,
+                args: part.args,
+              });
+            } else if (part.type === "tool-result" && "toolName" in part) {
+              toolResults.push({
+                name: part.toolName,
+                result: "output" in part ? part.output : undefined,
+              });
+            }
+          }
+        }
+
+        return {
+          id: msg._id,
+          role: message.role as "user" | "assistant",
+          content: textContent,
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          toolResults: toolResults.length > 0 ? toolResults : undefined,
+          createdAt: msg._creationTime,
+        };
+      })
+      .filter(Boolean);
+  },
+});
+
+/**
+ * Delete (archive) a CatGirl AI thread
+ */
+export const deleteThread = action({
+  args: {
+    threadId: v.string(),
+  },
+  handler: async (ctx, { threadId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Authentication required");
+    }
+
+    const user = await ctx.runQuery(internal.common.users.getUserByTokenIdentifier, {
+      tokenIdentifier: identity.tokenIdentifier,
+    });
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const userId = user._id as Id<"users">;
+
+    // Validate ownership
+    const isOwner = await ctx.runQuery(
+      internal.lifeos.catgirl_agent.validateThreadOwnership,
+      { threadId, userId }
+    );
+    if (!isOwner) {
+      throw new Error("Thread not found or access denied");
+    }
+
+    // Archive the thread
+    await ctx.runMutation(components.agent.threads.updateThread, {
+      threadId,
+      patch: { status: "archived" },
+    });
+
+    return { success: true };
   },
 });

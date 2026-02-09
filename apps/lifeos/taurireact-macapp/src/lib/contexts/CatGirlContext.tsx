@@ -4,9 +4,11 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
   ReactNode,
 } from "react";
-import { useAuth } from "@clerk/clerk-react";
+import { useAction, useQuery } from "convex/react";
+import { api } from "@holaai/convex";
 
 // ==================== TYPES ====================
 
@@ -37,6 +39,13 @@ export interface CatGirlMessage {
   timestamp: Date;
 }
 
+export interface CatGirlThread {
+  _id: string;
+  title?: string;
+  _creationTime: number;
+  status: string;
+}
+
 // ==================== AVAILABLE MODELS ====================
 
 /**
@@ -59,19 +68,21 @@ interface CatGirlState {
   error: string | null;
   selectedModelId: CatGirlModelId;
   cumulativeUsage: TokenUsage;
+  isThreadListOpen: boolean;
 }
 
 interface CatGirlContextValue extends CatGirlState {
+  threads: CatGirlThread[];
   setSelectedModelId: (modelId: CatGirlModelId) => void;
   createThread: () => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   clearMessages: () => void;
   clearError: () => void;
   resetUsage: () => void;
+  loadThread: (threadId: string) => void;
+  deleteThread: (threadId: string) => Promise<void>;
+  setThreadListOpen: (open: boolean) => void;
 }
-
-// Get Convex site URL for HTTP endpoints
-const CONVEX_SITE_URL = import.meta.env.VITE_CONVEX_URL?.replace(".cloud", ".site") || "";
 
 const defaultState: CatGirlState = {
   threadId: null,
@@ -84,6 +95,7 @@ const defaultState: CatGirlState = {
     completionTokens: 0,
     totalTokens: 0,
   },
+  isThreadListOpen: false,
 };
 
 // ==================== CONTEXT ====================
@@ -98,45 +110,47 @@ interface CatGirlProviderProps {
 
 export function CatGirlProvider({ children }: CatGirlProviderProps) {
   const [state, setState] = useState<CatGirlState>(defaultState);
-  const { getToken, isSignedIn } = useAuth();
 
-  // Auto-create thread on mount when signed in
+  // Convex hooks
+  const createThreadAction = useAction(api.lifeos.catgirl_agent.createThread);
+  const sendMessageAction = useAction(api.lifeos.catgirl_agent.sendMessage);
+  const deleteThreadAction = useAction(api.lifeos.catgirl_agent.deleteThread);
+
+  // Reactive thread list
+  const threadsData = useQuery(api.lifeos.catgirl_agent.listThreads, {});
+
+  // Reactive messages for current thread
+  const threadMessages = useQuery(
+    api.lifeos.catgirl_agent.getThreadMessages,
+    state.threadId ? { threadId: state.threadId } : "skip"
+  );
+
+  const threads: CatGirlThread[] = useMemo(() => {
+    if (!threadsData) return [];
+    return threadsData as unknown as CatGirlThread[];
+  }, [threadsData]);
+
+  // Auto-create thread on mount
   useEffect(() => {
-    if (isSignedIn && !state.threadId && !state.isLoading) {
+    if (!state.threadId && !state.isLoading && threadsData !== undefined) {
       createThreadInternal();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadsData]);
 
   // Helper to create thread
   const createThreadInternal = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const token = await getToken({ template: "convex" });
-      if (!token) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`${CONVEX_SITE_URL}/catgirl-agent/create-thread`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP ${response.status}`);
-      }
+      const result = await createThreadAction({});
 
       setState((prev) => ({
         ...prev,
         threadId: result.threadId,
         messages: [],
         isLoading: false,
+        cumulativeUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
       }));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to create thread";
@@ -146,7 +160,7 @@ export function CatGirlProvider({ children }: CatGirlProviderProps) {
         error: errorMessage,
       }));
     }
-  }, [getToken]);
+  }, [createThreadAction]);
 
   // Generate unique message ID
   const generateMessageId = useCallback(() => {
@@ -186,7 +200,7 @@ export function CatGirlProvider({ children }: CatGirlProviderProps) {
         return;
       }
 
-      // Add user message immediately
+      // Add user message immediately (optimistic)
       const userMessage: CatGirlMessage = {
         id: generateMessageId(),
         role: "user",
@@ -202,29 +216,11 @@ export function CatGirlProvider({ children }: CatGirlProviderProps) {
       }));
 
       try {
-        const token = await getToken({ template: "convex" });
-        if (!token) {
-          throw new Error("Not authenticated");
-        }
-
-        const response = await fetch(`${CONVEX_SITE_URL}/catgirl-agent/send-message`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            threadId: state.threadId,
-            message,
-            modelId: state.selectedModelId,
-          }),
+        const result = await sendMessageAction({
+          threadId: state.threadId,
+          message,
+          modelId: state.selectedModelId,
         });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || `HTTP ${response.status}`);
-        }
 
         // Add assistant message with usage info
         const assistantMessage: CatGirlMessage = {
@@ -242,7 +238,6 @@ export function CatGirlProvider({ children }: CatGirlProviderProps) {
           ...prev,
           messages: [...prev.messages, assistantMessage],
           isLoading: false,
-          // Update cumulative usage
           cumulativeUsage: result.usage
             ? {
                 promptTokens: prev.cumulativeUsage.promptTokens + (result.usage.promptTokens || 0),
@@ -260,8 +255,75 @@ export function CatGirlProvider({ children }: CatGirlProviderProps) {
         }));
       }
     },
-    [state.threadId, state.selectedModelId, getToken, generateMessageId]
+    [state.threadId, state.selectedModelId, sendMessageAction, generateMessageId]
   );
+
+  // Load an existing thread
+  const loadThread = useCallback((threadId: string) => {
+    setState((prev) => ({
+      ...prev,
+      threadId,
+      messages: [],
+      error: null,
+      isThreadListOpen: false,
+      cumulativeUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    }));
+  }, []);
+
+  // When threadMessages changes (reactive query), sync to local state for loaded threads
+  useEffect(() => {
+    if (threadMessages && state.threadId && !state.isLoading) {
+      // Only sync from server if we don't have optimistic messages (no pending send)
+      const serverMessages: CatGirlMessage[] = threadMessages
+        .filter((m): m is NonNullable<typeof m> => m !== null)
+        .map((m) => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          id: (m as any).id ?? `server_${(m as any).createdAt}`,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          role: (m as any).role as "user" | "assistant",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          content: (m as any).content ?? "",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          toolCalls: (m as any).toolCalls,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          toolResults: (m as any).toolResults,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          timestamp: new Date((m as any).createdAt),
+        }));
+
+      setState((prev) => {
+        // Don't overwrite optimistic messages during a send
+        if (prev.isLoading) return prev;
+        // Only update if the server has more messages (avoids flicker)
+        if (serverMessages.length >= prev.messages.length) {
+          return { ...prev, messages: serverMessages };
+        }
+        return prev;
+      });
+    }
+  }, [threadMessages, state.threadId, state.isLoading]);
+
+  // Delete a thread
+  const deleteThread = useCallback(
+    async (threadId: string) => {
+      try {
+        await deleteThreadAction({ threadId });
+        // If we deleted the current thread, create a new one
+        if (state.threadId === threadId) {
+          await createThreadInternal();
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to delete thread";
+        setState((prev) => ({ ...prev, error: errorMessage }));
+      }
+    },
+    [deleteThreadAction, state.threadId, createThreadInternal]
+  );
+
+  // Toggle thread list
+  const setThreadListOpen = useCallback((open: boolean) => {
+    setState((prev) => ({ ...prev, isThreadListOpen: open }));
+  }, []);
 
   // Clear all messages and reset thread (also resets usage)
   const clearMessages = useCallback(() => {
@@ -276,7 +338,6 @@ export function CatGirlProvider({ children }: CatGirlProviderProps) {
         totalTokens: 0,
       },
     }));
-    // Create a new thread
     createThreadInternal();
   }, [createThreadInternal]);
 
@@ -287,12 +348,16 @@ export function CatGirlProvider({ children }: CatGirlProviderProps) {
 
   const contextValue: CatGirlContextValue = {
     ...state,
+    threads,
     setSelectedModelId,
     createThread,
     sendMessage,
     clearMessages,
     clearError,
     resetUsage,
+    loadThread,
+    deleteThread,
+    setThreadListOpen,
   };
 
   return (
