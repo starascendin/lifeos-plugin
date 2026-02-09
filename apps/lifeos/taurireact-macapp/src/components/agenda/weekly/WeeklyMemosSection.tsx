@@ -47,6 +47,15 @@ function formatMemoTime(timestamp: number): string {
   });
 }
 
+// Sanitize memo name: if it's a raw ISO timestamp, format it as local time
+function displayMemoName(name: string, createdAt: number): string {
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(name)) {
+    const date = new Date(createdAt);
+    return `Recording - ${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}`;
+  }
+  return name;
+}
+
 // Unified memo type for merged display
 interface MergedWeeklyMemo {
   id: string;
@@ -118,7 +127,7 @@ function MemoItem({ memo }: MemoItemProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Mic className="h-4 w-4 text-violet-500 flex-shrink-0" />
-          <span className="font-medium text-sm truncate">{memo.name}</span>
+          <span className="font-medium text-sm truncate">{displayMemoName(memo.name, memo.clientCreatedAt)}</span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <Badge variant="outline" className="text-xs">

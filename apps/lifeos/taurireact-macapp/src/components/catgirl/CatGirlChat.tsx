@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 import { CatGirlMessage, TokenUsage } from "@/lib/contexts/CatGirlContext";
 
 interface CatGirlChatProps {
@@ -124,7 +125,11 @@ function MessageBubble({ message }: { message: CatGirlMessage }) {
               : "bg-muted"
           )}
         >
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          {isUser ? (
+            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <MarkdownRenderer content={message.content} className="text-sm" />
+          )}
           <ToolCallDisplay
             toolCalls={message.toolCalls}
             toolResults={message.toolResults}

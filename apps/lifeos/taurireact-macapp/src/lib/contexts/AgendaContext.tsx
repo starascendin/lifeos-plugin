@@ -346,10 +346,16 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
       : "skip",
   );
 
+  const timezoneOffsetMinutes = new Date().getTimezoneOffset();
+
   const weeklyMemos = useQuery(
     api.lifeos.voicememo.getMemosForDateRange,
     viewMode === "weekly"
-      ? { startDate: weekStartDate, endDate: weekEndDate }
+      ? {
+          startDate: weekStartDate,
+          endDate: weekEndDate,
+          timezoneOffsetMinutes,
+        }
       : "skip",
   );
 
@@ -363,7 +369,11 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   const monthlyMemos = useQuery(
     api.lifeos.voicememo.getMemosForDateRange,
     viewMode === "monthly"
-      ? { startDate: monthStartDate, endDate: monthEndDate }
+      ? {
+          startDate: monthStartDate,
+          endDate: monthEndDate,
+          timezoneOffsetMinutes,
+        }
       : "skip",
   );
 

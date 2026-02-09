@@ -49,17 +49,23 @@ function formatDuration(seconds: number): string {
   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
-// Format relative time
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
+// Format time for voice memo display
+function formatMemoTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
 
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(timestamp).toLocaleDateString();
+// Sanitize memo name: if it's a raw ISO timestamp, format it as local time
+function displayMemoName(name: string, createdAt: number): string {
+  // Detect ISO timestamp patterns like "2026-02-09T07:08:55Z" or "2026-02-09T07:08:55.000Z"
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(name)) {
+    const date = new Date(createdAt);
+    return `Recording - ${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}`;
+  }
+  return name;
 }
 
 type SyncStatus = "local" | "cloud" | "synced" | "exported" | "transcript";
@@ -256,9 +262,9 @@ function VoiceMemoItem({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-sm font-medium truncate">{memo.name}</span>
+            <span className="text-sm font-medium truncate">{displayMemoName(memo.name, memo.createdAt)}</span>
             <span className="text-[10px] text-muted-foreground">
-              {formatRelativeTime(memo.createdAt)}
+              {formatMemoTime(memo.createdAt)}
             </span>
             {renderSyncBadge()}
           </div>
@@ -368,7 +374,11 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
   const generateUploadUrl = useMutation(api.lifeos.voicememo.generateUploadUrl);
   const createConvexMemo = useMutation(api.lifeos.voicememo.createMemo);
   const transcribeMemoAction = useAction(api.lifeos.voicememo.transcribeMemo);
-  const cloudMemos = useQuery(api.lifeos.voicememo.getMemosForDate, { date });
+  const timezoneOffsetMinutes = new Date().getTimezoneOffset();
+  const cloudMemos = useQuery(api.lifeos.voicememo.getMemosForDate, {
+    date,
+    timezoneOffsetMinutes,
+  });
 
   const loadLocalMemos = useCallback(async () => {
     setIsLoadingLocal(true);
@@ -697,7 +707,7 @@ export function VoiceMemoRecorder({ date }: VoiceMemoRecorderProps) {
           const now = Date.now();
           const storedMemo: StoredVoiceMemo = {
             id: `voice_${now}`,
-            name: `Voice Note ${new Date(now).toLocaleTimeString()}`,
+            name: `Voice Note ${new Date(now).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`,
             audioBlob: blob,
             mimeType,
             extension,

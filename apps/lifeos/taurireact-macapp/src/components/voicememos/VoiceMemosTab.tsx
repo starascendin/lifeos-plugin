@@ -17,7 +17,7 @@ import {
   syncTranscriptsToConvex,
   getMemoDisplayName,
   formatMemoDuration,
-  formatMemoDate,
+  formatMemoDateTime,
   formatFileSize,
   exceedsGroqLimit,
 } from "../../lib/services/voicememos";
@@ -1363,7 +1363,7 @@ function VoiceMemoRow({ memo, isSelected, canSelect, onToggleSelect, isTranscrib
           </div>
         </TableCell>
         <TableCell>
-          <span className="text-sm text-muted-foreground">{formatMemoDate(memo.date)}</span>
+          <span className="text-sm text-muted-foreground">{formatMemoDateTime(memo.date)}</span>
         </TableCell>
         <TableCell>
           {memo.file_size && (

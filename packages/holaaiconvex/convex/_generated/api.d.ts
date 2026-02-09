@@ -127,6 +127,7 @@ import type * as lifeos_voice_agent_http from "../lifeos/voice_agent_http.js";
 import type * as lifeos_voiceagent from "../lifeos/voiceagent.js";
 import type * as lifeos_voiceagent_schema from "../lifeos/voiceagent_schema.js";
 import type * as lifeos_voicememo from "../lifeos/voicememo.js";
+import type * as lifeos_voicememo_ai_convo from "../lifeos/voicememo_ai_convo.js";
 import type * as lifeos_voicememo_extraction from "../lifeos/voicememo_extraction.js";
 import type * as lifeos_youtube from "../lifeos/youtube.js";
 
@@ -256,6 +257,7 @@ declare const fullApi: ApiFromModules<{
   "lifeos/voiceagent": typeof lifeos_voiceagent;
   "lifeos/voiceagent_schema": typeof lifeos_voiceagent_schema;
   "lifeos/voicememo": typeof lifeos_voicememo;
+  "lifeos/voicememo_ai_convo": typeof lifeos_voicememo_ai_convo;
   "lifeos/voicememo_extraction": typeof lifeos_voicememo_extraction;
   "lifeos/youtube": typeof lifeos_youtube;
 }>;

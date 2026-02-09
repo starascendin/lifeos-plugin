@@ -199,18 +199,34 @@ export const getMemo = query({
 });
 
 /**
+ * Compute UTC timestamps for start/end of a local day given timezone offset.
+ * timezoneOffsetMinutes: from Date.getTimezoneOffset() (positive = west of UTC, e.g. 420 for MST)
+ */
+function computeDayBoundaries(
+  dateStr: string,
+  timezoneOffsetMinutes?: number,
+) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const offsetMs = (timezoneOffsetMinutes ?? 0) * 60 * 1000;
+  const startMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0) + offsetMs;
+  const endMs = Date.UTC(year, month - 1, day, 23, 59, 59, 999) + offsetMs;
+  return { startMs, endMs };
+}
+
+/**
  * Get memos for a specific date (used by Daily View)
  */
 export const getMemosForDate = query({
   args: {
     date: v.string(), // YYYY-MM-DD
+    timezoneOffsetMinutes: v.optional(v.number()), // from Date.getTimezoneOffset()
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    // Parse date to timestamps (start of day and end of day)
-    const startTimestamp = new Date(args.date).setHours(0, 0, 0, 0);
-    const endTimestamp = new Date(args.date).setHours(23, 59, 59, 999);
+    // Parse date to timestamps (start of day and end of day in user's timezone)
+    const { startMs: startTimestamp, endMs: endTimestamp } =
+      computeDayBoundaries(args.date, args.timezoneOffsetMinutes);
 
     // Fetch all memos ordered by creation date
     const memos = await ctx.db
@@ -246,13 +262,20 @@ export const getMemosForDateRange = query({
   args: {
     startDate: v.string(), // YYYY-MM-DD
     endDate: v.string(), // YYYY-MM-DD
+    timezoneOffsetMinutes: v.optional(v.number()), // from Date.getTimezoneOffset()
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    // Parse dates to timestamps (start of day and end of day)
-    const startTimestamp = new Date(args.startDate).setHours(0, 0, 0, 0);
-    const endTimestamp = new Date(args.endDate).setHours(23, 59, 59, 999);
+    // Parse dates to timestamps (start of first day and end of last day in user's timezone)
+    const { startMs: startTimestamp } = computeDayBoundaries(
+      args.startDate,
+      args.timezoneOffsetMinutes,
+    );
+    const { endMs: endTimestamp } = computeDayBoundaries(
+      args.endDate,
+      args.timezoneOffsetMinutes,
+    );
 
     // Fetch all memos ordered by creation date
     const memos = await ctx.db
