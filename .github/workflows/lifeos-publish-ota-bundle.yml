@@ -1,0 +1,178 @@
+name: LifeOS - Publish OTA Bundle
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "apps/lifeos/taurireact-macapp/src/**"
+      - "apps/lifeos/taurireact-macapp/package.json"
+      - "apps/lifeos/taurireact-macapp/vite.config.ts"
+      - "apps/lifeos/taurireact-macapp/tsconfig.json"
+      - "packages/holaaiconvex/convex/**"
+      - ".github/workflows/lifeos-publish-ota-bundle.yml"
+  workflow_dispatch: # Manual trigger
+
+env:
+  CONVEX_URL: https://keen-nightingale-310.convex.cloud
+  APP_DIR: apps/lifeos/taurireact-macapp
+
+jobs:
+  publish-ota:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to push version bump
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Get current version from Convex
+        id: version
+        run: |
+          # Query Convex for the latest active OTA update version
+          RESPONSE=$(curl -s -X POST "${CONVEX_URL}/api/query" \
+            -H "Content-Type: application/json" \
+            -d '{"path": "lifeos/ota:getLatestUpdate", "args": {}}')
+
+          CURRENT_VERSION=$(echo "$RESPONSE" | node -p "
+            const data = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
+            data.value ? data.value.version : '0.0.0'
+          ")
+
+          # Bump patch version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+          # Update package.json
+          node -e "
+            const pkg = require('./${APP_DIR}/package.json');
+            pkg.version = '${NEW_VERSION}';
+            require('fs').writeFileSync('./${APP_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Version bump: $CURRENT_VERSION -> $NEW_VERSION"
+
+      - name: Build
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          VITE_CONVEX_URL: ${{ env.CONVEX_URL }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEV_PUBLISHABLE_KEY }}
+        run: pnpm build
+
+      - name: Create OTA bundle
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          cd dist
+          zip -r ../ota-bundle.zip .
+          cd ..
+          FILE_SIZE=$(stat -c%s ota-bundle.zip)
+          echo "FILE_SIZE=${FILE_SIZE}" >> $GITHUB_ENV
+          echo "Bundle size: $(echo "scale=2; ${FILE_SIZE}/1048576" | bc) MB"
+
+      - name: Upload bundle to Convex
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+
+          # Step 1: Get upload URL
+          echo "Getting upload URL..."
+          UPLOAD_RESPONSE=$(curl -s -X POST "${CONVEX_URL}/api/mutation" \
+            -H "Content-Type: application/json" \
+            -d '{"path": "lifeos/ota:generateUploadUrl", "args": {}}')
+
+          UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).value")
+
+          if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "undefined" ]; then
+            echo "Failed to get upload URL"
+            echo "$UPLOAD_RESPONSE"
+            exit 1
+          fi
+
+          # Step 2: Upload the zip file
+          echo "Uploading bundle..."
+          STORAGE_RESPONSE=$(curl -s -X POST "$UPLOAD_URL" \
+            -H "Content-Type: application/zip" \
+            --data-binary @ota-bundle.zip)
+
+          STORAGE_ID=$(echo "$STORAGE_RESPONSE" | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).storageId")
+
+          if [ -z "$STORAGE_ID" ] || [ "$STORAGE_ID" = "undefined" ]; then
+            echo "Failed to upload bundle"
+            echo "$STORAGE_RESPONSE"
+            exit 1
+          fi
+          echo "Storage ID: $STORAGE_ID"
+
+          # Step 3: Create OTA record and set active
+          echo "Creating OTA record..."
+          CREATE_RESPONSE=$(curl -s -X POST "${CONVEX_URL}/api/mutation" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"path\": \"lifeos/ota:createUpdate\",
+              \"args\": {
+                \"version\": \"${NEW_VERSION}\",
+                \"bundleStorageId\": \"${STORAGE_ID}\",
+                \"fileSize\": ${FILE_SIZE},
+                \"uploadedBy\": \"github-actions\",
+                \"setActive\": true
+              }
+            }")
+
+          # Check for error
+          STATUS=$(echo "$CREATE_RESPONSE" | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).status")
+          if [ "$STATUS" = "error" ]; then
+            echo "Failed to create OTA record"
+            echo "$CREATE_RESPONSE"
+            exit 1
+          fi
+
+          BUNDLE_URL=$(echo "$CREATE_RESPONSE" | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).value.bundleUrl")
+          echo "BUNDLE_URL=${BUNDLE_URL}" >> $GITHUB_ENV
+          echo "OTA update created: v${NEW_VERSION}"
+          echo "Bundle URL: ${BUNDLE_URL}"
+
+      - name: Cleanup
+        working-directory: ${{ env.APP_DIR }}
+        run: rm -f ota-bundle.zip
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ${{ env.APP_DIR }}/package.json
+          git commit -m "chore: bump lifeos OTA version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin dev && git push && break
+            echo "Push failed, retrying ($i/3)..."
+            sleep 2
+          done
+
+      - name: Summary
+        run: |
+          echo "### LifeOS OTA Bundle Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous:** ${{ steps.version.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Bundle URL:** ${BUNDLE_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "**Convex:** ${CONVEX_URL}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "iOS app will auto-update on next launch" >> $GITHUB_STEP_SUMMARY

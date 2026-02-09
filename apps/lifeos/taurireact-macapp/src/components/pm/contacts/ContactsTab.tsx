@@ -1,5 +1,6 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@holaai/convex";
+import type { Id } from "@holaai/convex";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -50,15 +51,21 @@ function formatMeetingDate(dateString?: string): string {
 
 export function ContactsTab() {
   const contacts = useQuery(api.lifeos.beeper.getBusinessContacts, {});
-  const autoLinkBusinessContacts = useAction(api.lifeos.beeper.autoLinkBusinessContacts);
+  const autoLinkBusinessContacts = useAction(
+    api.lifeos.beeper.autoLinkBusinessContacts,
+  );
   const unlinkMeetingFromBusinessContact = useMutation(
-    api.lifeos.beeper.unlinkMeetingFromBusinessContact
+    api.lifeos.beeper.unlinkMeetingFromBusinessContact,
   );
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(
+    null,
+  );
   const [isAutoLinking, setIsAutoLinking] = useState(false);
-  const [unlinkingMeetingKey, setUnlinkingMeetingKey] = useState<string | null>(null);
+  const [unlinkingMeetingKey, setUnlinkingMeetingKey] = useState<string | null>(
+    null,
+  );
   const [autoLinkSummary, setAutoLinkSummary] = useState<{
     analysis?: string;
     appliedLinks: number;
@@ -106,7 +113,10 @@ export function ContactsTab() {
 
   const selectedContact = useMemo(() => {
     if (!selectedContactId) return null;
-    return filteredContacts.find((contact) => contact._id === selectedContactId) ?? null;
+    return (
+      filteredContacts.find((contact) => contact._id === selectedContactId) ??
+      null
+    );
   }, [filteredContacts, selectedContactId]);
 
   const runAutoLink = useCallback(
@@ -134,17 +144,18 @@ export function ContactsTab() {
 
         if (manual || result.appliedLinks > 0 || result.autoCreatedPeople > 0) {
           toast.success(
-            `AI linked ${result.appliedLinks} contacts and created ${result.autoCreatedPeople} contacts.`
+            `AI linked ${result.appliedLinks} contacts and created ${result.autoCreatedPeople} contacts.`,
           );
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Auto-linking failed";
+        const message =
+          error instanceof Error ? error.message : "Auto-linking failed";
         toast.error(message);
       } finally {
         setIsAutoLinking(false);
       }
     },
-    [autoLinkBusinessContacts]
+    [autoLinkBusinessContacts],
   );
 
   useEffect(() => {
@@ -160,14 +171,14 @@ export function ContactsTab() {
         source: "granola" | "fathom";
         meetingId: string;
         title: string;
-      }
+      },
     ) => {
       const key = `${meeting.source}-${meeting.meetingId}`;
       setUnlinkingMeetingKey(key);
 
       try {
         const result = await unlinkMeetingFromBusinessContact({
-          threadConvexId,
+          threadConvexId: threadConvexId as Id<"lifeos_beeperThreads">,
           meetingSource: meeting.source,
           meetingId: meeting.meetingId,
         });
@@ -185,14 +196,15 @@ export function ContactsTab() {
         setUnlinkingMeetingKey((current) => (current === key ? null : current));
       }
     },
-    [unlinkMeetingFromBusinessContact]
+    [unlinkMeetingFromBusinessContact],
   );
 
   const totalContacts = contacts?.length ?? 0;
   const contactsWithMeetings =
     contacts?.filter((contact) => contact.linkedAIMeetingCount > 0).length ?? 0;
   const totalMeetings =
-    contacts?.reduce((sum, contact) => sum + contact.linkedAIMeetingCount, 0) ?? 0;
+    contacts?.reduce((sum, contact) => sum + contact.linkedAIMeetingCount, 0) ??
+    0;
 
   if (contacts === undefined) {
     return (
@@ -218,7 +230,9 @@ export function ContactsTab() {
 
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{totalContacts} contacts</Badge>
-            <Badge variant="outline">{contactsWithMeetings} with AI notes</Badge>
+            <Badge variant="outline">
+              {contactsWithMeetings} with AI notes
+            </Badge>
             <Badge variant="outline">{totalMeetings} linked notes</Badge>
             <Button
               size="sm"
@@ -239,8 +253,11 @@ export function ContactsTab() {
 
         {autoLinkSummary && (
           <div className="mt-3 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">AI linking summary:</span>{" "}
-            {autoLinkSummary.appliedLinks} applied, {autoLinkSummary.aiSuggestedLinks} suggested, {" "}
+            <span className="font-medium text-foreground">
+              AI linking summary:
+            </span>{" "}
+            {autoLinkSummary.appliedLinks} applied,{" "}
+            {autoLinkSummary.aiSuggestedLinks} suggested,{" "}
             {autoLinkSummary.autoCreatedPeople} contacts auto-created.
             {autoLinkSummary.analysis ? ` ${autoLinkSummary.analysis}` : ""}
           </div>
@@ -287,9 +304,12 @@ export function ContactsTab() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{contact.threadName}</p>
+                              <p className="truncate text-sm font-medium">
+                                {contact.threadName}
+                              </p>
                               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {contact.linkedPerson?.name ?? "Unlinked contact"}
+                                {contact.linkedPerson?.name ??
+                                  "Unlinked contact"}
                                 {contact.linkedClient?.name
                                   ? ` · ${contact.linkedClient.name}`
                                   : ""}
@@ -308,7 +328,9 @@ export function ContactsTab() {
                               <Video className="h-3 w-3" />
                               {contact.fathomMeetingCount}
                             </span>
-                            <span className="ml-auto">{formatRelativeTime(contact.lastMessageAt)}</span>
+                            <span className="ml-auto">
+                              {formatRelativeTime(contact.lastMessageAt)}
+                            </span>
                           </div>
                         </button>
                       );
@@ -323,7 +345,9 @@ export function ContactsTab() {
                 <>
                   <CardHeader className="border-b pb-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-base">{selectedContact.threadName}</CardTitle>
+                      <CardTitle className="text-base">
+                        {selectedContact.threadName}
+                      </CardTitle>
                       <Badge variant="secondary" className="uppercase">
                         {selectedContact.threadType}
                       </Badge>
@@ -366,20 +390,26 @@ export function ContactsTab() {
 
                     <div className="rounded-md border p-3">
                       <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold">Linked AI Notes</h3>
-                        <Badge variant="outline">{selectedContact.linkedMeetings.length}</Badge>
+                        <h3 className="text-sm font-semibold">
+                          Linked AI Notes
+                        </h3>
+                        <Badge variant="outline">
+                          {selectedContact.linkedMeetings.length}
+                        </Badge>
                       </div>
 
                       {selectedContact.linkedMeetings.length === 0 ? (
                         <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                          AI has not linked meetings for this contact yet. Auto-link runs on load and can be triggered again.
+                          AI has not linked meetings for this contact yet.
+                          Auto-link runs on load and can be triggered again.
                         </div>
                       ) : (
                         <ScrollArea className="h-[420px]">
                           <div className="space-y-2 pr-2">
                             {selectedContact.linkedMeetings.map((meeting) => {
                               const meetingKey = `${meeting.source}-${meeting.meetingId}`;
-                              const isUnlinking = unlinkingMeetingKey === meetingKey;
+                              const isUnlinking =
+                                unlinkingMeetingKey === meetingKey;
 
                               return (
                                 <div
@@ -389,13 +419,20 @@ export function ContactsTab() {
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-[10px] uppercase">
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] uppercase"
+                                        >
                                           {meeting.source}
                                         </Badge>
-                                        <p className="truncate text-xs font-medium">{meeting.title}</p>
+                                        <p className="truncate text-xs font-medium">
+                                          {meeting.title}
+                                        </p>
                                       </div>
                                       <p className="mt-1 text-[11px] text-muted-foreground">
-                                        {formatMeetingDate(meeting.meetingDate)} · via {meeting.associatedVia.join(" + ")}
+                                        {formatMeetingDate(meeting.meetingDate)}{" "}
+                                        · via{" "}
+                                        {meeting.associatedVia.join(" + ")}
                                       </p>
                                       {meeting.aiReason ? (
                                         <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
@@ -406,8 +443,17 @@ export function ContactsTab() {
 
                                     <div className="flex shrink-0 items-center gap-1">
                                       {meeting.url ? (
-                                        <Button asChild variant="ghost" size="sm" className="h-7 px-2">
-                                          <a href={meeting.url} target="_blank" rel="noreferrer">
+                                        <Button
+                                          asChild
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 px-2"
+                                        >
+                                          <a
+                                            href={meeting.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
                                             <ExternalLink className="h-3.5 w-3.5" />
                                           </a>
                                         </Button>
@@ -423,11 +469,14 @@ export function ContactsTab() {
                                         className="h-7 gap-1 px-2 text-destructive hover:text-destructive"
                                         disabled={isUnlinking}
                                         onClick={() =>
-                                          void handleUnlinkMeeting(selectedContact._id, {
-                                            source: meeting.source,
-                                            meetingId: meeting.meetingId,
-                                            title: meeting.title,
-                                          })
+                                          void handleUnlinkMeeting(
+                                            selectedContact._id,
+                                            {
+                                              source: meeting.source,
+                                              meetingId: meeting.meetingId,
+                                              title: meeting.title,
+                                            },
+                                          )
                                         }
                                       >
                                         {isUnlinking ? (
@@ -435,7 +484,9 @@ export function ContactsTab() {
                                         ) : (
                                           <Unlink2 className="h-3.5 w-3.5" />
                                         )}
-                                        <span className="text-[11px]">Unlink</span>
+                                        <span className="text-[11px]">
+                                          Unlink
+                                        </span>
                                       </Button>
                                     </div>
                                   </div>
