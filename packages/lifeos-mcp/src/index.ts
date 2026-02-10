@@ -125,6 +125,10 @@ const TOOLS: Tool[] = [
           enum: ["urgent", "high", "medium", "low", "none"],
           description: "Priority level (optional, default: none)",
         },
+        initiativeId: {
+          type: "string",
+          description: "Link to a yearly initiative ID (optional)",
+        },
       },
       required: ["name", "key"],
     },
@@ -170,6 +174,11 @@ const TOOLS: Tool[] = [
           type: "string",
           description:
             "Associate with a client ID, or empty to unlink (optional)",
+        },
+        initiativeId: {
+          type: "string",
+          description:
+            "Link to a yearly initiative ID, or empty to unlink (optional)",
         },
       },
       required: ["projectIdOrKey"],
@@ -288,6 +297,11 @@ const TOOLS: Tool[] = [
           description:
             "Assign to a specific phase within the project (optional)",
         },
+        initiativeId: {
+          type: "string",
+          description:
+            "Link directly to a yearly initiative ID (optional)",
+        },
       },
       required: ["title"],
     },
@@ -377,6 +391,11 @@ const TOOLS: Tool[] = [
         isTopPriority: {
           type: "boolean",
           description: "Mark as top priority (optional)",
+        },
+        initiativeId: {
+          type: "string",
+          description:
+            "Link to a yearly initiative ID, or empty to unlink (optional)",
         },
       },
       required: ["issueIdOrIdentifier"],
@@ -2104,6 +2123,310 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // ==================== INITIATIVE MANAGEMENT ====================
+  {
+    name: "get_initiatives",
+    description:
+      "Get yearly initiatives with optional filters. Initiatives are the highest-order goals (e.g., 'Career Growth', 'Health Improvement') that cascade down to projects, tasks, and habits.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        year: {
+          type: "number",
+          description: "Filter by year, e.g. 2026 (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["active", "completed", "paused", "cancelled"],
+          description: "Filter by initiative status (optional)",
+        },
+        category: {
+          type: "string",
+          enum: [
+            "career",
+            "health",
+            "learning",
+            "relationships",
+            "finance",
+            "personal",
+          ],
+          description: "Filter by category (optional)",
+        },
+        includeArchived: {
+          type: "boolean",
+          description: "Include archived initiatives (default: false)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_initiative",
+    description:
+      "Get a single initiative's details by ID.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        initiativeId: {
+          type: "string",
+          description: "The initiative ID (required)",
+        },
+      },
+      required: ["initiativeId"],
+    },
+  },
+  {
+    name: "get_initiative_with_stats",
+    description:
+      "Get an initiative with full stats: linked projects, habits, directly linked issues, task completion counts, and calculated progress.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        initiativeId: {
+          type: "string",
+          description: "The initiative ID (required)",
+        },
+      },
+      required: ["initiativeId"],
+    },
+  },
+  {
+    name: "create_initiative",
+    description:
+      "Create a new yearly initiative. Initiatives are the highest-order goals that organize projects, tasks, and habits.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        year: {
+          type: "number",
+          description: "The year for this initiative, e.g. 2026 (required)",
+        },
+        title: {
+          type: "string",
+          description: "Initiative title (required)",
+        },
+        category: {
+          type: "string",
+          enum: [
+            "career",
+            "health",
+            "learning",
+            "relationships",
+            "finance",
+            "personal",
+          ],
+          description: "Category for grouping (required)",
+        },
+        description: {
+          type: "string",
+          description: "Detailed description (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["active", "completed", "paused", "cancelled"],
+          description: "Status (optional, default: active)",
+        },
+        targetMetric: {
+          type: "string",
+          description:
+            "Target metric description, e.g. 'Complete 3 projects' or 'Run 500 miles' (optional)",
+        },
+        manualProgress: {
+          type: "number",
+          description: "Manual progress override 0-100 (optional)",
+        },
+        color: {
+          type: "string",
+          description: "Hex color for visual display (optional)",
+        },
+        icon: {
+          type: "string",
+          description: "Emoji icon (optional)",
+        },
+      },
+      required: ["year", "title", "category"],
+    },
+  },
+  {
+    name: "update_initiative",
+    description: "Update an initiative's details.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        initiativeId: {
+          type: "string",
+          description: "The initiative ID (required)",
+        },
+        title: {
+          type: "string",
+          description: "Updated title (optional)",
+        },
+        description: {
+          type: "string",
+          description: "Updated description (optional)",
+        },
+        category: {
+          type: "string",
+          enum: [
+            "career",
+            "health",
+            "learning",
+            "relationships",
+            "finance",
+            "personal",
+          ],
+          description: "Updated category (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["active", "completed", "paused", "cancelled"],
+          description: "Updated status (optional)",
+        },
+        targetMetric: {
+          type: "string",
+          description: "Updated target metric (optional)",
+        },
+        manualProgress: {
+          type: "number",
+          description: "Updated manual progress 0-100 (optional)",
+        },
+        color: {
+          type: "string",
+          description: "Updated hex color (optional)",
+        },
+        icon: {
+          type: "string",
+          description: "Updated emoji icon (optional)",
+        },
+      },
+      required: ["initiativeId"],
+    },
+  },
+  {
+    name: "archive_initiative",
+    description: "Archive an initiative (soft delete). Can be unarchived later.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        initiativeId: {
+          type: "string",
+          description: "The initiative ID (required)",
+        },
+      },
+      required: ["initiativeId"],
+    },
+  },
+  {
+    name: "delete_initiative",
+    description:
+      "Permanently delete an initiative. Linked projects, habits, and issues are unlinked (not deleted).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        initiativeId: {
+          type: "string",
+          description: "The initiative ID (required)",
+        },
+      },
+      required: ["initiativeId"],
+    },
+  },
+  {
+    name: "link_project_to_initiative",
+    description:
+      "Link a project to an initiative, or unlink by omitting initiativeId.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        projectIdOrKey: {
+          type: "string",
+          description: "Project ID or key like 'ACME' (required)",
+        },
+        initiativeId: {
+          type: "string",
+          description:
+            "Initiative ID to link to (optional — omit to unlink)",
+        },
+      },
+      required: ["projectIdOrKey"],
+    },
+  },
+  {
+    name: "link_issue_to_initiative",
+    description:
+      "Link an issue/task directly to an initiative, or unlink by omitting initiativeId.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        issueIdOrIdentifier: {
+          type: "string",
+          description:
+            "Issue ID or identifier like 'PROJ-123' (required)",
+        },
+        initiativeId: {
+          type: "string",
+          description:
+            "Initiative ID to link to (optional — omit to unlink)",
+        },
+      },
+      required: ["issueIdOrIdentifier"],
+    },
+  },
+  {
+    name: "get_initiative_yearly_rollup",
+    description:
+      "Get yearly rollup of all initiatives with aggregated stats: task counts, project counts, habit counts, and progress per initiative.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        year: {
+          type: "number",
+          description: "The year to get rollup for, e.g. 2026 (required)",
+        },
+      },
+      required: ["year"],
+    },
+  },
+
   // MCP Server Info
   {
     name: "get_version",
@@ -2226,6 +2549,19 @@ const PROMPTS: Prompt[] = [
         name: "action",
         description:
           "Optional action: 'close' to close the cycle, 'rollover' to close and roll over incomplete issues",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "initiative-review",
+    description:
+      "Review yearly initiative progress: get all initiatives for a year, show stats per category, highlight stalled or off-track initiatives.",
+    arguments: [
+      {
+        name: "year",
+        description:
+          "Year to review (optional, defaults to current year)",
         required: false,
       },
     ],
@@ -2455,7 +2791,7 @@ Present the cycle review:
 - **Progress**: Completion %, issues done vs total
 - **Incomplete Items**: List all non-done/non-cancelled issues with status and priority
 - **Next Cycle**: Show the next upcoming cycle (if any)
-- **Recommendations**: 
+- **Recommendations**:
   - If cycle is ending soon, suggest closing with rollover
   - If many items are incomplete, suggest re-prioritizing
   - If cycle is already past end date, strongly recommend closing it
@@ -2463,6 +2799,31 @@ Present the cycle review:
 ${args.action === "close" ? "After presenting the review, call close_cycle to close the current cycle WITHOUT rolling over incomplete issues." : ""}
 ${args.action === "rollover" ? "After presenting the review, call close_cycle with rolloverIncomplete=true to close the cycle and move incomplete issues to the next cycle." : ""}
 ${!args.action ? "Ask the user if they want to close the cycle, and whether to roll over incomplete issues to the next cycle." : ""}`,
+        },
+      },
+    ];
+  },
+  "initiative-review": (args) => {
+    const year = args.year || new Date().getFullYear().toString();
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Review my yearly initiative progress. Use the LifeOS MCP tools:
+
+1. Call get_initiative_yearly_rollup with year ${year} — this gives all initiatives with aggregated stats
+2. For any initiative with low progress or stalled status, call get_initiative_with_stats for deeper details
+
+Present the review:
+- **Year ${year} Overview**: Total initiatives, active vs completed, average progress
+- **By Category**: Group initiatives by category (career, health, learning, etc.) and show progress
+- **Each Initiative**: Title, status, progress %, tasks completed/total, linked projects, habits
+- **Highlights**: Call out any initiatives at 80%+ progress (near completion)
+- **Concerns**: Flag initiatives with 0% progress, no linked projects, or "paused" status
+- **Recommendations**: Suggest next actions — which initiatives to focus on, which need attention
+
+Be concise but thorough. Use emoji for categories. Suggest linking unlinked projects/tasks if appropriate.`,
         },
       },
     ];

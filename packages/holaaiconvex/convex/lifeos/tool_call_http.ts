@@ -112,6 +112,17 @@ export const AVAILABLE_TOOLS = [
   "reject_merge_suggestion",
   "dismiss_all_merge_suggestions",
   "unlink_meeting_from_business_contact",
+  // Initiative Management tools
+  "get_initiatives",
+  "get_initiative",
+  "get_initiative_with_stats",
+  "create_initiative",
+  "update_initiative",
+  "archive_initiative",
+  "delete_initiative",
+  "link_project_to_initiative",
+  "link_issue_to_initiative",
+  "get_initiative_yearly_rollup",
 ] as const;
 type ToolName = (typeof AVAILABLE_TOOLS)[number];
 
@@ -215,6 +226,7 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             clientId: params?.clientId as string | undefined,
             status: params?.status as string | undefined,
             priority: params?.priority as string | undefined,
+            initiativeId: params?.initiativeId as string | undefined,
           },
         );
         break;
@@ -231,6 +243,7 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             health: params?.health as string | undefined,
             priority: params?.priority as string | undefined,
             clientId: params?.clientId as string | undefined,
+            initiativeId: params?.initiativeId as string | undefined,
           },
         );
         break;
@@ -526,6 +539,7 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             dueDate: params?.dueDate as string | undefined,
             cycleId: params?.cycleId as string | undefined,
             phaseId: params?.phaseId as string | undefined,
+            initiativeId: params?.initiativeId as string | undefined,
           },
         );
         break;
@@ -562,6 +576,7 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             priority: params?.priority as string | undefined,
             dueDate: params?.dueDate as string | undefined,
             isTopPriority: params?.isTopPriority as boolean | undefined,
+            initiativeId: params?.initiativeId as string | undefined,
           },
         );
         break;
@@ -1130,6 +1145,128 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             threadConvexId: params?.threadConvexId as string,
             meetingSource: params?.meetingSource as string,
             meetingId: params?.meetingId as string,
+          },
+        );
+        break;
+
+      // ==================== INITIATIVE MANAGEMENT ====================
+      case "get_initiatives":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getInitiativesInternal,
+          {
+            userId: auth.userId,
+            year: params?.year as number | undefined,
+            status: params?.status as string | undefined,
+            category: params?.category as string | undefined,
+            includeArchived: params?.includeArchived as boolean | undefined,
+          },
+        );
+        break;
+
+      case "get_initiative":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getInitiativeInternal,
+          {
+            userId: auth.userId,
+            initiativeId: params?.initiativeId as string,
+          },
+        );
+        break;
+
+      case "get_initiative_with_stats":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getInitiativeWithStatsInternal,
+          {
+            userId: auth.userId,
+            initiativeId: params?.initiativeId as string,
+          },
+        );
+        break;
+
+      case "create_initiative":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.createInitiativeInternal,
+          {
+            userId: auth.userId,
+            year: params?.year as number,
+            title: params?.title as string,
+            category: params?.category as string,
+            description: params?.description as string | undefined,
+            status: params?.status as string | undefined,
+            targetMetric: params?.targetMetric as string | undefined,
+            manualProgress: params?.manualProgress as number | undefined,
+            color: params?.color as string | undefined,
+            icon: params?.icon as string | undefined,
+          },
+        );
+        break;
+
+      case "update_initiative":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.updateInitiativeInternal,
+          {
+            userId: auth.userId,
+            initiativeId: params?.initiativeId as string,
+            title: params?.title as string | undefined,
+            description: params?.description as string | undefined,
+            category: params?.category as string | undefined,
+            status: params?.status as string | undefined,
+            targetMetric: params?.targetMetric as string | undefined,
+            manualProgress: params?.manualProgress as number | undefined,
+            color: params?.color as string | undefined,
+            icon: params?.icon as string | undefined,
+          },
+        );
+        break;
+
+      case "archive_initiative":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.archiveInitiativeInternal,
+          {
+            userId: auth.userId,
+            initiativeId: params?.initiativeId as string,
+          },
+        );
+        break;
+
+      case "delete_initiative":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.deleteInitiativeInternal,
+          {
+            userId: auth.userId,
+            initiativeId: params?.initiativeId as string,
+          },
+        );
+        break;
+
+      case "link_project_to_initiative":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.linkProjectToInitiativeInternal,
+          {
+            userId: auth.userId,
+            projectIdOrKey: params?.projectIdOrKey as string,
+            initiativeId: params?.initiativeId as string | undefined,
+          },
+        );
+        break;
+
+      case "link_issue_to_initiative":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.linkIssueToInitiativeInternal,
+          {
+            userId: auth.userId,
+            issueIdOrIdentifier: params?.issueIdOrIdentifier as string,
+            initiativeId: params?.initiativeId as string | undefined,
+          },
+        );
+        break;
+
+      case "get_initiative_yearly_rollup":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getInitiativeYearlyRollupInternal,
+          {
+            userId: auth.userId,
+            year: params?.year as number,
           },
         );
         break;

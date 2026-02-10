@@ -170,6 +170,7 @@ export const pmTables = {
     projectId: v.optional(v.id("lifeos_pmProjects")),
     cycleId: v.optional(v.id("lifeos_pmCycles")),
     phaseId: v.optional(v.id("lifeos_pmPhases")), // Link to project phase
+    initiativeId: v.optional(v.id("lifeos_yearlyInitiatives")), // Direct link to yearly initiative
     parentId: v.optional(v.id("lifeos_pmIssues")), // For sub-issues
     // Issue identification
     identifier: v.string(), // e.g., "PROJ-123" (project key + number)
@@ -208,7 +209,8 @@ export const pmTables = {
     .index("by_project_number", ["projectId", "number"])
     .index("by_sort_order", ["userId", "status", "sortOrder"])
     .index("by_user_due_date", ["userId", "dueDate"])
-    .index("by_user_top_priority", ["userId", "isTopPriority"]),
+    .index("by_user_top_priority", ["userId", "isTopPriority"])
+    .index("by_initiative", ["initiativeId"]),
 
   // ==================== LABELS ====================
   lifeos_pmLabels: defineTable({

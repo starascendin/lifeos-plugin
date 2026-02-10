@@ -617,6 +617,94 @@ export const TOOL_DEFINITIONS = {
         "optional - colleague/friend/family/etc (default: colleague)",
     },
   },
+  // Initiative Management tools
+  get_initiatives: {
+    description:
+      "Get yearly initiatives with optional filters by year, status, or category",
+    params: {
+      year: "optional - filter by year (e.g., 2026)",
+      status: "optional - filter by status (active, completed, paused, cancelled)",
+      category:
+        "optional - filter by category (career, health, learning, relationships, finance, personal)",
+      includeArchived: "optional - include archived initiatives (default false)",
+    },
+  },
+  get_initiative: {
+    description: "Get a single initiative by ID",
+    params: {
+      initiativeId: "required - the initiative ID",
+    },
+  },
+  get_initiative_with_stats: {
+    description:
+      "Get an initiative with full stats: linked projects, habits, task counts, and progress",
+    params: {
+      initiativeId: "required - the initiative ID",
+    },
+  },
+  create_initiative: {
+    description: "Create a new yearly initiative",
+    params: {
+      year: "required - the year (e.g., 2026)",
+      title: "required - initiative title",
+      category:
+        "required - category (career, health, learning, relationships, finance, personal)",
+      description: "optional - detailed description",
+      status: "optional - active, completed, paused, cancelled (default: active)",
+      targetMetric: 'optional - target metric description (e.g., "Complete 3 projects")',
+      manualProgress: "optional - manual progress override (0-100)",
+      color: "optional - hex color",
+      icon: "optional - emoji icon",
+    },
+  },
+  update_initiative: {
+    description: "Update an initiative's details",
+    params: {
+      initiativeId: "required - the initiative ID",
+      title: "optional - updated title",
+      description: "optional - updated description",
+      category: "optional - updated category",
+      status: "optional - updated status",
+      targetMetric: "optional - updated target metric",
+      manualProgress: "optional - updated manual progress (0-100)",
+      color: "optional - updated hex color",
+      icon: "optional - updated emoji icon",
+    },
+  },
+  archive_initiative: {
+    description: "Archive an initiative (soft delete)",
+    params: {
+      initiativeId: "required - the initiative ID",
+    },
+  },
+  delete_initiative: {
+    description:
+      "Permanently delete an initiative. Unlinks projects, habits, and issues.",
+    params: {
+      initiativeId: "required - the initiative ID",
+    },
+  },
+  link_project_to_initiative: {
+    description: "Link or unlink a project to/from an initiative",
+    params: {
+      projectIdOrKey: "required - project ID or key (e.g., ACME)",
+      initiativeId: "optional - initiative ID to link to (omit to unlink)",
+    },
+  },
+  link_issue_to_initiative: {
+    description: "Link or unlink an issue/task to/from an initiative directly",
+    params: {
+      issueIdOrIdentifier: "required - issue ID or identifier (e.g., PROJ-123)",
+      initiativeId: "optional - initiative ID to link to (omit to unlink)",
+    },
+  },
+  get_initiative_yearly_rollup: {
+    description:
+      "Get yearly rollup of all initiatives with aggregated stats per initiative",
+    params: {
+      year: "required - the year (e.g., 2026)",
+    },
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOL_DEFINITIONS;
@@ -2502,6 +2590,7 @@ export const createIssueInternal = internalMutation({
     dueDate: v.optional(v.string()),
     cycleId: v.optional(v.string()),
     phaseId: v.optional(v.string()),
+    initiativeId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -2635,6 +2724,21 @@ export const createIssueInternal = internalMutation({
       }
     }
 
+    // Resolve initiative if provided
+    let initiativeId: Id<"lifeos_yearlyInitiatives"> | undefined;
+    if (args.initiativeId) {
+      try {
+        const initiative = await ctx.db.get(
+          args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+        );
+        if (initiative && initiative.userId === userId) {
+          initiativeId = initiative._id;
+        }
+      } catch {
+        // Invalid initiative ID, ignore
+      }
+    }
+
     // Get sort order for backlog
     const existingInBacklog = await ctx.db
       .query("lifeos_pmIssues")
@@ -2653,6 +2757,7 @@ export const createIssueInternal = internalMutation({
       projectId,
       cycleId,
       phaseId,
+      initiativeId,
       parentId: undefined,
       identifier,
       number,
@@ -4559,6 +4664,7 @@ export const createProjectInternal = internalMutation({
     clientId: v.optional(v.string()),
     status: v.optional(v.string()),
     priority: v.optional(v.string()),
+    initiativeId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -4640,9 +4746,25 @@ export const createProjectInternal = internalMutation({
       }
     }
 
+    // Validate initiative if provided
+    let initiativeId: Id<"lifeos_yearlyInitiatives"> | undefined;
+    if (args.initiativeId) {
+      try {
+        const initiative = await ctx.db.get(
+          args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+        );
+        if (initiative && initiative.userId === userId) {
+          initiativeId = initiative._id;
+        }
+      } catch {
+        // Invalid initiative ID, ignore
+      }
+    }
+
     const projectId = await ctx.db.insert("lifeos_pmProjects", {
       userId,
       clientId,
+      initiativeId,
       key,
       name: args.name.trim(),
       description: args.description?.trim(),
@@ -4680,6 +4802,7 @@ export const updateProjectInternal = internalMutation({
     health: v.optional(v.string()),
     priority: v.optional(v.string()),
     clientId: v.optional(v.string()),
+    initiativeId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -4761,6 +4884,24 @@ export const updateProjectInternal = internalMutation({
         }
       } else {
         updates.clientId = undefined;
+      }
+    }
+
+    // Handle initiative association
+    if (args.initiativeId !== undefined) {
+      if (args.initiativeId) {
+        try {
+          const initiative = await ctx.db.get(
+            args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+          );
+          if (initiative && initiative.userId === userId) {
+            updates.initiativeId = initiative._id;
+          }
+        } catch {
+          // Invalid initiative ID, ignore
+        }
+      } else {
+        updates.initiativeId = undefined;
       }
     }
 
@@ -4962,6 +5103,7 @@ export const updateIssueInternal = internalMutation({
     priority: v.optional(v.string()),
     dueDate: v.optional(v.string()),
     isTopPriority: v.optional(v.boolean()),
+    initiativeId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -5087,6 +5229,24 @@ export const updateIssueInternal = internalMutation({
         }
       } else {
         updates.dueDate = undefined;
+      }
+    }
+
+    // Handle initiative association
+    if (args.initiativeId !== undefined) {
+      if (args.initiativeId) {
+        try {
+          const initiative = await ctx.db.get(
+            args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+          );
+          if (initiative && initiative.userId === userId) {
+            updates.initiativeId = initiative._id;
+          }
+        } catch {
+          // Invalid initiative ID, ignore
+        }
+      } else {
+        updates.initiativeId = undefined;
       }
     }
 
@@ -7497,6 +7657,1011 @@ export const unlinkMeetingFromBusinessContactInternal = internalMutation({
         deletedGranolaThreadLinks +
         deletedGranolaPersonLinks +
         deletedUnifiedPersonLinks,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== INITIATIVE TOOLS ====================
+
+/**
+ * Get all initiatives for the authenticated user with optional filters
+ */
+export const getInitiativesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    year: v.optional(v.number()),
+    status: v.optional(v.string()),
+    category: v.optional(v.string()),
+    includeArchived: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    let initiatives;
+
+    if (args.year && args.status) {
+      // Validate status
+      const validStatuses = ["active", "completed", "paused", "cancelled"];
+      const status = validStatuses.includes(args.status) ? args.status as "active" | "completed" | "paused" | "cancelled" : undefined;
+      if (status) {
+        initiatives = await ctx.db
+          .query("lifeos_yearlyInitiatives")
+          .withIndex("by_user_year_status", (q) =>
+            q
+              .eq("userId", userId)
+              .eq("year", args.year!)
+              .eq("status", status),
+          )
+          .order("asc")
+          .collect();
+      } else {
+        initiatives = await ctx.db
+          .query("lifeos_yearlyInitiatives")
+          .withIndex("by_user_year", (q) =>
+            q.eq("userId", userId).eq("year", args.year!),
+          )
+          .order("asc")
+          .collect();
+      }
+    } else if (args.year) {
+      initiatives = await ctx.db
+        .query("lifeos_yearlyInitiatives")
+        .withIndex("by_user_year", (q) =>
+          q.eq("userId", userId).eq("year", args.year!),
+        )
+        .order("asc")
+        .collect();
+    } else if (args.category) {
+      const validCategories = ["career", "health", "learning", "relationships", "finance", "personal"];
+      const category = validCategories.includes(args.category) ? args.category as "career" | "health" | "learning" | "relationships" | "finance" | "personal" : undefined;
+      if (category) {
+        initiatives = await ctx.db
+          .query("lifeos_yearlyInitiatives")
+          .withIndex("by_user_category", (q) =>
+            q.eq("userId", userId).eq("category", category),
+          )
+          .order("asc")
+          .collect();
+      } else {
+        initiatives = await ctx.db
+          .query("lifeos_yearlyInitiatives")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .order("asc")
+          .collect();
+      }
+    } else {
+      initiatives = await ctx.db
+        .query("lifeos_yearlyInitiatives")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("asc")
+        .collect();
+    }
+
+    // Filter out archived unless explicitly requested
+    if (!args.includeArchived) {
+      initiatives = initiatives.filter((i) => !i.archivedAt);
+    }
+
+    return {
+      success: true,
+      data: initiatives.sort((a, b) => a.sortOrder - b.sortOrder).map((i) => ({
+        id: i._id,
+        year: i.year,
+        title: i.title,
+        description: i.description,
+        category: i.category,
+        status: i.status,
+        targetMetric: i.targetMetric,
+        manualProgress: i.manualProgress,
+        autoProgress: i.autoProgress,
+        color: i.color,
+        icon: i.icon,
+        sortOrder: i.sortOrder,
+        archivedAt: i.archivedAt ? new Date(i.archivedAt).toISOString() : undefined,
+        createdAt: new Date(i.createdAt).toISOString(),
+        updatedAt: new Date(i.updatedAt).toISOString(),
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single initiative by ID
+ */
+export const getInitiativeInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    initiativeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    let initiative;
+    try {
+      initiative = await ctx.db.get(
+        args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!initiative || initiative.userId !== userId) {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        id: initiative._id,
+        year: initiative.year,
+        title: initiative.title,
+        description: initiative.description,
+        category: initiative.category,
+        status: initiative.status,
+        targetMetric: initiative.targetMetric,
+        manualProgress: initiative.manualProgress,
+        autoProgress: initiative.autoProgress,
+        color: initiative.color,
+        icon: initiative.icon,
+        sortOrder: initiative.sortOrder,
+        createdAt: new Date(initiative.createdAt).toISOString(),
+        updatedAt: new Date(initiative.updatedAt).toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get initiative with full stats: linked projects, habits, task counts
+ */
+export const getInitiativeWithStatsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    initiativeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    let initiative;
+    try {
+      initiative = await ctx.db.get(
+        args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!initiative || initiative.userId !== userId) {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get linked projects
+    const projects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", initiative._id),
+      )
+      .filter((q) => q.eq(q.field("archivedAt"), undefined))
+      .collect();
+
+    // Get linked habits
+    const habits = await ctx.db
+      .query("lifeos_habits")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", initiative._id),
+      )
+      .filter((q) => q.eq(q.field("archivedAt"), undefined))
+      .collect();
+
+    // Get directly linked issues (not through projects)
+    const directIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", initiative._id),
+      )
+      .collect();
+
+    // Calculate task stats from projects
+    let projectTotalTasks = 0;
+    let projectCompletedTasks = 0;
+    for (const project of projects) {
+      projectTotalTasks += project.issueCount;
+      projectCompletedTasks += project.completedIssueCount;
+    }
+
+    // Calculate direct issue stats
+    const directIssuesDone = directIssues.filter(
+      (i) => i.status === "done",
+    ).length;
+
+    const totalTasks = projectTotalTasks + directIssues.length;
+    const completedTasks = projectCompletedTasks + directIssuesDone;
+    const autoProgress =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    return {
+      success: true,
+      data: {
+        id: initiative._id,
+        year: initiative.year,
+        title: initiative.title,
+        description: initiative.description,
+        category: initiative.category,
+        status: initiative.status,
+        targetMetric: initiative.targetMetric,
+        manualProgress: initiative.manualProgress,
+        autoProgress: initiative.autoProgress,
+        calculatedProgress: initiative.manualProgress ?? autoProgress,
+        color: initiative.color,
+        icon: initiative.icon,
+        projects: projects.map((p) => ({
+          id: p._id,
+          key: p.key,
+          name: p.name,
+          status: p.status,
+          issueCount: p.issueCount,
+          completedIssueCount: p.completedIssueCount,
+          completionPercentage:
+            p.issueCount > 0
+              ? Math.round((p.completedIssueCount / p.issueCount) * 100)
+              : 0,
+        })),
+        habits: habits.map((h) => ({
+          id: h._id,
+          name: h.name,
+          icon: h.icon,
+          frequency: h.frequency,
+          currentStreak: h.currentStreak,
+          bestStreak: h.longestStreak,
+        })),
+        directIssues: directIssues.map((i) => ({
+          id: i._id,
+          identifier: i.identifier,
+          title: i.title,
+          status: i.status,
+          priority: i.priority,
+        })),
+        taskStats: {
+          total: totalTasks,
+          completed: completedTasks,
+          directIssuesTotal: directIssues.length,
+          directIssuesCompleted: directIssuesDone,
+          projectTasksTotal: projectTotalTasks,
+          projectTasksCompleted: projectCompletedTasks,
+        },
+        projectCount: projects.length,
+        habitCount: habits.length,
+        createdAt: new Date(initiative.createdAt).toISOString(),
+        updatedAt: new Date(initiative.updatedAt).toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a new initiative
+ */
+export const createInitiativeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    year: v.number(),
+    title: v.string(),
+    category: v.string(),
+    description: v.optional(v.string()),
+    status: v.optional(v.string()),
+    targetMetric: v.optional(v.string()),
+    manualProgress: v.optional(v.number()),
+    color: v.optional(v.string()),
+    icon: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    // Validate category
+    type InitiativeCategory = "career" | "health" | "learning" | "relationships" | "finance" | "personal";
+    const validCategories: InitiativeCategory[] = ["career", "health", "learning", "relationships", "finance", "personal"];
+    const category = validCategories.includes(args.category as InitiativeCategory)
+      ? (args.category as InitiativeCategory)
+      : null;
+
+    if (!category) {
+      return {
+        success: false,
+        error: `Invalid category "${args.category}". Valid categories: ${validCategories.join(", ")}`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Validate status
+    type InitiativeStatus = "active" | "completed" | "paused" | "cancelled";
+    const validStatuses: InitiativeStatus[] = ["active", "completed", "paused", "cancelled"];
+    const status: InitiativeStatus =
+      args.status && validStatuses.includes(args.status as InitiativeStatus)
+        ? (args.status as InitiativeStatus)
+        : "active";
+
+    // Get the highest sortOrder for this user's initiatives in this year
+    const existingInitiatives = await ctx.db
+      .query("lifeos_yearlyInitiatives")
+      .withIndex("by_user_year", (q) =>
+        q.eq("userId", userId).eq("year", args.year),
+      )
+      .collect();
+
+    const maxSortOrder = existingInitiatives.reduce(
+      (max, i) => Math.max(max, i.sortOrder),
+      -1,
+    );
+
+    const initiativeId = await ctx.db.insert("lifeos_yearlyInitiatives", {
+      userId,
+      year: args.year,
+      title: args.title.trim(),
+      description: args.description?.trim(),
+      category,
+      status,
+      targetMetric: args.targetMetric?.trim(),
+      manualProgress: args.manualProgress,
+      color: args.color,
+      icon: args.icon,
+      sortOrder: maxSortOrder + 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      initiativeId,
+      title: args.title.trim(),
+      year: args.year,
+      category,
+      confirmationMessage: `Created initiative "${args.title.trim()}" for ${args.year} in category ${category}.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update an initiative
+ */
+export const updateInitiativeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    initiativeId: v.string(),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    category: v.optional(v.string()),
+    status: v.optional(v.string()),
+    targetMetric: v.optional(v.string()),
+    manualProgress: v.optional(v.number()),
+    color: v.optional(v.string()),
+    icon: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    let initiative;
+    try {
+      initiative = await ctx.db.get(
+        args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!initiative || initiative.userId !== userId) {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const updates: Record<string, unknown> = {
+      updatedAt: now,
+    };
+
+    if (args.title !== undefined) updates.title = args.title.trim();
+    if (args.description !== undefined) {
+      updates.description = args.description.trim() || undefined;
+    }
+
+    // Validate and set category
+    if (args.category !== undefined) {
+      const validCategories = ["career", "health", "learning", "relationships", "finance", "personal"];
+      if (validCategories.includes(args.category)) {
+        updates.category = args.category;
+      }
+    }
+
+    // Validate and set status
+    if (args.status !== undefined) {
+      const validStatuses = ["active", "completed", "paused", "cancelled"];
+      if (validStatuses.includes(args.status)) {
+        updates.status = args.status;
+      }
+    }
+
+    if (args.targetMetric !== undefined) {
+      updates.targetMetric = args.targetMetric.trim() || undefined;
+    }
+    if (args.manualProgress !== undefined) {
+      updates.manualProgress = args.manualProgress;
+    }
+    if (args.color !== undefined) {
+      updates.color = args.color || undefined;
+    }
+    if (args.icon !== undefined) {
+      updates.icon = args.icon || undefined;
+    }
+
+    await ctx.db.patch(initiative._id, updates);
+
+    return {
+      success: true,
+      initiativeId: initiative._id,
+      title: (args.title ?? initiative.title).trim(),
+      confirmationMessage: `Updated initiative "${(args.title ?? initiative.title).trim()}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Archive an initiative (soft delete)
+ */
+export const archiveInitiativeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    initiativeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    let initiative;
+    try {
+      initiative = await ctx.db.get(
+        args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!initiative || initiative.userId !== userId) {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    await ctx.db.patch(initiative._id, {
+      archivedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      confirmationMessage: `Archived initiative "${initiative.title}".`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete an initiative permanently — unlinks projects, habits, and direct issues
+ */
+export const deleteInitiativeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    initiativeId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    let initiative;
+    try {
+      initiative = await ctx.db.get(
+        args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!initiative || initiative.userId !== userId) {
+      return {
+        success: false,
+        error: `Initiative "${args.initiativeId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Unlink all projects
+    const linkedProjects = await ctx.db
+      .query("lifeos_pmProjects")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", initiative._id),
+      )
+      .collect();
+
+    for (const project of linkedProjects) {
+      await ctx.db.patch(project._id, {
+        initiativeId: undefined,
+        updatedAt: now,
+      });
+    }
+
+    // Unlink all habits
+    const linkedHabits = await ctx.db
+      .query("lifeos_habits")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", initiative._id),
+      )
+      .collect();
+
+    for (const habit of linkedHabits) {
+      await ctx.db.patch(habit._id, {
+        initiativeId: undefined,
+        updatedAt: now,
+      });
+    }
+
+    // Unlink all directly linked issues
+    const linkedIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_initiative", (q) =>
+        q.eq("initiativeId", initiative._id),
+      )
+      .collect();
+
+    for (const issue of linkedIssues) {
+      await ctx.db.patch(issue._id, {
+        initiativeId: undefined,
+        updatedAt: now,
+      });
+    }
+
+    // Delete the initiative
+    await ctx.db.delete(initiative._id);
+
+    return {
+      success: true,
+      confirmationMessage: `Deleted initiative "${initiative.title}". Unlinked ${linkedProjects.length} projects, ${linkedHabits.length} habits, and ${linkedIssues.length} issues.`,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Link or unlink a project to/from an initiative
+ */
+export const linkProjectToInitiativeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    projectIdOrKey: v.string(),
+    initiativeId: v.optional(v.string()), // Omit or empty to unlink
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    const project = await resolveProject(ctx, userId, args.projectIdOrKey);
+    if (!project) {
+      return {
+        success: false,
+        error: `Project "${args.projectIdOrKey}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (args.initiativeId) {
+      let initiative;
+      try {
+        initiative = await ctx.db.get(
+          args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+        );
+      } catch {
+        return {
+          success: false,
+          error: `Initiative "${args.initiativeId}" not found`,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+
+      if (!initiative || initiative.userId !== userId) {
+        return {
+          success: false,
+          error: `Initiative "${args.initiativeId}" not found or access denied`,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+
+      await ctx.db.patch(project._id, {
+        initiativeId: initiative._id,
+        updatedAt: Date.now(),
+      });
+
+      return {
+        success: true,
+        confirmationMessage: `Linked project "${project.name}" (${project.key}) to initiative "${initiative.title}".`,
+        generatedAt: new Date().toISOString(),
+      };
+    } else {
+      // Unlink
+      await ctx.db.patch(project._id, {
+        initiativeId: undefined,
+        updatedAt: Date.now(),
+      });
+
+      return {
+        success: true,
+        confirmationMessage: `Unlinked project "${project.name}" (${project.key}) from its initiative.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  },
+});
+
+/**
+ * Link or unlink an issue to/from an initiative
+ */
+export const linkIssueToInitiativeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    issueIdOrIdentifier: v.string(),
+    initiativeId: v.optional(v.string()), // Omit or empty to unlink
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    const issue = await resolveIssue(ctx, userId, args.issueIdOrIdentifier);
+    if (!issue) {
+      return {
+        success: false,
+        error: `Issue "${args.issueIdOrIdentifier}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (args.initiativeId) {
+      let initiative;
+      try {
+        initiative = await ctx.db.get(
+          args.initiativeId as Id<"lifeos_yearlyInitiatives">,
+        );
+      } catch {
+        return {
+          success: false,
+          error: `Initiative "${args.initiativeId}" not found`,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+
+      if (!initiative || initiative.userId !== userId) {
+        return {
+          success: false,
+          error: `Initiative "${args.initiativeId}" not found or access denied`,
+          generatedAt: new Date().toISOString(),
+        };
+      }
+
+      await ctx.db.patch(issue._id, {
+        initiativeId: initiative._id,
+        updatedAt: Date.now(),
+      });
+
+      return {
+        success: true,
+        confirmationMessage: `Linked issue ${issue.identifier} to initiative "${initiative.title}".`,
+        generatedAt: new Date().toISOString(),
+      };
+    } else {
+      // Unlink
+      await ctx.db.patch(issue._id, {
+        initiativeId: undefined,
+        updatedAt: Date.now(),
+      });
+
+      return {
+        success: true,
+        confirmationMessage: `Unlinked issue ${issue.identifier} from its initiative.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  },
+});
+
+/**
+ * Get yearly rollup for initiatives — all initiatives for a year with aggregated stats
+ */
+export const getInitiativeYearlyRollupInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    year: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+
+    const initiatives = await ctx.db
+      .query("lifeos_yearlyInitiatives")
+      .withIndex("by_user_year", (q) =>
+        q.eq("userId", userId).eq("year", args.year),
+      )
+      .filter((q) => q.eq(q.field("archivedAt"), undefined))
+      .collect();
+
+    const initiativeRollups = await Promise.all(
+      initiatives.map(async (initiative) => {
+        // Get linked projects
+        const projects = await ctx.db
+          .query("lifeos_pmProjects")
+          .withIndex("by_initiative", (q) =>
+            q.eq("initiativeId", initiative._id),
+          )
+          .filter((q) => q.eq(q.field("archivedAt"), undefined))
+          .collect();
+
+        // Get linked habits
+        const habits = await ctx.db
+          .query("lifeos_habits")
+          .withIndex("by_initiative", (q) =>
+            q.eq("initiativeId", initiative._id),
+          )
+          .filter((q) => q.eq(q.field("archivedAt"), undefined))
+          .collect();
+
+        // Get directly linked issues
+        const directIssues = await ctx.db
+          .query("lifeos_pmIssues")
+          .withIndex("by_initiative", (q) =>
+            q.eq("initiativeId", initiative._id),
+          )
+          .collect();
+
+        // Calculate task totals from projects
+        let projectTotalTasks = 0;
+        let projectCompletedTasks = 0;
+        for (const project of projects) {
+          projectTotalTasks += project.issueCount;
+          projectCompletedTasks += project.completedIssueCount;
+        }
+
+        const directIssuesDone = directIssues.filter(
+          (i) => i.status === "done",
+        ).length;
+
+        const totalTasks = projectTotalTasks + directIssues.length;
+        const completedTasks = projectCompletedTasks + directIssuesDone;
+
+        const autoProgress =
+          totalTasks > 0
+            ? Math.round((completedTasks / totalTasks) * 100)
+            : 0;
+
+        return {
+          id: initiative._id,
+          title: initiative.title,
+          category: initiative.category,
+          status: initiative.status,
+          targetMetric: initiative.targetMetric,
+          icon: initiative.icon,
+          color: initiative.color,
+          progress: initiative.manualProgress ?? autoProgress,
+          tasksCompleted: completedTasks,
+          tasksTotal: totalTasks,
+          directIssuesTotal: directIssues.length,
+          directIssuesCompleted: directIssuesDone,
+          projectCount: projects.length,
+          habitCount: habits.length,
+          habitsWithStreak: habits.filter((h) => h.currentStreak > 0).length,
+        };
+      }),
+    );
+
+    // Calculate summary
+    const activeInitiatives = initiativeRollups.filter(
+      (i) => i.status === "active",
+    ).length;
+    const totalProgress = initiativeRollups.reduce(
+      (sum, i) => sum + i.progress,
+      0,
+    );
+    const totalTasksCompleted = initiativeRollups.reduce(
+      (sum, i) => sum + i.tasksCompleted,
+      0,
+    );
+    const totalTasksTotal = initiativeRollups.reduce(
+      (sum, i) => sum + i.tasksTotal,
+      0,
+    );
+
+    return {
+      success: true,
+      data: {
+        year: args.year,
+        initiatives: initiativeRollups.sort((a, b) => {
+          // Sort by category then sort order
+          return initiatives.findIndex((i) => i._id === a.id) -
+            initiatives.findIndex((i) => i._id === b.id);
+        }),
+        summary: {
+          totalInitiatives: initiatives.length,
+          activeInitiatives,
+          completedInitiatives: initiativeRollups.filter(
+            (i) => i.status === "completed",
+          ).length,
+          averageProgress:
+            initiatives.length > 0
+              ? Math.round(totalProgress / initiatives.length)
+              : 0,
+          totalTasksCompleted,
+          totalTasksTotal,
+        },
+      },
       generatedAt: new Date().toISOString(),
     };
   },
