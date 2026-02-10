@@ -49,6 +49,23 @@ export type AgentState = "idle" | "listening" | "speaking" | "thinking";
 // ==================== MODEL CONFIGURATION ====================
 
 export const VOICE_AGENT_MODELS = [
+  // Gemini models
+  {
+    id: "gemini-3-flash-preview",
+    name: "Gemini 3 Flash",
+    description: "Fast & smart",
+  },
+  {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    description: "Balanced",
+  },
+  {
+    id: "gemini-2.0-flash",
+    name: "Gemini 2.0 Flash",
+    description: "Stable",
+  },
+  // OpenAI models
   { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Fast & affordable" },
   { id: "gpt-4o", name: "GPT-4o", description: "High quality" },
   { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Latest mini model" },
@@ -61,7 +78,8 @@ export const VOICE_AGENT_MODELS = [
 ] as const;
 
 export type VoiceAgentModelId = (typeof VOICE_AGENT_MODELS)[number]["id"];
-export const DEFAULT_VOICE_AGENT_MODEL: VoiceAgentModelId = "gpt-4o-mini";
+export const DEFAULT_VOICE_AGENT_MODEL: VoiceAgentModelId =
+  "gemini-3-flash-preview";
 
 interface VoiceAgentState {
   connectionState: VoiceAgentConnectionState;

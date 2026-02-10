@@ -9,6 +9,7 @@ import {
 } from '@livekit/agents';
 import { z } from 'zod';
 import * as livekit from '@livekit/agents-plugin-livekit';
+import * as google from '@livekit/agents-plugin-google';
 import * as openai from '@livekit/agents-plugin-openai';
 import * as silero from '@livekit/agents-plugin-silero';
 import { BackgroundVoiceCancellation } from '@livekit/noise-cancellation-node';
@@ -93,12 +94,34 @@ async function callConvexTool(
   }
 }
 
-// Supported OpenAI models
-const SUPPORTED_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-5-mini', 'gpt-4.1-mini', 'gpt-5.1-codex-mini'] as const;
+// Supported models across providers
+const SUPPORTED_MODELS = [
+  // Gemini models
+  'gemini-3-flash-preview',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  // OpenAI models
+  'gpt-4o-mini',
+  'gpt-4o',
+  'gpt-5-mini',
+  'gpt-4.1-mini',
+  'gpt-5.1-codex-mini',
+] as const;
 type ModelId = (typeof SUPPORTED_MODELS)[number];
 
 function isValidModel(model: string): model is ModelId {
   return SUPPORTED_MODELS.includes(model as ModelId);
+}
+
+function isGeminiModel(model: ModelId): boolean {
+  return model.startsWith('gemini-');
+}
+
+function createLLM(model: ModelId): google.LLM | openai.LLM {
+  if (isGeminiModel(model)) {
+    return new google.LLM({ model });
+  }
+  return new openai.LLM({ model });
 }
 
 export default defineAgent({
@@ -115,7 +138,7 @@ export default defineAgent({
     const participant = await ctx.waitForParticipant();
 
     // Parse model, userId, localTime, and timezone from participant metadata
-    let selectedModel: ModelId = 'gpt-4o-mini'; // default
+    let selectedModel: ModelId = 'gemini-3-flash-preview'; // default
     let userId: string | undefined;
     let localTime: string | undefined;
     let timezone: string | undefined;
@@ -497,11 +520,11 @@ Please be concise in your responses as this is voice interaction.`,
       },
     });
 
-    // Create session with dynamic model
+    // Create session with dynamic model (Gemini or OpenAI for LLM, OpenAI for STT/TTS)
     const session = new voice.AgentSession({
       vad,
       stt: new openai.STT(),
-      llm: new openai.LLM({ model: selectedModel }),
+      llm: createLLM(selectedModel),
       tts: new openai.TTS({ voice: 'alloy' }),
       turnDetection: new livekit.turnDetector.MultilingualModel(),
     });
