@@ -154,20 +154,7 @@ export function SettingsTab() {
         <OTAUpdateSection />
 
         {/* App Info */}
-        <div className="space-y-4">
-          <h2 className="text-sm font-medium text-[var(--text-primary)]">
-            App Info
-          </h2>
-
-          <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
-            <div className="text-xs text-[var(--text-secondary)] mb-1">
-              Mode
-            </div>
-            <div className="text-sm text-[var(--text-primary)] font-mono">
-              {import.meta.env.MODE}
-            </div>
-          </div>
-        </div>
+        <AppInfoSection />
       </div>
     </div>
   );
@@ -314,6 +301,84 @@ function ApiKeysSection() {
         >
           ↗ Open Full Disk Access Settings
         </button>
+      </div>
+    </div>
+  );
+}
+
+function AppInfoSection() {
+  const [bundleVersion, setBundleVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isCapacitor) {
+      getCurrentBundle().then((bundle) => {
+        setBundleVersion(bundle?.bundle?.version || null);
+      });
+    }
+  }, []);
+
+  const buildTime = new Date(__BUILD_TIMESTAMP__).toLocaleString();
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-medium text-[var(--text-primary)]">
+        App Info
+      </h2>
+
+      <div className="space-y-3">
+        <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">
+            App Version
+          </div>
+          <div className="text-sm text-[var(--text-primary)] font-mono">
+            {__APP_VERSION__}
+          </div>
+        </div>
+
+        <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">
+            Build Time
+          </div>
+          <div className="text-sm text-[var(--text-primary)] font-mono">
+            {buildTime}
+          </div>
+        </div>
+
+        {isCapacitor && (
+          <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
+            <div className="text-xs text-[var(--text-secondary)] mb-1">
+              OTA Bundle Version
+            </div>
+            <div className="text-sm text-[var(--text-primary)] font-mono">
+              {bundleVersion || "builtin (no OTA applied)"}
+            </div>
+            {bundleVersion && bundleVersion !== __APP_VERSION__ && (
+              <div className="text-xs text-yellow-400 mt-1">
+                OTA version differs from app version
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
+          <div className="text-xs text-[var(--text-secondary)] mb-1">
+            Mode
+          </div>
+          <div className="text-sm text-[var(--text-primary)] font-mono">
+            {import.meta.env.MODE}
+          </div>
+        </div>
+
+        {isCapacitor && (
+          <div className="bg-[var(--bg-secondary)] rounded-lg p-3">
+            <div className="text-xs text-[var(--text-secondary)] mb-1">
+              Platform
+            </div>
+            <div className="text-sm text-[var(--text-primary)] font-mono">
+              Capacitor (iOS/Android)
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ import App from "./App";
 import LifeOSApp from "./LifeOSApp";
 import { ConfigProvider } from "./lib/config";
 import { isCapacitor, isTauri } from "./lib/platform";
-import { initUpdater } from "./lib/capacitorUpdater";
+import { initUpdater, checkAndApplyUpdate } from "./lib/capacitorUpdater";
 import "./App.css";
 import {
   CapacitorAuthProvider,
@@ -36,6 +36,16 @@ async function initializeApp() {
   // Initialize Capacitor OTA updater if running in Capacitor
   if (isCapacitor) {
     await initUpdater();
+    // Check for updates and apply automatically (non-blocking)
+    checkAndApplyUpdate()
+      .then((updated) => {
+        if (updated) {
+          console.log("[OTA] Update applied, app will reload");
+        } else {
+          console.log("[OTA] No update available");
+        }
+      })
+      .catch((err) => console.error("[OTA] Update check failed:", err));
   }
 
   let clerkInstance = undefined;

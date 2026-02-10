@@ -787,6 +787,13 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
     convexMeetingId ? { meetingId: convexMeetingId } : "skip"
   ) as MeetingPersonLink[] | undefined;
   const deleteMeetingPersonLink = useMutation(api.lifeos.granola.deleteMeetingPersonLink);
+  const linkMeetingToPerson = useMutation(api.lifeos.granola.linkMeetingToPerson);
+
+  // Query all FRM people for manual person linking
+  const allPeople = useQuery(
+    api.lifeos.frm_people.getPeople,
+    convexMeetingId ? {} : "skip"
+  );
 
   // Convex hooks for calendar linking
   const calendarSuggestionsResult = useQuery(
@@ -895,6 +902,49 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
       }
     },
     [convexMeetingId, acceptSuggestion]
+  );
+
+  // Manual person link state
+  const [manualPersonLinkSearch, setManualPersonLinkSearch] = useState("");
+  const [manualPersonLinkPopoverOpen, setManualPersonLinkPopoverOpen] = useState(false);
+  const [isManualPersonLinking, setIsManualPersonLinking] = useState(false);
+
+  // Already linked person IDs
+  const linkedPersonIds = new Set(meetingPersonLinks?.map((l) => l.personId.toString()) || []);
+
+  // Filter people for manual linking (not already linked, and matching search)
+  const filteredPeople = (allPeople || [])
+    .filter((p) => !linkedPersonIds.has(p._id.toString()))
+    .filter((p) => {
+      if (!manualPersonLinkSearch.trim()) return true;
+      const search = manualPersonLinkSearch.toLowerCase();
+      return p.name.toLowerCase().includes(search);
+    })
+    .slice(0, 10);
+
+  // Handle manual person link
+  const handleManualLinkPerson = useCallback(
+    async (personId: Id<"lifeos_frmPeople">) => {
+      if (!convexMeetingId) return;
+
+      setIsManualPersonLinking(true);
+      try {
+        await linkMeetingToPerson({
+          meetingId: convexMeetingId,
+          personId,
+          linkSource: "manual",
+          aiConfidence: 1.0,
+          aiReason: "Manually linked by user",
+        });
+        setManualPersonLinkPopoverOpen(false);
+        setManualPersonLinkSearch("");
+      } catch (error) {
+        console.error("Failed to link person:", error);
+      } finally {
+        setIsManualPersonLinking(false);
+      }
+    },
+    [convexMeetingId, linkMeetingToPerson]
   );
 
   // Get AI suggestions for linking (both thread and person)
@@ -1353,6 +1403,67 @@ function MeetingDetailPanel({ meeting, convexMeetingId }: MeetingDetailPanelProp
                                   <span className="truncate">{thread.threadName}</span>
                                   {isManualLinking && (
                                     <Loader2 className="h-3 w-3 animate-spin ml-auto" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                    {/* Manual Link Contact (FRM Person) */}
+                    <Popover open={manualPersonLinkPopoverOpen} onOpenChange={setManualPersonLinkPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7">
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          Link Contact
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0" align="end">
+                        <ScrollArea className="max-h-[350px]">
+                          {/* Search people */}
+                          <div className="p-2 border-b">
+                            <div className="flex items-center gap-2 px-1">
+                              <Search className="h-4 w-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search contacts..."
+                                value={manualPersonLinkSearch}
+                                onChange={(e) => setManualPersonLinkSearch(e.target.value)}
+                                className="h-7 border-0 focus-visible:ring-0 p-0 text-sm"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+
+                          {/* People list */}
+                          {filteredPeople.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-muted-foreground">
+                              {allPeople?.length === 0
+                                ? "No contacts available"
+                                : manualPersonLinkSearch
+                                  ? "No matches found"
+                                  : "All contacts are already linked"}
+                            </div>
+                          ) : (
+                            <div className="p-1">
+                              {filteredPeople.map((person) => (
+                                <button
+                                  key={person._id}
+                                  onClick={() => handleManualLinkPerson(person._id)}
+                                  disabled={isManualPersonLinking}
+                                  className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-muted text-left text-sm"
+                                >
+                                  <span className="flex-shrink-0">
+                                    {person.avatarEmoji || <UserCircle className="h-4 w-4 text-green-500" />}
+                                  </span>
+                                  <span className="truncate flex-1">{person.name}</span>
+                                  {person.relationshipType && (
+                                    <Badge variant="outline" className="h-4 text-[9px] px-1 flex-shrink-0">
+                                      {person.relationshipType}
+                                    </Badge>
+                                  )}
+                                  {isManualPersonLinking && (
+                                    <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
                                   )}
                                 </button>
                               ))}

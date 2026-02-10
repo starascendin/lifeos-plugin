@@ -1,0 +1,45 @@
+name: OTA Release Dev
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "apps/lifeos/taurireact-macapp/**"
+      - ".github/workflows/ota-release-dev.yml"
+
+jobs:
+  ota-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run OTA Release
+        working-directory: apps/lifeos/taurireact-macapp
+        env:
+          VITE_CONVEX_URL: https://keen-nightingale-310.convex.cloud
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEV_PUBLISHABLE_KEY }}
+        run: node scripts/ota-release.mjs dev patch
+
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add apps/lifeos/taurireact-macapp/package.json
+          git diff --staged --quiet || git commit -m "chore(lifeos): bump OTA version [skip ci]"
+          git push
