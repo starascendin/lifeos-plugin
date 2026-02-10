@@ -64,6 +64,9 @@ export const cycleSettingsValidator = v.object({
   // Timezone offset in minutes from UTC (e.g., -420 for UTC-7/Denver)
   // Used to calculate cycle start dates in user's local timezone
   timezoneOffsetMinutes: v.optional(v.number()),
+  // When true, incomplete issues (not done/cancelled) are automatically
+  // moved to the next cycle when the current cycle ends
+  autoRolloverIncompleteIssues: v.optional(v.boolean()),
 });
 
 export const cycleRetrospectiveValidator = v.object({

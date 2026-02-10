@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useTheme } from "../../lib/contexts/ThemeContext";
 import { useApiKeys } from "../../lib/hooks/useApiKeys";
 import { isCapacitor } from "../../lib/platform";
 import {
-  downloadAndApplyUpdate,
+  checkForUpdates,
+  checkAndApplyUpdate,
   getCurrentBundle,
   listBundles,
   resetToBuiltin,
+  onUpdateStatus,
+  type CheckUpdateResult,
+  type UpdateStatus,
 } from "../../lib/capacitorUpdater";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL || "";
@@ -55,7 +59,9 @@ export function SettingsTab() {
       <div className="space-y-6">
         {/* Environment Badge */}
         <div className="flex items-center gap-3">
-          <span className="text-sm text-[var(--text-secondary)]">Environment:</span>
+          <span className="text-sm text-[var(--text-secondary)]">
+            Environment:
+          </span>
           <span
             className={`px-3 py-1 rounded-full text-xs font-medium border ${envColors[environment]}`}
           >
@@ -285,15 +291,14 @@ function ApiKeysSection() {
           </div>
         )}
 
-        {error && (
-          <div className="text-xs text-red-400">{error}</div>
-        )}
+        {error && <div className="text-xs text-red-400">{error}</div>}
       </div>
 
       {/* Full Disk Access */}
       <div className="bg-[var(--bg-secondary)] rounded-lg p-3 space-y-2">
         <div className="text-xs text-[var(--text-secondary)]">
-          <strong>Note:</strong> Full Disk Access may be required for the app to save settings.
+          <strong>Note:</strong> Full Disk Access may be required for the app to
+          save settings.
         </div>
         <button
           onClick={openFullDiskAccessSettings}
@@ -385,59 +390,93 @@ function AppInfoSection() {
 }
 
 function OTAUpdateSection() {
-  const [updateUrl, setUpdateUrl] = useState("http://10.0.0.144:8888/ota-update.zip");
-  const [version, setVersion] = useState("1.0.1");
+  const [isChecking, setIsChecking] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
   const [currentBundle, setCurrentBundle] = useState<any>(null);
   const [bundles, setBundles] = useState<any[]>([]);
+  const [checkResult, setCheckResult] = useState<CheckUpdateResult | null>(
+    null,
+  );
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({
+    hasUpdate: false,
+  });
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadBundleInfo();
-  }, []);
-
-  const loadBundleInfo = async () => {
+  const loadBundleInfo = useCallback(async () => {
     const current = await getCurrentBundle();
     const allBundles = await listBundles();
     setCurrentBundle(current);
     setBundles(allBundles);
+  }, []);
+
+  useEffect(() => {
+    loadBundleInfo();
+
+    // Subscribe to update status from the auto-updater
+    const unsubscribe = onUpdateStatus((status) => {
+      setUpdateStatus(status);
+      if (status.error) {
+        setError(status.error);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [loadBundleInfo]);
+
+  const handleCheckForUpdates = async () => {
+    setIsChecking(true);
+    setError(null);
+    try {
+      const result = await checkForUpdates();
+      setCheckResult(result);
+      if (!result.hasUpdate) {
+        setError(null);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to check for updates");
+    } finally {
+      setIsChecking(false);
+    }
   };
 
-  const handleUpdate = async () => {
-    if (!updateUrl.trim() || !version.trim()) return;
+  const handleApplyUpdate = async () => {
     setIsUpdating(true);
-    setStatus("Downloading...");
+    setError(null);
     try {
-      await downloadAndApplyUpdate(updateUrl.trim(), version.trim());
-      // App will reload, so this won't show
-      setStatus("Update applied!");
-    } catch (error: any) {
-      setStatus(`Error: ${error.message}`);
+      await checkAndApplyUpdate();
+      // App will reload if update is applied
+    } catch (err: any) {
+      setError(err.message || "Failed to apply update");
       setIsUpdating(false);
     }
   };
 
   const handleReset = async () => {
+    setError(null);
     try {
-      setStatus("Resetting...");
       await resetToBuiltin();
-      setStatus("Reset complete. App will reload.");
-    } catch (error: any) {
-      setStatus(`Error: ${error.message}`);
+      // App will reload
+    } catch (err: any) {
+      setError(err.message || "Failed to reset");
     }
   };
+
+  const currentVersion = currentBundle?.bundle?.version || "builtin";
+  const isDownloading = updateStatus.downloading || isUpdating;
 
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-medium text-[var(--text-primary)]">
-        OTA Updates (Dev)
+        OTA Updates
       </h2>
 
       {/* Current Bundle Info */}
       <div className="bg-[var(--bg-secondary)] rounded-lg p-3 space-y-2">
-        <div className="text-xs text-[var(--text-secondary)]">Current Bundle</div>
+        <div className="text-xs text-[var(--text-secondary)]">
+          Current Bundle
+        </div>
         <div className="text-sm text-[var(--text-primary)] font-mono">
-          {currentBundle?.bundle?.version || "builtin"}
+          v{currentVersion}
         </div>
         {bundles.length > 0 && (
           <div className="text-xs text-[var(--text-secondary)]">
@@ -446,52 +485,85 @@ function OTAUpdateSection() {
         )}
       </div>
 
-      {/* Update Form */}
-      <div className="bg-[var(--bg-secondary)] rounded-lg p-3 space-y-3">
-        <div>
-          <div className="text-xs text-[var(--text-secondary)] mb-1">Update URL</div>
-          <input
-            type="text"
-            value={updateUrl}
-            onChange={(e) => setUpdateUrl(e.target.value)}
-            placeholder="http://..."
-            className="w-full px-3 py-2 text-sm rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--app-border)] focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
-          />
+      {/* Update Status */}
+      {isDownloading && (
+        <div className="bg-blue-500/10 rounded-lg p-3 space-y-2">
+          <div className="text-xs text-blue-400 font-medium">
+            Downloading update
+            {updateStatus.version ? ` v${updateStatus.version}` : ""}...
+          </div>
+          {updateStatus.progress !== undefined && (
+            <div className="w-full bg-[var(--bg-primary)] rounded-full h-2">
+              <div
+                className="bg-blue-500 h-2 rounded-full transition-all"
+                style={{ width: `${updateStatus.progress}%` }}
+              />
+            </div>
+          )}
         </div>
+      )}
 
-        <div>
-          <div className="text-xs text-[var(--text-secondary)] mb-1">Version</div>
-          <input
-            type="text"
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
-            placeholder="1.0.1"
-            className="w-full px-3 py-2 text-sm rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--app-border)] focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
-          />
+      {/* Check Result */}
+      {checkResult && !isDownloading && (
+        <div
+          className={`rounded-lg p-3 ${checkResult.hasUpdate ? "bg-green-500/10" : "bg-[var(--bg-secondary)]"}`}
+        >
+          {checkResult.hasUpdate && checkResult.updateInfo ? (
+            <div className="space-y-2">
+              <div className="text-xs text-green-400 font-medium">
+                Update available: v{checkResult.updateInfo.version}
+              </div>
+              {checkResult.updateInfo.releaseNotes && (
+                <div className="text-xs text-[var(--text-secondary)]">
+                  {checkResult.updateInfo.releaseNotes}
+                </div>
+              )}
+              {checkResult.updateInfo.fileSize && (
+                <div className="text-xs text-[var(--text-secondary)]">
+                  Size:{" "}
+                  {(checkResult.updateInfo.fileSize / 1024 / 1024).toFixed(2)}{" "}
+                  MB
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-xs text-[var(--text-secondary)]">
+              You're on the latest version.
+            </div>
+          )}
         </div>
+      )}
 
-        <div className="flex gap-2">
+      {/* Actions */}
+      <div className="flex gap-2">
+        {checkResult?.hasUpdate && !isDownloading ? (
           <button
-            onClick={handleUpdate}
-            disabled={isUpdating || !updateUrl.trim()}
+            onClick={handleApplyUpdate}
+            disabled={isUpdating}
+            className="flex-1 px-3 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpdating ? "Applying..." : "Update Now"}
+          </button>
+        ) : (
+          <button
+            onClick={handleCheckForUpdates}
+            disabled={isChecking || isDownloading}
             className="flex-1 px-3 py-2 text-sm font-medium rounded-md bg-[var(--app-accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isUpdating ? "Updating..." : "Download & Apply Update"}
+            {isChecking ? "Checking..." : "Check for Updates"}
           </button>
-          <button
-            onClick={handleReset}
-            className="px-3 py-2 text-sm font-medium rounded-md bg-red-500/20 text-red-400 hover:bg-red-500/30"
-          >
-            Reset
-          </button>
-        </div>
-
-        {status && (
-          <div className={`text-xs ${status.startsWith("Error") ? "text-red-400" : "text-green-400"}`}>
-            {status}
-          </div>
         )}
+        <button
+          onClick={handleReset}
+          disabled={isDownloading}
+          className="px-3 py-2 text-sm font-medium rounded-md bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
+        >
+          Reset
+        </button>
       </div>
+
+      {/* Error */}
+      {error && <div className="text-xs text-red-400">{error}</div>}
     </div>
   );
 }

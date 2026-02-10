@@ -108,7 +108,8 @@ export const TOOL_DEFINITIONS = {
   },
   // Voice Notes Deep Dive tools
   get_voice_memo: {
-    description: "Get a single voice memo with full details including AI extraction",
+    description:
+      "Get a single voice memo with full details including AI extraction",
     params: {
       memoId: "required - the voice memo ID",
     },
@@ -122,14 +123,16 @@ export const TOOL_DEFINITIONS = {
     },
   },
   get_voice_memos_by_labels: {
-    description: "Get voice memos that have specific labels/tags from AI extraction",
+    description:
+      "Get voice memos that have specific labels/tags from AI extraction",
     params: {
       labels: "required - array of labels to search for",
       limit: "optional - max results (default 50, max 100)",
     },
   },
   get_voice_memo_labels: {
-    description: "Get all unique labels from voice memo extractions with counts",
+    description:
+      "Get all unique labels from voice memo extractions with counts",
     params: {},
   },
   // AI Conversation Summary tools (crystallization)
@@ -157,7 +160,8 @@ export const TOOL_DEFINITIONS = {
     },
   },
   get_ai_convo_summary: {
-    description: "Get a single AI conversation summary with related memo details",
+    description:
+      "Get a single AI conversation summary with related memo details",
     params: {
       summaryId: "required - the summary ID",
     },
@@ -284,7 +288,8 @@ export const TOOL_DEFINITIONS = {
       issueIdOrIdentifier: "required - issue ID or identifier like PROJ-123",
       title: "optional - updated title",
       description: "optional - updated description",
-      status: "optional - backlog, todo, in_progress, in_review, done, cancelled",
+      status:
+        "optional - backlog, todo, in_progress, in_review, done, cancelled",
       priority: "optional - urgent, high, medium, low, none",
       dueDate: "optional - ISO date string or empty to clear",
       isTopPriority: "optional - true/false",
@@ -342,6 +347,23 @@ export const TOOL_DEFINITIONS = {
       cycleId: "required - cycle ID",
     },
   },
+  close_cycle: {
+    description:
+      "Close/complete a cycle, optionally rolling over incomplete issues to the next cycle",
+    params: {
+      cycleId: "required - cycle ID",
+      rolloverIncomplete:
+        "optional - true to move incomplete issues to next cycle (defaults to user setting)",
+    },
+  },
+  generate_cycles: {
+    description:
+      "Generate upcoming cycles based on user settings (duration, start day, timezone)",
+    params: {
+      count:
+        "optional - number of cycles to generate (defaults to user setting)",
+    },
+  },
   // FRM (Friend Relationship Management) tools
   get_people: {
     description: "Get all contacts/people with optional filters",
@@ -353,7 +375,8 @@ export const TOOL_DEFINITIONS = {
     },
   },
   get_person: {
-    description: "Get a single person's details with their AI-generated profile",
+    description:
+      "Get a single person's details with their AI-generated profile",
     params: {
       personId: "required - the person's ID",
     },
@@ -407,7 +430,8 @@ export const TOOL_DEFINITIONS = {
     params: {
       personId: "required - the person's ID",
       voiceMemoId: "required - the voice memo's ID",
-      context: "optional - context for the link (e.g., 'Phone call', 'Coffee meetup')",
+      context:
+        "optional - context for the link (e.g., 'Phone call', 'Coffee meetup')",
     },
   },
   // Client Management tools
@@ -544,7 +568,8 @@ export const TOOL_DEFINITIONS = {
     },
   },
   get_granola_meeting: {
-    description: "Get a single Granola meeting by its Granola doc ID (includes AI notes)",
+    description:
+      "Get a single Granola meeting by its Granola doc ID (includes AI notes)",
     params: {
       granolaDocId: "required - the Granola document ID",
     },
@@ -588,7 +613,8 @@ export const TOOL_DEFINITIONS = {
       threadId: "required - Beeper thread ID string",
       personId: "optional - existing person ID (omit to create new)",
       personName: "optional - name for new person (defaults to threadName)",
-      relationshipType: "optional - colleague/friend/family/etc (default: colleague)",
+      relationshipType:
+        "optional - colleague/friend/family/etc (default: colleague)",
     },
   },
 } as const;
@@ -605,30 +631,32 @@ const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
 function htmlToPlainText(html: string | undefined): string | undefined {
   if (!html) return undefined;
 
-  return html
-    // Convert line breaks and block elements to newlines
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<\/h[1-6]>/gi, '\n\n')
-    // Convert list items to bullets
-    .replace(/<li[^>]*>/gi, '• ')
-    // Convert task list items
-    .replace(/<li[^>]*data-checked="true"[^>]*>/gi, '☑ ')
-    .replace(/<li[^>]*data-checked="false"[^>]*>/gi, '☐ ')
-    // Strip all remaining HTML tags
-    .replace(/<[^>]+>/g, '')
-    // Decode common HTML entities
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    // Clean up whitespace
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return (
+    html
+      // Convert line breaks and block elements to newlines
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<\/h[1-6]>/gi, "\n\n")
+      // Convert list items to bullets
+      .replace(/<li[^>]*>/gi, "• ")
+      // Convert task list items
+      .replace(/<li[^>]*data-checked="true"[^>]*>/gi, "☑ ")
+      .replace(/<li[^>]*data-checked="false"[^>]*>/gi, "☐ ")
+      // Strip all remaining HTML tags
+      .replace(/<[^>]+>/g, "")
+      // Decode common HTML entities
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      // Clean up whitespace
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
 // ==================== TOOL 1: GET TODAY'S TASKS ====================
@@ -1130,7 +1158,10 @@ export const getVoiceMemoInternal = internalQuery({
 
     const memo = await ctx.db.get(memoId);
     if (!memo || memo.userId !== userId) {
-      return { error: "Voice memo not found", generatedAt: new Date().toISOString() };
+      return {
+        error: "Voice memo not found",
+        generatedAt: new Date().toISOString(),
+      };
     }
 
     // Get latest extraction if available
@@ -1185,8 +1216,8 @@ export const getVoiceMemosByDateInternal = internalQuery({
       .filter((q) =>
         q.and(
           q.gte(q.field("clientCreatedAt"), startTs),
-          q.lte(q.field("clientCreatedAt"), endTs)
-        )
+          q.lte(q.field("clientCreatedAt"), endTs),
+        ),
       )
       .order("desc")
       .take(limit);
@@ -1217,7 +1248,7 @@ export const getVoiceMemosByDateInternal = internalQuery({
               }
             : null,
         };
-      })
+      }),
     );
 
     return {
@@ -1255,9 +1286,9 @@ export const getVoiceMemosByLabelsInternal = internalQuery({
         args.labels.some(
           (reqLabel) =>
             label.toLowerCase().includes(reqLabel.toLowerCase()) ||
-            reqLabel.toLowerCase().includes(label.toLowerCase())
-        )
-      )
+            reqLabel.toLowerCase().includes(label.toLowerCase()),
+        ),
+      ),
     );
 
     // Get the corresponding memos
@@ -1281,7 +1312,7 @@ export const getVoiceMemosByLabelsInternal = internalQuery({
             sentiment: extraction.sentiment,
           },
         };
-      })
+      }),
     );
 
     const filtered = results.filter(Boolean);
@@ -1363,7 +1394,7 @@ export const createAiConvoSummaryInternal = internalMutation({
       ideas: args.ideas,
       tags: args.tags,
       relatedMemoIds: args.relatedMemoIds?.map(
-        (id) => id as Id<"life_voiceMemos">
+        (id) => id as Id<"life_voiceMemos">,
       ),
       summaryType: args.summaryType,
       conversationContext: args.conversationContext,
@@ -1436,7 +1467,10 @@ export const getAiConvoSummaryInternal = internalQuery({
 
     const summary = await ctx.db.get(summaryId);
     if (!summary || summary.userId !== userId) {
-      return { error: "Summary not found", generatedAt: new Date().toISOString() };
+      return {
+        error: "Summary not found",
+        generatedAt: new Date().toISOString(),
+      };
     }
 
     // Get related memos if any
@@ -1451,7 +1485,7 @@ export const getAiConvoSummaryInternal = internalQuery({
                   createdAt: new Date(memo.clientCreatedAt).toISOString(),
                 }
               : null;
-          })
+          }),
         )
       : [];
 
@@ -1488,7 +1522,7 @@ export const searchAiConvoSummariesInternal = internalQuery({
     const results = await ctx.db
       .query("life_voiceNotesAiConvoSummary")
       .withSearchIndex("search_summary", (q) =>
-        q.search("summary", args.query).eq("userId", userId)
+        q.search("summary", args.query).eq("userId", userId),
       )
       .take(limit);
 
@@ -2029,7 +2063,7 @@ export const getMonthlyAgendaInternal = internalQuery({
     const monthEnd = new Date(
       startDateObj.getFullYear(),
       startDateObj.getMonth() + 1,
-      0
+      0,
     );
 
     const startOfMonth = startDateObj.getTime();
@@ -2052,7 +2086,9 @@ export const getMonthlyAgendaInternal = internalQuery({
     const completedTasks = allIssues.filter((issue) => {
       if (issue.status !== "done") return false;
       if (!issue.completedAt) return false;
-      return issue.completedAt >= startOfMonth && issue.completedAt <= endOfMonth;
+      return (
+        issue.completedAt >= startOfMonth && issue.completedAt <= endOfMonth
+      );
     });
 
     // Get project info
@@ -2105,7 +2141,9 @@ export const getMonthlyAgendaInternal = internalQuery({
     for (const task of relevantTasks) {
       if (!task.dueDate) continue;
       const weekKey = getWeekKey(task.dueDate);
-      const project = task.projectId ? projectMap.get(task.projectId) : undefined;
+      const project = task.projectId
+        ? projectMap.get(task.projectId)
+        : undefined;
 
       if (!tasksByWeek[weekKey]) tasksByWeek[weekKey] = [];
       tasksByWeek[weekKey].push({
@@ -2123,7 +2161,9 @@ export const getMonthlyAgendaInternal = internalQuery({
     for (const task of completedTasks) {
       if (!task.completedAt) continue;
       const weekKey = getWeekKey(task.completedAt);
-      const project = task.projectId ? projectMap.get(task.projectId) : undefined;
+      const project = task.projectId
+        ? projectMap.get(task.projectId)
+        : undefined;
 
       if (!completedByWeek[weekKey]) completedByWeek[weekKey] = [];
       completedByWeek[weekKey].push({
@@ -2276,7 +2316,7 @@ export const updateWeeklyPromptInternal = internalMutation({
     const existing = await ctx.db
       .query("lifeos_weeklySummaries")
       .withIndex("by_user_week", (q) =>
-        q.eq("userId", userId).eq("weekStartDate", args.weekStartDate)
+        q.eq("userId", userId).eq("weekStartDate", args.weekStartDate),
       )
       .first();
 
@@ -2335,7 +2375,7 @@ export const updateMonthlyPromptInternal = internalMutation({
     const existing = await ctx.db
       .query("lifeos_monthlySummaries")
       .withIndex("by_user_month", (q) =>
-        q.eq("userId", userId).eq("monthStartDate", args.monthStartDate)
+        q.eq("userId", userId).eq("monthStartDate", args.monthStartDate),
       )
       .first();
 
@@ -2353,7 +2393,11 @@ export const updateMonthlyPromptInternal = internalMutation({
     } else {
       // Calculate month end date
       const startDate = new Date(args.monthStartDate);
-      const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+      const monthEnd = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth() + 1,
+        0,
+      );
       const monthEndStr = monthEnd.toISOString().split("T")[0];
 
       const id = await ctx.db.insert("lifeos_monthlySummaries", {
@@ -3117,7 +3161,9 @@ export const getPeopleInternal = internalQuery({
 
     // Filter by relationship type
     if (args.relationshipType) {
-      people = people.filter((p) => p.relationshipType === args.relationshipType);
+      people = people.filter(
+        (p) => p.relationshipType === args.relationshipType,
+      );
     }
 
     // Sort by last interaction (most recent first), then by name
@@ -3245,7 +3291,7 @@ export const searchPeopleInternal = internalQuery({
     const results = await ctx.db
       .query("lifeos_frmPeople")
       .withSearchIndex("search_name", (q) =>
-        q.search("name", args.query).eq("userId", userId)
+        q.search("name", args.query).eq("userId", userId),
       )
       .take(limit);
 
@@ -3316,7 +3362,7 @@ export const getMemosForPersonInternal = internalQuery({
           linkedAt: new Date(link.createdAt).toISOString(),
           createdAt: new Date(memo.clientCreatedAt).toISOString(),
         };
-      })
+      }),
     );
 
     const validMemos = memos.filter(Boolean);
@@ -3420,10 +3466,24 @@ export const createPersonInternal = internalMutation({
     const now = Date.now();
 
     // Validate relationship type
-    const validTypes = ["family", "friend", "colleague", "acquaintance", "mentor", "other"];
-    const relationshipType = args.relationshipType && validTypes.includes(args.relationshipType)
-      ? (args.relationshipType as "family" | "friend" | "colleague" | "acquaintance" | "mentor" | "other")
-      : undefined;
+    const validTypes = [
+      "family",
+      "friend",
+      "colleague",
+      "acquaintance",
+      "mentor",
+      "other",
+    ];
+    const relationshipType =
+      args.relationshipType && validTypes.includes(args.relationshipType)
+        ? (args.relationshipType as
+            | "family"
+            | "friend"
+            | "colleague"
+            | "acquaintance"
+            | "mentor"
+            | "other")
+        : undefined;
 
     const personId = await ctx.db.insert("lifeos_frmPeople", {
       userId,
@@ -3502,7 +3562,14 @@ export const updatePersonInternal = internalMutation({
 
     // Validate and set relationship type
     if (args.relationshipType !== undefined) {
-      const validTypes = ["family", "friend", "colleague", "acquaintance", "mentor", "other"];
+      const validTypes = [
+        "family",
+        "friend",
+        "colleague",
+        "acquaintance",
+        "mentor",
+        "other",
+      ];
       if (validTypes.includes(args.relationshipType)) {
         updates.relationshipType = args.relationshipType;
       }
@@ -3646,7 +3713,9 @@ export const getClientsInternal = internalQuery({
       clients = await ctx.db
         .query("lifeos_pmClients")
         .withIndex("by_user_status", (q) =>
-          q.eq("userId", userId).eq("status", args.status as "active" | "archived")
+          q
+            .eq("userId", userId)
+            .eq("status", args.status as "active" | "archived"),
         )
         .order("desc")
         .collect();
@@ -3702,8 +3771,12 @@ export const getClientInternal = internalQuery({
       .collect();
 
     const projectCount = projects.length;
-    const activeProjectCount = projects.filter((p) => p.status === "in_progress").length;
-    const completedProjectCount = projects.filter((p) => p.status === "completed").length;
+    const activeProjectCount = projects.filter(
+      (p) => p.status === "in_progress",
+    ).length;
+    const completedProjectCount = projects.filter(
+      (p) => p.status === "completed",
+    ).length;
 
     return {
       success: true,
@@ -3924,9 +3997,11 @@ export const getPhasesInternal = internalQuery({
           .collect();
 
         const totalIssues = issues.length;
-        const completedIssues = issues.filter((i) => i.status === "done").length;
+        const completedIssues = issues.filter(
+          (i) => i.status === "done",
+        ).length;
         const inProgressIssues = issues.filter(
-          (i) => i.status === "in_progress" || i.status === "in_review"
+          (i) => i.status === "in_progress" || i.status === "in_review",
         ).length;
 
         return {
@@ -3938,9 +4013,7 @@ export const getPhasesInternal = internalQuery({
           startDate: phase.startDate
             ? new Date(phase.startDate).toISOString()
             : null,
-          endDate: phase.endDate
-            ? new Date(phase.endDate).toISOString()
-            : null,
+          endDate: phase.endDate ? new Date(phase.endDate).toISOString() : null,
           stats: {
             totalIssues,
             completedIssues,
@@ -3951,7 +4024,7 @@ export const getPhasesInternal = internalQuery({
                 : 0,
           },
         };
-      })
+      }),
     );
 
     return {
@@ -4018,9 +4091,7 @@ export const getPhaseInternal = internalQuery({
         startDate: phase.startDate
           ? new Date(phase.startDate).toISOString()
           : null,
-        endDate: phase.endDate
-          ? new Date(phase.endDate).toISOString()
-          : null,
+        endDate: phase.endDate ? new Date(phase.endDate).toISOString() : null,
         projectId: phase.projectId,
         projectName: project?.name ?? "",
         projectKey: project?.key ?? "",
@@ -4032,9 +4103,7 @@ export const getPhaseInternal = internalQuery({
         status: issue.status,
         priority: issue.priority,
         isTopPriority: issue.isTopPriority || false,
-        dueDate: issue.dueDate
-          ? new Date(issue.dueDate).toISOString()
-          : null,
+        dueDate: issue.dueDate ? new Date(issue.dueDate).toISOString() : null,
       })),
       stats: {
         totalIssues,
@@ -4101,7 +4170,11 @@ export const createPhaseInternal = internalMutation({
 
     // Validate status
     type PhaseStatus = "not_started" | "in_progress" | "completed";
-    const validStatuses: PhaseStatus[] = ["not_started", "in_progress", "completed"];
+    const validStatuses: PhaseStatus[] = [
+      "not_started",
+      "in_progress",
+      "completed",
+    ];
     const status: PhaseStatus =
       args.status && validStatuses.includes(args.status as PhaseStatus)
         ? (args.status as PhaseStatus)
@@ -4520,8 +4593,19 @@ export const createProjectInternal = internalMutation({
     }
 
     // Validate status
-    type ProjectStatus = "planned" | "in_progress" | "paused" | "completed" | "cancelled";
-    const validStatuses: ProjectStatus[] = ["planned", "in_progress", "paused", "completed", "cancelled"];
+    type ProjectStatus =
+      | "planned"
+      | "in_progress"
+      | "paused"
+      | "completed"
+      | "cancelled";
+    const validStatuses: ProjectStatus[] = [
+      "planned",
+      "in_progress",
+      "paused",
+      "completed",
+      "cancelled",
+    ];
     const status: ProjectStatus =
       args.status && validStatuses.includes(args.status as ProjectStatus)
         ? (args.status as ProjectStatus)
@@ -4529,7 +4613,13 @@ export const createProjectInternal = internalMutation({
 
     // Validate priority
     type Priority = "urgent" | "high" | "medium" | "low" | "none";
-    const validPriorities: Priority[] = ["urgent", "high", "medium", "low", "none"];
+    const validPriorities: Priority[] = [
+      "urgent",
+      "high",
+      "medium",
+      "low",
+      "none",
+    ];
     const priority: Priority =
       args.priority && validPriorities.includes(args.priority as Priority)
         ? (args.priority as Priority)
@@ -4539,7 +4629,9 @@ export const createProjectInternal = internalMutation({
     let clientId: Id<"lifeos_pmClients"> | undefined;
     if (args.clientId) {
       try {
-        const client = await ctx.db.get(args.clientId as Id<"lifeos_pmClients">);
+        const client = await ctx.db.get(
+          args.clientId as Id<"lifeos_pmClients">,
+        );
         if (client && client.userId === userId) {
           clientId = client._id;
         }
@@ -4626,7 +4718,13 @@ export const updateProjectInternal = internalMutation({
 
     // Validate and set status
     if (args.status !== undefined) {
-      const validStatuses = ["planned", "in_progress", "paused", "completed", "cancelled"];
+      const validStatuses = [
+        "planned",
+        "in_progress",
+        "paused",
+        "completed",
+        "cancelled",
+      ];
       if (validStatuses.includes(args.status)) {
         updates.status = args.status;
       }
@@ -4652,7 +4750,9 @@ export const updateProjectInternal = internalMutation({
     if (args.clientId !== undefined) {
       if (args.clientId) {
         try {
-          const client = await ctx.db.get(args.clientId as Id<"lifeos_pmClients">);
+          const client = await ctx.db.get(
+            args.clientId as Id<"lifeos_pmClients">,
+          );
           if (client && client.userId === userId) {
             updates.clientId = client._id;
           }
@@ -4796,7 +4896,11 @@ export const getIssueInternal = internalQuery({
     if (issue.projectId) {
       const projectDoc = await ctx.db.get(issue.projectId);
       if (projectDoc) {
-        project = { id: projectDoc._id, key: projectDoc.key, name: projectDoc.name };
+        project = {
+          id: projectDoc._id,
+          key: projectDoc.key,
+          name: projectDoc.name,
+        };
       }
     }
 
@@ -4812,7 +4916,10 @@ export const getIssueInternal = internalQuery({
     if (issue.cycleId) {
       const cycleDoc = await ctx.db.get(issue.cycleId);
       if (cycleDoc) {
-        cycle = { id: cycleDoc._id, name: cycleDoc.name ?? `Cycle ${cycleDoc.number}` };
+        cycle = {
+          id: cycleDoc._id,
+          name: cycleDoc.name ?? `Cycle ${cycleDoc.number}`,
+        };
       }
     }
 
@@ -4828,7 +4935,9 @@ export const getIssueInternal = internalQuery({
         isTopPriority: issue.isTopPriority || false,
         estimate: issue.estimate,
         dueDate: issue.dueDate ? new Date(issue.dueDate).toISOString() : null,
-        completedAt: issue.completedAt ? new Date(issue.completedAt).toISOString() : null,
+        completedAt: issue.completedAt
+          ? new Date(issue.completedAt).toISOString()
+          : null,
         project,
         phase,
         cycle,
@@ -4889,12 +4998,20 @@ export const updateIssueInternal = internalMutation({
     if (args.description !== undefined) {
       updates.description = args.description.trim() || undefined;
     }
-    if (args.isTopPriority !== undefined) updates.isTopPriority = args.isTopPriority;
+    if (args.isTopPriority !== undefined)
+      updates.isTopPriority = args.isTopPriority;
 
     // Validate and set status
     const previousStatus = issue.status;
     if (args.status !== undefined) {
-      const validStatuses = ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"];
+      const validStatuses = [
+        "backlog",
+        "todo",
+        "in_progress",
+        "in_review",
+        "done",
+        "cancelled",
+      ];
       if (validStatuses.includes(args.status)) {
         updates.status = args.status;
 
@@ -4931,7 +5048,10 @@ export const updateIssueInternal = internalMutation({
             const project = await ctx.db.get(issue.projectId);
             if (project) {
               await ctx.db.patch(issue.projectId, {
-                completedIssueCount: Math.max(0, project.completedIssueCount - 1),
+                completedIssueCount: Math.max(
+                  0,
+                  project.completedIssueCount - 1,
+                ),
                 updatedAt: now,
               });
             }
@@ -5146,11 +5266,17 @@ export const getCyclesInternal = internalQuery({
     const limit = args.limit ?? 20;
 
     let cycles;
-    if (args.status === "upcoming" || args.status === "active" || args.status === "completed") {
+    if (
+      args.status === "upcoming" ||
+      args.status === "active" ||
+      args.status === "completed"
+    ) {
       cycles = await ctx.db
         .query("lifeos_pmCycles")
         .withIndex("by_user_status", (q) =>
-          q.eq("userId", userId).eq("status", args.status as "upcoming" | "active" | "completed")
+          q
+            .eq("userId", userId)
+            .eq("status", args.status as "upcoming" | "active" | "completed"),
         )
         .order("desc")
         .take(limit);
@@ -5164,9 +5290,13 @@ export const getCyclesInternal = internalQuery({
 
     const cyclesWithInfo = cycles.map((cycle) => {
       const now = Date.now();
-      const daysRemaining = cycle.status === "active"
-        ? Math.max(0, Math.ceil((cycle.endDate - now) / (24 * 60 * 60 * 1000)))
-        : null;
+      const daysRemaining =
+        cycle.status === "active"
+          ? Math.max(
+              0,
+              Math.ceil((cycle.endDate - now) / (24 * 60 * 60 * 1000)),
+            )
+          : null;
 
       return {
         id: cycle._id,
@@ -5248,9 +5378,10 @@ export const createCycleInternal = internalMutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
-    const maxNumber = existingCycles.length > 0
-      ? Math.max(...existingCycles.map((c) => c.number))
-      : 0;
+    const maxNumber =
+      existingCycles.length > 0
+        ? Math.max(...existingCycles.map((c) => c.number))
+        : 0;
 
     const number = maxNumber + 1;
 
@@ -5384,7 +5515,8 @@ export const updateCycleInternal = internalMutation({
 
     await ctx.db.patch(cycleIdTyped, updates);
 
-    const cycleName = args.name?.trim() || cycle.name || `Cycle ${cycle.number}`;
+    const cycleName =
+      args.name?.trim() || cycle.name || `Cycle ${cycle.number}`;
 
     return {
       success: true,
@@ -5458,6 +5590,317 @@ export const deleteCycleInternal = internalMutation({
   },
 });
 
+// ==================== CLOSE CYCLE TOOL ====================
+
+/**
+ * Close a cycle and optionally roll over incomplete issues to the next cycle
+ * If no rolloverIncomplete param, uses the user's autoRolloverIncompleteIssues setting
+ */
+export const closeCycleInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    cycleId: v.string(),
+    rolloverIncomplete: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const cycleIdTyped = args.cycleId as Id<"lifeos_pmCycles">;
+    const now = Date.now();
+
+    const cycle = await ctx.db.get(cycleIdTyped);
+    if (!cycle || cycle.userId !== userId) {
+      return {
+        success: false,
+        error: "Cycle not found or access denied",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (cycle.status === "completed") {
+      return {
+        success: false,
+        error: `${cycle.name ?? `Cycle ${cycle.number}`} is already completed.`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get user settings to check autoRolloverIncompleteIssues
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
+    const shouldRollover =
+      args.rolloverIncomplete ??
+      userSettings?.cycleSettings?.autoRolloverIncompleteIssues ??
+      false;
+
+    // Get all issues in this cycle
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", cycleIdTyped))
+      .collect();
+
+    const incompleteIssues = issues.filter(
+      (i) => i.status !== "done" && i.status !== "cancelled",
+    );
+    const completedIssues = issues.filter((i) => i.status === "done");
+
+    let rolledOverCount = 0;
+    let targetCycleName: string | undefined;
+
+    if (shouldRollover && incompleteIssues.length > 0) {
+      // Find next upcoming cycle
+      const upcomingCycles = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", userId).eq("status", "upcoming"),
+        )
+        .collect();
+
+      upcomingCycles.sort((a, b) => a.startDate - b.startDate);
+
+      let targetCycle: Doc<"lifeos_pmCycles"> | null =
+        upcomingCycles[0] ?? null;
+
+      // If no upcoming, check active (different from current)
+      if (!targetCycle) {
+        const activeCycles = await ctx.db
+          .query("lifeos_pmCycles")
+          .withIndex("by_user_status", (q) =>
+            q.eq("userId", userId).eq("status", "active"),
+          )
+          .collect();
+
+        targetCycle = activeCycles.find((c) => c._id !== cycleIdTyped) ?? null;
+      }
+
+      if (targetCycle) {
+        targetCycleName = targetCycle.name ?? `Cycle ${targetCycle.number}`;
+
+        for (const issue of incompleteIssues) {
+          await ctx.db.patch(issue._id, {
+            cycleId: targetCycle._id,
+            updatedAt: now,
+          });
+          rolledOverCount++;
+        }
+
+        // Update target cycle counts
+        const targetIssues = await ctx.db
+          .query("lifeos_pmIssues")
+          .withIndex("by_cycle", (q) => q.eq("cycleId", targetCycle._id))
+          .collect();
+
+        await ctx.db.patch(targetCycle._id, {
+          issueCount: targetIssues.length,
+          completedIssueCount: targetIssues.filter((i) => i.status === "done")
+            .length,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Mark cycle as completed
+    await ctx.db.patch(cycleIdTyped, {
+      status: "completed",
+      updatedAt: now,
+    });
+
+    // Update source cycle counts
+    const remainingIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", cycleIdTyped))
+      .collect();
+
+    await ctx.db.patch(cycleIdTyped, {
+      issueCount: remainingIssues.length,
+      completedIssueCount: remainingIssues.filter((i) => i.status === "done")
+        .length,
+    });
+
+    const cycleName = cycle.name ?? `Cycle ${cycle.number}`;
+
+    // Build confirmation message
+    let confirmationMessage = `Closed ${cycleName}. ${completedIssues.length} issues completed.`;
+    if (rolledOverCount > 0 && targetCycleName) {
+      confirmationMessage += ` ${rolledOverCount} incomplete issues rolled over to ${targetCycleName}.`;
+    } else if (incompleteIssues.length > 0 && !shouldRollover) {
+      confirmationMessage += ` ${incompleteIssues.length} incomplete issues remain in the closed cycle.`;
+    }
+
+    return {
+      success: true,
+      cycleId: cycleIdTyped,
+      cycleName,
+      completedIssues: completedIssues.length,
+      rolledOverCount,
+      targetCycleName,
+      incompleteRemaining: shouldRollover ? 0 : incompleteIssues.length,
+      confirmationMessage,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+// ==================== GENERATE CYCLES TOOL ====================
+
+/**
+ * Generate upcoming cycles based on user settings
+ * Uses the user's cycle settings (duration, startDay, timezone) to create cycles
+ */
+export const generateCyclesInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    count: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const userId = user._id;
+    const now = Date.now();
+
+    // Get user settings
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userSettings?.cycleSettings) {
+      return {
+        success: false,
+        error:
+          "No cycle settings configured. Please configure cycle settings first (duration, start day, etc.).",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const settings = userSettings.cycleSettings;
+    const count = args.count ?? settings.defaultCyclesToCreate ?? 4;
+    const tzOffsetMinutes = settings.timezoneOffsetMinutes ?? 0;
+    const tzOffsetMs = tzOffsetMinutes * 60 * 1000;
+
+    // Calculate duration in milliseconds
+    const durationMs =
+      settings.duration === "1_week"
+        ? 7 * 24 * 60 * 60 * 1000
+        : 14 * 24 * 60 * 60 * 1000;
+
+    // Find the latest cycle end date to start from
+    const allCycles = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    let startFrom: number | undefined;
+    if (allCycles.length > 0) {
+      const latestEndDate = Math.max(...allCycles.map((c) => c.endDate));
+      startFrom = latestEndDate + 1;
+    }
+
+    // Find next start date based on startDay (in user's timezone)
+    let startDate = startFrom ?? now;
+    const targetDayNum = settings.startDay === "sunday" ? 0 : 1;
+
+    const localTimeMs = startDate + tzOffsetMs;
+    const currentDate = new Date(localTimeMs);
+    const currentDay = currentDate.getUTCDay();
+    const daysUntilTarget = (targetDayNum - currentDay + 7) % 7;
+
+    if (daysUntilTarget === 0 && !startFrom) {
+      startDate += 7 * 24 * 60 * 60 * 1000;
+    } else if (daysUntilTarget > 0) {
+      startDate += daysUntilTarget * 24 * 60 * 60 * 1000;
+    }
+
+    // Normalize to midnight in USER's timezone
+    const localStartMs = startDate + tzOffsetMs;
+    const startDateObj = new Date(localStartMs);
+    startDateObj.setUTCHours(0, 0, 0, 0);
+    startDate = startDateObj.getTime() - tzOffsetMs;
+
+    // Get existing max cycle number
+    let nextNumber =
+      allCycles.reduce((max, c) => Math.max(max, c.number), 0) + 1;
+
+    // Generate cycles
+    const generated: {
+      id: string;
+      name: string;
+      startDate: string;
+      endDate: string;
+      status: string;
+    }[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const cycleStartDate = startDate + i * durationMs;
+      const cycleEndDate = cycleStartDate + durationMs - 1;
+
+      let status: "upcoming" | "active" | "completed" = "upcoming";
+      if (now >= cycleStartDate && now <= cycleEndDate) {
+        status = "active";
+      } else if (now > cycleEndDate) {
+        status = "completed";
+      }
+
+      const number = nextNumber++;
+      const cycleId = await ctx.db.insert("lifeos_pmCycles", {
+        userId,
+        number,
+        startDate: cycleStartDate,
+        endDate: cycleEndDate,
+        status,
+        issueCount: 0,
+        completedIssueCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      generated.push({
+        id: cycleId,
+        name: `Cycle ${number}`,
+        startDate: new Date(cycleStartDate).toISOString().split("T")[0],
+        endDate: new Date(cycleEndDate).toISOString().split("T")[0],
+        status,
+      });
+    }
+
+    const confirmationMessage = `Generated ${generated.length} cycles (${settings.duration === "1_week" ? "1 week" : "2 weeks"} each, starting ${settings.startDay}s).`;
+
+    return {
+      success: true,
+      generated,
+      count: generated.length,
+      confirmationMessage,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
 // ==================== BEEPER BUSINESS CONTACTS TOOLS ====================
 
 /**
@@ -5475,7 +5918,7 @@ export const getBeeperThreadsInternal = internalQuery({
     const threads = await ctx.db
       .query("lifeos_beeperThreads")
       .withIndex("by_user_business", (q) =>
-        q.eq("userId", userId).eq("isBusinessChat", true)
+        q.eq("userId", userId).eq("isBusinessChat", true),
       )
       .order("desc")
       .take(limit);
@@ -5515,7 +5958,7 @@ export const getBeeperThreadInternal = internalQuery({
     const thread = await ctx.db
       .query("lifeos_beeperThreads")
       .withIndex("by_user_threadId", (q) =>
-        q.eq("userId", userId).eq("threadId", args.threadId)
+        q.eq("userId", userId).eq("threadId", args.threadId),
       )
       .unique();
 
@@ -5565,7 +6008,7 @@ export const getBeeperThreadMessagesInternal = internalQuery({
     const thread = await ctx.db
       .query("lifeos_beeperThreads")
       .withIndex("by_user_threadId", (q) =>
-        q.eq("userId", userId).eq("threadId", args.threadId)
+        q.eq("userId", userId).eq("threadId", args.threadId),
       )
       .unique();
 
@@ -5580,7 +6023,7 @@ export const getBeeperThreadMessagesInternal = internalQuery({
     const messages = await ctx.db
       .query("lifeos_beeperMessages")
       .withIndex("by_user_threadId", (q) =>
-        q.eq("userId", userId).eq("threadId", args.threadId)
+        q.eq("userId", userId).eq("threadId", args.threadId),
       )
       .order("desc")
       .take(limit);
@@ -5627,7 +6070,7 @@ export const searchBeeperMessagesInternal = internalQuery({
     const results = await ctx.db
       .query("lifeos_beeperMessages")
       .withSearchIndex("search_text", (q) =>
-        q.search("text", args.query).eq("userId", userId)
+        q.search("text", args.query).eq("userId", userId),
       )
       .take(limit);
 
@@ -5775,7 +6218,8 @@ export const getGranolaMeetingsInternal = internalQuery({
       hasTranscript: m.hasTranscript,
       granolaCreatedAt: m.granolaCreatedAt,
       resumeMarkdown: m.resumeMarkdown
-        ? m.resumeMarkdown.substring(0, 500) + (m.resumeMarkdown.length > 500 ? "..." : "")
+        ? m.resumeMarkdown.substring(0, 500) +
+          (m.resumeMarkdown.length > 500 ? "..." : "")
         : undefined,
       folders: m.folders,
     }));
@@ -5802,7 +6246,7 @@ export const getGranolaMeetingInternal = internalQuery({
     const meeting = await ctx.db
       .query("life_granolaMeetings")
       .withIndex("by_user_granola_doc_id", (q) =>
-        q.eq("userId", userId).eq("granolaDocId", args.granolaDocId)
+        q.eq("userId", userId).eq("granolaDocId", args.granolaDocId),
       )
       .unique();
 
@@ -5903,7 +6347,7 @@ export const searchGranolaMeetingsInternal = internalQuery({
     const titleResults = await ctx.db
       .query("life_granolaMeetings")
       .withSearchIndex("search_title", (q) =>
-        q.search("title", args.query).eq("userId", userId)
+        q.search("title", args.query).eq("userId", userId),
       )
       .take(limit);
 
@@ -5911,7 +6355,7 @@ export const searchGranolaMeetingsInternal = internalQuery({
     const resumeResults = await ctx.db
       .query("life_granolaMeetings")
       .withSearchIndex("search_resume", (q) =>
-        q.search("resumeMarkdown", args.query).eq("userId", userId)
+        q.search("resumeMarkdown", args.query).eq("userId", userId),
       )
       .take(limit);
 
@@ -5932,7 +6376,8 @@ export const searchGranolaMeetingsInternal = internalQuery({
       hasTranscript: m.hasTranscript,
       granolaCreatedAt: m.granolaCreatedAt,
       resumeMarkdown: m.resumeMarkdown
-        ? m.resumeMarkdown.substring(0, 300) + (m.resumeMarkdown.length > 300 ? "..." : "")
+        ? m.resumeMarkdown.substring(0, 300) +
+          (m.resumeMarkdown.length > 300 ? "..." : "")
         : undefined,
     }));
 
@@ -5988,10 +6433,12 @@ export const getGranolaMeetingsForPersonInternal = internalQuery({
           linkSource: link.linkSource,
           aiConfidence: link.aiConfidence,
         };
-      })
+      }),
     );
 
-    const validLinks = enrichedLinks.filter((l): l is NonNullable<typeof l> => l !== null);
+    const validLinks = enrichedLinks.filter(
+      (l): l is NonNullable<typeof l> => l !== null,
+    );
 
     return {
       success: true,
@@ -6027,7 +6474,9 @@ export const getGranolaMeetingsForThreadInternal = internalQuery({
 
     const links = await ctx.db
       .query("life_granolaMeetingLinks")
-      .withIndex("by_beeperThread", (q) => q.eq("beeperThreadId", beeperThreadId))
+      .withIndex("by_beeperThread", (q) =>
+        q.eq("beeperThreadId", beeperThreadId),
+      )
       .collect();
 
     // Enrich with meeting info
@@ -6044,10 +6493,12 @@ export const getGranolaMeetingsForThreadInternal = internalQuery({
           linkSource: link.linkSource,
           aiConfidence: link.aiConfidence,
         };
-      })
+      }),
     );
 
-    const validLinks = enrichedLinks.filter((l): l is NonNullable<typeof l> => l !== null);
+    const validLinks = enrichedLinks.filter(
+      (l): l is NonNullable<typeof l> => l !== null,
+    );
 
     return {
       success: true,
@@ -6082,7 +6533,7 @@ export const getContactDossierInternal = internalQuery({
       const results = await ctx.db
         .query("lifeos_frmPeople")
         .withSearchIndex("search_name", (q) =>
-          q.search("name", args.nameQuery!).eq("userId", userId)
+          q.search("name", args.nameQuery!).eq("userId", userId),
         )
         .take(1);
       person = results[0] ?? null;
@@ -6125,7 +6576,7 @@ export const getContactDossierInternal = internalQuery({
       ctx.db
         .query("lifeos_beeperThreads")
         .withIndex("by_linkedPerson", (q) =>
-          q.eq("linkedPersonId", person!._id)
+          q.eq("linkedPersonId", person!._id),
         )
         .collect(),
 
@@ -6211,12 +6662,12 @@ export const getContactDossierInternal = internalQuery({
           resumeMarkdown,
           calendarEvent,
         };
-      })
+      }),
     );
 
     // Enrich Fathom meetings from unified links
     const fathomLinks = unifiedMeetingLinks.filter(
-      (l) => l.meetingSource === "fathom"
+      (l) => l.meetingSource === "fathom",
     );
     const fathomMeetings = await Promise.all(
       fathomLinks.map(async (link) => {
@@ -6239,7 +6690,7 @@ export const getContactDossierInternal = internalQuery({
           calendarInvitees: meeting.calendarInvitees,
           fathomUrl: meeting.fathomUrl,
         };
-      })
+      }),
     );
 
     // Enrich voice memos
@@ -6258,7 +6709,7 @@ export const getContactDossierInternal = internalQuery({
           context: link.context,
           createdAt: memo.createdAt,
         };
-      })
+      }),
     );
 
     return {
@@ -6298,13 +6749,13 @@ export const getContactDossierInternal = internalQuery({
         lastMessageAt: t.lastMessageAt,
       })),
       granolaMeetings: granolaMeetings.filter(
-        (m): m is NonNullable<typeof m> => m !== null
+        (m): m is NonNullable<typeof m> => m !== null,
       ),
       fathomMeetings: fathomMeetings.filter(
-        (m): m is NonNullable<typeof m> => m !== null
+        (m): m is NonNullable<typeof m> => m !== null,
       ),
       voiceMemos: voiceMemos.filter(
-        (m): m is NonNullable<typeof m> => m !== null
+        (m): m is NonNullable<typeof m> => m !== null,
       ),
       generatedAt: new Date().toISOString(),
     };
@@ -6357,11 +6808,11 @@ export const getMeetingCalendarLinksInternal = internalQuery({
             responseStatus: a.responseStatus,
           })),
         };
-      })
+      }),
     );
 
     const validEvents = calendarEvents.filter(
-      (e): e is NonNullable<typeof e> => e !== null
+      (e): e is NonNullable<typeof e> => e !== null,
     );
 
     return {
@@ -6389,7 +6840,9 @@ async function cascadeGranolaMeetingLinks(
 ): Promise<number> {
   const meetingLinks = await ctx.db
     .query("life_granolaMeetingLinks")
-    .withIndex("by_beeperThread", (q) => q.eq("beeperThreadId", beeperThreadConvexId))
+    .withIndex("by_beeperThread", (q) =>
+      q.eq("beeperThreadId", beeperThreadConvexId),
+    )
     .collect();
 
   let created = 0;
@@ -6436,12 +6889,12 @@ export const syncBeeperContactsToFrmInternal = internalMutation({
     const allThreads = await ctx.db
       .query("lifeos_beeperThreads")
       .withIndex("by_user_business", (q) =>
-        q.eq("userId", userId).eq("isBusinessChat", true)
+        q.eq("userId", userId).eq("isBusinessChat", true),
       )
       .collect();
 
     const unlinkedDmThreads = allThreads.filter(
-      (t) => t.threadType === "dm" && !t.linkedPersonId
+      (t) => t.threadType === "dm" && !t.linkedPersonId,
     );
 
     if (unlinkedDmThreads.length === 0) {
@@ -6492,7 +6945,10 @@ export const syncBeeperContactsToFrmInternal = internalMutation({
       });
 
       // Link thread to person
-      await ctx.db.patch(thread._id, { linkedPersonId: personId, updatedAt: now });
+      await ctx.db.patch(thread._id, {
+        linkedPersonId: personId,
+        updatedAt: now,
+      });
 
       // Cascade Granola meeting links
       const meetingLinksCreated = await cascadeGranolaMeetingLinks(
@@ -6540,7 +6996,7 @@ export const linkBeeperThreadToPersonInternal = internalMutation({
     const thread = await ctx.db
       .query("lifeos_beeperThreads")
       .withIndex("by_user_threadId", (q) =>
-        q.eq("userId", userId).eq("threadId", args.threadId)
+        q.eq("userId", userId).eq("threadId", args.threadId),
       )
       .first();
 
@@ -6567,7 +7023,7 @@ export const linkBeeperThreadToPersonInternal = internalMutation({
     if (args.personId) {
       // Link to existing person — verify ownership
       const existingPerson = await ctx.db.get(
-        args.personId as Id<"lifeos_frmPeople">
+        args.personId as Id<"lifeos_frmPeople">,
       );
       if (!existingPerson || existingPerson.userId !== userId) {
         return {
@@ -6579,10 +7035,23 @@ export const linkBeeperThreadToPersonInternal = internalMutation({
       personId = existingPerson._id;
     } else {
       // Create new person
-      const validTypes = ["family", "friend", "colleague", "acquaintance", "mentor", "other"];
+      const validTypes = [
+        "family",
+        "friend",
+        "colleague",
+        "acquaintance",
+        "mentor",
+        "other",
+      ];
       const relationshipType =
         args.relationshipType && validTypes.includes(args.relationshipType)
-          ? (args.relationshipType as "family" | "friend" | "colleague" | "acquaintance" | "mentor" | "other")
+          ? (args.relationshipType as
+              | "family"
+              | "friend"
+              | "colleague"
+              | "acquaintance"
+              | "mentor"
+              | "other")
           : "colleague";
 
       const name = args.personName?.trim() || thread.threadName;
@@ -6598,7 +7067,10 @@ export const linkBeeperThreadToPersonInternal = internalMutation({
     }
 
     // Link thread to person
-    await ctx.db.patch(thread._id, { linkedPersonId: personId, updatedAt: now });
+    await ctx.db.patch(thread._id, {
+      linkedPersonId: personId,
+      updatedAt: now,
+    });
 
     // Cascade Granola meeting links
     const meetingLinksCreated = await cascadeGranolaMeetingLinks(
@@ -6615,7 +7087,7 @@ export const linkBeeperThreadToPersonInternal = internalMutation({
       personId: personId as string,
       personName: args.personId
         ? (await ctx.db.get(personId))?.name
-        : (args.personName?.trim() || thread.threadName),
+        : args.personName?.trim() || thread.threadName,
       meetingLinksCreated,
       confirmationMessage: `Linked thread "${thread.threadName}" to ${args.personId ? "existing" : "new"} contact${meetingLinksCreated > 0 ? ` (${meetingLinksCreated} Granola meeting link(s) cascaded)` : ""}`,
       generatedAt: new Date().toISOString(),
@@ -6638,7 +7110,7 @@ export const getBusinessContactsInternal = internalQuery({
     const threads = await ctx.db
       .query("lifeos_beeperThreads")
       .withIndex("by_user_business", (q) =>
-        q.eq("userId", userId).eq("isBusinessChat", true)
+        q.eq("userId", userId).eq("isBusinessChat", true),
       )
       .order("desc")
       .collect();
@@ -6665,7 +7137,9 @@ export const getBusinessContactsInternal = internalQuery({
         // Count linked Granola meetings
         const granolaLinks = await ctx.db
           .query("life_granolaMeetingLinks")
-          .withIndex("by_beeperThread", (q) => q.eq("beeperThreadId", thread._id))
+          .withIndex("by_beeperThread", (q) =>
+            q.eq("beeperThreadId", thread._id),
+          )
           .collect();
 
         return {
@@ -6682,7 +7156,7 @@ export const getBusinessContactsInternal = internalQuery({
           granolaLinkCount: granolaLinks.length,
           businessNote: thread.businessNote,
         };
-      })
+      }),
     );
 
     return {
@@ -6707,7 +7181,7 @@ export const getMergeSuggestionsInternal = internalQuery({
     const suggestions = await ctx.db
       .query("lifeos_frmMergeSuggestions")
       .withIndex("by_user_status", (q) =>
-        q.eq("userId", userId).eq("status", "pending")
+        q.eq("userId", userId).eq("status", "pending"),
       )
       .collect();
 
@@ -6741,7 +7215,7 @@ export const getMergeSuggestionsInternal = internalQuery({
           },
           createdAt: suggestion.createdAt,
         };
-      })
+      }),
     );
 
     return {
@@ -6815,7 +7289,9 @@ export const acceptMergeSuggestionInternal = internalMutation({
     // Re-link memos from source to target
     const memos = await ctx.db
       .query("lifeos_frmPersonMemos")
-      .withIndex("by_person", (q) => q.eq("personId", suggestion.sourcePersonId))
+      .withIndex("by_person", (q) =>
+        q.eq("personId", suggestion.sourcePersonId),
+      )
       .collect();
     for (const memo of memos) {
       await ctx.db.patch(memo._id, { personId: suggestion.targetPersonId });
@@ -6828,7 +7304,10 @@ export const acceptMergeSuggestionInternal = internalMutation({
       .filter((q) => q.eq(q.field("linkedPersonId"), suggestion.sourcePersonId))
       .collect();
     for (const thread of threads) {
-      await ctx.db.patch(thread._id, { linkedPersonId: suggestion.targetPersonId, updatedAt: now });
+      await ctx.db.patch(thread._id, {
+        linkedPersonId: suggestion.targetPersonId,
+        updatedAt: now,
+      });
     }
 
     // Archive source person
@@ -6898,7 +7377,7 @@ export const dismissAllMergeSuggestionsInternal = internalMutation({
     const suggestions = await ctx.db
       .query("lifeos_frmMergeSuggestions")
       .withIndex("by_user_status", (q) =>
-        q.eq("userId", userId).eq("status", "pending")
+        q.eq("userId", userId).eq("status", "pending"),
       )
       .collect();
 
@@ -6961,7 +7440,9 @@ export const unlinkMeetingFromBusinessContactInternal = internalMutation({
       if (thread.linkedPersonId) {
         const personLinks = await ctx.db
           .query("life_granolaMeetingPersonLinks")
-          .withIndex("by_person", (q) => q.eq("personId", thread.linkedPersonId!))
+          .withIndex("by_person", (q) =>
+            q.eq("personId", thread.linkedPersonId!),
+          )
           .collect();
 
         for (const link of personLinks) {
@@ -6974,7 +7455,9 @@ export const unlinkMeetingFromBusinessContactInternal = internalMutation({
         const unifiedLinks = await ctx.db
           .query("lifeos_meetingPersonLinks")
           .withIndex("by_person_source", (q) =>
-            q.eq("personId", thread.linkedPersonId!).eq("meetingSource", "granola")
+            q
+              .eq("personId", thread.linkedPersonId!)
+              .eq("meetingSource", "granola"),
           )
           .collect();
 
@@ -6991,7 +7474,9 @@ export const unlinkMeetingFromBusinessContactInternal = internalMutation({
       const unifiedLinks = await ctx.db
         .query("lifeos_meetingPersonLinks")
         .withIndex("by_person_source", (q) =>
-          q.eq("personId", thread.linkedPersonId!).eq("meetingSource", "fathom")
+          q
+            .eq("personId", thread.linkedPersonId!)
+            .eq("meetingSource", "fathom"),
         )
         .collect();
 
