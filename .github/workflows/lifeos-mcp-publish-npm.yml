@@ -7,6 +7,7 @@ on:
       - "packages/lifeos-mcp/src/**"
       - "packages/lifeos-mcp/package.json"
       - "packages/lifeos-mcp/tsconfig.json"
+      - "packages/holaaiconvex/convex/lifeos/**"
       - ".github/workflows/lifeos-mcp-publish-npm.yml"
   workflow_dispatch: # Manual trigger
 
@@ -18,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # Needed to push version bump
-      id-token: write # Needed for npm trusted publishing (OIDC)
 
     steps:
       - name: Checkout
@@ -29,11 +29,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
           registry-url: "https://registry.npmjs.org"
-
-      - name: Ensure latest npm (trusted publishing needs npm >=11.5.1)
-        run: npm install -g npm@latest
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -60,7 +57,9 @@ jobs:
 
       - name: Publish to npm
         working-directory: ${{ env.PKG_DIR }}
-        run: npm publish --access public --provenance
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit version bump
         run: |
