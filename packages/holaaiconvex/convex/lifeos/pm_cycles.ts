@@ -2,12 +2,15 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "../_generated/server";
 import { requireUser } from "../_lib/auth";
 import { Doc, Id } from "../_generated/dataModel";
-import {
-  cycleStatusValidator,
-  cycleRetrospectiveValidator,
-} from "./pm_schema";
+import { cycleStatusValidator, cycleRetrospectiveValidator } from "./pm_schema";
 
-type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled";
+type IssueStatus =
+  | "backlog"
+  | "todo"
+  | "in_progress"
+  | "in_review"
+  | "done"
+  | "cancelled";
 
 // ==================== QUERIES ====================
 
@@ -37,7 +40,7 @@ export const getCycles = query({
       cycles = await ctx.db
         .query("lifeos_pmCycles")
         .withIndex("by_user_status", (q) =>
-          q.eq("userId", user._id).eq("status", args.status!)
+          q.eq("userId", user._id).eq("status", args.status!),
         )
         .order("desc")
         .take(limit);
@@ -66,14 +69,12 @@ export const getCurrentCycle = query({
     let activeCycles = await ctx.db
       .query("lifeos_pmCycles")
       .withIndex("by_user_status", (q) =>
-        q.eq("userId", user._id).eq("status", "active")
+        q.eq("userId", user._id).eq("status", "active"),
       )
       .collect();
 
     if (args.projectId) {
-      activeCycles = activeCycles.filter(
-        (c) => c.projectId === args.projectId
-      );
+      activeCycles = activeCycles.filter((c) => c.projectId === args.projectId);
     }
 
     // Return the most recently started active cycle
@@ -96,7 +97,7 @@ export const getUpcomingCycles = query({
     let cycles = await ctx.db
       .query("lifeos_pmCycles")
       .withIndex("by_user_status", (q) =>
-        q.eq("userId", user._id).eq("status", "upcoming")
+        q.eq("userId", user._id).eq("status", "upcoming"),
       )
       .take(limit);
 
@@ -191,11 +192,11 @@ export const getCycleWithBreakdowns = query({
     // Calculate stats
     const scopeCount = userIssues.length;
     const startedCount = userIssues.filter(
-      (i) => i.status === "in_progress" || i.status === "in_review"
+      (i) => i.status === "in_progress" || i.status === "in_review",
     ).length;
     const completedCount = userIssues.filter((i) => i.status === "done").length;
     const todoCount = userIssues.filter(
-      (i) => i.status === "backlog" || i.status === "todo"
+      (i) => i.status === "backlog" || i.status === "todo",
     ).length;
 
     // Calculate weekdays remaining
@@ -238,7 +239,8 @@ export const getCycleWithBreakdowns = query({
       none: 0,
     };
     for (const issue of userIssues) {
-      priorityCounts[issue.priority] = (priorityCounts[issue.priority] || 0) + 1;
+      priorityCounts[issue.priority] =
+        (priorityCounts[issue.priority] || 0) + 1;
     }
     const byPriority = Object.entries(priorityCounts)
       .filter(([_, count]) => count > 0)
@@ -249,7 +251,10 @@ export const getCycleWithBreakdowns = query({
       }));
 
     // Group by label
-    const labelCounts: Map<string, { labelId: Id<"lifeos_pmLabels">; count: number }> = new Map();
+    const labelCounts: Map<
+      string,
+      { labelId: Id<"lifeos_pmLabels">; count: number }
+    > = new Map();
     for (const issue of userIssues) {
       for (const labelId of issue.labelIds) {
         const existing = labelCounts.get(labelId);
@@ -272,11 +277,14 @@ export const getCycleWithBreakdowns = query({
           count,
           percent: scopeCount > 0 ? Math.round((count / scopeCount) * 100) : 0,
         };
-      })
+      }),
     );
 
     // Group by project
-    const projectCounts: Map<string, { projectId: Id<"lifeos_pmProjects">; count: number }> = new Map();
+    const projectCounts: Map<
+      string,
+      { projectId: Id<"lifeos_pmProjects">; count: number }
+    > = new Map();
     const noProjectCount = userIssues.filter((i) => !i.projectId).length;
 
     for (const issue of userIssues) {
@@ -285,7 +293,10 @@ export const getCycleWithBreakdowns = query({
         if (existing) {
           existing.count++;
         } else {
-          projectCounts.set(issue.projectId, { projectId: issue.projectId, count: 1 });
+          projectCounts.set(issue.projectId, {
+            projectId: issue.projectId,
+            count: 1,
+          });
         }
       }
     }
@@ -301,7 +312,7 @@ export const getCycleWithBreakdowns = query({
           count,
           percent: scopeCount > 0 ? Math.round((count / scopeCount) * 100) : 0,
         };
-      })
+      }),
     );
 
     // Add "No project" entry if there are unassigned issues
@@ -311,7 +322,8 @@ export const getCycleWithBreakdowns = query({
         projectName: "No project",
         color: undefined,
         count: noProjectCount,
-        percent: scopeCount > 0 ? Math.round((noProjectCount / scopeCount) * 100) : 0,
+        percent:
+          scopeCount > 0 ? Math.round((noProjectCount / scopeCount) * 100) : 0,
       });
     }
 
@@ -325,8 +337,10 @@ export const getCycleWithBreakdowns = query({
         completedCount,
         todoCount,
         weekdaysLeft,
-        capacityPercent: scopeCount > 0 ? Math.round((completedCount / scopeCount) * 100) : 0,
-        startedPercent: scopeCount > 0 ? Math.round((startedCount / scopeCount) * 100) : 0,
+        capacityPercent:
+          scopeCount > 0 ? Math.round((completedCount / scopeCount) * 100) : 0,
+        startedPercent:
+          scopeCount > 0 ? Math.round((startedCount / scopeCount) * 100) : 0,
       },
       breakdowns: {
         byPriority,
@@ -371,7 +385,7 @@ export const createCycle = mutation({
 
     const maxNumber = existingCycles.reduce(
       (max, c) => Math.max(max, c.number),
-      0
+      0,
     );
 
     // Determine status based on dates
@@ -536,7 +550,7 @@ export const updateCycleCounts = mutation({
 
     const issueCount = allIssues.length;
     const completedIssueCount = allIssues.filter(
-      (i) => i.status === "done"
+      (i) => i.status === "done",
     ).length;
 
     await ctx.db.patch(args.cycleId, {
@@ -679,7 +693,7 @@ export const ensureUpcomingCycles = mutation({
     const upcomingCycles = await ctx.db
       .query("lifeos_pmCycles")
       .withIndex("by_user_status", (q) =>
-        q.eq("userId", user._id).eq("status", "upcoming")
+        q.eq("userId", user._id).eq("status", "upcoming"),
       )
       .collect();
 
@@ -776,7 +790,252 @@ export const ensureUpcomingCycles = mutation({
   },
 });
 
+// ==================== CLOSE CYCLE WITH ROLLOVER ====================
+
+/**
+ * Close a cycle and optionally roll over incomplete issues to the next cycle.
+ * - Sets cycle status to "completed"
+ * - If rolloverIncomplete is true (or user setting autoRolloverIncompleteIssues is true),
+ *   moves all non-done/non-cancelled issues to the next upcoming cycle
+ * - Updates issue counts on both old and new cycles
+ */
+export const closeCycle = mutation({
+  args: {
+    cycleId: v.id("lifeos_pmCycles"),
+    rolloverIncomplete: v.optional(v.boolean()), // Override user setting
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle || cycle.userId !== user._id) {
+      throw new Error("Cycle not found or access denied");
+    }
+
+    if (cycle.status === "completed") {
+      throw new Error("Cycle is already completed");
+    }
+
+    // Get user settings to check autoRolloverIncompleteIssues
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    const shouldRollover =
+      args.rolloverIncomplete ??
+      userSettings?.cycleSettings?.autoRolloverIncompleteIssues ??
+      false;
+
+    // Get all issues in this cycle
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .collect();
+
+    const incompleteIssues = issues.filter(
+      (i) => i.status !== "done" && i.status !== "cancelled",
+    );
+
+    let rolledOverCount = 0;
+    let targetCycleName: string | undefined;
+
+    if (shouldRollover && incompleteIssues.length > 0) {
+      // Find next upcoming or active cycle to roll into
+      const upcomingCycles = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", user._id).eq("status", "upcoming"),
+        )
+        .collect();
+
+      // Sort by start date (soonest first)
+      upcomingCycles.sort((a, b) => a.startDate - b.startDate);
+
+      let targetCycle: Doc<"lifeos_pmCycles"> | null =
+        upcomingCycles[0] ?? null;
+
+      // If no upcoming cycle, check for active cycle (different from current)
+      if (!targetCycle) {
+        const activeCycles = await ctx.db
+          .query("lifeos_pmCycles")
+          .withIndex("by_user_status", (q) =>
+            q.eq("userId", user._id).eq("status", "active"),
+          )
+          .collect();
+
+        targetCycle = activeCycles.find((c) => c._id !== args.cycleId) ?? null;
+      }
+
+      if (targetCycle) {
+        targetCycleName = targetCycle.name ?? `Cycle ${targetCycle.number}`;
+
+        // Move incomplete issues to target cycle
+        for (const issue of incompleteIssues) {
+          await ctx.db.patch(issue._id, {
+            cycleId: targetCycle._id,
+            updatedAt: now,
+          });
+          rolledOverCount++;
+        }
+
+        // Update target cycle counts
+        const targetIssues = await ctx.db
+          .query("lifeos_pmIssues")
+          .withIndex("by_cycle", (q) => q.eq("cycleId", targetCycle._id))
+          .collect();
+
+        await ctx.db.patch(targetCycle._id, {
+          issueCount: targetIssues.length,
+          completedIssueCount: targetIssues.filter((i) => i.status === "done")
+            .length,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Mark cycle as completed
+    await ctx.db.patch(args.cycleId, {
+      status: "completed",
+      updatedAt: now,
+    });
+
+    // Update source cycle counts (only done/cancelled issues remain)
+    const remainingIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .collect();
+
+    await ctx.db.patch(args.cycleId, {
+      issueCount: remainingIssues.length,
+      completedIssueCount: remainingIssues.filter((i) => i.status === "done")
+        .length,
+    });
+
+    return {
+      cycleId: args.cycleId,
+      status: "completed",
+      rolledOverCount,
+      targetCycleName,
+    };
+  },
+});
+
 // ==================== INTERNAL MUTATIONS (for cron jobs) ====================
+
+/**
+ * Internal: Close a cycle for a user (called by cron job)
+ * Performs the same logic as closeCycle but without auth (uses userId directly)
+ */
+export const _closeCycleForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    cycleId: v.id("lifeos_pmCycles"),
+    rolloverIncomplete: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle || cycle.userId !== args.userId) {
+      return { success: false, reason: "cycle_not_found" };
+    }
+
+    if (cycle.status === "completed") {
+      return { success: false, reason: "already_completed" };
+    }
+
+    // Get all issues in this cycle
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .collect();
+
+    const incompleteIssues = issues.filter(
+      (i) => i.status !== "done" && i.status !== "cancelled",
+    );
+
+    let rolledOverCount = 0;
+    let targetCycleId: string | undefined;
+
+    if (args.rolloverIncomplete && incompleteIssues.length > 0) {
+      // Find next upcoming cycle
+      const upcomingCycles = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", args.userId).eq("status", "upcoming"),
+        )
+        .collect();
+
+      upcomingCycles.sort((a, b) => a.startDate - b.startDate);
+
+      let targetCycle: Doc<"lifeos_pmCycles"> | null =
+        upcomingCycles[0] ?? null;
+
+      // If no upcoming, check active (different from current)
+      if (!targetCycle) {
+        const activeCycles = await ctx.db
+          .query("lifeos_pmCycles")
+          .withIndex("by_user_status", (q) =>
+            q.eq("userId", args.userId).eq("status", "active"),
+          )
+          .collect();
+
+        targetCycle = activeCycles.find((c) => c._id !== args.cycleId) ?? null;
+      }
+
+      if (targetCycle) {
+        targetCycleId = targetCycle._id;
+
+        for (const issue of incompleteIssues) {
+          await ctx.db.patch(issue._id, {
+            cycleId: targetCycle._id,
+            updatedAt: now,
+          });
+          rolledOverCount++;
+        }
+
+        // Update target cycle counts
+        const targetIssues = await ctx.db
+          .query("lifeos_pmIssues")
+          .withIndex("by_cycle", (q) => q.eq("cycleId", targetCycle._id))
+          .collect();
+
+        await ctx.db.patch(targetCycle._id, {
+          issueCount: targetIssues.length,
+          completedIssueCount: targetIssues.filter((i) => i.status === "done")
+            .length,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Mark cycle as completed
+    await ctx.db.patch(args.cycleId, {
+      status: "completed",
+      updatedAt: now,
+    });
+
+    // Update source cycle counts
+    const remainingIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .collect();
+
+    await ctx.db.patch(args.cycleId, {
+      issueCount: remainingIssues.length,
+      completedIssueCount: remainingIssues.filter((i) => i.status === "done")
+        .length,
+    });
+
+    return {
+      success: true,
+      rolledOverCount,
+      targetCycleId,
+    };
+  },
+});
 
 /**
  * Internal: Process a single user for cycle auto-generation
@@ -828,7 +1087,9 @@ export const _autoGenerateCyclesForUser = internalMutation({
 
     // Count upcoming cycles (after status update)
     const upcomingCycles = allCycles.filter(
-      (c) => now < c.startDate || (now >= c.startDate && now <= c.endDate && c.status !== "completed")
+      (c) =>
+        now < c.startDate ||
+        (now >= c.startDate && now <= c.endDate && c.status !== "completed"),
     );
     const actualUpcoming = upcomingCycles.filter((c) => now < c.startDate);
 
@@ -923,13 +1184,47 @@ export const _autoGenerateCyclesForUser = internalMutation({
 export const _getUsersWithCycleSettings = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const allSettings = await ctx.db
-      .query("lifeos_pmUserSettings")
-      .collect();
+    const allSettings = await ctx.db.query("lifeos_pmUserSettings").collect();
 
     // Return user IDs that have cycle settings configured
-    return allSettings
-      .filter((s) => s.cycleSettings)
-      .map((s) => s.userId);
+    return allSettings.filter((s) => s.cycleSettings).map((s) => s.userId);
+  },
+});
+
+/**
+ * Internal: Get expired active cycles for a user (endDate < now but status still "active")
+ * Used by the cron job to find cycles that need to be closed with rollover
+ */
+export const _getExpiredActiveCyclesForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    const activeCycles = await ctx.db
+      .query("lifeos_pmCycles")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", args.userId).eq("status", "active"),
+      )
+      .collect();
+
+    // Return cycles whose endDate has passed
+    const expired = activeCycles.filter((c) => now > c.endDate);
+
+    // Get user settings to check rollover preference
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    const autoRollover =
+      userSettings?.cycleSettings?.autoRolloverIncompleteIssues ?? false;
+
+    return expired.map((c) => ({
+      cycleId: c._id,
+      userId: args.userId,
+      autoRollover,
+    }));
   },
 });

@@ -168,7 +168,8 @@ const TOOLS: Tool[] = [
         },
         clientId: {
           type: "string",
-          description: "Associate with a client ID, or empty to unlink (optional)",
+          description:
+            "Associate with a client ID, or empty to unlink (optional)",
         },
       },
       required: ["projectIdOrKey"],
@@ -284,7 +285,8 @@ const TOOLS: Tool[] = [
         },
         phaseId: {
           type: "string",
-          description: "Assign to a specific phase within the project (optional)",
+          description:
+            "Assign to a specific phase within the project (optional)",
         },
       },
       required: ["title"],
@@ -353,7 +355,14 @@ const TOOLS: Tool[] = [
         },
         status: {
           type: "string",
-          enum: ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"],
+          enum: [
+            "backlog",
+            "todo",
+            "in_progress",
+            "in_review",
+            "done",
+            "cancelled",
+          ],
           description: "Updated status (optional)",
         },
         priority: {
@@ -433,8 +442,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_cycles",
-    description:
-      "Get all cycles/sprints for the user with stats and progress.",
+    description: "Get all cycles/sprints for the user with stats and progress.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -542,6 +550,49 @@ const TOOLS: Tool[] = [
       required: ["cycleId"],
     },
   },
+  {
+    name: "close_cycle",
+    description:
+      "Close/complete a cycle. Optionally rolls over incomplete issues (not done/cancelled) to the next upcoming cycle. If rolloverIncomplete is not specified, uses the user's autoRolloverIncompleteIssues setting.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        cycleId: {
+          type: "string",
+          description: "Cycle ID to close (required)",
+        },
+        rolloverIncomplete: {
+          type: "boolean",
+          description:
+            "If true, move incomplete issues to the next cycle. If omitted, uses user's auto-rollover setting.",
+        },
+      },
+      required: ["cycleId"],
+    },
+  },
+  {
+    name: "generate_cycles",
+    description:
+      "Generate upcoming cycles based on the user's cycle settings (duration, start day, timezone). Creates cycles starting after the latest existing cycle.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        count: {
+          type: "number",
+          description:
+            "Number of cycles to generate (optional, defaults to user's defaultCyclesToCreate setting)",
+        },
+      },
+    },
+  },
 
   // Agenda Tools
   {
@@ -593,15 +644,15 @@ const TOOLS: Tool[] = [
         },
         monthStartDate: {
           type: "string",
-          description: "First day of month in ISO format like '2024-01-01' (optional, default: current month)",
+          description:
+            "First day of month in ISO format like '2024-01-01' (optional, default: current month)",
         },
       },
     },
   },
   {
     name: "regenerate_daily_summary",
-    description:
-      "Regenerate the AI summary for a specific day.",
+    description: "Regenerate the AI summary for a specific day.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -615,7 +666,8 @@ const TOOLS: Tool[] = [
         },
         model: {
           type: "string",
-          description: "AI model to use (optional, default: openai/gpt-4o-mini)",
+          description:
+            "AI model to use (optional, default: openai/gpt-4o-mini)",
         },
       },
       required: ["date"],
@@ -623,8 +675,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "regenerate_weekly_summary",
-    description:
-      "Regenerate the AI summary for a specific week.",
+    description: "Regenerate the AI summary for a specific week.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -634,11 +685,13 @@ const TOOLS: Tool[] = [
         },
         weekStartDate: {
           type: "string",
-          description: "Monday of the week in ISO format like '2024-01-15' (required)",
+          description:
+            "Monday of the week in ISO format like '2024-01-15' (required)",
         },
         model: {
           type: "string",
-          description: "AI model to use (optional, default: openai/gpt-4o-mini)",
+          description:
+            "AI model to use (optional, default: openai/gpt-4o-mini)",
         },
       },
       required: ["weekStartDate"],
@@ -646,8 +699,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "regenerate_monthly_summary",
-    description:
-      "Regenerate the AI summary for a specific month.",
+    description: "Regenerate the AI summary for a specific month.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -657,11 +709,13 @@ const TOOLS: Tool[] = [
         },
         monthStartDate: {
           type: "string",
-          description: "First day of month in ISO format like '2024-01-01' (required)",
+          description:
+            "First day of month in ISO format like '2024-01-01' (required)",
         },
         model: {
           type: "string",
-          description: "AI model to use (optional, default: openai/gpt-4o-mini)",
+          description:
+            "AI model to use (optional, default: openai/gpt-4o-mini)",
         },
       },
       required: ["monthStartDate"],
@@ -680,11 +734,13 @@ const TOOLS: Tool[] = [
         },
         weekStartDate: {
           type: "string",
-          description: "Monday of the week in ISO format like '2024-01-15' (required)",
+          description:
+            "Monday of the week in ISO format like '2024-01-15' (required)",
         },
         customPrompt: {
           type: "string",
-          description: "Custom prompt template for AI summary generation (required)",
+          description:
+            "Custom prompt template for AI summary generation (required)",
         },
       },
       required: ["weekStartDate", "customPrompt"],
@@ -703,11 +759,13 @@ const TOOLS: Tool[] = [
         },
         monthStartDate: {
           type: "string",
-          description: "First day of month in ISO format like '2024-01-01' (required)",
+          description:
+            "First day of month in ISO format like '2024-01-01' (required)",
         },
         customPrompt: {
           type: "string",
-          description: "Custom prompt template for AI summary generation (required)",
+          description:
+            "Custom prompt template for AI summary generation (required)",
         },
       },
       required: ["monthStartDate", "customPrompt"],
@@ -862,7 +920,8 @@ const TOOLS: Tool[] = [
         labels: {
           type: "array",
           items: { type: "string" },
-          description: "Labels to search for (required). Matches are fuzzy/partial.",
+          description:
+            "Labels to search for (required). Matches are fuzzy/partial.",
         },
         limit: {
           type: "number",
@@ -905,17 +964,20 @@ const TOOLS: Tool[] = [
         },
         summary: {
           type: "string",
-          description: "The main summary/insights from the conversation (required)",
+          description:
+            "The main summary/insights from the conversation (required)",
         },
         keyInsights: {
           type: "array",
           items: { type: "string" },
-          description: "Key insights extracted from the conversation (optional)",
+          description:
+            "Key insights extracted from the conversation (optional)",
         },
         actionItems: {
           type: "array",
           items: { type: "string" },
-          description: "Action items that emerged from the conversation (optional)",
+          description:
+            "Action items that emerged from the conversation (optional)",
         },
         ideas: {
           type: "array",
@@ -930,7 +992,8 @@ const TOOLS: Tool[] = [
         relatedMemoIds: {
           type: "array",
           items: { type: "string" },
-          description: "IDs of voice memos discussed in this conversation (optional)",
+          description:
+            "IDs of voice memos discussed in this conversation (optional)",
         },
         summaryType: {
           type: "string",
@@ -939,7 +1002,8 @@ const TOOLS: Tool[] = [
         },
         conversationContext: {
           type: "string",
-          description: "The topic/context of the conversation that led to this summary (optional)",
+          description:
+            "The topic/context of the conversation that led to this summary (optional)",
         },
       },
       required: ["title", "summary"],
@@ -1088,7 +1152,14 @@ const TOOLS: Tool[] = [
         },
         relationshipType: {
           type: "string",
-          enum: ["family", "friend", "colleague", "acquaintance", "mentor", "other"],
+          enum: [
+            "family",
+            "friend",
+            "colleague",
+            "acquaintance",
+            "mentor",
+            "other",
+          ],
           description: "Filter by relationship type",
         },
         includeArchived: {
@@ -1208,7 +1279,14 @@ const TOOLS: Tool[] = [
         },
         relationshipType: {
           type: "string",
-          enum: ["family", "friend", "colleague", "acquaintance", "mentor", "other"],
+          enum: [
+            "family",
+            "friend",
+            "colleague",
+            "acquaintance",
+            "mentor",
+            "other",
+          ],
           description: "Relationship type (optional)",
         },
         avatarEmoji: {
@@ -1247,7 +1325,14 @@ const TOOLS: Tool[] = [
         },
         relationshipType: {
           type: "string",
-          enum: ["family", "friend", "colleague", "acquaintance", "mentor", "other"],
+          enum: [
+            "family",
+            "friend",
+            "colleague",
+            "acquaintance",
+            "mentor",
+            "other",
+          ],
           description: "Updated relationship type (optional)",
         },
         email: {
@@ -1286,7 +1371,8 @@ const TOOLS: Tool[] = [
         },
         context: {
           type: "string",
-          description: "Context for the link, e.g., 'Phone call', 'Coffee meetup' (optional)",
+          description:
+            "Context for the link, e.g., 'Phone call', 'Coffee meetup' (optional)",
         },
       },
       required: ["personId", "voiceMemoId"],
@@ -1315,8 +1401,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_client",
-    description:
-      "Get a single client's details with project statistics.",
+    description: "Get a single client's details with project statistics.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1406,8 +1491,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "delete_client",
-    description:
-      "Delete a client. Projects are unlinked (not deleted).",
+    description: "Delete a client. Projects are unlinked (not deleted).",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1484,7 +1568,8 @@ const TOOLS: Tool[] = [
         },
         description: {
           type: "string",
-          description: "Phase description in tiptap HTML format (e.g., '<p>Phase description here</p>'). Do NOT use JSON format. (optional)",
+          description:
+            "Phase description in tiptap HTML format (e.g., '<p>Phase description here</p>'). Do NOT use JSON format. (optional)",
         },
         status: {
           type: "string",
@@ -1515,7 +1600,8 @@ const TOOLS: Tool[] = [
         },
         description: {
           type: "string",
-          description: "Updated description in tiptap HTML format (e.g., '<p>Updated description here</p>'). Do NOT use JSON format. (optional)",
+          description:
+            "Updated description in tiptap HTML format (e.g., '<p>Updated description here</p>'). Do NOT use JSON format. (optional)",
         },
         status: {
           type: "string",
@@ -1555,8 +1641,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "assign_issue_to_phase",
-    description:
-      "Assign an issue to a phase, or unassign by omitting phaseId.",
+    description: "Assign an issue to a phase, or unassign by omitting phaseId.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1570,7 +1655,8 @@ const TOOLS: Tool[] = [
         },
         phaseId: {
           type: "string",
-          description: "Phase ID (optional - omit to unassign from current phase)",
+          description:
+            "Phase ID (optional - omit to unassign from current phase)",
         },
       },
       required: ["issueIdOrIdentifier"],
@@ -1598,8 +1684,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_beeper_thread",
-    description:
-      "Get a single Beeper thread by its Beeper thread ID.",
+    description: "Get a single Beeper thread by its Beeper thread ID.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1617,8 +1702,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_beeper_thread_messages",
-    description:
-      "Get messages for a Beeper thread.",
+    description: "Get messages for a Beeper thread.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1640,8 +1724,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "search_beeper_messages",
-    description:
-      "Full-text search across all synced Beeper messages.",
+    description: "Full-text search across all synced Beeper messages.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1663,8 +1746,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_beeper_threads_for_person",
-    description:
-      "Get Beeper threads linked to a FRM person/contact.",
+    description: "Get Beeper threads linked to a FRM person/contact.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1682,8 +1764,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_beeper_threads_for_client",
-    description:
-      "Get Beeper threads linked to a PM client.",
+    description: "Get Beeper threads linked to a PM client.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1703,8 +1784,7 @@ const TOOLS: Tool[] = [
   // Granola Meeting Tools
   {
     name: "get_granola_meetings",
-    description:
-      "List all synced Granola meeting notes.",
+    description: "List all synced Granola meeting notes.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1740,8 +1820,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_granola_transcript",
-    description:
-      "Get the full transcript for a Granola meeting.",
+    description: "Get the full transcript for a Granola meeting.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1759,8 +1838,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "search_granola_meetings",
-    description:
-      "Search Granola meetings by title or content.",
+    description: "Search Granola meetings by title or content.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1770,7 +1848,8 @@ const TOOLS: Tool[] = [
         },
         query: {
           type: "string",
-          description: "Search terms to find in meeting titles and notes (required)",
+          description:
+            "Search terms to find in meeting titles and notes (required)",
         },
         limit: {
           type: "number",
@@ -1784,8 +1863,7 @@ const TOOLS: Tool[] = [
   // Cross-Entity Linking Tools
   {
     name: "get_granola_meetings_for_person",
-    description:
-      "Get Granola meetings linked to a FRM person/contact.",
+    description: "Get Granola meetings linked to a FRM person/contact.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1803,8 +1881,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_granola_meetings_for_thread",
-    description:
-      "Get Granola meetings linked to a Beeper thread.",
+    description: "Get Granola meetings linked to a Beeper thread.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1878,8 +1955,7 @@ const TOOLS: Tool[] = [
         },
         dryRun: {
           type: "boolean",
-          description:
-            "Preview without making changes (default: false)",
+          description: "Preview without making changes (default: false)",
         },
       },
     },
@@ -1988,8 +2064,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "dismiss_all_merge_suggestions",
-    description:
-      "Dismiss all pending merge suggestions at once.",
+    description: "Dismiss all pending merge suggestions at once.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -2045,40 +2120,47 @@ const TOOLS: Tool[] = [
 const PROMPTS: Prompt[] = [
   {
     name: "daily-standup",
-    description: "Get daily standup briefing: agenda, tasks due today, sprint progress.",
+    description:
+      "Get daily standup briefing: agenda, tasks due today, sprint progress.",
     arguments: [
       {
         name: "date",
-        description: "Specific date in ISO format (optional, defaults to today)",
+        description:
+          "Specific date in ISO format (optional, defaults to today)",
         required: false,
       },
     ],
   },
   {
     name: "weekly-review",
-    description: "Run weekly review: completed work, in-progress items, sprint health, blockers.",
+    description:
+      "Run weekly review: completed work, in-progress items, sprint health, blockers.",
     arguments: [
       {
         name: "date",
-        description: "Week start date in ISO format (optional, defaults to this week)",
+        description:
+          "Week start date in ISO format (optional, defaults to this week)",
         required: false,
       },
     ],
   },
   {
     name: "sprint-plan",
-    description: "Plan the current sprint: review backlog, assign tasks to cycle, check capacity.",
+    description:
+      "Plan the current sprint: review backlog, assign tasks to cycle, check capacity.",
     arguments: [
       {
         name: "notes",
-        description: "Additional context or specific tasks to include (optional)",
+        description:
+          "Additional context or specific tasks to include (optional)",
         required: false,
       },
     ],
   },
   {
     name: "contact-lookup",
-    description: "Full contact dossier: profile, AI insights, meetings, messages, voice memos.",
+    description:
+      "Full contact dossier: profile, AI insights, meetings, messages, voice memos.",
     arguments: [
       {
         name: "name",
@@ -2089,7 +2171,8 @@ const PROMPTS: Prompt[] = [
   },
   {
     name: "client-brief",
-    description: "Full client briefing: projects, phases, completion stats, recent communications.",
+    description:
+      "Full client briefing: projects, phases, completion stats, recent communications.",
     arguments: [
       {
         name: "client",
@@ -2100,7 +2183,8 @@ const PROMPTS: Prompt[] = [
   },
   {
     name: "project-status",
-    description: "Project status report: phases, task breakdown, blockers, urgent items.",
+    description:
+      "Project status report: phases, task breakdown, blockers, urgent items.",
     arguments: [
       {
         name: "project",
@@ -2111,7 +2195,8 @@ const PROMPTS: Prompt[] = [
   },
   {
     name: "capture",
-    description: "Quick capture a thought, task, or note. Auto-routes to task or note based on content.",
+    description:
+      "Quick capture a thought, task, or note. Auto-routes to task or note based on content.",
     arguments: [
       {
         name: "input",
@@ -2122,7 +2207,8 @@ const PROMPTS: Prompt[] = [
   },
   {
     name: "meeting-prep",
-    description: "Prepare for a meeting: contact dossier, past meetings, recent messages, open items.",
+    description:
+      "Prepare for a meeting: contact dossier, past meetings, recent messages, open items.",
     arguments: [
       {
         name: "name",
@@ -2131,17 +2217,38 @@ const PROMPTS: Prompt[] = [
       },
     ],
   },
+  {
+    name: "cycle-review",
+    description:
+      "Review the current cycle: progress, incomplete items, rollover options. Useful for end-of-sprint review.",
+    arguments: [
+      {
+        name: "action",
+        description:
+          "Optional action: 'close' to close the cycle, 'rollover' to close and roll over incomplete issues",
+        required: false,
+      },
+    ],
+  },
 ];
 
 // Prompt message templates keyed by prompt name
-const PROMPT_MESSAGES: Record<string, (args: Record<string, string>) => { role: "user"; content: { type: "text"; text: string } }[]> = {
+const PROMPT_MESSAGES: Record<
+  string,
+  (
+    args: Record<string, string>,
+  ) => { role: "user"; content: { type: "text"; text: string } }[]
+> = {
   "daily-standup": (args) => {
-    const dateClause = args.date ? `Use date: ${args.date}` : "Use today's date.";
-    return [{
-      role: "user",
-      content: {
-        type: "text",
-        text: `Get my daily standup briefing. Use the LifeOS MCP tools to gather:
+    const dateClause = args.date
+      ? `Use date: ${args.date}`
+      : "Use today's date.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Get my daily standup briefing. Use the LifeOS MCP tools to gather:
 
 1. Call get_daily_agenda for today's agenda (tasks due today, calendar events, top priorities)
 2. Call get_todays_tasks for today's task list
@@ -2156,16 +2263,20 @@ Summarize in a concise standup format:
 - **Calendar**: Any meetings or events today
 
 Keep it short and actionable.`,
+        },
       },
-    }];
+    ];
   },
   "weekly-review": (args) => {
-    const dateClause = args.date ? `Use week start date: ${args.date}` : "Use this week.";
-    return [{
-      role: "user",
-      content: {
-        type: "text",
-        text: `Run my weekly review. Use the LifeOS MCP tools to gather:
+    const dateClause = args.date
+      ? `Use week start date: ${args.date}`
+      : "Use this week.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Run my weekly review. Use the LifeOS MCP tools to gather:
 
 1. Call get_weekly_agenda for this week's agenda and AI summary
 2. Call get_current_cycle for sprint progress
@@ -2181,16 +2292,18 @@ Present a weekly review:
 - **Sprint Health**: Cycle progress, burndown status
 - **Blockers**: Anything overdue or stuck
 - **Next Week**: Key items to tackle`,
+        },
       },
-    }];
+    ];
   },
   "sprint-plan": (args) => {
     const notesClause = args.notes ? `Additional context: ${args.notes}` : "";
-    return [{
-      role: "user",
-      content: {
-        type: "text",
-        text: `Help me plan my sprint. Use the LifeOS MCP tools:
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Help me plan my sprint. Use the LifeOS MCP tools:
 
 1. Call get_current_cycle to see the active sprint and its current state
 2. Call get_tasks with status "backlog" to see unplanned work
@@ -2206,14 +2319,16 @@ Then help me plan:
 - If I provide specific tasks, create issues and assign them to the current cycle
 
 Ask me to confirm before creating or assigning any issues.`,
+        },
       },
-    }];
+    ];
   },
-  "contact-lookup": (args) => [{
-    role: "user",
-    content: {
-      type: "text",
-      text: `Look up everything about a contact. Use the LifeOS MCP tools:
+  "contact-lookup": (args) => [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Look up everything about a contact. Use the LifeOS MCP tools:
 
 1. Call get_contact_dossier with nameQuery "${args.name}" to get the full profile
    - This returns: person info, AI profile, Beeper threads, Granola meetings (with AI notes and calendar events), and voice memos
@@ -2224,13 +2339,15 @@ Present the dossier in a structured format:
 - **Recent Interactions**: Last few voice memos, meetings, and messages — sorted by recency
 - **Meeting History**: Granola/Fathom meetings with key takeaways
 - **Chat Threads**: Beeper conversation threads linked to this person`,
+      },
     },
-  }],
-  "client-brief": (args) => [{
-    role: "user",
-    content: {
-      type: "text",
-      text: `Get a full client briefing for "${args.client}". Use the LifeOS MCP tools:
+  ],
+  "client-brief": (args) => [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Get a full client briefing for "${args.client}". Use the LifeOS MCP tools:
 
 1. Call get_clients to find the matching client
 2. Call get_client with the client ID for full details
@@ -2245,13 +2362,15 @@ Present as a client brief:
 - **Completion Stats**: Issues done vs total across all projects
 - **Recent Comms**: Latest Beeper thread activity
 - **Action Items**: Any overdue or urgent tasks for this client`,
+      },
     },
-  }],
-  "project-status": (args) => [{
-    role: "user",
-    content: {
-      type: "text",
-      text: `Get project status for "${args.project}". Use the LifeOS MCP tools:
+  ],
+  "project-status": (args) => [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Get project status for "${args.project}". Use the LifeOS MCP tools:
 
 1. Call get_project with the project key/ID
 2. Call get_phases for the project to see phase breakdown
@@ -2264,13 +2383,15 @@ Present a project status report:
 - **Urgent/Overdue**: Any urgent or overdue tasks
 - **In Progress**: What's actively being worked on
 - **Blockers**: Anything that looks stuck`,
+      },
     },
-  }],
-  "capture": (args) => [{
-    role: "user",
-    content: {
-      type: "text",
-      text: `Quick capture: "${args.input}"
+  ],
+  capture: (args) => [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Quick capture: "${args.input}"
 
 Analyze the input and determine what type of capture this is:
 
@@ -2287,13 +2408,15 @@ Analyze the input and determine what type of capture this is:
 **If ambiguous**, default to creating a quick note.
 
 After creating, confirm what was captured with the ID/identifier.`,
+      },
     },
-  }],
-  "meeting-prep": (args) => [{
-    role: "user",
-    content: {
-      type: "text",
-      text: `Prepare for a meeting with "${args.name}". Use the LifeOS MCP tools:
+  ],
+  "meeting-prep": (args) => [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Prepare for a meeting with "${args.name}". Use the LifeOS MCP tools:
 
 1. Call get_contact_dossier with nameQuery "${args.name}" for full context
 2. Call get_granola_meetings_for_person for past meeting notes
@@ -2307,8 +2430,43 @@ Compile a meeting prep brief:
 - **Recent Messages**: Key points from recent Beeper conversations
 - **Past Meetings**: Summary of last 3 meetings with key decisions/takeaways
 - **Suggested Talking Points**: Based on open items and recent context`,
+      },
     },
-  }],
+  ],
+  "cycle-review": (args) => {
+    const actionClause = args.action
+      ? `\n\nThe user wants to: ${args.action === "rollover" ? "close the cycle AND roll over incomplete issues to the next cycle" : args.action === "close" ? "close the cycle (without rollover)" : args.action}`
+      : "";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Review my current cycle/sprint. Use the LifeOS MCP tools:
+
+1. Call get_current_cycle for the active cycle with progress stats
+2. Call get_cycles with status "upcoming" to see what's next
+3. Call get_tasks with status "in_progress" to see active work
+4. Call get_tasks with status "backlog" or "todo" to see incomplete items in the cycle
+${actionClause}
+
+Present the cycle review:
+- **Cycle Summary**: Name, dates, days remaining
+- **Progress**: Completion %, issues done vs total
+- **Incomplete Items**: List all non-done/non-cancelled issues with status and priority
+- **Next Cycle**: Show the next upcoming cycle (if any)
+- **Recommendations**: 
+  - If cycle is ending soon, suggest closing with rollover
+  - If many items are incomplete, suggest re-prioritizing
+  - If cycle is already past end date, strongly recommend closing it
+
+${args.action === "close" ? "After presenting the review, call close_cycle to close the current cycle WITHOUT rolling over incomplete issues." : ""}
+${args.action === "rollover" ? "After presenting the review, call close_cycle with rolloverIncomplete=true to close the cycle and move incomplete issues to the next cycle." : ""}
+${!args.action ? "Ask the user if they want to close the cycle, and whether to roll over incomplete issues to the next cycle." : ""}`,
+        },
+      },
+    ];
+  },
 };
 
 // Configuration: CLI flags take precedence over env vars
@@ -2328,10 +2486,14 @@ if (missingConfig.length > 0) {
   missingConfig.forEach((c) => console.error(`  - ${c}`));
   console.error("");
   console.error("Example usage:");
-  console.error("  lifeos-mcp --url https://your-app.convex.site --user-id xxx --api-key yyy");
+  console.error(
+    "  lifeos-mcp --url https://your-app.convex.site --user-id xxx --api-key yyy",
+  );
   console.error("");
   console.error("Or with environment variables:");
-  console.error("  CONVEX_URL=https://your-app.convex.site LIFEOS_USER_ID=xxx LIFEOS_API_KEY=yyy lifeos-mcp");
+  console.error(
+    "  CONVEX_URL=https://your-app.convex.site LIFEOS_USER_ID=xxx LIFEOS_API_KEY=yyy lifeos-mcp",
+  );
   process.exit(1);
 }
 
@@ -2428,13 +2590,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ version: VERSION, buildTime: BUILD_TIME }, null, 2),
+            text: JSON.stringify(
+              { version: VERSION, buildTime: BUILD_TIME },
+              null,
+              2,
+            ),
           },
         ],
       };
     }
 
-    const result = await callConvexTool(name, (args as Record<string, unknown>) || {});
+    const result = await callConvexTool(
+      name,
+      (args as Record<string, unknown>) || {},
+    );
 
     return {
       content: [
