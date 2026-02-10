@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # Needed to push version bump
+      id-token: write # Needed for npm trusted publishing (OIDC)
 
     steps:
       - name: Checkout
@@ -56,9 +57,7 @@ jobs:
 
       - name: Publish to npm
         working-directory: ${{ env.PKG_DIR }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
 
       - name: Commit version bump
         run: |
