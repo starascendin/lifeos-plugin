@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/env-decrypt.sh
-# Decrypts all .env*.age files in apps/* and packages/*
+# Decrypts all .env*.age files in root, apps/*, and packages/*
 
 set -e
 
@@ -69,6 +69,9 @@ decrypt_env_files() {
         fi
     done
 }
+
+# Process root directory
+decrypt_env_files "$REPO_ROOT"
 
 # Process apps/ directory (including nested like apps/lifeos/*)
 for dir in "$REPO_ROOT"/apps/*; do

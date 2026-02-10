@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/env-encrypt.sh
-# Encrypts all .env* files (excluding .age files) in apps/* and packages/*
+# Encrypts all .env* files (excluding .age files) in root, apps/*, and packages/*
 
 set -e
 
@@ -45,7 +45,7 @@ ENCRYPTED=0
 SKIPPED=0
 FAILED=0
 
-# Function to encrypt env files in a directory
+# Function to encrypt env files in a directory (defined before use)
 encrypt_env_files() {
     local dir="$1"
 
@@ -71,6 +71,9 @@ encrypt_env_files() {
         fi
     done
 }
+
+# Process root directory
+encrypt_env_files "$REPO_ROOT"
 
 # Process apps/ directory (including nested like apps/lifeos/*)
 for dir in "$REPO_ROOT"/apps/*; do
