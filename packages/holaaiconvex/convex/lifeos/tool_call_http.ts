@@ -375,6 +375,7 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             conversationContext: params?.conversationContext as
               | string
               | undefined,
+            rawConversation: params?.rawConversation as string | undefined,
           },
         );
         break;

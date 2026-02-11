@@ -34,6 +34,7 @@ import { LifeOSClaudeCode } from "./components/lifeos/ClaudeCode";
 import { LifeOSGranolaAI } from "./components/lifeos/GranolaAI";
 import { LifeOSFathomAI } from "./components/lifeos/FathomAI";
 import { LifeOSCatGirl } from "./components/lifeos/CatGirl";
+import { LifeOSCustomAgents } from "./components/lifeos/CustomAgents";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -136,6 +137,7 @@ export default function LifeOSApp() {
                   <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
                   <Route path="voicenotes" element={<LifeOSVoiceNotes />} />
                   <Route path="aiagent" element={<LifeOSAIAgent />} />
+                  <Route path="custom-agents" element={<LifeOSCustomAgents />} />
                   <Route path="catgirl" element={<LifeOSCatGirl />} />
                   <Route path="settings" element={<LifeOSSettings />} />
                   <Route path="*" element={<Navigate to="/lifeos" replace />} />

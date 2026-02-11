@@ -175,6 +175,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           },
           { name: "LLM Council", href: "/lifeos/llmcouncil", icon: Users },
           { name: "ClaudeCode", href: "/lifeos/claudecode", icon: Terminal },
+          { name: "Custom Agents", href: "/lifeos/custom-agents", icon: Bot },
         ],
       },
       { name: "Settings", href: "/lifeos/settings", icon: Settings },

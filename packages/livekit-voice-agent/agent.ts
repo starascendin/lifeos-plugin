@@ -13,6 +13,7 @@ import * as google from '@livekit/agents-plugin-google';
 import * as openai from '@livekit/agents-plugin-openai';
 import * as silero from '@livekit/agents-plugin-silero';
 import { BackgroundVoiceCancellation } from '@livekit/noise-cancellation-node';
+import { GoogleGenAI } from '@google/genai';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
@@ -222,6 +223,98 @@ function createLLM(model: ModelId): google.LLM | openai.LLM {
   return new openai.LLM({ model });
 }
 
+/**
+ * Build a raw transcript string from chat history items
+ */
+function buildRawTranscript(items: Array<{ type: string; role?: string; textContent?: string | undefined }>): { transcript: string; messageCount: number } {
+  const lines: string[] = [];
+  let messageCount = 0;
+  for (const item of items) {
+    if (item.type === 'message') {
+      const text = item.textContent;
+      if (text) {
+        lines.push(`[${item.role}]: ${text}`);
+        if (item.role === 'user' || item.role === 'assistant') {
+          messageCount++;
+        }
+      }
+    }
+  }
+  return { transcript: lines.join('\n'), messageCount };
+}
+
+/**
+ * Use Gemini to summarize a conversation transcript
+ */
+async function summarizeConversation(transcript: string): Promise<{
+  title: string;
+  summary: string;
+  keyInsights: string[];
+  actionItems: string[];
+  conversationContext: string;
+} | null> {
+  try {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      console.error('[VoiceAgent] GOOGLE_API_KEY not set, cannot summarize');
+      return null;
+    }
+    const genai = new GoogleGenAI({ apiKey });
+    const response = await genai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: `You are analyzing a voice conversation transcript between a user and their LifeOS AI assistant. Extract a structured summary.
+
+TRANSCRIPT:
+${transcript}
+
+Respond ONLY with valid JSON (no markdown, no code fences):
+{
+  "title": "Short descriptive title (5-8 words)",
+  "summary": "2-3 sentence overview of what was discussed",
+  "keyInsights": ["insight 1", "insight 2"],
+  "actionItems": ["action 1", "action 2"],
+  "conversationContext": "Brief topic/context label"
+}
+
+If there are no action items, use an empty array. If there are no key insights, use an empty array.`,
+    });
+
+    const text = response.text?.trim();
+    if (!text) return null;
+
+    // Strip markdown code fences if present
+    const cleaned = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error('[VoiceAgent] Failed to summarize conversation:', error);
+    return null;
+  }
+}
+
+/**
+ * Format preloaded summaries into a context string for the agent
+ */
+function formatPastSummaries(summaries: Array<{
+  title: string;
+  summary: string;
+  keyInsights?: string[];
+  actionItems?: string[];
+  createdAt: string;
+}>): string {
+  if (!summaries.length) return '';
+
+  const lines = summaries.map((s) => {
+    const date = s.createdAt.split('T')[0];
+    let line = `- [${date}] "${s.title}" - ${s.summary}`;
+    if (s.actionItems?.length) {
+      line += ` | Action items: ${s.actionItems.join('; ')}`;
+    }
+    return line;
+  });
+
+  return `\n\nPrevious conversations (most recent first):\n${lines.join('\n')}`;
+}
+
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
     proc.userData.vad = await silero.VAD.load();
@@ -265,6 +358,22 @@ export default defineAgent({
     console.log(`[VoiceAgent] Using model: ${selectedModel}, userId: ${userId || 'NOT PROVIDED - tools will fail!'}, timezone: ${timezone || 'unknown'}`);
     if (!userId) {
       console.warn('[VoiceAgent] WARNING: No userId in metadata. All tools requiring user context will return errors.');
+    }
+
+    // Preload past conversation summaries for context continuity
+    let pastSummariesContext = '';
+    if (userId) {
+      try {
+        console.log('[VoiceAgent] Preloading past conversation summaries...');
+        const summariesResponse = await callConvexTool('get_ai_convo_summaries', userId, { limit: 10 });
+        if (summariesResponse.success && summariesResponse.result) {
+          const result = summariesResponse.result as { summaries: Array<{ title: string; summary: string; keyInsights?: string[]; actionItems?: string[]; createdAt: string }> };
+          pastSummariesContext = formatPastSummaries(result.summaries);
+          console.log(`[VoiceAgent] Loaded ${result.summaries.length} past summaries for context`);
+        }
+      } catch (e) {
+        console.warn('[VoiceAgent] Failed to preload summaries:', e);
+      }
     }
 
     // Helper to create voice tools with standard execute pattern
@@ -316,7 +425,9 @@ Available capabilities:
 - **Business Contacts/CRM**: Manage business contacts and merge suggestions
 - **Initiatives**: Yearly goal tracking that cascades to projects and tasks
 
-Please be concise in your responses as this is voice interaction. When referencing tasks, use their identifiers (like PROJ-123) when available.`,
+**Memory & Continuity**: You have memory of past conversations. Conversations are automatically saved when the user disconnects. If the user asks "what did we talk about last time?" or similar, reference the past conversation summaries below. If the user says "remember this" or "save this", use the create_ai_convo_summary tool to explicitly save important context.
+
+Please be concise in your responses as this is voice interaction. When referencing tasks, use their identifiers (like PROJ-123) when available.${pastSummariesContext}`,
       tools: {
         // ==================== AGENDA ====================
         get_my_daily_agenda: makeTool('get_daily_agenda',
@@ -761,8 +872,9 @@ Please be concise in your responses as this is voice interaction. When referenci
             ideas: z.array(z.string()).optional().describe('Ideas or plans formulated'),
             tags: z.array(z.string()).optional().describe('Tags for categorization'),
             relatedMemoIds: z.array(z.string()).optional().describe('IDs of related voice memos'),
-            summaryType: z.string().optional().describe('Type: reflection, planning, brainstorm, journal_review, idea_refinement'),
+            summaryType: z.string().optional().describe('Type: reflection, planning, brainstorm, journal_review, idea_refinement, voice_session'),
             conversationContext: z.string().optional().describe('Topic/context of the conversation'),
+            rawConversation: z.string().optional().describe('Raw conversation transcript as JSON string'),
           }),
         ),
         get_ai_convo_summaries: makeTool('get_ai_convo_summaries',
@@ -1045,6 +1157,47 @@ Please be concise in your responses as this is voice interaction. When referenci
       turnDetection: new livekit.turnDetector.MultilingualModel(),
     });
 
+    // Auto-summarize conversation on session close
+    session.on(voice.AgentSessionEventTypes.Close, async (_ev) => {
+      console.log('[VoiceAgent] Session closing, checking if conversation should be saved...');
+      if (!userId) {
+        console.log('[VoiceAgent] No userId, skipping auto-summarize');
+        return;
+      }
+
+      try {
+        const history = session.history;
+        const { transcript, messageCount } = buildRawTranscript(history.items);
+
+        // Skip trivial conversations (less than 4 user+assistant messages)
+        if (messageCount < 4) {
+          console.log(`[VoiceAgent] Conversation too short (${messageCount} messages), skipping auto-summarize`);
+          return;
+        }
+
+        console.log(`[VoiceAgent] Summarizing conversation (${messageCount} messages)...`);
+        const summary = await summarizeConversation(transcript);
+        if (!summary) {
+          console.error('[VoiceAgent] Failed to generate summary');
+          return;
+        }
+
+        console.log(`[VoiceAgent] Saving summary: "${summary.title}"`);
+        await callConvexTool('create_ai_convo_summary', userId, {
+          title: summary.title,
+          summary: summary.summary,
+          keyInsights: summary.keyInsights,
+          actionItems: summary.actionItems,
+          conversationContext: summary.conversationContext,
+          summaryType: 'voice_session',
+          rawConversation: transcript,
+        });
+        console.log('[VoiceAgent] Auto-summary saved successfully');
+      } catch (error) {
+        console.error('[VoiceAgent] Error during auto-summarize:', error);
+      }
+    });
+
     await session.start({
       agent: assistant,
       room: ctx.room,
@@ -1054,7 +1207,7 @@ Please be concise in your responses as this is voice interaction. When referenci
     });
 
     session.generateReply({
-      instructions: `Greet the user briefly. You are their LifeOS voice assistant with full access to their productivity system. Offer to help with their agenda, tasks, projects, clients, contacts, meetings, notes, or initiatives.`,
+      instructions: `Greet the user briefly. You are their LifeOS voice assistant with full access to their productivity system. Offer to help with their agenda, tasks, projects, clients, contacts, meetings, notes, or initiatives.${pastSummariesContext ? ' You can reference past conversations if relevant.' : ''}`,
     });
   },
 });

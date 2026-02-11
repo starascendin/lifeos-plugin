@@ -1,5 +1,6 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
+import { customAgentTables } from "./agents_schema";
 import { avatarTables } from "./avatar_schema";
 import { beeperTables } from "./beeper_schema";
 import { calendarTables } from "./calendar_schema";
@@ -27,6 +28,8 @@ import { voiceAgentTables } from "./voiceagent_schema";
  * All table names are prefixed with `life_` or `lifeos_chatnexus` or `lifeos_pm` to avoid conflicts.
  */
 export const lifeosTables = {
+  // Custom AI Agent tables
+  ...customAgentTables,
   // Avatar Stats tables
   ...avatarTables,
   // Beeper (WhatsApp via Beeper Desktop) tables
@@ -378,6 +381,8 @@ export const lifeosTables = {
     summaryType: v.optional(v.string()),
     // Optional: the conversation context/topic that led to this summary
     conversationContext: v.optional(v.string()),
+    // Raw conversation transcript (JSON string of role+text pairs)
+    rawConversation: v.optional(v.string()),
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),

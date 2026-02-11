@@ -132,6 +132,7 @@ export function VoiceMemosTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isRunningAllSteps, setIsRunningAllSteps] = useState(false);
+  const hasAutoRunRef = useRef(false);
   const [allStepsProgress, setAllStepsProgress] = useState<{
     step: "transcribe" | "sync" | "extract";
     extractCurrent: number;
@@ -280,10 +281,12 @@ export function VoiceMemosTab() {
 
   // Run all steps: Transcribe → Sync to Cloud → Extract AI Insights
   // Handles memos at different stages — only runs the steps each memo still needs
-  const handleRunAllSteps = async () => {
-    if (selectedIds.size === 0) return;
+  // Can be called with explicit memo IDs (for auto-run) or uses selectedIds
+  const handleRunAllSteps = async (autoRunIds?: Set<number>) => {
+    const idsToProcess = autoRunIds || selectedIds;
+    if (idsToProcess.size === 0) return;
 
-    const selectedMemos = memos.filter((m) => selectedIds.has(m.id));
+    const selectedMemos = memos.filter((m) => idsToProcess.has(m.id));
     const selectedMemoUuids = selectedMemos.map((m) => m.uuid);
 
     // Split selected memos by what they need
@@ -377,6 +380,42 @@ export function VoiceMemosTab() {
       setAllStepsProgress(null);
     }
   };
+
+  // Auto-run "Run all steps" on the latest 10 unprocessed memos when the tab loads
+  const MAX_AUTO_RUN = 10;
+  useEffect(() => {
+    if (hasAutoRunRef.current) return;
+    if (isLoading || !syncedMemos || memos.length === 0) return;
+    if (!isTauri) return;
+    if (!groqApiKey) return;
+
+    // Find memos with incomplete pipeline steps
+    const incomplete = memos
+      .filter((memo) => {
+        // Needs transcription
+        if (memo.local_path && !memo.transcription && !exceedsGroqLimit(memo.file_size)) return true;
+        // Has transcript but not synced to cloud
+        if (memo.transcription && !syncedUuidSet.has(memo.uuid)) return true;
+        // Synced but no AI extraction
+        const synced = syncedMemoMap.get(memo.uuid);
+        if (synced && !synced.hasExtraction) return true;
+        return false;
+      })
+      .sort((a, b) => b.date - a.date)
+      .slice(0, MAX_AUTO_RUN);
+
+    if (incomplete.length === 0) return;
+
+    hasAutoRunRef.current = true;
+    const autoIds = new Set(incomplete.map((m) => m.id));
+    setSelectedIds(autoIds);
+
+    // Small delay so the UI reflects the selection before the pipeline starts
+    const timer = setTimeout(() => {
+      handleRunAllSteps(autoIds);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [isLoading, memos, syncedMemos, isTauri, groqApiKey]);
 
   // Toggle selection
   const toggleSelection = (id: number) => {
@@ -553,7 +592,7 @@ export function VoiceMemosTab() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      onClick={handleRunAllSteps}
+                      onClick={() => handleRunAllSteps()}
                       disabled={!isTauri || selectedIds.size === 0 || isAnyOperationInProgress}
                       size="sm"
                     >

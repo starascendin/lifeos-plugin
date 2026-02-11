@@ -1024,6 +1024,11 @@ const TOOLS: Tool[] = [
           description:
             "The topic/context of the conversation that led to this summary (optional)",
         },
+        rawConversation: {
+          type: "string",
+          description:
+            "Raw conversation transcript as a JSON string (optional)",
+        },
       },
       required: ["title", "summary"],
     },

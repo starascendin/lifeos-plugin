@@ -25,6 +25,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@google/genai": "^1.40.0",
     "@livekit/agents": "~1.0.43",
     "@livekit/agents-plugin-google": "^1.0.43",
     "@livekit/agents-plugin-livekit": "~1.0.43",

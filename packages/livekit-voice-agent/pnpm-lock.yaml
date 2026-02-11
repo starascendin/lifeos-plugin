@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@google/genai':
+        specifier: ^1.40.0
+        version: 1.40.0
       '@livekit/agents':
         specifier: ~1.0.43
         version: 1.0.43(@livekit/rtc-node@0.13.24)(zod@4.3.6)

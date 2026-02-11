@@ -1468,6 +1468,7 @@ export const createAiConvoSummaryInternal = internalMutation({
     relatedMemoIds: v.optional(v.array(v.string())),
     summaryType: v.optional(v.string()),
     conversationContext: v.optional(v.string()),
+    rawConversation: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = args.userId as Id<"users">;
@@ -1486,6 +1487,7 @@ export const createAiConvoSummaryInternal = internalMutation({
       ),
       summaryType: args.summaryType,
       conversationContext: args.conversationContext,
+      rawConversation: args.rawConversation,
       createdAt: now,
       updatedAt: now,
     });
