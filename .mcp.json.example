@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "lifeos": {
+      "command": "npx",
+      "args": [
+        "@starascendin/lifeos-mcp@latest",
+        "--url", "https://YOUR_APP.convex.site",
+        "--user-id", "YOUR_USER_ID",
+        "--api-key", "YOUR_API_KEY"
+      ]
+    }
+  }
+}
