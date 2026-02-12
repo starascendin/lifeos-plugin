@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,55 +23,11 @@ export function AISummarySection() {
     generateSummary,
     selectedModel,
     setSelectedModel,
-    saveDailyUserNote,
     updateDailyPrompt,
     dateString,
   } = useAgenda();
 
   const hasSummary = dailySummary?.aiSummary;
-
-  // User note state - local draft synced from server
-  const [noteValue, setNoteValue] = useState("");
-  const [noteDirty, setNoteDirty] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Sync server value into local state when it changes (and not dirty)
-  useEffect(() => {
-    if (!noteDirty) {
-      setNoteValue(dailySummary?.userNote ?? "");
-    }
-  }, [dailySummary?.userNote, noteDirty]);
-
-  // Reset dirty flag when date changes
-  useEffect(() => {
-    setNoteDirty(false);
-  }, [dateString]);
-
-  const saveNote = useCallback(
-    (value: string) => {
-      saveDailyUserNote({ date: dateString, userNote: value });
-      setNoteDirty(false);
-    },
-    [saveDailyUserNote, dateString],
-  );
-
-  const handleNoteChange = useCallback(
-    (value: string) => {
-      setNoteValue(value);
-      setNoteDirty(true);
-      // Debounce save
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveNote(value), 1500);
-    },
-    [saveNote],
-  );
-
-  const handleNoteBlur = useCallback(() => {
-    if (noteDirty) {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveNote(noteValue);
-    }
-  }, [noteDirty, noteValue, saveNote]);
 
   // Debug prompt dialog
   const [debugOpen, setDebugOpen] = useState(false);
@@ -106,7 +62,7 @@ export function AISummarySection() {
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={() => generateSummary(noteValue || undefined)}
+              onClick={() => generateSummary()}
               disabled={isGeneratingSummary}
               title={hasSummary ? "Regenerate summary" : "Generate summary"}
             >
@@ -125,16 +81,6 @@ export function AISummarySection() {
             </Button>
           </div>
         </div>
-
-        {/* User note textarea */}
-        <Textarea
-          placeholder="Write a note for today..."
-          value={noteValue}
-          onChange={(e) => handleNoteChange(e.target.value)}
-          onBlur={handleNoteBlur}
-          className="min-h-[60px] text-sm resize-none mb-3"
-          rows={2}
-        />
 
         {/* AI Summary display */}
         {isLoadingSummary ? (

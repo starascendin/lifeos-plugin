@@ -1,6 +1,7 @@
 import { AISummarySection } from "./AISummarySection";
 import { CalendarEventsSection } from "./CalendarEventsSection";
 import { DailyFieldsSection } from "./DailyFieldsSection";
+import { DailyNoteSection } from "./DailyNoteSection";
 import { HabitsSection } from "./HabitsSection";
 import { TasksSection } from "./TasksSection";
 import { VoiceMemoRecorder } from "./VoiceMemoRecorder";
@@ -17,6 +18,9 @@ export function DailyView() {
       <div className="flex flex-col lg:flex-row gap-4 p-4 md:p-6">
         {/* Center column - cards */}
         <div className="flex-1 min-w-0 space-y-4">
+          <Card>
+            <DailyNoteSection />
+          </Card>
           <Card>
             <AISummarySection />
           </Card>
