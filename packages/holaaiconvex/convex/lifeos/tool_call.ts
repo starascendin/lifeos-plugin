@@ -2592,6 +2592,7 @@ export const createIssueInternal = internalMutation({
     dueDate: v.optional(v.string()),
     cycleId: v.optional(v.string()),
     phaseId: v.optional(v.string()),
+    phaseNameOrId: v.optional(v.string()),
     initiativeId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -2644,27 +2645,49 @@ export const createIssueInternal = internalMutation({
       }
     }
 
-    // Resolve phase if provided
+    // Resolve phase if provided (supports both ID and name lookup)
     let phaseId: Id<"lifeos_pmPhases"> | undefined;
     let phaseName: string | undefined;
 
-    if (args.phaseId) {
+    const phaseInput = args.phaseNameOrId || args.phaseId;
+    if (phaseInput) {
+      // First try as direct ID
+      let phase: Doc<"lifeos_pmPhases"> | null = null;
       try {
-        const phase = await ctx.db.get(args.phaseId as Id<"lifeos_pmPhases">);
-        if (phase && phase.userId === userId) {
-          // Verify phase belongs to the same project
-          if (!projectId || phase.projectId === projectId) {
-            phaseId = phase._id;
-            phaseName = phase.name;
-            // If projectId wasn't provided but phase was, use the phase's project
-            if (!projectId) {
-              projectId = phase.projectId;
-              project = await ctx.db.get(projectId);
-            }
+        phase = await ctx.db.get(phaseInput as Id<"lifeos_pmPhases">);
+        if (phase && phase.userId !== userId) phase = null;
+      } catch {
+        // Not a valid ID, try name lookup
+      }
+
+      // If not found by ID and we have a project, try matching by name
+      if (!phase && projectId) {
+        const projectPhases = await ctx.db
+          .query("lifeos_pmPhases")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId!))
+          .collect();
+        const nameLower = phaseInput.toLowerCase();
+        phase =
+          projectPhases.find(
+            (p) => p.name.toLowerCase() === nameLower,
+          ) ??
+          projectPhases.find((p) =>
+            p.name.toLowerCase().includes(nameLower),
+          ) ??
+          null;
+      }
+
+      if (phase) {
+        // Verify phase belongs to the same project
+        if (!projectId || phase.projectId === projectId) {
+          phaseId = phase._id;
+          phaseName = phase.name;
+          // If projectId wasn't provided but phase was, use the phase's project
+          if (!projectId) {
+            projectId = phase.projectId;
+            project = await ctx.db.get(projectId);
           }
         }
-      } catch {
-        // Invalid phase ID, ignore
       }
     }
 

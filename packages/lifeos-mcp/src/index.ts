@@ -259,7 +259,7 @@ const TOOLS: Tool[] = [
   {
     name: "create_issue",
     description:
-      "Create a new task/issue. Optionally assign to a project, set priority, and due date.",
+      "Create a new task/issue. Assign to a project (by key like 'KORT') and optionally a phase (by name like 'Building Foundation' or by ID). Set priority, due date, cycle, and initiative.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -277,7 +277,8 @@ const TOOLS: Tool[] = [
         },
         projectIdOrKey: {
           type: "string",
-          description: "Project ID or key like 'ACME' (optional)",
+          description:
+            "Project ID or key like 'KORT'. Required if assigning to a phase by name.",
         },
         priority: {
           type: "string",
@@ -292,10 +293,15 @@ const TOOLS: Tool[] = [
           type: "string",
           description: "Assign to a specific cycle (optional)",
         },
+        phaseNameOrId: {
+          type: "string",
+          description:
+            "Phase name (e.g. 'Building Foundation') or phase ID. Resolved within the project specified by projectIdOrKey. Preferred over phaseId.",
+        },
         phaseId: {
           type: "string",
           description:
-            "Assign to a specific phase within the project (optional)",
+            "Phase ID (deprecated, use phaseNameOrId instead)",
         },
         initiativeId: {
           type: "string",
@@ -2571,6 +2577,135 @@ const PROMPTS: Prompt[] = [
       },
     ],
   },
+  {
+    name: "client-health",
+    description:
+      "Show health dashboard across all clients with risk indicators, project health, and communication recency.",
+    arguments: [
+      {
+        name: "filter",
+        description:
+          "Optional filter: 'critical' to only show at-risk and critical clients",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "context-switch",
+    description:
+      "Quickly load context for a client or project for fast mental context switching.",
+    arguments: [
+      {
+        name: "name",
+        description: "Client name or project key/name to load context for (required)",
+        required: true,
+      },
+    ],
+  },
+  {
+    name: "end-of-day",
+    description:
+      "Run end-of-day wrap-up with completion summary, carry-over items, and tomorrow planning.",
+    arguments: [
+      {
+        name: "date",
+        description:
+          "Specific date in ISO format (optional, defaults to today)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "follow-ups",
+    description:
+      "Track follow-ups needed with people and clients based on interaction recency.",
+    arguments: [
+      {
+        name: "name",
+        description:
+          "Optional: specific person or client name to focus on",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "inbox-triage",
+    description:
+      "Process captured notes and triage into actionable tasks, tags, and links.",
+    arguments: [
+      {
+        name: "mode",
+        description:
+          "Optional: 'auto' to process automatically with best-guess actions instead of asking",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "monthly-review",
+    description:
+      "Run monthly review with accomplishments, project progress, client health, and next month planning.",
+    arguments: [
+      {
+        name: "month",
+        description:
+          "Month to review in ISO format like '2025-01' (optional, defaults to current month)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "overdue",
+    description:
+      "Show what's overdue or slipping — tasks past due, off-track projects, stale in-progress items.",
+    arguments: [
+      {
+        name: "filter",
+        description:
+          "Optional: 'critical' or 'urgent' to only show critical items",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "relationship-pulse",
+    description:
+      "Check on neglected relationships and suggest reconnection actions based on interaction history.",
+    arguments: [
+      {
+        name: "type",
+        description:
+          "Optional: relationship type to filter (e.g., 'family', 'friends', 'colleagues')",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "voice-notes",
+    description:
+      "Interactive voice memo exploration — review, analyze, and discuss your recorded thoughts.",
+    arguments: [
+      {
+        name: "topic",
+        description:
+          "Optional: topic or date range to start exploring",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "voice-notes-crystallize",
+    description:
+      "Save a crystallized summary of AI conversation — preserve insights, plans, and ideas from voice note discussions.",
+    arguments: [
+      {
+        name: "title",
+        description:
+          "Optional: title or topic for the crystallization summary",
+        required: false,
+      },
+    ],
+  },
 ];
 
 // Prompt message templates keyed by prompt name
@@ -2829,6 +2964,346 @@ Present the review:
 - **Recommendations**: Suggest next actions — which initiatives to focus on, which need attention
 
 Be concise but thorough. Use emoji for categories. Suggest linking unlinked projects/tasks if appropriate.`,
+        },
+      },
+    ];
+  },
+  "client-health": (args) => {
+    const filterClause = args.filter === "critical"
+      ? "\n\nOnly show at-risk and critical clients."
+      : "";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Show health dashboard across all clients. Use the LifeOS MCP tools:
+
+1. Call get_clients to get all active clients
+2. For each client, call get_projects_for_client to get project stats
+3. Call get_tasks to analyze overdue/at-risk tasks per client
+4. Call get_beeper_threads to check communication recency
+
+Calculate health score for each client based on:
+- **Project health**: Are projects on_track, at_risk, or off_track?
+- **Task completion**: % of tasks done vs total
+- **Overdue items**: Number of overdue tasks
+- **Communication**: Days since last message/meeting
+- **Revenue risk**: Active projects nearing completion without follow-on
+
+Present as a dashboard:
+| Client | Health | Projects | Overdue | Last Contact | Action |
+|--------|--------|----------|---------|--------------|--------|
+
+Then detail:
+- **Healthy clients**: All good, maintain relationship
+- **At-risk clients**: Need attention soon (explain why)
+- **Critical clients**: Immediate action needed
+
+For at-risk and critical, provide specific recommended actions.${filterClause}`,
+        },
+      },
+    ];
+  },
+  "context-switch": (args) => [
+    {
+      role: "user",
+      content: {
+        type: "text",
+        text: `Quickly load context for "${args.name}". Use the LifeOS MCP tools:
+
+**If it's a client name:**
+1. Call get_clients and find the matching client
+2. Call get_client with the client ID for details
+3. Call get_projects_for_client to see their projects
+4. Call get_beeper_threads_for_client for recent communications
+
+**If it's a project name/key:**
+1. Call get_project with the project key/name
+2. Call get_phases for the project phases
+3. Call get_tasks filtered by the project to see active work
+4. If project has a client, load client context too
+
+Present a quick context brief:
+- **Overview**: What this client/project is about
+- **Current Status**: Active phase, health, completion %
+- **Open Items**: Tasks in progress or todo (top 5)
+- **Recent Activity**: Last meeting, last message (if available)
+- **Blockers**: Anything stuck or overdue
+- **Quick Actions**: Suggested next steps
+
+Keep it scannable — this is for fast context loading, not deep analysis.`,
+      },
+    },
+  ],
+  "end-of-day": (args) => {
+    const dateClause = args.date
+      ? `Use date: ${args.date}`
+      : "Use today's date.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Run my end-of-day wrap-up. Use the LifeOS MCP tools:
+
+1. Call get_daily_agenda for today's agenda
+2. Call get_tasks with status "done" to see what was completed today
+3. Call get_tasks with status "in_progress" to see what's still in flight
+4. Call get_todays_tasks to see what was planned vs actual
+5. Call get_recent_notes with limit 5 for any thoughts captured today
+
+${dateClause}
+
+Present an end-of-day summary:
+- **Completed today**: What got done (celebrate wins!)
+- **Still in progress**: What's carrying over
+- **Moved to tomorrow**: Tasks that got bumped
+- **Unplanned work**: Things that came up unexpectedly
+- **Notes captured**: Any thoughts/ideas from today
+
+Then prompt for reflection:
+- What went well today?
+- What was challenging?
+- What's the #1 priority for tomorrow morning?
+
+Offer to:
+- Update any task statuses
+- Create tasks for tomorrow based on reflection
+- Capture any final thoughts as a note`,
+        },
+      },
+    ];
+  },
+  "follow-ups": (args) => {
+    const nameClause = args.name
+      ? `\n\nFocus specifically on: "${args.name}"`
+      : "";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Track follow-ups needed with people and clients. Use the LifeOS MCP tools:
+
+1. Call get_people to get all contacts
+2. Call get_clients to get all clients
+3. Call get_beeper_threads to see recent message activity
+4. Call get_granola_meetings to see recent meetings
+
+Analyze and identify:
+- **People needing follow-up**: Contacts with no interaction in 7+ days who have open items or recent meetings
+- **Client follow-ups**: Clients with stale threads or meetings that had action items
+- **Promised callbacks**: Any meetings/messages where you said "I'll get back to you"
+
+Present as:
+- **Urgent** (14+ days): People/clients you really need to reach out to
+- **Soon** (7-14 days): Worth a quick check-in
+- **Suggested actions**: Specific follow-up actions for each${nameClause}`,
+        },
+      },
+    ];
+  },
+  "inbox-triage": (args) => {
+    const autoMode = args.mode === "auto"
+      ? "\n\nProcess automatically with best-guess actions instead of asking for confirmation."
+      : "\n\nAsk for confirmation before making changes.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Process captured notes and triage into actionable items. Use the LifeOS MCP tools:
+
+1. Call get_recent_notes with limit 20 to get recent unprocessed captures
+2. Call get_projects to know available projects for assignment
+3. Call get_people to know contacts for linking
+
+For each note, analyze and suggest:
+- **Convert to task?** If it contains an action item, offer to create an issue
+- **Link to person?** If it mentions someone, offer to link the note
+- **Link to project?** If it relates to a project, suggest assignment
+- **Add tags?** Suggest relevant tags based on content
+
+Present as an interactive triage list:
+- Show each note with its content summary
+- Provide recommended action (task, tag, link, or archive)
+
+After triage, use the appropriate tools:
+- Call create_issue to convert notes to tasks
+- Call add_tags_to_note to categorize
+- Call link_memo_to_person to connect to people${autoMode}`,
+        },
+      },
+    ];
+  },
+  "monthly-review": (args) => {
+    const monthClause = args.month
+      ? `Use month start date: ${args.month}-01`
+      : "Use the current month.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Run my monthly review. Use the LifeOS MCP tools:
+
+1. Call get_monthly_agenda for this month's overview and AI summary
+2. Call get_cycles to see all sprints this month and their completion rates
+3. Call get_tasks with status "done" to see everything completed this month
+4. Call get_projects to see project progress and health
+5. Call get_clients to review client status
+6. Call get_recent_notes with limit 20 to review captured thoughts
+
+${monthClause}
+
+Present a monthly review:
+- **Accomplishments**: Major wins and completed work this month
+- **Projects Progress**: Status of each active project
+- **Sprint Performance**: Average completion rate across cycles
+- **Client Health**: How each client relationship is doing
+- **Themes**: Patterns from notes and completed work
+- **Carried Forward**: What's rolling into next month
+- **Reflections**: What worked, what didn't
+- **Next Month Focus**: Top 3 priorities for the coming month`,
+        },
+      },
+    ];
+  },
+  overdue: (args) => {
+    const filterClause =
+      args.filter === "critical" || args.filter === "urgent"
+        ? "\n\nOnly show critical items (7+ days overdue)."
+        : "";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Show what's overdue or slipping. Use the LifeOS MCP tools:
+
+1. Call get_tasks to get all tasks
+2. Call get_projects to get all projects with health status
+3. Call get_current_cycle to see sprint status
+
+Analyze and identify:
+- **Overdue tasks**: Tasks past their due date (compare dueDate to today)
+- **Off-track projects**: Projects with health "off_track" or "at_risk"
+- **Stale in-progress**: Tasks marked "in_progress" for more than 7 days
+- **Sprint slippage**: If cycle completion % is behind expected pace
+
+Present as:
+- **Critical** (7+ days overdue): Needs immediate attention
+- **Overdue** (1-7 days): Should address soon
+- **At Risk**: In-progress items that might slip
+- **Projects Off Track**: Projects needing intervention
+
+For each item, suggest: reschedule, delegate, or drop.${filterClause}`,
+        },
+      },
+    ];
+  },
+  "relationship-pulse": (args) => {
+    const typeClause = args.type
+      ? `\n\nFilter to relationship type: "${args.type}"`
+      : "";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Check on neglected relationships. Use the LifeOS MCP tools:
+
+1. Call get_people to get all contacts
+2. Call get_beeper_threads to check message activity
+3. Call get_granola_meetings to see meeting history
+
+Analyze each contact for:
+- **Last interaction**: When did you last talk/meet?
+- **Interaction frequency**: How often do you typically connect?
+- **Relationship type**: Family, friend, colleague, mentor, etc.
+
+Identify neglected relationships:
+- **Family/Close friends**: No contact in 14+ days
+- **Friends**: No contact in 30+ days
+- **Colleagues/Mentors**: No contact in 60+ days
+- **Acquaintances**: No contact in 90+ days
+
+Present as:
+- **Reach out soon**: People you should contact (prioritized by relationship closeness)
+- **Consider reconnecting**: People you might want to re-engage
+- **Suggested touchpoints**: Quick ways to reconnect (reply to old thread, schedule catch-up, etc.)${typeClause}`,
+        },
+      },
+    ];
+  },
+  "voice-notes": (args) => {
+    const topicClause = args.topic
+      ? `\n\nStart by exploring: "${args.topic}"`
+      : "\n\nShow recent activity and ask what I want to explore.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Explore and work with my voice notes interactively. Use the LifeOS MCP tools.
+
+This is an interactive session to help me think through my voice notes, formulate plans, refine ideas, and review journal entries.
+
+**Getting Started:**
+1. Call get_voice_memo_labels to see all topics/labels
+2. Call get_recent_notes with limit 10 to see recent entries
+
+**Based on what I want to explore:**
+- To review recent notes: Call get_recent_notes or get_voice_memos_by_date
+- To explore a topic: Call get_voice_memos_by_labels or search_notes
+- To review a time period: Call get_voice_memos_by_date with date range
+- For deeper analysis: Call get_voice_memo for full details
+
+**During the conversation:**
+- Help me think through my notes
+- Identify patterns and connections across memos
+- Surface action items I may have forgotten
+- Help formulate new plans or refine existing ideas
+- Offer reflections on journal entries
+
+**At the end:** Offer to crystallize insights using the voice-notes-crystallize prompt.${topicClause}`,
+        },
+      },
+    ];
+  },
+  "voice-notes-crystallize": (args) => {
+    const titleClause = args.title
+      ? `Use title: "${args.title}"`
+      : "Generate a title based on the conversation.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Save a crystallized summary of our conversation about voice notes. Use the LifeOS MCP tools.
+
+${titleClause}
+
+**Analyze the conversation and extract:**
+
+1. **Title**: A descriptive title for this crystallization
+2. **Summary**: The main insights, conclusions, or outcomes (2-4 paragraphs)
+3. **Key Insights**: 3-7 bullet points of the most important realizations
+4. **Action Items**: Any tasks or actions that emerged
+5. **Ideas**: New ideas, plans, or directions formulated
+6. **Tags**: 3-5 relevant tags for categorization
+
+**Determine the summary type:**
+- reflection — Processing past experiences or feelings
+- planning — Creating plans or strategies
+- brainstorm — Generating new ideas
+- journal_review — Reviewing journal/diary entries
+- idea_refinement — Developing and refining existing ideas
+
+**Save using:** Call create_ai_convo_summary with the extracted data.
+
+**After saving:** Confirm success and show the summary ID.`,
         },
       },
     ];

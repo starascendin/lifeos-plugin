@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { Pencil, Check, X, Target } from "lucide-react";
+import { Target } from "lucide-react";
 
 interface CycleGoalsEditorProps {
   goals: string[] | undefined;
@@ -14,103 +13,98 @@ export function CycleGoalsEditor({
   onSave,
   readOnly = false,
 }: CycleGoalsEditorProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState("");
+  const goalsText = (goals ?? []).join("\n");
+  const [value, setValue] = useState(goalsText);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const isFocusedRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef(goalsText);
 
-  const handleStartEdit = () => {
-    setEditValue((goals ?? []).join("\n"));
-    setIsEditing(true);
-  };
+  // Sync from props ONLY when not focused
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setValue(goalsText);
+      lastSavedRef.current = goalsText;
+    }
+  }, [goalsText]);
 
-  const handleCancel = () => {
-    setIsEditing(false);
-    setEditValue("");
-  };
-
-  const handleSave = async () => {
+  const save = useCallback(async (text: string) => {
+    const newGoals = text
+      .split("\n")
+      .map((g) => g.trim())
+      .filter((g) => g.length > 0);
+    const next = newGoals.join("\n");
+    if (lastSavedRef.current === next) return;
     setIsSaving(true);
     try {
-      const newGoals = editValue
-        .split("\n")
-        .map((g) => g.trim())
-        .filter((g) => g.length > 0);
       await onSave(newGoals);
-      setIsEditing(false);
+      lastSavedRef.current = next;
+      setSavedAt(new Date());
     } finally {
       setIsSaving(false);
     }
+  }, [onSave]);
+
+  const scheduleAutoSave = useCallback((text: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      save(text);
+    }, 1500);
+  }, [save]);
+
+  const handleChange = (text: string) => {
+    setValue(text);
+    scheduleAutoSave(text);
   };
 
-  if (isEditing) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="flex items-center gap-2 text-sm font-medium">
-            <Target className="h-4 w-4" />
-            Goals
-          </h4>
-          <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleCancel}
-              disabled={isSaving}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <Textarea
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          placeholder="Enter goals (one per line)..."
-          className="min-h-[120px] resize-none"
-          disabled={isSaving}
-        />
-        <p className="text-xs text-muted-foreground">
-          Enter one goal per line
-        </p>
-      </div>
-    );
-  }
+  const handleBlur = () => {
+    isFocusedRef.current = false;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    save(value);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const formatSavedAt = (date: Date) => {
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="flex items-center gap-2 text-sm font-medium">
+        <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Target className="h-4 w-4" />
           Goals
-        </h4>
-        {!readOnly && (
-          <Button size="sm" variant="ghost" onClick={handleStartEdit}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-        )}
+        </h3>
+        <span className="text-xs text-muted-foreground">
+          {isSaving
+            ? "Saving..."
+            : savedAt
+              ? `Saved at ${formatSavedAt(savedAt)}`
+              : ""}
+        </span>
       </div>
-      {goals && goals.length > 0 ? (
-        <ul className="space-y-1.5">
-          {goals.map((goal, index) => (
-            <li
-              key={index}
-              className="flex items-start gap-2 text-sm text-muted-foreground"
-            >
-              <div className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-muted-foreground" />
-              <span>{goal}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-muted-foreground">No goals set</p>
-      )}
+      <Textarea
+        value={value}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={() => { isFocusedRef.current = true; }}
+        onBlur={handleBlur}
+        placeholder="Enter goals (one per line)..."
+        className="min-h-[80px] resize-none text-sm"
+        disabled={readOnly}
+      />
     </div>
   );
 }

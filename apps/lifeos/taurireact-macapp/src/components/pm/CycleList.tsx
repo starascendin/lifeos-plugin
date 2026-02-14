@@ -1,9 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { usePM, CycleStatus } from "@/lib/contexts/PMContext";
-import { MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { RefreshCw, Play, CheckCircle, Clock, LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import type { Id } from "@holaai/convex";
 
@@ -30,7 +28,7 @@ const STATUS_CONFIG: Record<CycleStatus, { label: string; icon: LucideIcon; colo
 
 export function CycleList() {
   const navigate = useNavigate();
-  const { cycles, isLoadingCycles, setSelectedCycleForDetail } = usePM();
+  const { cycles, isLoadingCycles } = usePM();
 
   const handleCycleClick = (cycleId: Id<"lifeos_pmCycles">) => {
     navigate(`/lifeos/pm/cycles/${cycleId}`);
@@ -115,17 +113,6 @@ export function CycleList() {
                     <span className={statusConfig.color}>
                       {statusConfig.label}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCycleForDetail(cycle._id);
-                      }}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
 
@@ -204,17 +191,6 @@ export function CycleList() {
                     <span className={statusConfig.color}>
                       {statusConfig.label}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCycleForDetail(cycle._id);
-                      }}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
               );
@@ -273,17 +249,6 @@ export function CycleList() {
                         {progress}%
                       </span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCycleForDetail(cycle._id);
-                      }}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
               );

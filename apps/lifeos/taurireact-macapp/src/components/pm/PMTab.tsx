@@ -5,7 +5,6 @@ import { ProjectList } from "./ProjectList";
 import { CycleList } from "./CycleList";
 import { ProjectDetailView } from "./project/ProjectDetailView";
 import { IssueDetailPanel } from "./issue/IssueDetailPanel";
-import { CycleDetailPanel } from "./cycle/CycleDetailPanel";
 import { CycleDetailView } from "./cycle/CycleDetailView";
 import { ContactsTab } from "./contacts/ContactsTab";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,6 @@ import {
 } from "@/components/ui/select";
 import {
   Plus,
-  Filter,
   Kanban,
   FolderKanban,
   RefreshCw,
@@ -28,9 +26,9 @@ import {
 import { useState } from "react";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { CreateIssueDialog } from "./CreateIssueDialog";
-import { CreateCycleDialog } from "./CreateCycleDialog";
 import { CycleSettingsModal } from "./CycleSettingsModal";
 import { PomodoroWidget, PomodoroStatsMini } from "./pomodoro";
+import { toast } from "sonner";
 import type { Id } from "@holaai/convex";
 
 type ViewType = "board" | "projects" | "cycles" | "contacts";
@@ -38,12 +36,30 @@ type ViewType = "board" | "projects" | "cycles" | "contacts";
 export function PMTab() {
   const { view, id } = useParams<{ view?: string; id?: string }>();
   const navigate = useNavigate();
-  const { projects, filters, setFilters, clearFilters } = usePM();
+  const { projects, filters, setFilters, clearFilters, userSettings, generateCycles } = usePM();
 
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateIssue, setShowCreateIssue] = useState(false);
-  const [showCreateCycle, setShowCreateCycle] = useState(false);
   const [showCycleSettings, setShowCycleSettings] = useState(false);
+  const [isGeneratingCycle, setIsGeneratingCycle] = useState(false);
+
+  const handleNewCycle = async () => {
+    if (!userSettings?.cycleSettings) {
+      toast.info("Configure your cycle settings first");
+      setShowCycleSettings(true);
+      return;
+    }
+    setIsGeneratingCycle(true);
+    try {
+      await generateCycles({ count: 1 });
+      toast.success("Cycle created");
+    } catch (error) {
+      toast.error("Failed to create cycle");
+      console.error("Failed to generate cycle:", error);
+    } finally {
+      setIsGeneratingCycle(false);
+    }
+  };
 
   // Determine current view from URL
   const currentView: ViewType =
@@ -174,9 +190,9 @@ export function PMTab() {
               >
                 <Settings className="h-4 w-4" />
               </Button>
-              <Button onClick={() => setShowCreateCycle(true)} className="gap-2">
+              <Button onClick={handleNewCycle} disabled={isGeneratingCycle} className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Cycle
+                {isGeneratingCycle ? "Creating..." : "New Cycle"}
               </Button>
             </>
           )}
@@ -209,10 +225,6 @@ export function PMTab() {
         open={showCreateIssue}
         onOpenChange={setShowCreateIssue}
       />
-      <CreateCycleDialog
-        open={showCreateCycle}
-        onOpenChange={setShowCreateCycle}
-      />
       <CycleSettingsModal
         open={showCycleSettings}
         onOpenChange={setShowCycleSettings}
@@ -220,9 +232,6 @@ export function PMTab() {
 
       {/* Issue Detail Panel */}
       <IssueDetailPanel />
-
-      {/* Cycle Detail Panel */}
-      <CycleDetailPanel />
     </div>
   );
 }

@@ -540,6 +540,7 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             dueDate: params?.dueDate as string | undefined,
             cycleId: params?.cycleId as string | undefined,
             phaseId: params?.phaseId as string | undefined,
+            phaseNameOrId: params?.phaseNameOrId as string | undefined,
             initiativeId: params?.initiativeId as string | undefined,
           },
         );

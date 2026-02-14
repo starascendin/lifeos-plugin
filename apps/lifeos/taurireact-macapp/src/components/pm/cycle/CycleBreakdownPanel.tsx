@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import type { Id, Doc } from "@holaai/convex";
@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { CycleStatsCard } from "./CycleStatsCard";
 import { CycleBurnupChart } from "./CycleBurnupChart";
 import { CycleBreakdownTabs } from "./CycleBreakdownTabs";
-import { Priority } from "@/lib/contexts/PMContext";
+import { CycleGoalsEditor } from "./CycleGoalsEditor";
+import { CycleRetrospectiveForm } from "./CycleRetrospectiveForm";
+import { usePM, CycleStatus, CycleRetrospective } from "@/lib/contexts/PMContext";
 import { cn } from "@/lib/utils";
 
 interface CycleBreakdownPanelProps {
@@ -52,10 +54,19 @@ export function CycleBreakdownPanel({
   breakdowns,
 }: CycleBreakdownPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { updateCycle } = usePM();
 
   const snapshots = useQuery(api.lifeos.pm_cycle_snapshots.getCycleSnapshots, {
     cycleId,
   });
+
+  const handleUpdateGoals = useCallback(async (goals: string[]) => {
+    await updateCycle({ cycleId, goals });
+  }, [updateCycle, cycleId]);
+
+  const handleUpdateRetrospective = useCallback(async (retrospective: CycleRetrospective) => {
+    await updateCycle({ cycleId, retrospective });
+  }, [updateCycle, cycleId]);
 
   return (
     <div
@@ -85,6 +96,13 @@ export function CycleBreakdownPanel({
       {!isCollapsed && (
         <div className="flex-1 overflow-auto p-4">
           <div className="space-y-6">
+            {/* Goals */}
+            <CycleGoalsEditor
+              goals={cycle.goals}
+              onSave={handleUpdateGoals}
+              readOnly={cycle.status === "completed"}
+            />
+
             {/* Stats Section */}
             <div>
               <h3 className="mb-3 text-sm font-medium text-muted-foreground">
@@ -115,6 +133,13 @@ export function CycleBreakdownPanel({
               </h3>
               <CycleBreakdownTabs breakdowns={breakdowns} />
             </div>
+
+            {/* Retrospective */}
+            <CycleRetrospectiveForm
+              retrospective={cycle.retrospective as CycleRetrospective | undefined}
+              onSave={handleUpdateRetrospective}
+              cycleStatus={cycle.status as CycleStatus}
+            />
           </div>
         </div>
       )}

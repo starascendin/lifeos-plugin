@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { RefreshCw, Wand2 } from "lucide-react";
 
 interface CycleSettingsModalProps {
@@ -34,6 +35,7 @@ export function CycleSettingsModal({
   const [duration, setDuration] = useState<CycleDuration>("2_weeks");
   const [startDay, setStartDay] = useState<CycleStartDay>("monday");
   const [defaultCyclesToCreate, setDefaultCyclesToCreate] = useState(4);
+  const [autoRollover, setAutoRollover] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [cyclesToGenerate, setCyclesToGenerate] = useState(4);
@@ -45,6 +47,7 @@ export function CycleSettingsModal({
       setStartDay(userSettings.cycleSettings.startDay);
       setDefaultCyclesToCreate(userSettings.cycleSettings.defaultCyclesToCreate);
       setCyclesToGenerate(userSettings.cycleSettings.defaultCyclesToCreate);
+      setAutoRollover(userSettings.cycleSettings.autoRolloverIncompleteIssues ?? false);
     }
   }, [userSettings]);
 
@@ -62,6 +65,7 @@ export function CycleSettingsModal({
           startDay,
           defaultCyclesToCreate,
           timezoneOffsetMinutes,
+          autoRolloverIncompleteIssues: autoRollover,
         },
       });
     } catch (error) {
@@ -84,6 +88,7 @@ export function CycleSettingsModal({
           startDay,
           defaultCyclesToCreate,
           timezoneOffsetMinutes,
+          autoRolloverIncompleteIssues: autoRollover,
         },
       });
       // Then generate cycles
@@ -176,6 +181,32 @@ export function CycleSettingsModal({
               <p className="text-xs text-muted-foreground">
                 Number of cycles to create when generating (1-12)
               </p>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Automation Section */}
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium">Automation</h4>
+                <p className="text-sm text-muted-foreground">
+                  Cycles are automatically managed — expired cycles close daily, and new upcoming cycles are generated as needed.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autoRollover">Auto-rollover incomplete issues</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Move unfinished issues to the next cycle when a cycle ends
+                  </p>
+                </div>
+                <Switch
+                  id="autoRollover"
+                  checked={autoRollover}
+                  onCheckedChange={setAutoRollover}
+                />
+              </div>
             </div>
 
             <Button

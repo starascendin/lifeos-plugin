@@ -9,7 +9,6 @@ import {
   Clock,
   Play,
   CheckCircle,
-  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +51,6 @@ export function CycleDetailView({ cycleId }: CycleDetailViewProps) {
     updateIssueStatus,
     setFilters,
     filters,
-    setSelectedCycleForDetail,
   } = usePM();
 
   const cycleData = useQuery(
@@ -175,17 +173,6 @@ export function CycleDetailView({ cycleId }: CycleDetailViewProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setSelectedCycleForDetail(cycleId)}
-            title="Cycle settings"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       {/* Main Content */}
