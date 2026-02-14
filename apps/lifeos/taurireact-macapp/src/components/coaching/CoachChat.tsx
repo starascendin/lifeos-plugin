@@ -1,9 +1,8 @@
 /**
- * CoachChat - Interactive coaching chat UI
+ * CoachChat - Full-bleed chat UI (no wrapping Card).
  *
- * Manages active sessions, message sending/receiving,
- * and session lifecycle (start/end with auto-summarization).
- * Mobile-friendly: reduced padding, full-width messages, safe input area.
+ * iMessage-like: messages fill the space, input pinned to bottom
+ * with safe-area-bottom for iOS. No unnecessary chrome.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -12,7 +11,6 @@ import { api } from "@holaai/convex";
 import { Id } from "@holaai/convex/convex/_generated/dataModel";
 import { Doc } from "@holaai/convex/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
@@ -52,7 +50,6 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Queries
   const activeSession = useQuery(api.lifeos.coaching.getActiveSession, {
     coachProfileId: coachProfile._id,
   });
@@ -61,19 +58,16 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
     sessionId ? { sessionId } : "skip",
   );
 
-  // Actions
-  const startSession = useAction(api.lifeos.coaching.startSession);
-  const sendMessage = useAction(api.lifeos.coaching.sendMessage);
-  const endSession = useAction(api.lifeos.coaching.endSession);
+  const startSessionAction = useAction(api.lifeos.coaching.startSession);
+  const sendMessageAction = useAction(api.lifeos.coaching.sendMessage);
+  const endSessionAction = useAction(api.lifeos.coaching.endSession);
 
-  // Set session ID from active session
   useEffect(() => {
     if (activeSession) {
       setSessionId(activeSession._id);
     }
   }, [activeSession]);
 
-  // Sync remote messages with local state
   useEffect(() => {
     if (sessionMessages && sessionMessages.length > 0) {
       const remote = sessionMessages.map((m) => ({
@@ -88,7 +82,6 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
     }
   }, [sessionMessages]);
 
-  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [localMessages, isLoading]);
@@ -96,12 +89,11 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
   const handleStartSession = useCallback(async () => {
     setIsStarting(true);
     try {
-      const result = await startSession({
+      const result = await startSessionAction({
         coachProfileId: coachProfile._id,
       });
       setSessionId(result.sessionId);
       setLocalMessages([]);
-
       if (coachProfile.greeting) {
         setLocalMessages([
           {
@@ -117,13 +109,13 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
     } finally {
       setIsStarting(false);
     }
-  }, [startSession, coachProfile]);
+  }, [startSessionAction, coachProfile]);
 
   const handleEndSession = useCallback(async () => {
     if (!sessionId) return;
     setIsEnding(true);
     try {
-      await endSession({ sessionId });
+      await endSessionAction({ sessionId });
       setSessionId(null);
       setLocalMessages([]);
     } catch (error) {
@@ -131,11 +123,10 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
     } finally {
       setIsEnding(false);
     }
-  }, [endSession, sessionId]);
+  }, [endSessionAction, sessionId]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !sessionId || isLoading) return;
-
     const userMessage = input.trim();
     setInput("");
     setIsLoading(true);
@@ -143,20 +134,14 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
     const tempId = `temp-${Date.now()}`;
     setLocalMessages((prev) => [
       ...prev,
-      {
-        id: tempId,
-        role: "user",
-        content: userMessage,
-        createdAt: Date.now(),
-      },
+      { id: tempId, role: "user", content: userMessage, createdAt: Date.now() },
     ]);
 
     try {
-      const result = await sendMessage({
+      const result = await sendMessageAction({
         sessionId,
         message: userMessage,
       });
-
       setLocalMessages((prev) => [
         ...prev,
         {
@@ -182,7 +167,7 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [input, sessionId, isLoading, sendMessage]);
+  }, [input, sessionId, isLoading, sendMessageAction]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -195,152 +180,151 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* Chat header */}
-      <div className="mb-2 flex items-center gap-2 md:mb-3 md:gap-3">
-        <div
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-sm md:h-8 md:w-8"
-          style={{
-            backgroundColor: coachProfile.color
-              ? `${coachProfile.color}20`
-              : "hsl(var(--muted))",
-          }}
-        >
-          {coachProfile.icon || (
-            <GraduationCap className="h-3.5 w-3.5 md:h-4 md:w-4" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold md:text-base">
-            {coachProfile.name}
-          </h3>
-          <p className="hidden text-muted-foreground text-xs md:block">
-            {coachProfile.focusAreas.join(" / ")}
-          </p>
-        </div>
-        {hasActiveSession ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleEndSession}
-            disabled={isEnding}
-          >
-            {isEnding ? (
-              <Loader2 className="mr-1 h-4 w-4 animate-spin md:mr-1.5" />
-            ) : (
-              <Square className="mr-1 h-4 w-4 md:mr-1.5" />
-            )}
-            <span className="hidden sm:inline">End Session</span>
-            <span className="sm:hidden">End</span>
-          </Button>
-        ) : (
-          <Button size="sm" onClick={handleStartSession} disabled={isStarting}>
-            {isStarting ? (
-              <Loader2 className="mr-1 h-4 w-4 animate-spin md:mr-1.5" />
-            ) : (
-              <Play className="mr-1 h-4 w-4 md:mr-1.5" />
-            )}
-            <span className="hidden sm:inline">Start Session</span>
-            <span className="sm:hidden">Start</span>
-          </Button>
-        )}
-      </div>
-
-      {/* Messages area */}
-      <Card className="flex flex-1 flex-col overflow-hidden">
-        <CardContent className="flex-1 space-y-3 overflow-y-auto p-3 md:space-y-4 md:p-4">
-          {!hasActiveSession && localMessages.length === 0 && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center px-4">
-                <GraduationCap className="mx-auto mb-2 h-10 w-10 text-muted-foreground md:mb-3 md:h-12 md:w-12" />
-                <p className="font-medium text-sm md:text-base">
-                  Ready for a coaching session?
-                </p>
-                <p className="mt-1 text-muted-foreground text-xs md:text-sm">
-                  Tap &quot;Start&quot; to begin with {coachProfile.name}.
-                </p>
-                {coachProfile.sessionCadence && (
-                  <Badge variant="outline" className="mt-2">
-                    Suggested: {coachProfile.sessionCadence}
-                  </Badge>
-                )}
-              </div>
+      {/* ─── Empty state / start session ─── */}
+      {!hasActiveSession && localMessages.length === 0 && (
+        <div className="flex flex-1 items-center justify-center px-6">
+          <div className="text-center">
+            <div
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl"
+              style={{
+                backgroundColor: coachProfile.color
+                  ? `${coachProfile.color}20`
+                  : "hsl(var(--muted))",
+              }}
+            >
+              {coachProfile.icon || (
+                <GraduationCap className="h-8 w-8 text-muted-foreground" />
+              )}
             </div>
-          )}
+            <p className="font-medium">{coachProfile.name}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {coachProfile.focusAreas.slice(0, 3).join(" / ")}
+            </p>
+            {coachProfile.sessionCadence && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Suggested: {coachProfile.sessionCadence}
+              </p>
+            )}
+            <Button
+              className="mt-5"
+              onClick={handleStartSession}
+              disabled={isStarting}
+            >
+              {isStarting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              Start Session
+            </Button>
+          </div>
+        </div>
+      )}
 
-          {localMessages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
-
-          {isLoading && (
-            <div className="flex gap-2 md:gap-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted md:h-8 md:w-8">
-                <GraduationCap className="h-3.5 w-3.5 md:h-4 md:w-4" />
-              </div>
-              <div className="rounded-lg bg-muted px-3 py-2 md:px-4">
-                <div className="flex gap-1">
-                  <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50" />
-                  <span
-                    className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50"
-                    style={{ animationDelay: "0.1s" }}
-                  />
-                  <span
-                    className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50"
-                    style={{ animationDelay: "0.2s" }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </CardContent>
-
-        {/* Input area — safe-area-bottom for iOS */}
-        {hasActiveSession && (
-          <div className="border-t p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:p-3 md:pb-3">
-            <div className="flex gap-2">
-              <Textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type your message..."
-                className="min-h-[44px] max-h-[150px] resize-none text-base md:min-h-[60px] md:max-h-[200px] md:text-sm"
-                disabled={isLoading}
-                rows={1}
-              />
+      {/* ─── Messages ─── */}
+      {(hasActiveSession || localMessages.length > 0) && (
+        <>
+          {/* End session bar */}
+          {hasActiveSession && (
+            <div className="flex items-center justify-end px-3 py-1.5 md:px-4">
               <Button
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="self-end"
-                size="icon"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground"
+                onClick={handleEndSession}
+                disabled={isEnding}
               >
-                <Send className="h-4 w-4" />
+                {isEnding ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Square className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                End Session
               </Button>
             </div>
+          )}
+
+          {/* Scrollable messages */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 md:px-4 md:py-3">
+            <div className="mx-auto max-w-2xl space-y-4">
+              {localMessages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+
+              {isLoading && (
+                <div className="flex gap-2.5">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted">
+                    <GraduationCap className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5">
+                    <div className="flex gap-1">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40" />
+                      <span
+                        className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40"
+                        style={{ animationDelay: "0.15s" }}
+                      />
+                      <span
+                        className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/40"
+                        style={{ animationDelay: "0.3s" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
-        )}
-      </Card>
+
+          {/* ─── Input ─── */}
+          {hasActiveSession && (
+            <div className="border-t bg-background px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2 md:px-4 md:pb-3 md:pt-3">
+              <div className="mx-auto flex max-w-2xl gap-2">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type a message..."
+                  className="min-h-[44px] max-h-[120px] resize-none rounded-xl text-base md:min-h-[44px] md:max-h-[200px] md:text-sm"
+                  disabled={isLoading}
+                  rows={1}
+                />
+                <Button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading}
+                  size="icon"
+                  className="h-[44px] w-[44px] flex-shrink-0 rounded-xl"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-// ==================== MESSAGE BUBBLE ====================
+// ─── Message Bubble ───
 
 function MessageBubble({ message }: { message: LocalMessage }) {
   const [showTools, setShowTools] = useState(false);
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex gap-2 md:gap-3", isUser && "flex-row-reverse")}>
+    <div className={cn("flex gap-2.5", isUser && "flex-row-reverse")}>
       {!isUser && (
-        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted md:h-8 md:w-8">
-          <GraduationCap className="h-3.5 w-3.5 md:h-4 md:w-4" />
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted">
+          <GraduationCap className="h-3.5 w-3.5" />
         </div>
       )}
       <div
         className={cn(
-          "max-w-[85%] rounded-lg px-3 py-2 md:max-w-[80%] md:px-4",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted",
+          "max-w-[85%] rounded-2xl px-3.5 py-2.5 md:max-w-[75%]",
+          isUser
+            ? "rounded-tr-sm bg-primary text-primary-foreground"
+            : "rounded-tl-sm bg-muted",
         )}
       >
         {isUser ? (
@@ -349,12 +333,11 @@ function MessageBubble({ message }: { message: LocalMessage }) {
           <MarkdownRenderer content={message.content} className="text-sm" />
         )}
 
-        {/* Tool calls indicator */}
         {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 border-t border-border/30 pt-2">
+          <div className="mt-2 border-t border-border/20 pt-1.5">
             <button
               onClick={() => setShowTools(!showTools)}
-              className="flex items-center gap-1 text-muted-foreground text-xs"
+              className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-muted-foreground"
             >
               <Wrench className="h-3 w-3" />
               {message.toolCalls.length} tool
@@ -368,7 +351,7 @@ function MessageBubble({ message }: { message: LocalMessage }) {
             {showTools && (
               <div className="mt-1 flex flex-wrap gap-1">
                 {message.toolCalls.map((tc, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
+                  <Badge key={i} variant="secondary" className="text-[10px]">
                     {tc.name}
                   </Badge>
                 ))}

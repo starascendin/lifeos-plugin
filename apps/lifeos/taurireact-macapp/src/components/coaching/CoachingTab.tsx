@@ -1,8 +1,9 @@
 /**
  * CoachingTab - Main coaching container
  *
- * Mobile: Coach list as horizontal scroll strip at top, content below
- * Desktop: Left sidebar (coach list) + center content
+ * Mobile: Full-screen views. Coach picker -> tapping a coach goes full-screen into chat.
+ *         Back button to return to coach picker.
+ * Desktop: Left sidebar (coach list) + center content area.
  */
 
 import { useState } from "react";
@@ -10,7 +11,6 @@ import { useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { Id } from "@holaai/convex/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -20,13 +20,14 @@ import {
   History,
   CheckSquare,
   Settings2,
+  ChevronLeft,
 } from "lucide-react";
 import { CoachChat } from "./CoachChat";
 import { CoachProfileEditor } from "./CoachProfileEditor";
 import { CoachSessionHistory } from "./CoachSessionHistory";
 import { CoachActionItems } from "./CoachActionItems";
 
-type View = "chat" | "history" | "actions" | "settings";
+type View = "chat" | "history" | "actions";
 
 export function CoachingTab() {
   const profiles = useQuery(api.lifeos.coaching.getCoachProfiles) ?? [];
@@ -42,153 +43,138 @@ export function CoachingTab() {
 
   const selectedProfile = profiles.find((p) => p._id === selectedProfileId);
 
-  // Auto-select first profile if none selected
+  // Auto-select first profile on desktop (don't auto-select on mobile — let user tap)
   if (!selectedProfileId && profiles.length > 0 && !showProfileEditor) {
     setSelectedProfileId(profiles[0]._id);
   }
 
-  return (
-    <div className="flex h-full flex-col md:flex-row md:gap-4">
-      {/* Coach list: horizontal strip on mobile, vertical sidebar on desktop */}
-      <div className="flex-shrink-0 md:w-64">
-        {/* Header */}
-        <div className="mb-2 flex items-center justify-between md:mb-3">
-          <h2 className="font-semibold text-base md:text-lg">Coaches</h2>
+  const handleSelectCoach = (id: Id<"lifeos_coachingProfiles">) => {
+    setSelectedProfileId(id);
+    setShowProfileEditor(false);
+    setView("chat");
+  };
+
+  const handleBack = () => {
+    setSelectedProfileId(null);
+    setShowProfileEditor(false);
+  };
+
+  // ─── MOBILE: Full-screen profile editor ───
+  if (showProfileEditor) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="flex items-center gap-2 border-b px-3 py-2 md:hidden">
           <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setShowProfileEditor(false)}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <span className="text-sm font-medium">
+            {editingProfileId ? "Edit Coach" : "New Coach"}
+          </span>
+        </div>
+        <div className="flex flex-1 flex-col overflow-hidden md:flex-row md:gap-4 md:p-6">
+          {/* Desktop sidebar still visible */}
+          <div className="hidden md:block">
+            <CoachSidebar
+              profiles={profiles}
+              actionItemCounts={actionItemCounts}
+              selectedProfileId={selectedProfileId}
+              showProfileEditor={showProfileEditor}
+              onSelectCoach={handleSelectCoach}
+              onNewCoach={() => {
+                setEditingProfileId(null);
+                setShowProfileEditor(true);
+              }}
+            />
+          </div>
+          <div className="flex-1 overflow-auto p-3 md:p-0">
+            <CoachProfileEditor
+              profileId={editingProfileId}
+              onSave={() => setShowProfileEditor(false)}
+              onCancel={() => setShowProfileEditor(false)}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── MOBILE: Full-screen coach detail (chat/history/actions) ───
+  if (selectedProfile) {
+    return (
+      <div className="flex h-full flex-col md:flex-row md:gap-4 md:p-6">
+        {/* Desktop sidebar */}
+        <div className="hidden md:block">
+          <CoachSidebar
+            profiles={profiles}
+            actionItemCounts={actionItemCounts}
+            selectedProfileId={selectedProfileId}
+            showProfileEditor={false}
+            onSelectCoach={handleSelectCoach}
+            onNewCoach={() => {
               setEditingProfileId(null);
               setShowProfileEditor(true);
             }}
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            New
-          </Button>
-        </div>
-
-        {/* Coach cards: horizontal scroll on mobile, vertical stack on desktop */}
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-2 md:mb-0 md:flex-col md:overflow-x-visible md:pb-0">
-          {profiles.map((profile) => {
-            const pendingCount = actionItemCounts[profile._id] || 0;
-            return (
-              <button
-                key={profile._id}
-                onClick={() => {
-                  setSelectedProfileId(profile._id);
-                  setShowProfileEditor(false);
-                  setView("chat");
-                }}
-                className={cn(
-                  "flex flex-shrink-0 items-center gap-2 rounded-lg border p-2.5 text-left transition-colors md:w-full md:items-start md:gap-3 md:p-3",
-                  selectedProfileId === profile._id && !showProfileEditor
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50",
-                )}
-              >
-                <div
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-base md:h-10 md:w-10 md:text-lg"
-                  style={{
-                    backgroundColor: profile.color
-                      ? `${profile.color}20`
-                      : "hsl(var(--muted))",
-                  }}
-                >
-                  {profile.icon || (
-                    <GraduationCap className="h-4 w-4 md:h-5 md:w-5" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-sm">{profile.name}</p>
-                  <p className="hidden truncate text-muted-foreground text-xs md:block">
-                    {profile.focusAreas.slice(0, 2).join(", ")}
-                  </p>
-                  {pendingCount > 0 && (
-                    <Badge variant="secondary" className="mt-1 text-xs">
-                      {pendingCount}
-                    </Badge>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-
-          {profiles.length === 0 && (
-            <Card className="w-full">
-              <CardContent className="py-6 text-center md:py-8">
-                <GraduationCap className="mx-auto mb-2 h-7 w-7 text-muted-foreground md:mb-3 md:h-8 md:w-8" />
-                <p className="text-muted-foreground text-sm">No coaches yet</p>
-                <Button
-                  size="sm"
-                  className="mt-2 md:mt-3"
-                  onClick={() => {
-                    setEditingProfileId(null);
-                    setShowProfileEditor(true);
-                  }}
-                >
-                  <Plus className="mr-1 h-4 w-4" />
-                  Create your first coach
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {/* Center content */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {showProfileEditor ? (
-          <CoachProfileEditor
-            profileId={editingProfileId}
-            onSave={() => setShowProfileEditor(false)}
-            onCancel={() => setShowProfileEditor(false)}
           />
-        ) : selectedProfile ? (
-          <>
-            {/* View tabs */}
-            <div className="mb-3 flex items-center gap-1 overflow-x-auto border-b pb-2 md:mb-4">
-              <Button
-                variant={view === "chat" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setView("chat")}
-                className="flex-shrink-0"
-              >
-                <MessageSquare className="mr-1.5 h-4 w-4" />
-                Chat
-              </Button>
-              <Button
-                variant={view === "history" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setView("history")}
-                className="flex-shrink-0"
-              >
-                <History className="mr-1.5 h-4 w-4" />
-                Sessions
-              </Button>
-              <Button
-                variant={view === "actions" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setView("actions")}
-                className="flex-shrink-0"
-              >
-                <CheckSquare className="mr-1.5 h-4 w-4" />
-                Actions
-              </Button>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEditingProfileId(selectedProfileId);
-                  setShowProfileEditor(true);
-                }}
-                className="flex-shrink-0"
-              >
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </div>
+        </div>
 
-            {/* View content */}
+        {/* Content */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* Mobile coach header with back + tabs */}
+          <div className="flex items-center gap-1 border-b px-2 py-1.5 md:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 flex-shrink-0"
+              onClick={handleBack}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <div
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-sm"
+              style={{
+                backgroundColor: selectedProfile.color
+                  ? `${selectedProfile.color}20`
+                  : "hsl(var(--muted))",
+              }}
+            >
+              {selectedProfile.icon || (
+                <GraduationCap className="h-3.5 w-3.5" />
+              )}
+            </div>
+            <span className="min-w-0 truncate text-sm font-medium">
+              {selectedProfile.name}
+            </span>
+            <div className="flex-1" />
+            <ViewTabs
+              view={view}
+              onViewChange={setView}
+              onSettings={() => {
+                setEditingProfileId(selectedProfileId);
+                setShowProfileEditor(true);
+              }}
+            />
+          </div>
+
+          {/* Desktop tabs */}
+          <div className="mb-3 hidden items-center gap-1 border-b pb-2 md:flex">
+            <ViewTabs
+              view={view}
+              onViewChange={setView}
+              onSettings={() => {
+                setEditingProfileId(selectedProfileId);
+                setShowProfileEditor(true);
+              }}
+              showLabels
+            />
+          </div>
+
+          {/* View content */}
+          <div className="flex min-h-0 flex-1 flex-col">
             {view === "chat" && <CoachChat coachProfile={selectedProfile} />}
             {view === "history" && (
               <CoachSessionHistory
@@ -202,21 +188,259 @@ export function CoachingTab() {
                 coachName={selectedProfile.name}
               />
             )}
-          </>
-        ) : (
-          <Card className="flex flex-1 items-center justify-center">
-            <CardContent className="text-center">
-              <GraduationCap className="mx-auto mb-2 h-10 w-10 text-muted-foreground md:mb-3 md:h-12 md:w-12" />
-              <CardTitle className="mb-2 text-base md:text-lg">
-                AI Coaching
-              </CardTitle>
-              <p className="text-muted-foreground text-sm">
-                Select a coach to start a session, or create a new one.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── No coach selected (or mobile coach picker) ───
+  return (
+    <div className="flex h-full flex-col md:flex-row md:gap-4 md:p-6">
+      {/* Desktop sidebar */}
+      <div className="hidden md:block">
+        <CoachSidebar
+          profiles={profiles}
+          actionItemCounts={actionItemCounts}
+          selectedProfileId={selectedProfileId}
+          showProfileEditor={false}
+          onSelectCoach={handleSelectCoach}
+          onNewCoach={() => {
+            setEditingProfileId(null);
+            setShowProfileEditor(true);
+          }}
+        />
+      </div>
+
+      {/* Mobile: full-screen coach picker */}
+      <div className="flex flex-1 flex-col md:hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <h2 className="text-lg font-semibold">AI Coaches</h2>
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditingProfileId(null);
+              setShowProfileEditor(true);
+            }}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            New
+          </Button>
+        </div>
+
+        {profiles.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center px-6">
+            <div className="text-center">
+              <GraduationCap className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+              <p className="font-medium">No coaches yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create a coach to start your first session.
               </p>
-            </CardContent>
-          </Card>
+              <Button
+                className="mt-4"
+                onClick={() => {
+                  setEditingProfileId(null);
+                  setShowProfileEditor(true);
+                }}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Create Coach
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-4">
+            {profiles.map((profile) => {
+              const pendingCount = actionItemCounts[profile._id] || 0;
+              return (
+                <button
+                  key={profile._id}
+                  onClick={() => handleSelectCoach(profile._id)}
+                  className="flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors active:bg-muted/50"
+                >
+                  <div
+                    className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-lg"
+                    style={{
+                      backgroundColor: profile.color
+                        ? `${profile.color}20`
+                        : "hsl(var(--muted))",
+                    }}
+                  >
+                    {profile.icon || <GraduationCap className="h-5 w-5" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{profile.name}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {profile.focusAreas.slice(0, 3).join(", ")}
+                    </p>
+                  </div>
+                  {pendingCount > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="flex-shrink-0 text-xs"
+                    >
+                      {pendingCount}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
+
+      {/* Desktop: empty state in center */}
+      <div className="hidden flex-1 items-center justify-center md:flex">
+        <div className="text-center">
+          <GraduationCap className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+          <p className="text-lg font-medium">AI Coaching</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Select a coach to start a session, or create a new one.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sidebar (desktop only) ───
+
+function CoachSidebar({
+  profiles,
+  actionItemCounts,
+  selectedProfileId,
+  showProfileEditor,
+  onSelectCoach,
+  onNewCoach,
+}: {
+  profiles: Array<{
+    _id: Id<"lifeos_coachingProfiles">;
+    name: string;
+    icon?: string;
+    color?: string;
+    focusAreas: string[];
+  }>;
+  actionItemCounts: Record<string, number>;
+  selectedProfileId: Id<"lifeos_coachingProfiles"> | null;
+  showProfileEditor: boolean;
+  onSelectCoach: (id: Id<"lifeos_coachingProfiles">) => void;
+  onNewCoach: () => void;
+}) {
+  return (
+    <div className="w-56 flex-shrink-0">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Coaches
+        </h2>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          onClick={onNewCoach}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="space-y-1">
+        {profiles.map((profile) => {
+          const pendingCount = actionItemCounts[profile._id] || 0;
+          const isSelected =
+            selectedProfileId === profile._id && !showProfileEditor;
+          return (
+            <button
+              key={profile._id}
+              onClick={() => onSelectCoach(profile._id)}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                isSelected
+                  ? "bg-accent text-accent-foreground"
+                  : "hover:bg-muted/50",
+              )}
+            >
+              <div
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-sm"
+                style={{
+                  backgroundColor: profile.color
+                    ? `${profile.color}20`
+                    : "hsl(var(--muted))",
+                }}
+              >
+                {profile.icon || <GraduationCap className="h-4 w-4" />}
+              </div>
+              <span className="min-w-0 truncate">{profile.name}</span>
+              {pendingCount > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="ml-auto flex-shrink-0 text-[10px] px-1.5"
+                >
+                  {pendingCount}
+                </Badge>
+              )}
+            </button>
+          );
+        })}
+
+        {profiles.length === 0 && (
+          <div className="rounded-lg border border-dashed p-4 text-center">
+            <p className="text-xs text-muted-foreground">No coaches yet</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={onNewCoach}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Create
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── View Tabs ───
+
+function ViewTabs({
+  view,
+  onViewChange,
+  onSettings,
+  showLabels = false,
+}: {
+  view: View;
+  onViewChange: (v: View) => void;
+  onSettings: () => void;
+  showLabels?: boolean;
+}) {
+  const tabs: { key: View; icon: typeof MessageSquare; label: string }[] = [
+    { key: "chat", icon: MessageSquare, label: "Chat" },
+    { key: "history", icon: History, label: "Sessions" },
+    { key: "actions", icon: CheckSquare, label: "Actions" },
+  ];
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {tabs.map(({ key, icon: Icon, label }) => (
+        <Button
+          key={key}
+          variant={view === key ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-8", showLabels ? "px-3" : "w-8 px-0")}
+          onClick={() => onViewChange(key)}
+        >
+          <Icon className={cn("h-4 w-4", showLabels && "mr-1.5")} />
+          {showLabels && label}
+        </Button>
+      ))}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn("h-8", showLabels ? "ml-auto px-3" : "w-8 px-0")}
+        onClick={onSettings}
+      >
+        <Settings2 className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

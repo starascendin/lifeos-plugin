@@ -1,7 +1,6 @@
 /**
- * CoachProfileEditor - Create/edit coach profiles
- *
- * Mobile-friendly: single column layout on mobile, reduced padding.
+ * CoachProfileEditor - Create/edit coach profiles.
+ * Clean single-column form. Templates at top for quick start.
  */
 
 import { useState, useEffect } from "react";
@@ -12,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -21,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Save, Trash2, X } from "lucide-react";
 
@@ -255,7 +254,7 @@ export function CoachProfileEditor({
           icon: icon || undefined,
           color: color || undefined,
         });
-        toast.success("Coach profile updated");
+        toast.success("Coach updated");
       } else {
         await createProfile({
           name,
@@ -269,13 +268,11 @@ export function CoachProfileEditor({
           icon: icon || undefined,
           color: color || undefined,
         });
-        toast.success("Coach profile created");
+        toast.success("Coach created");
       }
       onSave();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save profile",
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to save");
     } finally {
       setIsSaving(false);
     }
@@ -285,17 +282,16 @@ export function CoachProfileEditor({
     if (!profileId) return;
     if (
       !confirm(
-        "Delete this coach profile? All sessions and action items will be removed.",
+        "Delete this coach? All sessions and action items will be removed.",
       )
     )
       return;
-
     try {
       await deleteProfile({ profileId });
-      toast.success("Coach profile deleted");
+      toast.success("Coach deleted");
       onSave();
     } catch (error) {
-      toast.error("Failed to delete profile");
+      toast.error("Failed to delete");
     }
   };
 
@@ -306,89 +302,94 @@ export function CoachProfileEditor({
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto md:gap-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-base md:text-lg">
-          {profileId ? "Edit Coach" : "Create Coach"}
+    <div className="flex flex-1 flex-col overflow-y-auto">
+      {/* Sticky action bar (desktop) */}
+      <div className="mb-4 hidden items-center justify-between md:flex">
+        <h2 className="text-lg font-semibold">
+          {profileId ? "Edit Coach" : "New Coach"}
         </h2>
-        <div className="flex gap-1.5 md:gap-2">
+        <div className="flex gap-2">
           {profileId && (
-            <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4 md:mr-1" />
-              <span className="hidden sm:inline">Delete</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive"
+              onClick={handleDelete}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              Delete
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onCancel}>
-            <X className="h-4 w-4 md:mr-1" />
-            <span className="hidden sm:inline">Cancel</span>
+            Cancel
           </Button>
           <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            <Save className="h-4 w-4 md:mr-1" />
-            <span className="hidden sm:inline">
-              {isSaving ? "Saving..." : "Save"}
-            </span>
+            <Save className="mr-1.5 h-4 w-4" />
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
 
-      {/* Templates (only for new profiles) */}
+      {/* Templates (new profile only) */}
       {!profileId && (
-        <Card>
-          <CardHeader className="px-3 pb-2 pt-3 md:px-6 md:pb-3 md:pt-6">
-            <CardTitle className="text-sm">Start from a template</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2 px-3 pb-3 md:px-6 md:pb-6">
-            {COACH_TEMPLATES.map((template) => (
+        <div className="mb-4">
+          <p className="mb-2 text-sm font-medium text-muted-foreground">
+            Quick start
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {COACH_TEMPLATES.map((t) => (
               <Button
-                key={template.name}
+                key={t.name}
                 variant="outline"
                 size="sm"
-                onClick={() => handleApplyTemplate(template)}
+                onClick={() => handleApplyTemplate(t)}
               >
-                <span className="mr-1">{template.icon}</span>
-                {template.name}
+                <span className="mr-1.5">{t.icon}</span>
+                {t.name}
               </Button>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Form: single column on mobile, 2-col on desktop */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
-        {/* Left / top column */}
-        <div className="space-y-3 md:space-y-4">
-          <div className="space-y-1.5 md:space-y-2">
-            <Label>Name</Label>
+      {/* Form — single column, clean spacing */}
+      <div className="max-w-xl space-y-4">
+        {/* Identity row */}
+        <div className="flex gap-3">
+          <div className="flex-1 space-y-1.5">
+            <Label className="text-xs">Name</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Business Coach"
+              className="text-base md:text-sm"
             />
           </div>
-
-          <div className="grid grid-cols-2 gap-2 md:gap-3">
-            <div className="space-y-1.5 md:space-y-2">
-              <Label>Icon (emoji)</Label>
-              <Input
-                value={icon}
-                onChange={(e) => setIcon(e.target.value)}
-                placeholder="🏢"
-                maxLength={4}
-              />
-            </div>
-            <div className="space-y-1.5 md:space-y-2">
-              <Label>Color</Label>
-              <Input
-                type="color"
-                value={color || "#3b82f6"}
-                onChange={(e) => setColor(e.target.value)}
-              />
-            </div>
+          <div className="w-16 space-y-1.5">
+            <Label className="text-xs">Icon</Label>
+            <Input
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              placeholder="🏢"
+              maxLength={4}
+              className="text-center text-base md:text-sm"
+            />
           </div>
+          <div className="w-14 space-y-1.5">
+            <Label className="text-xs">Color</Label>
+            <Input
+              type="color"
+              value={color || "#3b82f6"}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-9 cursor-pointer px-1"
+            />
+          </div>
+        </div>
 
-          <div className="space-y-1.5 md:space-y-2">
-            <Label>Model</Label>
+        {/* Model + Cadence row */}
+        <div className="flex gap-3">
+          <div className="flex-1 space-y-1.5">
+            <Label className="text-xs">Model</Label>
             <Select value={model} onValueChange={setModel}>
               <SelectTrigger>
                 <SelectValue />
@@ -396,15 +397,14 @@ export function CoachProfileEditor({
               <SelectContent>
                 {AVAILABLE_MODELS.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
-                    {m.name} ({m.provider})
+                    {m.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
-          <div className="space-y-1.5 md:space-y-2">
-            <Label>Session Cadence</Label>
+          <div className="w-32 space-y-1.5">
+            <Label className="text-xs">Cadence</Label>
             <Select value={sessionCadence} onValueChange={setSessionCadence}>
               <SelectTrigger>
                 <SelectValue />
@@ -418,46 +418,71 @@ export function CoachProfileEditor({
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          <div className="space-y-1.5 md:space-y-2">
-            <Label>Focus Areas</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {FOCUS_AREA_PRESETS.map((area) => (
-                <Badge
-                  key={area}
-                  variant={focusAreas.includes(area) ? "default" : "outline"}
-                  className="cursor-pointer text-xs"
-                  onClick={() => toggleFocusArea(area)}
-                >
-                  {area}
-                </Badge>
-              ))}
-            </div>
+        {/* Focus areas */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Focus Areas</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {FOCUS_AREA_PRESETS.map((area) => (
+              <Badge
+                key={area}
+                variant={focusAreas.includes(area) ? "default" : "outline"}
+                className="cursor-pointer text-xs"
+                onClick={() => toggleFocusArea(area)}
+              >
+                {area}
+              </Badge>
+            ))}
           </div>
         </div>
 
-        {/* Right / bottom column */}
-        <div className="space-y-3 md:space-y-4">
-          <div className="space-y-1.5 md:space-y-2">
-            <Label>Coaching Instructions (System Prompt)</Label>
-            <Textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Define the coach's personality, methodology, and approach..."
-              className="min-h-[200px] font-mono text-xs md:min-h-[280px]"
-            />
-          </div>
+        <Separator />
 
-          <div className="space-y-1.5 md:space-y-2">
-            <Label>Greeting (first message)</Label>
-            <Textarea
-              value={greeting}
-              onChange={(e) => setGreeting(e.target.value)}
-              placeholder="Hi! I'm your coach. What would you like to work on today?"
-              className="min-h-[60px] md:min-h-[80px]"
-            />
-          </div>
+        {/* Instructions */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">System Prompt</Label>
+          <Textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Define the coach's personality, methodology, and approach..."
+            className="min-h-[180px] font-mono text-xs md:min-h-[240px]"
+          />
         </div>
+
+        {/* Greeting */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Greeting Message</Label>
+          <Textarea
+            value={greeting}
+            onChange={(e) => setGreeting(e.target.value)}
+            placeholder="Hi! I'm your coach. What would you like to work on today?"
+            className="min-h-[60px] text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Mobile bottom action bar */}
+      <div className="mt-6 flex gap-2 pb-[calc(env(safe-area-inset-bottom,0px))] md:hidden">
+        {profileId && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive"
+            onClick={handleDelete}
+          >
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            Delete
+          </Button>
+        )}
+        <div className="flex-1" />
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={isSaving}>
+          <Save className="mr-1.5 h-4 w-4" />
+          {isSaving ? "Saving..." : "Save"}
+        </Button>
       </div>
     </div>
   );
