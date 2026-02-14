@@ -29,6 +29,7 @@ import {
   Clock,
   Cpu,
   FileAudio,
+  GraduationCap,
   FlaskConical,
   Globe,
   Headphones,
@@ -127,6 +128,7 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           { name: "Focus", href: "/lifeos/focus", icon: Timer },
           { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
           { name: "Voice AI", href: "/lifeos/voiceagent", icon: Headphones },
+          { name: "AI Coach", href: "/lifeos/coaching", icon: GraduationCap },
           { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
         ],
       },
@@ -250,7 +252,9 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
             <TooltipTrigger asChild>
               <Link to="/lifeos/catgirl">
                 <Button
-                  variant={pathname === "/lifeos/catgirl" ? "default" : "outline"}
+                  variant={
+                    pathname === "/lifeos/catgirl" ? "default" : "outline"
+                  }
                   className={cn(
                     "w-full transition-all",
                     effectiveCollapsed
