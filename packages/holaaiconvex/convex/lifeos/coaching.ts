@@ -4,6 +4,7 @@
  * Public mutations/queries for coach profile management,
  * coaching sessions (interactive chat), and action items.
  * Uses @convex-dev/agent for thread/message persistence.
+ * Reuses the same tools as CatGirl agent via catgirlTools.
  */
 
 import { v } from "convex/values";
@@ -17,6 +18,10 @@ import {
 import { components, internal } from "../_generated/api";
 import { getAuthUserId, requireUser } from "../_lib/auth";
 import { Id } from "../_generated/dataModel";
+import { Agent } from "@convex-dev/agent";
+import { gateway } from "@ai-sdk/gateway";
+import { catgirlTools } from "./lib/catgirl_tools";
+import { setCurrentUserId, getCurrentUserId } from "./lib/catgirl_context";
 
 // ==================== COACH PROFILE QUERIES ====================
 
@@ -177,7 +182,6 @@ export const deleteCoachProfile = mutation({
       .withIndex("by_coach", (q) => q.eq("coachProfileId", profileId))
       .collect();
     for (const session of sessions) {
-      // Archive the agent thread if it exists
       if (session.threadId) {
         try {
           await ctx.scheduler.runAfter(
@@ -192,7 +196,6 @@ export const deleteCoachProfile = mutation({
       await ctx.db.delete(session._id);
     }
 
-    // Delete profile
     await ctx.db.delete(profileId);
   },
 });
@@ -283,6 +286,50 @@ export const getActiveSession = query({
   },
 });
 
+// ==================== AGENT FACTORY ====================
+
+/**
+ * Filter catgirlTools to only the enabled subset for this coach.
+ * Reuses the exact same tool instances that CatGirl uses, so
+ * userId flows via the shared module-level context (catgirl_context.ts).
+ */
+function getFilteredTools(enabledTools: string[]) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filtered: Record<string, any> = {};
+  for (const toolName of enabledTools) {
+    if (toolName in catgirlTools) {
+      filtered[toolName] = catgirlTools[toolName as keyof typeof catgirlTools];
+    }
+  }
+  return filtered;
+}
+
+/**
+ * Create a coach agent instance with the given profile config.
+ * Tools are the CatGirl tools filtered to the coach's enabledTools list.
+ */
+function createCoachAgent(
+  model: string,
+  instructions: string,
+  enabledTools: string[],
+  coachName: string,
+  contextPrefix?: string,
+) {
+  const fullInstructions = contextPrefix
+    ? `${instructions}\n\n--- SESSION CONTEXT ---\n${contextPrefix}`
+    : instructions;
+
+  const tools = getFilteredTools(enabledTools);
+
+  return new Agent(components.agent, {
+    name: coachName,
+    languageModel: gateway(model),
+    instructions: fullInstructions,
+    tools,
+    maxSteps: 15,
+  });
+}
+
 // ==================== SESSION MANAGEMENT ====================
 
 /**
@@ -318,16 +365,19 @@ export const startSession = action({
     );
     if (!profile) throw new Error("Coach profile not found");
 
-    // Create agent thread
-    const { thread, threadId } = await createCoachAgent(
+    // Create agent thread (set userId context for tools)
+    setCurrentUserId(userId);
+    const agent = createCoachAgent(
       profile.model,
       profile.instructions,
       profile.enabledTools,
       profile.name,
-    ).createThread(ctx, {
+    );
+    const { threadId } = await agent.createThread(ctx, {
       userId: identity.subject,
       title: `${profile.name} Session`,
     });
+    setCurrentUserId(null);
 
     // Create session record
     const now = Date.now();
@@ -347,7 +397,8 @@ export const startSession = action({
 });
 
 /**
- * Send a message in a coaching session
+ * Send a message in a coaching session.
+ * Uses the same module-level userId pattern as CatGirl agent.
  */
 export const sendMessage = action({
   args: {
@@ -411,6 +462,9 @@ export const sendMessage = action({
       sessionId,
     );
 
+    // Set userId for tool context (same pattern as CatGirl)
+    setCurrentUserId(userId);
+
     // Create agent and continue the thread
     const agent = createCoachAgent(
       profile.model,
@@ -426,6 +480,9 @@ export const sendMessage = action({
     const result = await thread.generateText({
       prompt: message,
     });
+
+    // Clear userId after request
+    setCurrentUserId(null);
 
     // Extract tool calls and results
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -538,7 +595,7 @@ export const endSession = action({
 });
 
 /**
- * Get messages for a coaching session
+ * Get messages for a coaching session (reactive query)
  */
 export const getSessionMessages = query({
   args: {
@@ -733,7 +790,6 @@ export const updateActionItem = mutation({
       }
     }
 
-    // Set completedAt if marking as completed
     if (updates.status === "completed") {
       patch.completedAt = Date.now();
     }
@@ -845,299 +901,18 @@ export const createActionItemInternal = internalMutation({
   },
 });
 
-// ==================== HELPER: AGENT FACTORY ====================
-
-import { Agent, createTool } from "@convex-dev/agent";
-import { gateway } from "@ai-sdk/gateway";
-import { TOOL_REGISTRY } from "./agents_tool_registry";
-import { z } from "zod";
-
-/**
- * Maps tool names to their internal function references.
- * Reuses the same dispatch table as agents_runner.ts
- */
-const TOOL_DISPATCH: Record<
-  string,
-  { ref: string; type: "query" | "mutation" }
-> = {
-  get_todays_tasks: { ref: "getTodaysTasksInternal", type: "query" },
-  get_tasks: { ref: "getTasksInternal", type: "query" },
-  create_issue: { ref: "createIssueInternal", type: "mutation" },
-  mark_issue_complete: { ref: "markIssueCompleteInternal", type: "mutation" },
-  get_issue: { ref: "getIssueInternal", type: "query" },
-  update_issue: { ref: "updateIssueInternal", type: "mutation" },
-  delete_issue: { ref: "deleteIssueInternal", type: "mutation" },
-  get_projects: { ref: "getProjectsInternal", type: "query" },
-  get_project: { ref: "getProjectInternal", type: "query" },
-  create_project: { ref: "createProjectInternal", type: "mutation" },
-  update_project: { ref: "updateProjectInternal", type: "mutation" },
-  delete_project: { ref: "deleteProjectInternal", type: "mutation" },
-  get_current_cycle: { ref: "getCurrentCycleInternal", type: "query" },
-  get_cycles: { ref: "getCyclesInternal", type: "query" },
-  create_cycle: { ref: "createCycleInternal", type: "mutation" },
-  update_cycle: { ref: "updateCycleInternal", type: "mutation" },
-  delete_cycle: { ref: "deleteCycleInternal", type: "mutation" },
-  close_cycle: { ref: "closeCycleInternal", type: "mutation" },
-  generate_cycles: { ref: "generateCyclesInternal", type: "mutation" },
-  assign_issue_to_cycle: {
-    ref: "assignIssueToCycleInternal",
-    type: "mutation",
-  },
-  get_phases: { ref: "getPhasesInternal", type: "query" },
-  get_phase: { ref: "getPhaseInternal", type: "query" },
-  create_phase: { ref: "createPhaseInternal", type: "mutation" },
-  update_phase: { ref: "updatePhaseInternal", type: "mutation" },
-  delete_phase: { ref: "deletePhaseInternal", type: "mutation" },
-  assign_issue_to_phase: {
-    ref: "assignIssueToPhaseInternal",
-    type: "mutation",
-  },
-  get_daily_agenda: { ref: "getDailyAgendaInternal", type: "query" },
-  get_weekly_agenda: { ref: "getWeeklyAgendaInternal", type: "query" },
-  get_monthly_agenda: { ref: "getMonthlyAgendaInternal", type: "query" },
-  regenerate_daily_summary: {
-    ref: "regenerateDailySummaryInternal",
-    type: "mutation",
-  },
-  regenerate_weekly_summary: {
-    ref: "regenerateWeeklySummaryInternal",
-    type: "mutation",
-  },
-  regenerate_monthly_summary: {
-    ref: "regenerateMonthlySummaryInternal",
-    type: "mutation",
-  },
-  update_weekly_prompt: { ref: "updateWeeklyPromptInternal", type: "mutation" },
-  update_monthly_prompt: {
-    ref: "updateMonthlyPromptInternal",
-    type: "mutation",
-  },
-  get_clients: { ref: "getClientsInternal", type: "query" },
-  get_client: { ref: "getClientInternal", type: "query" },
-  get_projects_for_client: {
-    ref: "getProjectsForClientInternal",
-    type: "query",
-  },
-  create_client: { ref: "createClientInternal", type: "mutation" },
-  update_client: { ref: "updateClientInternal", type: "mutation" },
-  delete_client: { ref: "deleteClientInternal", type: "mutation" },
-  get_people: { ref: "getPeopleInternal", type: "query" },
-  get_person: { ref: "getPersonInternal", type: "query" },
-  search_people: { ref: "searchPeopleInternal", type: "query" },
-  get_memos_for_person: { ref: "getMemosForPersonInternal", type: "query" },
-  get_person_timeline: { ref: "getPersonTimelineInternal", type: "query" },
-  create_person: { ref: "createPersonInternal", type: "mutation" },
-  update_person: { ref: "updatePersonInternal", type: "mutation" },
-  link_memo_to_person: { ref: "linkMemoToPersonInternal", type: "mutation" },
-  search_notes: { ref: "searchNotesInternal", type: "query" },
-  get_recent_notes: { ref: "getRecentNotesInternal", type: "query" },
-  create_quick_note: { ref: "createQuickNoteInternal", type: "mutation" },
-  add_tags_to_note: { ref: "addTagsToNoteInternal", type: "mutation" },
-  get_voice_memo: { ref: "getVoiceMemoInternal", type: "query" },
-  get_voice_memos_by_date: {
-    ref: "getVoiceMemosByDateInternal",
-    type: "query",
-  },
-  get_voice_memos_by_labels: {
-    ref: "getVoiceMemosByLabelsInternal",
-    type: "query",
-  },
-  get_voice_memo_labels: { ref: "getVoiceMemoLabelsInternal", type: "query" },
-  create_ai_convo_summary: {
-    ref: "createAiConvoSummaryInternal",
-    type: "mutation",
-  },
-  get_ai_convo_summaries: { ref: "getAiConvoSummariesInternal", type: "query" },
-  get_ai_convo_summary: { ref: "getAiConvoSummaryInternal", type: "query" },
-  search_ai_convo_summaries: {
-    ref: "searchAiConvoSummariesInternal",
-    type: "query",
-  },
-  update_ai_convo_summary: {
-    ref: "updateAiConvoSummaryInternal",
-    type: "mutation",
-  },
-  delete_ai_convo_summary: {
-    ref: "deleteAiConvoSummaryInternal",
-    type: "mutation",
-  },
-  get_beeper_threads: { ref: "getBeeperThreadsInternal", type: "query" },
-  get_beeper_thread: { ref: "getBeeperThreadInternal", type: "query" },
-  get_beeper_thread_messages: {
-    ref: "getBeeperThreadMessagesInternal",
-    type: "query",
-  },
-  search_beeper_messages: {
-    ref: "searchBeeperMessagesInternal",
-    type: "query",
-  },
-  get_beeper_threads_for_person: {
-    ref: "getBeeperThreadsForPersonInternal",
-    type: "query",
-  },
-  get_beeper_threads_for_client: {
-    ref: "getBeeperThreadsForClientInternal",
-    type: "query",
-  },
-  get_granola_meetings: { ref: "getGranolaMeetingsInternal", type: "query" },
-  get_granola_meeting: { ref: "getGranolaMeetingInternal", type: "query" },
-  get_granola_transcript: {
-    ref: "getGranolaTranscriptInternal",
-    type: "query",
-  },
-  search_granola_meetings: {
-    ref: "searchGranolaMeetingsInternal",
-    type: "query",
-  },
-  get_granola_meetings_for_person: {
-    ref: "getGranolaMeetingsForPersonInternal",
-    type: "query",
-  },
-  get_granola_meetings_for_thread: {
-    ref: "getGranolaMeetingsForThreadInternal",
-    type: "query",
-  },
-  get_contact_dossier: { ref: "getContactDossierInternal", type: "query" },
-  get_meeting_calendar_links: {
-    ref: "getMeetingCalendarLinksInternal",
-    type: "query",
-  },
-  sync_beeper_contacts_to_frm: {
-    ref: "syncBeeperContactsToFrmInternal",
-    type: "mutation",
-  },
-  link_beeper_thread_to_person: {
-    ref: "linkBeeperThreadToPersonInternal",
-    type: "mutation",
-  },
-  get_business_contacts: { ref: "getBusinessContactsInternal", type: "query" },
-  get_merge_suggestions: { ref: "getMergeSuggestionsInternal", type: "query" },
-  accept_merge_suggestion: {
-    ref: "acceptMergeSuggestionInternal",
-    type: "mutation",
-  },
-  reject_merge_suggestion: {
-    ref: "rejectMergeSuggestionInternal",
-    type: "mutation",
-  },
-  dismiss_all_merge_suggestions: {
-    ref: "dismissAllMergeSuggestionsInternal",
-    type: "mutation",
-  },
-  unlink_meeting_from_business_contact: {
-    ref: "unlinkMeetingFromBusinessContactInternal",
-    type: "mutation",
-  },
-  get_initiatives: { ref: "getInitiativesInternal", type: "query" },
-  get_initiative: { ref: "getInitiativeInternal", type: "query" },
-  get_initiative_with_stats: {
-    ref: "getInitiativeWithStatsInternal",
-    type: "query",
-  },
-  create_initiative: { ref: "createInitiativeInternal", type: "mutation" },
-  update_initiative: { ref: "updateInitiativeInternal", type: "mutation" },
-  archive_initiative: { ref: "archiveInitiativeInternal", type: "mutation" },
-  delete_initiative: { ref: "deleteInitiativeInternal", type: "mutation" },
-  link_project_to_initiative: {
-    ref: "linkProjectToInitiativeInternal",
-    type: "mutation",
-  },
-  link_issue_to_initiative: {
-    ref: "linkIssueToInitiativeInternal",
-    type: "mutation",
-  },
-  get_initiative_yearly_rollup: {
-    ref: "getInitiativeYearlyRollupInternal",
-    type: "query",
-  },
-};
-
-/**
- * Build createTool wrappers for the enabled tools, injecting userId.
- */
-function buildCoachTools(enabledTools: string[], userId: Id<"users">) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tools: Record<string, any> = {};
-
-  for (const toolName of enabledTools) {
-    const registry = TOOL_REGISTRY[toolName];
-    const dispatch = TOOL_DISPATCH[toolName];
-    if (!registry || !dispatch) continue;
-
-    const capturedRef = dispatch.ref;
-    const capturedType = dispatch.type;
-    const capturedUserId = userId;
-
-    tools[toolName] = createTool({
-      description: registry.description,
-      args: registry.parameters,
-      handler: async (ctx, args) => {
-        const params = { userId: capturedUserId, ...args } as Record<
-          string,
-          unknown
-        >;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fnRef = (internal.lifeos.tool_call as any)[capturedRef];
-        if (!fnRef) return { error: `Tool function not found: ${capturedRef}` };
-
-        try {
-          if (capturedType === "query") {
-            return await ctx.runQuery(fnRef, params);
-          } else {
-            return await ctx.runMutation(fnRef, params);
-          }
-        } catch (error) {
-          return {
-            error:
-              error instanceof Error ? error.message : "Tool execution failed",
-          };
-        }
-      },
-    });
-  }
-
-  return tools;
-}
-
-/**
- * Create a coach agent instance with the given profile config.
- * Builds tools dynamically from enabledTools.
- */
-function createCoachAgent(
-  model: string,
-  instructions: string,
-  enabledTools: string[],
-  coachName: string,
-  contextPrefix?: string,
-) {
-  // We'll build tools lazily in the action since we need userId
-  // For now, create agent without tools - they're added per-request
-  const fullInstructions = contextPrefix
-    ? `${instructions}\n\n--- SESSION CONTEXT ---\n${contextPrefix}`
-    : instructions;
-
-  return new Agent(components.agent, {
-    name: coachName,
-    languageModel: gateway(model),
-    instructions: fullInstructions,
-    // Tools are built dynamically per-request since we need userId
-    // However @convex-dev/agent requires tools at instantiation
-    // We'll pass empty here and use the full set via continueThread
-    tools: {},
-    maxSteps: 15,
-  });
-}
+// ==================== COACHING CONTEXT BUILDER ====================
 
 /**
  * Build coaching context to prepend to the session.
- * Loads past session summaries, action items, current goals.
+ * Loads past session summaries and pending action items.
  */
 async function buildCoachingContext(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ctx: any,
   userId: Id<"users">,
   coachProfileId: Id<"lifeos_coachingProfiles">,
-  currentSessionId: Id<"lifeos_coachingSessions">,
+  _currentSessionId: Id<"lifeos_coachingSessions">,
 ): Promise<string> {
   const parts: string[] = [];
 

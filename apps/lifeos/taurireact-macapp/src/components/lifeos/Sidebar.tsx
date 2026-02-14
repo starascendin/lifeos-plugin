@@ -128,7 +128,6 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           { name: "Focus", href: "/lifeos/focus", icon: Timer },
           { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
           { name: "Voice AI", href: "/lifeos/voiceagent", icon: Headphones },
-          { name: "AI Coach", href: "/lifeos/coaching", icon: GraduationCap },
           { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
         ],
       },
@@ -239,6 +238,42 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
               </TooltipContent>
             </Tooltip>
           )}
+        </div>
+
+        {/* AI Coach Button */}
+        <div
+          className={cn(
+            "border-b border-sidebar-border",
+            effectiveCollapsed ? "px-2 py-2" : "px-4 py-3",
+          )}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to="/lifeos/coaching">
+                <Button
+                  variant={
+                    pathname === "/lifeos/coaching" ? "default" : "outline"
+                  }
+                  className={cn(
+                    "w-full transition-all",
+                    effectiveCollapsed
+                      ? "justify-center p-3"
+                      : "justify-start gap-3",
+                    pathname === "/lifeos/coaching" &&
+                      "bg-emerald-600 hover:bg-emerald-700 text-white",
+                  )}
+                >
+                  <GraduationCap className="h-5 w-5" />
+                  {!effectiveCollapsed && (
+                    <span className="font-medium">AI Coach</span>
+                  )}
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            {effectiveCollapsed && (
+              <TooltipContent side="right">AI Coach</TooltipContent>
+            )}
+          </Tooltip>
         </div>
 
         {/* CatGirlAI Button */}
