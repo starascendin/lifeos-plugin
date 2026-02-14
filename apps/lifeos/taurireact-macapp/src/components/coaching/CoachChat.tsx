@@ -3,10 +3,11 @@
  *
  * Manages active sessions, message sending/receiving,
  * and session lifecycle (start/end with auto-summarization).
+ * Mobile-friendly: reduced padding, full-width messages, safe input area.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery, useAction, useMutation } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@holaai/convex";
 import { Id } from "@holaai/convex/convex/_generated/dataModel";
 import { Doc } from "@holaai/convex/convex/_generated/dataModel";
@@ -101,7 +102,6 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
       setSessionId(result.sessionId);
       setLocalMessages([]);
 
-      // Add greeting if profile has one
       if (coachProfile.greeting) {
         setLocalMessages([
           {
@@ -140,7 +140,6 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
     setInput("");
     setIsLoading(true);
 
-    // Optimistic user message
     const tempId = `temp-${Date.now()}`;
     setLocalMessages((prev) => [
       ...prev,
@@ -158,7 +157,6 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
         message: userMessage,
       });
 
-      // Add assistant response
       setLocalMessages((prev) => [
         ...prev,
         {
@@ -172,7 +170,6 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
       ]);
     } catch (error) {
       console.error("Failed to send message:", error);
-      // Add error message
       setLocalMessages((prev) => [
         ...prev,
         {
@@ -199,20 +196,24 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
   return (
     <div className="flex flex-1 flex-col">
       {/* Chat header */}
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-2 flex items-center gap-2 md:mb-3 md:gap-3">
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-sm"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-sm md:h-8 md:w-8"
           style={{
             backgroundColor: coachProfile.color
               ? `${coachProfile.color}20`
               : "hsl(var(--muted))",
           }}
         >
-          {coachProfile.icon || <GraduationCap className="h-4 w-4" />}
+          {coachProfile.icon || (
+            <GraduationCap className="h-3.5 w-3.5 md:h-4 md:w-4" />
+          )}
         </div>
-        <div className="flex-1">
-          <h3 className="font-semibold">{coachProfile.name}</h3>
-          <p className="text-muted-foreground text-xs">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold md:text-base">
+            {coachProfile.name}
+          </h3>
+          <p className="hidden text-muted-foreground text-xs md:block">
             {coachProfile.focusAreas.join(" / ")}
           </p>
         </div>
@@ -224,35 +225,38 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
             disabled={isEnding}
           >
             {isEnding ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1 h-4 w-4 animate-spin md:mr-1.5" />
             ) : (
-              <Square className="mr-1.5 h-4 w-4" />
+              <Square className="mr-1 h-4 w-4 md:mr-1.5" />
             )}
-            End Session
+            <span className="hidden sm:inline">End Session</span>
+            <span className="sm:hidden">End</span>
           </Button>
         ) : (
           <Button size="sm" onClick={handleStartSession} disabled={isStarting}>
             {isStarting ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1 h-4 w-4 animate-spin md:mr-1.5" />
             ) : (
-              <Play className="mr-1.5 h-4 w-4" />
+              <Play className="mr-1 h-4 w-4 md:mr-1.5" />
             )}
-            Start Session
+            <span className="hidden sm:inline">Start Session</span>
+            <span className="sm:hidden">Start</span>
           </Button>
         )}
       </div>
 
       {/* Messages area */}
       <Card className="flex flex-1 flex-col overflow-hidden">
-        <CardContent className="flex-1 space-y-4 overflow-y-auto p-4">
+        <CardContent className="flex-1 space-y-3 overflow-y-auto p-3 md:space-y-4 md:p-4">
           {!hasActiveSession && localMessages.length === 0 && (
             <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <GraduationCap className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-                <p className="font-medium">Ready for a coaching session?</p>
-                <p className="mt-1 text-muted-foreground text-sm">
-                  Click "Start Session" to begin a conversation with{" "}
-                  {coachProfile.name}.
+              <div className="text-center px-4">
+                <GraduationCap className="mx-auto mb-2 h-10 w-10 text-muted-foreground md:mb-3 md:h-12 md:w-12" />
+                <p className="font-medium text-sm md:text-base">
+                  Ready for a coaching session?
+                </p>
+                <p className="mt-1 text-muted-foreground text-xs md:text-sm">
+                  Tap &quot;Start&quot; to begin with {coachProfile.name}.
                 </p>
                 {coachProfile.sessionCadence && (
                   <Badge variant="outline" className="mt-2">
@@ -268,11 +272,11 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
           ))}
 
           {isLoading && (
-            <div className="flex gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                <GraduationCap className="h-4 w-4" />
+            <div className="flex gap-2 md:gap-3">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted md:h-8 md:w-8">
+                <GraduationCap className="h-3.5 w-3.5 md:h-4 md:w-4" />
               </div>
-              <div className="rounded-lg bg-muted px-4 py-2">
+              <div className="rounded-lg bg-muted px-3 py-2 md:px-4">
                 <div className="flex gap-1">
                   <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50" />
                   <span
@@ -290,9 +294,9 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
           <div ref={messagesEndRef} />
         </CardContent>
 
-        {/* Input area */}
+        {/* Input area — safe-area-bottom for iOS */}
         {hasActiveSession && (
-          <div className="border-t p-3">
+          <div className="border-t p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:p-3 md:pb-3">
             <div className="flex gap-2">
               <Textarea
                 ref={textareaRef}
@@ -300,8 +304,9 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
-                className="min-h-[60px] max-h-[200px] resize-none"
+                className="min-h-[44px] max-h-[150px] resize-none text-base md:min-h-[60px] md:max-h-[200px] md:text-sm"
                 disabled={isLoading}
+                rows={1}
               />
               <Button
                 onClick={handleSend}
@@ -326,15 +331,15 @@ function MessageBubble({ message }: { message: LocalMessage }) {
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
+    <div className={cn("flex gap-2 md:gap-3", isUser && "flex-row-reverse")}>
       {!isUser && (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted">
-          <GraduationCap className="h-4 w-4" />
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted md:h-8 md:w-8">
+          <GraduationCap className="h-3.5 w-3.5 md:h-4 md:w-4" />
         </div>
       )}
       <div
         className={cn(
-          "max-w-[80%] rounded-lg px-4 py-2",
+          "max-w-[85%] rounded-lg px-3 py-2 md:max-w-[80%] md:px-4",
           isUser ? "bg-primary text-primary-foreground" : "bg-muted",
         )}
       >
@@ -361,9 +366,9 @@ function MessageBubble({ message }: { message: LocalMessage }) {
               )}
             </button>
             {showTools && (
-              <div className="mt-1 space-y-1">
+              <div className="mt-1 flex flex-wrap gap-1">
                 {message.toolCalls.map((tc, i) => (
-                  <Badge key={i} variant="secondary" className="mr-1 text-xs">
+                  <Badge key={i} variant="secondary" className="text-xs">
                     {tc.name}
                   </Badge>
                 ))}

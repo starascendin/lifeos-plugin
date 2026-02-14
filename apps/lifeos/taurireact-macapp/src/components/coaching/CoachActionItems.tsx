@@ -1,5 +1,6 @@
 /**
  * CoachActionItems - Track action items across coaching sessions
+ * Mobile-friendly: wrapping filter buttons, tighter card spacing.
  */
 
 import { useQuery, useMutation } from "convex/react";
@@ -11,13 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import {
-  CheckSquare,
-  Circle,
-  ArrowUpCircle,
-  Calendar,
-  Loader2,
-} from "lucide-react";
+import { CheckSquare, ArrowUpCircle, Calendar } from "lucide-react";
 import { useState } from "react";
 
 interface CoachActionItemsProps {
@@ -83,15 +78,14 @@ export function CoachActionItems({
 
   if (allItems.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center">
+      <div className="flex flex-1 items-center justify-center px-4">
         <div className="text-center">
-          <CheckSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="text-muted-foreground">
+          <CheckSquare className="mx-auto mb-2 h-7 w-7 text-muted-foreground md:mb-3 md:h-8 md:w-8" />
+          <p className="text-muted-foreground text-sm">
             No action items from {coachName} yet.
           </p>
-          <p className="mt-1 text-muted-foreground text-sm">
-            Action items are automatically extracted when you end a coaching
-            session.
+          <p className="mt-1 text-muted-foreground text-xs">
+            Action items are automatically extracted when you end a session.
           </p>
         </div>
       </div>
@@ -99,13 +93,14 @@ export function CoachActionItems({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
-      {/* Stats bar */}
-      <div className="flex items-center gap-3">
+    <div className="flex flex-1 flex-col gap-2 overflow-y-auto md:gap-3">
+      {/* Filter bar — wraps on mobile */}
+      <div className="flex flex-wrap items-center gap-1.5 md:gap-3">
         <Button
           variant={filter === "all" ? "default" : "outline"}
           size="sm"
           onClick={() => setFilter("all")}
+          className="text-xs md:text-sm"
         >
           All ({allItems.length})
         </Button>
@@ -113,6 +108,7 @@ export function CoachActionItems({
           variant={filter === "pending" ? "default" : "outline"}
           size="sm"
           onClick={() => setFilter("pending")}
+          className="text-xs md:text-sm"
         >
           Pending ({pendingCount})
         </Button>
@@ -120,20 +116,22 @@ export function CoachActionItems({
           variant={filter === "in_progress" ? "default" : "outline"}
           size="sm"
           onClick={() => setFilter("in_progress")}
+          className="text-xs md:text-sm"
         >
-          In Progress ({inProgressCount})
+          Active ({inProgressCount})
         </Button>
         <Button
           variant={filter === "completed" ? "default" : "outline"}
           size="sm"
           onClick={() => setFilter("completed")}
+          className="text-xs md:text-sm"
         >
           Done ({completedCount})
         </Button>
       </div>
 
       {/* Action items list */}
-      <div className="space-y-2">
+      <div className="space-y-1.5 md:space-y-2">
         {filteredItems.map((item) => {
           const priorityColors: Record<string, string> = {
             high: "text-red-500",
@@ -143,7 +141,7 @@ export function CoachActionItems({
 
           return (
             <Card key={item._id}>
-              <CardContent className="flex items-start gap-3 py-3">
+              <CardContent className="flex items-start gap-2 px-3 py-2.5 md:gap-3 md:px-4 md:py-3">
                 <Checkbox
                   checked={item.status === "completed"}
                   onCheckedChange={() =>
@@ -154,25 +152,28 @@ export function CoachActionItems({
                 <div className="min-w-0 flex-1">
                   <p
                     className={cn(
-                      "text-sm",
+                      "text-xs md:text-sm",
                       item.status === "completed" &&
                         "line-through text-muted-foreground",
                     )}
                   >
                     {item.text}
                   </p>
-                  <div className="mt-1 flex items-center gap-2">
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 md:gap-2">
                     {item.priority && (
                       <Badge
                         variant="outline"
-                        className={cn("text-xs", priorityColors[item.priority])}
+                        className={cn(
+                          "text-[10px] md:text-xs",
+                          priorityColors[item.priority],
+                        )}
                       >
-                        <ArrowUpCircle className="mr-1 h-3 w-3" />
+                        <ArrowUpCircle className="mr-0.5 h-3 w-3 md:mr-1" />
                         {item.priority}
                       </Badge>
                     )}
                     {item.dueDate && (
-                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                      <span className="flex items-center gap-1 text-muted-foreground text-[10px] md:text-xs">
                         <Calendar className="h-3 w-3" />
                         {new Date(item.dueDate).toLocaleDateString()}
                       </span>
@@ -180,12 +181,12 @@ export function CoachActionItems({
                     {item.status === "in_progress" && (
                       <Badge
                         variant="secondary"
-                        className="bg-blue-500/10 text-blue-600 text-xs"
+                        className="bg-blue-500/10 text-blue-600 text-[10px] md:text-xs"
                       >
                         In Progress
                       </Badge>
                     )}
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-muted-foreground text-[10px] md:text-xs">
                       {new Date(item.createdAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -194,7 +195,7 @@ export function CoachActionItems({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-xs"
+                    className="flex-shrink-0 text-xs"
                     onClick={() => handleSetInProgress(item._id)}
                   >
                     Start

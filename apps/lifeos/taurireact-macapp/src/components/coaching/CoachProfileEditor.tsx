@@ -1,8 +1,7 @@
 /**
  * CoachProfileEditor - Create/edit coach profiles
  *
- * Form for configuring a coach's name, instructions, focus areas,
- * tool access, model, and session settings.
+ * Mobile-friendly: single column layout on mobile, reduced padding.
  */
 
 import { useState, useEffect } from "react";
@@ -120,7 +119,7 @@ Key behaviors:
     sessionCadence: "weekly" as const,
   },
   {
-    name: "GTD Productivity Coach",
+    name: "GTD Coach",
     icon: "📋",
     color: "#22c55e",
     focusAreas: [
@@ -172,7 +171,6 @@ export function CoachProfileEditor({
   const [color, setColor] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load existing profile data
   useEffect(() => {
     if (existingProfile) {
       setName(existingProfile.name);
@@ -212,7 +210,6 @@ export function CoachProfileEditor({
 
     setIsSaving(true);
     try {
-      // Use all available tools by default for new profiles
       const enabledTools = [
         "get_todays_tasks",
         "get_tasks",
@@ -309,25 +306,28 @@ export function CoachProfileEditor({
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+    <div className="flex flex-1 flex-col gap-3 overflow-y-auto md:gap-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-lg">
+        <h2 className="font-semibold text-base md:text-lg">
           {profileId ? "Edit Coach" : "Create Coach"}
         </h2>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 md:gap-2">
           {profileId && (
             <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="mr-1 h-4 w-4" />
-              Delete
+              <Trash2 className="h-4 w-4 md:mr-1" />
+              <span className="hidden sm:inline">Delete</span>
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onCancel}>
-            <X className="mr-1 h-4 w-4" />
-            Cancel
+            <X className="h-4 w-4 md:mr-1" />
+            <span className="hidden sm:inline">Cancel</span>
           </Button>
           <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            <Save className="mr-1 h-4 w-4" />
-            {isSaving ? "Saving..." : "Save"}
+            <Save className="h-4 w-4 md:mr-1" />
+            <span className="hidden sm:inline">
+              {isSaving ? "Saving..." : "Save"}
+            </span>
           </Button>
         </div>
       </div>
@@ -335,10 +335,10 @@ export function CoachProfileEditor({
       {/* Templates (only for new profiles) */}
       {!profileId && (
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="px-3 pb-2 pt-3 md:px-6 md:pb-3 md:pt-6">
             <CardTitle className="text-sm">Start from a template</CardTitle>
           </CardHeader>
-          <CardContent className="flex gap-2">
+          <CardContent className="flex flex-wrap gap-2 px-3 pb-3 md:px-6 md:pb-6">
             {COACH_TEMPLATES.map((template) => (
               <Button
                 key={template.name}
@@ -354,10 +354,11 @@ export function CoachProfileEditor({
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* Left column */}
-        <div className="space-y-4">
-          <div className="space-y-2">
+      {/* Form: single column on mobile, 2-col on desktop */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
+        {/* Left / top column */}
+        <div className="space-y-3 md:space-y-4">
+          <div className="space-y-1.5 md:space-y-2">
             <Label>Name</Label>
             <Input
               value={name}
@@ -366,17 +367,17 @@ export function CoachProfileEditor({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2 md:gap-3">
+            <div className="space-y-1.5 md:space-y-2">
               <Label>Icon (emoji)</Label>
               <Input
                 value={icon}
                 onChange={(e) => setIcon(e.target.value)}
-                placeholder="e.g., 🏢"
+                placeholder="🏢"
                 maxLength={4}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5 md:space-y-2">
               <Label>Color</Label>
               <Input
                 type="color"
@@ -386,7 +387,7 @@ export function CoachProfileEditor({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5 md:space-y-2">
             <Label>Model</Label>
             <Select value={model} onValueChange={setModel}>
               <SelectTrigger>
@@ -402,7 +403,7 @@ export function CoachProfileEditor({
             </Select>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5 md:space-y-2">
             <Label>Session Cadence</Label>
             <Select value={sessionCadence} onValueChange={setSessionCadence}>
               <SelectTrigger>
@@ -418,14 +419,14 @@ export function CoachProfileEditor({
             </Select>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5 md:space-y-2">
             <Label>Focus Areas</Label>
             <div className="flex flex-wrap gap-1.5">
               {FOCUS_AREA_PRESETS.map((area) => (
                 <Badge
                   key={area}
                   variant={focusAreas.includes(area) ? "default" : "outline"}
-                  className="cursor-pointer"
+                  className="cursor-pointer text-xs"
                   onClick={() => toggleFocusArea(area)}
                 >
                   {area}
@@ -435,25 +436,25 @@ export function CoachProfileEditor({
           </div>
         </div>
 
-        {/* Right column */}
-        <div className="space-y-4">
-          <div className="space-y-2">
+        {/* Right / bottom column */}
+        <div className="space-y-3 md:space-y-4">
+          <div className="space-y-1.5 md:space-y-2">
             <Label>Coaching Instructions (System Prompt)</Label>
             <Textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder="Define the coach's personality, methodology, and approach..."
-              className="min-h-[280px] font-mono text-xs"
+              className="min-h-[200px] font-mono text-xs md:min-h-[280px]"
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5 md:space-y-2">
             <Label>Greeting (first message)</Label>
             <Textarea
               value={greeting}
               onChange={(e) => setGreeting(e.target.value)}
               placeholder="Hi! I'm your coach. What would you like to work on today?"
-              className="min-h-[80px]"
+              className="min-h-[60px] md:min-h-[80px]"
             />
           </div>
         </div>

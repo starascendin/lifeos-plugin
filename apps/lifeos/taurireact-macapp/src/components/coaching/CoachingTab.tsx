@@ -1,10 +1,8 @@
 /**
  * CoachingTab - Main coaching container
  *
- * Three-pane layout:
- * - Left: Coach profiles list
- * - Center: Active chat or session history
- * - Right: Action items sidebar (when in session)
+ * Mobile: Coach list as horizontal scroll strip at top, content below
+ * Desktop: Left sidebar (coach list) + center content
  */
 
 import { useState } from "react";
@@ -12,7 +10,7 @@ import { useQuery } from "convex/react";
 import { api } from "@holaai/convex";
 import { Id } from "@holaai/convex/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -50,11 +48,12 @@ export function CoachingTab() {
   }
 
   return (
-    <div className="flex h-full gap-4">
-      {/* Left sidebar - Coach list */}
-      <div className="w-64 flex-shrink-0 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-lg">Coaches</h2>
+    <div className="flex h-full flex-col md:flex-row md:gap-4">
+      {/* Coach list: horizontal strip on mobile, vertical sidebar on desktop */}
+      <div className="flex-shrink-0 md:w-64">
+        {/* Header */}
+        <div className="mb-2 flex items-center justify-between md:mb-3">
+          <h2 className="font-semibold text-base md:text-lg">Coaches</h2>
           <Button
             size="sm"
             variant="outline"
@@ -68,7 +67,8 @@ export function CoachingTab() {
           </Button>
         </div>
 
-        <div className="space-y-2">
+        {/* Coach cards: horizontal scroll on mobile, vertical stack on desktop */}
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-2 md:mb-0 md:flex-col md:overflow-x-visible md:pb-0">
           {profiles.map((profile) => {
             const pendingCount = actionItemCounts[profile._id] || 0;
             return (
@@ -80,30 +80,32 @@ export function CoachingTab() {
                   setView("chat");
                 }}
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors",
+                  "flex flex-shrink-0 items-center gap-2 rounded-lg border p-2.5 text-left transition-colors md:w-full md:items-start md:gap-3 md:p-3",
                   selectedProfileId === profile._id && !showProfileEditor
                     ? "border-primary bg-primary/5"
                     : "border-border hover:border-primary/50",
                 )}
               >
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-lg text-lg"
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-base md:h-10 md:w-10 md:text-lg"
                   style={{
                     backgroundColor: profile.color
                       ? `${profile.color}20`
                       : "hsl(var(--muted))",
                   }}
                 >
-                  {profile.icon || <GraduationCap className="h-5 w-5" />}
+                  {profile.icon || (
+                    <GraduationCap className="h-4 w-4 md:h-5 md:w-5" />
+                  )}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <p className="truncate font-medium text-sm">{profile.name}</p>
-                  <p className="truncate text-muted-foreground text-xs">
+                  <p className="hidden truncate text-muted-foreground text-xs md:block">
                     {profile.focusAreas.slice(0, 2).join(", ")}
                   </p>
                   {pendingCount > 0 && (
                     <Badge variant="secondary" className="mt-1 text-xs">
-                      {pendingCount} action{pendingCount !== 1 ? "s" : ""}
+                      {pendingCount}
                     </Badge>
                   )}
                 </div>
@@ -112,13 +114,13 @@ export function CoachingTab() {
           })}
 
           {profiles.length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <GraduationCap className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+            <Card className="w-full">
+              <CardContent className="py-6 text-center md:py-8">
+                <GraduationCap className="mx-auto mb-2 h-7 w-7 text-muted-foreground md:mb-3 md:h-8 md:w-8" />
                 <p className="text-muted-foreground text-sm">No coaches yet</p>
                 <Button
                   size="sm"
-                  className="mt-3"
+                  className="mt-2 md:mt-3"
                   onClick={() => {
                     setEditingProfileId(null);
                     setShowProfileEditor(true);
@@ -134,7 +136,7 @@ export function CoachingTab() {
       </div>
 
       {/* Center content */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {showProfileEditor ? (
           <CoachProfileEditor
             profileId={editingProfileId}
@@ -144,11 +146,12 @@ export function CoachingTab() {
         ) : selectedProfile ? (
           <>
             {/* View tabs */}
-            <div className="mb-4 flex items-center gap-1 border-b pb-2">
+            <div className="mb-3 flex items-center gap-1 overflow-x-auto border-b pb-2 md:mb-4">
               <Button
                 variant={view === "chat" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setView("chat")}
+                className="flex-shrink-0"
               >
                 <MessageSquare className="mr-1.5 h-4 w-4" />
                 Chat
@@ -157,6 +160,7 @@ export function CoachingTab() {
                 variant={view === "history" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setView("history")}
+                className="flex-shrink-0"
               >
                 <History className="mr-1.5 h-4 w-4" />
                 Sessions
@@ -165,9 +169,10 @@ export function CoachingTab() {
                 variant={view === "actions" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setView("actions")}
+                className="flex-shrink-0"
               >
                 <CheckSquare className="mr-1.5 h-4 w-4" />
-                Action Items
+                Actions
               </Button>
               <div className="flex-1" />
               <Button
@@ -177,6 +182,7 @@ export function CoachingTab() {
                   setEditingProfileId(selectedProfileId);
                   setShowProfileEditor(true);
                 }}
+                className="flex-shrink-0"
               >
                 <Settings2 className="h-4 w-4" />
               </Button>
@@ -200,8 +206,10 @@ export function CoachingTab() {
         ) : (
           <Card className="flex flex-1 items-center justify-center">
             <CardContent className="text-center">
-              <GraduationCap className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
-              <CardTitle className="mb-2">AI Coaching</CardTitle>
+              <GraduationCap className="mx-auto mb-2 h-10 w-10 text-muted-foreground md:mb-3 md:h-12 md:w-12" />
+              <CardTitle className="mb-2 text-base md:text-lg">
+                AI Coaching
+              </CardTitle>
               <p className="text-muted-foreground text-sm">
                 Select a coach to start a session, or create a new one.
               </p>
