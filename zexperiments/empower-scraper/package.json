@@ -1,0 +1,11 @@
+{
+  "name": "empower-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "scrape": "node scrape.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  }
+}
