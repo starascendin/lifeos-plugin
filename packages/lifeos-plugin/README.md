@@ -2,7 +2,7 @@
 
 Universal skills and MCP integration for LifeOS — your personal productivity OS powered by Convex.
 
-20 workflow skills for project management, contacts, agendas, voice notes, and more.
+24 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, and more.
 
 ## Installation
 
@@ -55,7 +55,7 @@ export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 ```
 
-## Skills (20 total)
+## Skills (24 total)
 
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
@@ -88,6 +88,14 @@ export LIFEOS_API_KEY=your-api-key
 ### Voice Notes
 - **voice-notes** — Interactive voice memo exploration
 - **voice-notes-crystallize** — Save conversation insights as crystallized summaries
+
+### Health (Oura Ring)
+- **health-check** — Quick health overview: sleep, activity, readiness scores and trends
+- **health-weekly** — Weekly health review with workouts, recovery, and recommendations
+
+### Finance
+- **finance-overview** — Net worth summary, account balances, and trend analysis
+- **finance-spending** — Spending analysis with daily patterns and recent transactions
 
 ## MCP Server
 

@@ -2438,6 +2438,226 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // ==================== HEALTH (Oura Ring) Tools ====================
+  {
+    name: "get_health_sleep",
+    description:
+      "Get daily sleep data from Oura Ring including scores, durations (total/deep/REM/light), HRV, resting heart rate, and sleep quality metrics.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to fetch (default 30)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_health_activity",
+    description:
+      "Get daily activity data from Oura Ring including scores, steps, calories (active/total), exercise durations by intensity, and distance.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to fetch (default 30)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_health_readiness",
+    description:
+      "Get daily readiness scores from Oura Ring including readiness score, temperature deviation, and recovery contributor scores.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to fetch (default 30)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_health_stress",
+    description:
+      "Get daily stress and recovery data from Oura Ring including stress high, recovery high, and day summary.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to fetch (default 30)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_health_spo2",
+    description:
+      "Get daily blood oxygen (SpO2) percentage data from Oura Ring.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to fetch (default 30)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_health_heart_rate",
+    description:
+      "Get heart rate data from Oura Ring with min/max/avg BPM aggregated per day.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to fetch (default 14)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_health_workouts",
+    description:
+      "Get workout history from Oura Ring including activity type, duration, calories, intensity, and distance.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to fetch (default 30)",
+        },
+      },
+    },
+  },
+
+  // ==================== FINANCE Tools ====================
+  {
+    name: "get_finance_accounts",
+    description:
+      "Get all finance accounts including checking, savings, IRAs, 401k, brokerage, credit cards, and loans with current balances.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_finance_net_worth",
+    description:
+      "Get net worth summary with total assets, total liabilities, net worth, and per-account breakdown. All amounts in cents.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_finance_transactions",
+    description:
+      "Get financial transactions, optionally filtered by account. Returns date, description, category, and amount. Ordered newest first.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        accountId: {
+          type: "string",
+          description: "Filter by account ID (optional)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results to return (default 100)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_finance_snapshots",
+    description:
+      "Get historical daily net worth snapshots for trend analysis. Each snapshot has date, net worth, total assets, total liabilities.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days of history (default 90)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_finance_daily_spending",
+    description:
+      "Get daily income/spending/net aggregation for spending analysis. Useful for understanding spending patterns over time.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days (default 30)",
+        },
+        accountId: {
+          type: "string",
+          description: "Filter by account ID (optional)",
+        },
+      },
+    },
+  },
+
   // MCP Server Info
   {
     name: "get_version",
@@ -2702,6 +2922,58 @@ const PROMPTS: Prompt[] = [
         name: "title",
         description:
           "Optional: title or topic for the crystallization summary",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "health-check",
+    description:
+      "Quick health overview: recent Oura Ring scores for sleep, activity, readiness, plus trends and insights.",
+    arguments: [
+      {
+        name: "days",
+        description:
+          "Number of days to review (optional, defaults to 7)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "health-weekly",
+    description:
+      "Weekly health review: sleep quality trends, activity patterns, readiness scores, workouts, and recovery insights.",
+    arguments: [
+      {
+        name: "weeks",
+        description:
+          "Number of weeks to review (optional, defaults to 2)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "finance-overview",
+    description:
+      "Financial overview: net worth summary, account balances, and net worth trend over time.",
+    arguments: [
+      {
+        name: "days",
+        description:
+          "Number of days for trend data (optional, defaults to 90)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "finance-spending",
+    description:
+      "Spending analysis: daily income/spending patterns, top spending categories, and recent transactions.",
+    arguments: [
+      {
+        name: "days",
+        description:
+          "Number of days to analyze (optional, defaults to 30)",
         required: false,
       },
     ],
@@ -3304,6 +3576,114 @@ ${titleClause}
 **Save using:** Call create_ai_convo_summary with the extracted data.
 
 **After saving:** Confirm success and show the summary ID.`,
+        },
+      },
+    ];
+  },
+  "health-check": (args) => {
+    const daysCount = args.days ? parseInt(args.days) : 7;
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Give me a quick health overview. Use the LifeOS MCP tools to gather Oura Ring data for the last ${daysCount} days:
+
+1. Call get_health_sleep with days=${daysCount} for sleep scores and durations
+2. Call get_health_activity with days=${daysCount} for activity scores and steps
+3. Call get_health_readiness with days=${daysCount} for readiness scores
+4. Call get_health_heart_rate with days=${daysCount} for resting heart rate trends
+
+Present a concise health dashboard:
+- **Overall Status**: Quick assessment (great / good / needs attention)
+- **Sleep**: Average score, total sleep trend, any concerning nights
+- **Activity**: Average score, daily steps, active calories
+- **Readiness**: Average score, trend direction (improving/declining/stable)
+- **Heart Rate**: Resting HR trend, HRV if available
+- **Insights**: 2-3 actionable observations based on the data
+
+Keep it concise. Highlight anything unusual or noteworthy.`,
+        },
+      },
+    ];
+  },
+  "health-weekly": (args) => {
+    const weeksCount = args.weeks ? parseInt(args.weeks) : 2;
+    const daysCount = weeksCount * 7;
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Run a weekly health review for the last ${weeksCount} week(s). Use the LifeOS MCP tools:
+
+1. Call get_health_sleep with days=${daysCount} for sleep data
+2. Call get_health_activity with days=${daysCount} for activity data
+3. Call get_health_readiness with days=${daysCount} for readiness data
+4. Call get_health_stress with days=${daysCount} for stress/recovery data
+5. Call get_health_workouts with days=${daysCount} for workout history
+6. Call get_health_heart_rate with days=${daysCount} for HR trends
+
+Present a detailed weekly health review:
+- **Sleep Quality**: Weekly average scores, best/worst nights, sleep duration trends, deep/REM balance
+- **Activity Patterns**: Weekly step averages, active days vs rest days, calorie burn
+- **Readiness & Recovery**: Score trends, stress vs recovery balance
+- **Workouts**: List workouts with type, duration, calories burned
+- **Heart Rate**: Resting HR trend, HRV trend (if available)
+- **Week-over-Week**: Compare this week vs last week (if multiple weeks)
+- **Recommendations**: 3-5 specific, actionable health recommendations
+
+Group data by week for easy comparison.`,
+        },
+      },
+    ];
+  },
+  "finance-overview": (args) => {
+    const daysCount = args.days ? parseInt(args.days) : 90;
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Give me a financial overview. Use the LifeOS MCP tools:
+
+1. Call get_finance_net_worth for current net worth and account breakdown
+2. Call get_finance_accounts for all account details
+3. Call get_finance_snapshots with days=${daysCount} for net worth trend
+
+Present a financial dashboard:
+- **Net Worth**: Current total with change over the period
+- **Assets**: Total assets, broken down by account type (checking, savings, investments, retirement)
+- **Liabilities**: Total liabilities, broken down by type (credit cards, loans)
+- **Trend**: Net worth direction over the last ${daysCount} days (growing/declining/stable)
+- **Accounts**: List each account with name, type, and current balance (convert cents to dollars)
+- **Insights**: Notable changes or patterns
+
+Convert all amounts from cents to dollars for display. Format as currency.`,
+        },
+      },
+    ];
+  },
+  "finance-spending": (args) => {
+    const daysCount = args.days ? parseInt(args.days) : 30;
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Analyze my spending patterns. Use the LifeOS MCP tools:
+
+1. Call get_finance_daily_spending with days=${daysCount} for daily income/spending aggregation
+2. Call get_finance_transactions with limit=50 for recent transaction details
+
+Present a spending analysis:
+- **Summary**: Total income, total spending, net for the period
+- **Daily Average**: Average daily spending
+- **Spending Pattern**: Identify high-spending days and patterns
+- **Recent Transactions**: Show the most notable recent transactions
+- **Insights**: Spending trends, any unusual activity, suggestions
+
+Convert all amounts from cents to dollars. Format as currency.`,
         },
       },
     ];

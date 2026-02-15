@@ -31,9 +31,9 @@ export LIFEOS_API_KEY=your-api-key
 ```
 
 The agent now has:
-- 20 skills (invoked via `/daily-standup`, `/capture "idea"`, `/meeting-prep John`, etc.)
-- 94 MCP tools (get_tasks, create_issue, get_contact_dossier, etc.)
-- 21 MCP prompts (same workflows as skills, but via MCP protocol)
+- 24 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, etc.)
+- 106 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, etc.)
+- 25 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
 
@@ -142,7 +142,7 @@ Add to the agent's MCP config (see `.mcp.json.example`):
 }
 ```
 
-This gives the agent 94 tools + 21 prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-standup` via the MCP prompt.
+This gives the agent 106 tools + 25 prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-standup` via the MCP prompt.
 
 Alternatively, use env vars instead of CLI args:
 
@@ -164,7 +164,7 @@ Alternatively, use env vars instead of CLI args:
 
 ## What the Agent Gets
 
-### 20 Skills (Claude Code / OpenCode)
+### 24 Skills (Claude Code / OpenCode)
 
 | Skill | Usage | What it does |
 |-------|-------|-------------|
@@ -188,12 +188,16 @@ Alternatively, use env vars instead of CLI args:
 | `overdue` | `/overdue` | Overdue and slipping items |
 | `voice-notes` | `/voice-notes` | Interactive memo exploration |
 | `voice-notes-crystallize` | `/voice-notes-crystallize` | Save conversation insights |
+| `health-check` | `/health-check` | Quick Oura health overview: scores, trends |
+| `health-weekly` | `/health-weekly` | Weekly health review with workouts |
+| `finance-overview` | `/finance-overview` | Net worth, accounts, trends |
+| `finance-spending` | `/finance-spending` | Spending analysis and patterns |
 
-### 94 MCP Tools
+### 106 MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, and more.
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), and finance (accounts, net worth, transactions, snapshots, daily spending).
 
-### 21 MCP Prompts
+### 25 MCP Prompts
 
 Same workflows as the skills above, exposed via MCP protocol. Any MCP client can invoke them.
 

@@ -705,6 +705,89 @@ export const TOOL_DEFINITIONS = {
       year: "required - the year (e.g., 2026)",
     },
   },
+  // Health (Oura Ring) tools
+  get_health_sleep: {
+    description:
+      "Get daily sleep data from Oura Ring (scores, durations, HRV, resting HR)",
+    params: {
+      days: "optional - number of days to fetch (default 30)",
+    },
+  },
+  get_health_activity: {
+    description:
+      "Get daily activity data from Oura Ring (scores, steps, calories, activity times)",
+    params: {
+      days: "optional - number of days to fetch (default 30)",
+    },
+  },
+  get_health_readiness: {
+    description:
+      "Get daily readiness scores from Oura Ring (readiness score, temperature deviation, contributors)",
+    params: {
+      days: "optional - number of days to fetch (default 30)",
+    },
+  },
+  get_health_stress: {
+    description:
+      "Get daily stress/recovery data from Oura Ring",
+    params: {
+      days: "optional - number of days to fetch (default 30)",
+    },
+  },
+  get_health_spo2: {
+    description: "Get daily blood oxygen (SpO2) data from Oura Ring",
+    params: {
+      days: "optional - number of days to fetch (default 30)",
+    },
+  },
+  get_health_heart_rate: {
+    description:
+      "Get heart rate data from Oura Ring (min/max/avg BPM per day)",
+    params: {
+      days: "optional - number of days to fetch (default 14)",
+    },
+  },
+  get_health_workouts: {
+    description:
+      "Get workout history from Oura Ring (activity type, duration, calories, intensity)",
+    params: {
+      days: "optional - number of days to fetch (default 30)",
+    },
+  },
+  // Finance tools
+  get_finance_accounts: {
+    description:
+      "Get all finance accounts (checking, savings, IRAs, 401k, brokerage, credit cards, loans)",
+    params: {},
+  },
+  get_finance_net_worth: {
+    description:
+      "Get net worth summary with total assets, total liabilities, and per-account breakdown",
+    params: {},
+  },
+  get_finance_transactions: {
+    description:
+      "Get financial transactions, optionally filtered by account",
+    params: {
+      accountId: "optional - filter by account ID",
+      limit: "optional - max results (default 100)",
+    },
+  },
+  get_finance_snapshots: {
+    description:
+      "Get historical daily net worth snapshots for trend analysis",
+    params: {
+      days: "optional - number of days of history (default 90)",
+    },
+  },
+  get_finance_daily_spending: {
+    description:
+      "Get daily income/spending/net aggregation for spending analysis",
+    params: {
+      days: "optional - number of days (default 30)",
+      accountId: "optional - filter by account ID",
+    },
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOL_DEFINITIONS;
@@ -8689,5 +8772,243 @@ export const getInitiativeYearlyRollupInternal = internalQuery({
       },
       generatedAt: new Date().toISOString(),
     };
+  },
+});
+
+// ==================== HEALTH (Oura) TOOLS ====================
+
+export const getHealthSleepInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.days ?? 30;
+    return await ctx.db
+      .query("lifeos_ouraDailySleep")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const getHealthActivityInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.days ?? 30;
+    return await ctx.db
+      .query("lifeos_ouraDailyActivity")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const getHealthReadinessInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.days ?? 30;
+    return await ctx.db
+      .query("lifeos_ouraDailyReadiness")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const getHealthStressInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.days ?? 30;
+    return await ctx.db
+      .query("lifeos_ouraDailyStress")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const getHealthSpo2Internal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.days ?? 30;
+    return await ctx.db
+      .query("lifeos_ouraDailySpo2")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const getHealthHeartRateInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.days ?? 14;
+    return await ctx.db
+      .query("lifeos_ouraHeartRate")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const getHealthWorkoutsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.days ?? 30;
+    return await ctx.db
+      .query("lifeos_ouraWorkouts")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+// ==================== FINANCE TOOLS ====================
+
+export const getFinanceAccountsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("lifeos_financeAccounts")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId as Id<"users">))
+      .collect();
+  },
+});
+
+export const getFinanceNetWorthInternal = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const accounts = await ctx.db
+      .query("lifeos_financeAccounts")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId as Id<"users">))
+      .collect();
+
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+    for (const acct of accounts) {
+      if (acct.assetClass === "asset") {
+        totalAssets += acct.balanceCents;
+      } else {
+        totalLiabilities += acct.balanceCents;
+      }
+    }
+
+    return {
+      totalAssets,
+      totalLiabilities,
+      netWorth: totalAssets - totalLiabilities,
+      accounts,
+    };
+  },
+});
+
+export const getFinanceTransactionsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    accountId: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 100;
+
+    if (args.accountId) {
+      return await ctx.db
+        .query("lifeos_financeTransactions")
+        .withIndex("by_account", (q) => q.eq("accountId", args.accountId as Id<"lifeos_financeAccounts">))
+        .order("desc")
+        .take(limit);
+    }
+
+    return await ctx.db
+      .query("lifeos_financeTransactions")
+      .withIndex("by_user_date", (q) => q.eq("userId", args.userId as Id<"users">))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const getFinanceSnapshotsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const days = args.days ?? 90;
+    const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+    return await ctx.db
+      .query("lifeos_financeSnapshots")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", args.userId as Id<"users">).gte("date", cutoffStr),
+      )
+      .collect();
+  },
+});
+
+export const getFinanceDailySpendingInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    days: v.optional(v.number()),
+    accountId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const days = args.days ?? 30;
+    const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    let txns;
+    if (args.accountId) {
+      txns = await ctx.db
+        .query("lifeos_financeTransactions")
+        .withIndex("by_account", (q) => q.eq("accountId", args.accountId as Id<"lifeos_financeAccounts">))
+        .collect();
+      txns = txns.filter((t) => t.dateMs >= cutoffMs);
+    } else {
+      txns = await ctx.db
+        .query("lifeos_financeTransactions")
+        .withIndex("by_user_date", (q) =>
+          q.eq("userId", args.userId as Id<"users">).gte("dateMs", cutoffMs),
+        )
+        .collect();
+    }
+
+    const byDay = new Map<string, { income: number; spending: number; net: number }>();
+    for (const t of txns) {
+      const existing = byDay.get(t.date) ?? { income: 0, spending: 0, net: 0 };
+      if (t.amountCents >= 0) {
+        existing.income += t.amountCents;
+      } else {
+        existing.spending += Math.abs(t.amountCents);
+      }
+      existing.net += t.amountCents;
+      byDay.set(t.date, existing);
+    }
+
+    return Array.from(byDay.entries())
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   },
 });

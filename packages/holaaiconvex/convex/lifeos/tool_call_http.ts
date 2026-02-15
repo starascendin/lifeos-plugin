@@ -112,6 +112,20 @@ export const AVAILABLE_TOOLS = [
   "reject_merge_suggestion",
   "dismiss_all_merge_suggestions",
   "unlink_meeting_from_business_contact",
+  // Health (Oura Ring) tools
+  "get_health_sleep",
+  "get_health_activity",
+  "get_health_readiness",
+  "get_health_stress",
+  "get_health_spo2",
+  "get_health_heart_rate",
+  "get_health_workouts",
+  // Finance tools
+  "get_finance_accounts",
+  "get_finance_net_worth",
+  "get_finance_transactions",
+  "get_finance_snapshots",
+  "get_finance_daily_spending",
   // Initiative Management tools
   "get_initiatives",
   "get_initiative",
@@ -1147,6 +1161,128 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             threadConvexId: params?.threadConvexId as string,
             meetingSource: params?.meetingSource as string,
             meetingId: params?.meetingId as string,
+          },
+        );
+        break;
+
+      // ==================== HEALTH (Oura Ring) ====================
+      case "get_health_sleep":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getHealthSleepInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      case "get_health_activity":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getHealthActivityInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      case "get_health_readiness":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getHealthReadinessInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      case "get_health_stress":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getHealthStressInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      case "get_health_spo2":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getHealthSpo2Internal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      case "get_health_heart_rate":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getHealthHeartRateInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      case "get_health_workouts":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getHealthWorkoutsInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      // ==================== FINANCE ====================
+      case "get_finance_accounts":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getFinanceAccountsInternal,
+          {
+            userId: auth.userId,
+          },
+        );
+        break;
+
+      case "get_finance_net_worth":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getFinanceNetWorthInternal,
+          {
+            userId: auth.userId,
+          },
+        );
+        break;
+
+      case "get_finance_transactions":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getFinanceTransactionsInternal,
+          {
+            userId: auth.userId,
+            accountId: params?.accountId as string | undefined,
+            limit: params?.limit as number | undefined,
+          },
+        );
+        break;
+
+      case "get_finance_snapshots":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getFinanceSnapshotsInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+          },
+        );
+        break;
+
+      case "get_finance_daily_spending":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getFinanceDailySpendingInternal,
+          {
+            userId: auth.userId,
+            days: params?.days as number | undefined,
+            accountId: params?.accountId as string | undefined,
           },
         );
         break;

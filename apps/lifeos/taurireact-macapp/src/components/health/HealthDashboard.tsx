@@ -55,8 +55,8 @@ function scoreColor(score: number | undefined): string {
 function scoreBadge(score: number | undefined) {
   if (score === undefined) return null;
   const variant = score >= 85 ? "default" : score >= 70 ? "secondary" : "destructive";
-  const label = score >= 85 ? "Optimal" : score >= 70 ? "Good" : "Pay attention";
-  return <Badge variant={variant} className="text-xs">{label}</Badge>;
+  const label = score >= 85 ? "Optimal" : score >= 70 ? "Good" : "Attention";
+  return <Badge variant={variant} className="text-[10px] px-1.5 py-0">{label}</Badge>;
 }
 
 // ==================== SCORE RING ====================
@@ -74,8 +74,8 @@ function ScoreRing({ score, label, icon: Icon, color }: {
   const offset = c - (pct / 100) * c;
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative h-16 w-16 flex-shrink-0">
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0">
         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
           <circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeWidth="7" className="text-muted/20" />
           <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="7"
@@ -83,13 +83,13 @@ function ScoreRing({ score, label, icon: Icon, color }: {
             className="transition-all duration-700" />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-lg font-bold">{score ?? "–"}</span>
+          <span className="text-base sm:text-lg font-bold">{score ?? "–"}</span>
         </div>
       </div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">{label}</span>
+      <div className="flex flex-col items-center gap-0.5">
+        <div className="flex items-center gap-1">
+          <Icon className="h-3 w-3 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{label}</span>
         </div>
         {scoreBadge(score)}
       </div>
@@ -123,14 +123,14 @@ function DayView({ selectedDate, onDateChange }: { selectedDate: string; onDateC
   const hasAnyData = daySleep || dayActivity || dayReadiness || dayHR || daySpo2 || dayStress;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Date Navigator */}
-      <div className="flex items-center justify-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigateDay(-1)}>
+      <div className="flex items-center justify-center gap-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDay(-1)}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="font-medium text-lg min-w-[200px] text-center">{formatDateShort(selectedDate)}</span>
-        <Button variant="ghost" size="icon" onClick={() => navigateDay(1)}
+        <span className="font-medium text-sm sm:text-base min-w-[160px] text-center">{formatDateShort(selectedDate)}</span>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDay(1)}
           disabled={selectedDate >= new Date().toISOString().slice(0, 10)}>
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -138,8 +138,8 @@ function DayView({ selectedDate, onDateChange }: { selectedDate: string; onDateC
 
       {!hasAnyData && (
         <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            No data for this date. Try syncing with more days or pick a different date.
+          <CardContent className="p-6 text-center text-sm text-muted-foreground">
+            No data for this date. Try syncing or pick a different date.
           </CardContent>
         </Card>
       )}
@@ -148,13 +148,13 @@ function DayView({ selectedDate, onDateChange }: { selectedDate: string; onDateC
         <>
           {/* Scores + Quick Stats */}
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-around">
+            <CardContent className="p-3 sm:p-4">
+              <div className="grid grid-cols-3 place-items-center gap-2">
                 <ScoreRing score={daySleep?.score ?? undefined} label="Sleep" icon={Moon} color="#8b5cf6" />
                 <ScoreRing score={dayActivity?.score ?? undefined} label="Activity" icon={Activity} color="#22c55e" />
                 <ScoreRing score={dayReadiness?.score ?? undefined} label="Readiness" icon={Zap} color="#f59e0b" />
               </div>
-              <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-border">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2 mt-3 pt-3 border-t border-border">
                 <MiniStat icon={<Heart className="h-3.5 w-3.5 text-red-500" />} label="Resting HR"
                   value={`${daySleep?.restingHeartRate ?? dayHR?.avgBpm ?? "–"}`} unit="bpm" />
                 <MiniStat icon={<Activity className="h-3.5 w-3.5 text-violet-500" />} label="HRV"
@@ -168,16 +168,16 @@ function DayView({ selectedDate, onDateChange }: { selectedDate: string; onDateC
           </Card>
 
           {/* Details Grid */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             {daySleep && (
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="px-3 sm:px-6 pb-1.5 pt-3 sm:pt-4">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Moon className="h-4 w-4 text-violet-500" /> Sleep
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                <CardContent className="px-3 sm:px-6 pt-0 pb-3 sm:pb-4">
+                  <div className="grid grid-cols-2 gap-y-1.5 gap-x-3 text-sm">
                     <Stat label="Total" value={formatDuration(daySleep.totalSleepDuration)} />
                     <Stat label="Deep" value={formatDuration(daySleep.deepSleepDuration)} />
                     <Stat label="REM" value={formatDuration(daySleep.remSleepDuration)} />
@@ -191,13 +191,13 @@ function DayView({ selectedDate, onDateChange }: { selectedDate: string; onDateC
 
             {dayActivity && (
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="px-3 sm:px-6 pb-1.5 pt-3 sm:pt-4">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Activity className="h-4 w-4 text-green-500" /> Activity
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                <CardContent className="px-3 sm:px-6 pt-0 pb-3 sm:pb-4">
+                  <div className="grid grid-cols-2 gap-y-1.5 gap-x-3 text-sm">
                     <Stat label="Steps" value={dayActivity.steps?.toLocaleString() ?? "–"} icon={<Footprints className="h-3 w-3" />} />
                     <Stat label="Active Cal" value={dayActivity.activeCalories?.toLocaleString() ?? "–"} icon={<Flame className="h-3 w-3" />} />
                     <Stat label="Total Cal" value={dayActivity.totalCalories?.toLocaleString() ?? "–"} />
@@ -223,25 +223,20 @@ function WeekView() {
   const readiness = useQuery(api.lifeos.oura.getDailyReadiness, { days: 30 });
   const workouts = useQuery(api.lifeos.oura.getWorkouts, { days: 30 });
 
-  // Build week data
   const weekData = useMemo(() => {
     if (!sleep && !activity && !readiness) return [];
 
-    // Collect all dates
     const allDates = new Set<string>();
     sleep?.forEach((s) => allDates.add(s.date));
     activity?.forEach((a) => allDates.add(a.date));
     readiness?.forEach((r) => allDates.add(r.date));
 
-    // Build daily map
     const dailyMap = new Map<string, {
       date: string; sleepScore?: number; activityScore?: number; readinessScore?: number;
       steps?: number; totalSleep?: number; hrv?: number;
     }>();
 
-    for (const date of allDates) {
-      dailyMap.set(date, { date });
-    }
+    for (const date of allDates) dailyMap.set(date, { date });
     sleep?.forEach((s) => {
       const e = dailyMap.get(s.date)!;
       e.sleepScore = s.score ?? undefined;
@@ -261,7 +256,6 @@ function WeekView() {
     return Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [sleep, activity, readiness]);
 
-  // Group by week
   const weeks = useMemo(() => {
     const weekMap = new Map<string, typeof weekData>();
     for (const day of weekData) {
@@ -270,7 +264,7 @@ function WeekView() {
       weekMap.get(start)!.push(day);
     }
     return Array.from(weekMap.entries())
-      .sort(([a], [b]) => b.localeCompare(a)) // newest first
+      .sort(([a], [b]) => b.localeCompare(a))
       .map(([weekStart, days]) => {
         const { label } = getWeekRange(weekStart);
         const avg = (arr: (number | undefined)[]) => {
@@ -282,8 +276,7 @@ function WeekView() {
           return nums.length ? nums.reduce((a, b) => a + b, 0) : undefined;
         };
         return {
-          weekStart,
-          label,
+          weekStart, label,
           days: days.length,
           avgSleep: avg(days.map((d) => d.sleepScore)),
           avgActivity: avg(days.map((d) => d.activityScore)),
@@ -292,7 +285,6 @@ function WeekView() {
           totalSteps: sum(days.map((d) => d.steps)),
           avgHRV: avg(days.map((d) => d.hrv)),
           avgTotalSleep: avg(days.map((d) => d.totalSleep)),
-          dailyData: days,
         };
       });
   }, [weekData]);
@@ -300,7 +292,7 @@ function WeekView() {
   if (weekData.length === 0) {
     return (
       <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
+        <CardContent className="p-6 text-center text-sm text-muted-foreground">
           No data yet. Sync your Oura Ring data to see weekly trends.
         </CardContent>
       </Card>
@@ -308,21 +300,21 @@ function WeekView() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Trend Chart */}
       {weekData.length > 1 && (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="px-3 sm:px-6 pb-1 pt-3 sm:pt-4">
             <CardTitle className="text-sm">Score Trends</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="h-56">
+          <CardContent className="px-1 sm:px-4 pb-3">
+            <div className="h-48 sm:h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weekData}>
+                <LineChart data={weekData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                  <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} interval="preserveStartEnd" />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 9 }} width={40} />
+                  <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 11, padding: "4px 8px" }} />
                   <Line type="monotone" dataKey="sleepScore" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Sleep" connectNulls />
                   <Line type="monotone" dataKey="activityScore" stroke="#22c55e" strokeWidth={2} dot={false} name="Activity" connectNulls />
                   <Line type="monotone" dataKey="readinessScore" stroke="#f59e0b" strokeWidth={2} dot={false} name="Readiness" connectNulls />
@@ -336,17 +328,17 @@ function WeekView() {
       {/* Steps Chart */}
       {weekData.some((d) => d.steps) && (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="px-3 sm:px-6 pb-1 pt-3 sm:pt-4">
             <CardTitle className="text-sm">Daily Steps</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="h-40">
+          <CardContent className="px-1 sm:px-4 pb-3">
+            <div className="h-36 sm:h-40">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weekData}>
+                <BarChart data={weekData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 9 }} width={40} />
+                  <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 11, padding: "4px 8px" }} />
                   <Bar dataKey="steps" fill="#22c55e" radius={[4, 4, 0, 0]} name="Steps" />
                 </BarChart>
               </ResponsiveContainer>
@@ -357,42 +349,21 @@ function WeekView() {
 
       {/* Weekly Summaries */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="px-3 sm:px-6 pb-1 pt-3 sm:pt-4">
           <CardTitle className="text-sm">Weekly Averages</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-0 divide-y divide-border">
+        <CardContent className="px-3 sm:px-6 pb-3 space-y-0 divide-y divide-border">
           {weeks.map((week) => (
-            <div key={week.weekStart} className="py-3 first:pt-0 last:pb-0">
-              <p className="text-xs text-muted-foreground mb-1.5">{week.label} <span>({week.days}d)</span></p>
-              <div className="grid grid-cols-4 md:grid-cols-7 gap-x-4 gap-y-1 text-sm">
-                <div>
-                  <span className={`font-semibold ${scoreColor(week.avgSleep)}`}>{week.avgSleep ?? "–"}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">sleep</span>
-                </div>
-                <div>
-                  <span className={`font-semibold ${scoreColor(week.avgActivity)}`}>{week.avgActivity ?? "–"}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">activity</span>
-                </div>
-                <div>
-                  <span className={`font-semibold ${scoreColor(week.avgReadiness)}`}>{week.avgReadiness ?? "–"}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">readiness</span>
-                </div>
-                <div>
-                  <span className="font-semibold">{week.avgSteps?.toLocaleString() ?? "–"}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">steps/d</span>
-                </div>
-                <div>
-                  <span className="font-semibold">{formatDuration(week.avgTotalSleep)}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">sleep</span>
-                </div>
-                <div>
-                  <span className="font-semibold">{week.avgHRV ?? "–"}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">HRV</span>
-                </div>
-                <div>
-                  <span className="font-semibold">{week.totalSteps?.toLocaleString() ?? "–"}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">total steps</span>
-                </div>
+            <div key={week.weekStart} className="py-2.5 first:pt-0 last:pb-0">
+              <p className="text-xs text-muted-foreground mb-1.5">{week.label} ({week.days}d)</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-x-3 gap-y-1.5 text-sm">
+                <WeekStat value={week.avgSleep} label="sleep" colorize />
+                <WeekStat value={week.avgActivity} label="activity" colorize />
+                <WeekStat value={week.avgReadiness} label="readiness" colorize />
+                <WeekStat value={week.avgSteps?.toLocaleString()} label="steps/d" />
+                <WeekStat value={formatDuration(week.avgTotalSleep)} label="sleep" raw />
+                <WeekStat value={week.avgHRV} label="HRV" />
+                <WeekStat value={week.totalSteps?.toLocaleString()} label="total" />
               </div>
             </div>
           ))}
@@ -402,23 +373,21 @@ function WeekView() {
       {/* Recent Workouts */}
       {workouts && workouts.length > 0 && (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="px-3 sm:px-6 pb-1 pt-3 sm:pt-4">
             <CardTitle className="text-sm flex items-center gap-2">
               <Dumbbell className="h-4 w-4" /> Recent Workouts
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="px-3 sm:px-6 pb-3">
+            <div className="space-y-0 divide-y divide-border">
               {workouts.slice(0, 8).map((w) => (
-                <div key={w._id} className="flex items-center justify-between text-sm border-b border-border pb-2 last:border-0">
-                  <div>
-                    <span className="font-medium capitalize">{w.activity.replace(/_/g, " ")}</span>
-                    <span className="text-muted-foreground ml-2">{formatDateShort(w.date)}</span>
-                  </div>
-                  <div className="flex gap-3 text-muted-foreground">
+                <div key={w._id} className="py-2 first:pt-0 last:pb-0 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                  <span className="font-medium capitalize">{w.activity.replace(/_/g, " ")}</span>
+                  <span className="text-xs text-muted-foreground">{formatDateShort(w.date)}</span>
+                  <span className="ml-auto text-xs text-muted-foreground flex gap-2">
                     {w.duration && <span>{formatDuration(w.duration)}</span>}
                     {w.calories && <span>{w.calories} cal</span>}
-                  </div>
+                  </span>
                 </div>
               ))}
             </div>
@@ -433,23 +402,39 @@ function WeekView() {
 
 function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <div>
-      <span className="text-muted-foreground flex items-center gap-1 text-xs">
+    <div className="min-w-0">
+      <span className="text-muted-foreground flex items-center gap-1 text-xs truncate">
         {icon}{label}
       </span>
-      <p className="font-medium">{value}</p>
+      <p className="font-medium text-sm truncate">{value}</p>
     </div>
   );
 }
 
 function MiniStat({ icon, label, value, unit }: { icon: React.ReactNode; label: string; value: string; unit: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      {icon}
-      <div>
-        <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
-        <p className="text-sm font-semibold">{value} <span className="text-[10px] font-normal text-muted-foreground">{unit}</span></p>
+    <div className="flex items-center gap-1.5 min-w-0">
+      <div className="flex-shrink-0">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-[10px] text-muted-foreground leading-tight truncate">{label}</p>
+        <p className="text-sm font-semibold truncate">{value} <span className="text-[10px] font-normal text-muted-foreground">{unit}</span></p>
       </div>
+    </div>
+  );
+}
+
+function WeekStat({ value, label, colorize, raw }: {
+  value: number | string | undefined;
+  label: string;
+  colorize?: boolean;
+  raw?: boolean;
+}) {
+  const display = raw ? (value as string) : (value ?? "–");
+  const color = colorize && typeof value === "number" ? scoreColor(value) : "";
+  return (
+    <div className="min-w-0 truncate">
+      <span className={`font-semibold text-sm ${color}`}>{display}</span>
+      <span className="text-[10px] text-muted-foreground ml-1">{label}</span>
     </div>
   );
 }
@@ -460,7 +445,7 @@ export function HealthDashboard() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   return (
-    <Tabs defaultValue="day" className="space-y-4">
+    <Tabs defaultValue="day" className="space-y-3">
       <TabsList>
         <TabsTrigger value="day">Day</TabsTrigger>
         <TabsTrigger value="week">Week</TabsTrigger>

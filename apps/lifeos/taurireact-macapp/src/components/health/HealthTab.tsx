@@ -47,7 +47,7 @@ export function HealthTab() {
 
   if (!isConnected) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
         <h1 className="text-2xl font-bold">Health</h1>
         <OuraConnectCard />
       </div>
@@ -55,7 +55,7 @@ export function HealthTab() {
   }
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-3 sm:space-y-4 max-w-7xl mx-auto">
       {/* Compact header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
