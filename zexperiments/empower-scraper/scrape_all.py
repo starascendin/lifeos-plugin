@@ -9,6 +9,8 @@ import asyncio
 import csv
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from patchright.async_api import async_playwright
 
@@ -43,7 +45,10 @@ async def get_accounts(page):
             const seen = new Set();
             for (const btn of buttons) {
                 const text = btn.textContent.trim();
-                const match = text.match(/(\\d{4})\\s*•\\s*(\\d+[mhd]?)\\s*ago/);
+                // Skip Reconnect accounts — they have stale data
+                if (text.includes('Reconnect')) continue;
+                // Match accounts: 3-4 digit number + "• Xh/m/d ago"
+                const match = text.match(/(\\d{3,4})\\s*•\\s*(\\d+[mhd]?)\\s*ago/);
                 if (match) {
                     const accountNum = match[1];
                     if (seen.has(accountNum)) continue;
@@ -52,7 +57,7 @@ async def get_accounts(page):
                     const institution = lines[0] || '';
                     const balanceMatch = text.match(/\\$([\\d,]+(?:\\.\\d{2})?)/);
                     const balance = balanceMatch ? balanceMatch[0] : '$0';
-                    accounts.push({ institution, accountNum, balance });
+                    accounts.push({ institution, accountNum, balance, buttonText: text.substring(0, 80) });
                 }
             }
             return accounts;
@@ -60,13 +65,24 @@ async def get_accounts(page):
     """)
 
 
-async def click_account(page, account_num):
-    """Click an account button by its 4-digit identifier."""
+async def click_account(page, account):
+    """Click an account button by matching its text content."""
+    account_num = account["accountNum"]
+    institution = account["institution"]
     return await page.evaluate(f"""
         () => {{
             const buttons = document.querySelectorAll('button');
             for (const btn of buttons) {{
-                if (btn.textContent.includes('{account_num}') && btn.textContent.includes('ago')) {{
+                const text = btn.textContent;
+                if (text.includes('{account_num}') && text.includes('ago') && text.includes('{institution}')) {{
+                    btn.click();
+                    return true;
+                }}
+            }}
+            // Fallback: match by account number only
+            for (const btn of buttons) {{
+                const text = btn.textContent;
+                if (text.includes('{account_num}') && text.includes('ago')) {{
                     btn.click();
                     return true;
                 }}
@@ -78,18 +94,29 @@ async def click_account(page, account_num):
 
 async def scrape_account(page, account):
     """Click account, wait for detail, extract transactions."""
-    clicked = await click_account(page, account["accountNum"])
+    clicked = await click_account(page, account)
     if not clicked:
         print(f"  Could not click {account['accountNum']}, skipping")
         return None
 
     await asyncio.sleep(3)
 
+    acct_num = account["accountNum"]
+    inst = account["institution"].replace("'", "\\'")
     detail = await page.evaluate(f"""
         () => {{
             const text = document.body.innerText;
-            const titleMatch = text.match(/([\\w\\s]+ - Ending in {account['accountNum']})/);
-            const accountTitle = titleMatch ? titleMatch[1] : '{account["institution"]} {account["accountNum"]}';
+            // Try multiple patterns to find the account title
+            let accountTitle = '';
+            const patterns = [
+                /([\\w\\s]+ - Ending in {acct_num})/,
+                /({inst}[\\s\\S]{{0,50}}?{acct_num})/,
+            ];
+            for (const p of patterns) {{
+                const m = text.match(p);
+                if (m) {{ accountTitle = m[1]; break; }}
+            }}
+            if (!accountTitle) accountTitle = '{inst} {acct_num}';
 
             const searchIdx = text.indexOf('Search transactions');
             if (searchIdx === -1) return {{ accountTitle, rawSection: '', hasTransactions: false }};
@@ -200,10 +227,22 @@ async def main():
             channel="chrome",
             headless=False,
             no_viewport=True,
-            # do NOT add custom browser headers or user_agent
+            args=["--start-maximized"],
         )
 
         page = browser.pages[0] if browser.pages else await browser.new_page()
+
+        # Hide Chrome immediately (macOS) — hidden apps still render
+        await asyncio.sleep(1)
+        if sys.platform == "darwin":
+            try:
+                subprocess.run([
+                    "osascript", "-e",
+                    'tell application "System Events" to set visible of process "Google Chrome" to false'
+                ], timeout=5, capture_output=True)
+                print("Chrome hidden.")
+            except Exception:
+                pass
 
         # Navigate to Empower login page
         print("Navigating to Empower...")
@@ -286,12 +325,6 @@ async def main():
 
         print("Dashboard loaded!\n")
 
-        # Minimize the window after Cloudflare passed
-        try:
-            await page.evaluate("window.blur()")
-        except Exception:
-            pass
-
         # Scrape accounts
         accounts = await get_accounts(page)
         print(f"Found {len(accounts)} accounts:")
@@ -310,7 +343,8 @@ async def main():
             print(f"  {len(txns)} transactions")
 
             if txns:
-                safe_name = re.sub(r"[^a-zA-Z0-9_]", "", f"{account['institution']}_{account['accountNum']}")
+                inst_clean = re.sub(r"[^a-zA-Z0-9]", "_", account["institution"]).strip("_")
+                safe_name = f"{inst_clean}_{account['accountNum']}"
                 csv_path = OUTPUT_DIR / f"{safe_name}.csv"
                 save_csv(txns, csv_path, is_investment)
                 print(f"  Saved: {csv_path.name}")
