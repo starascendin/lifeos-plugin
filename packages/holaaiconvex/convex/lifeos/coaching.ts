@@ -308,6 +308,19 @@ function getFilteredTools(enabledTools: string[]) {
  * Create a coach agent instance with the given profile config.
  * Tools are the CatGirl tools filtered to the coach's enabledTools list.
  */
+const CITATION_INSTRUCTIONS = `
+## Citation Requirements
+When you reference information from notes, AI conversation summaries, or any data retrieved via tools, you MUST cite your sources inline. Use this format:
+
+- For notes: cite as "[Note: <name>, <date>]" using the name and createdAt from the tool result.
+- For AI conversation summaries: cite as "[Summary: <title>, <date>]" using the title and createdAt.
+- For tasks/issues/projects: cite as "[<type>: <name/title>]".
+
+Example: "Based on your reflection about work-life balance [Note: Morning Thoughts, 2/10/2026], it seems like..."
+
+Always cite the specific source so the user knows where the information came from. If you use multiple sources, cite each one where it's referenced.
+`;
+
 function createCoachAgent(
   model: string,
   instructions: string,
@@ -316,8 +329,8 @@ function createCoachAgent(
   contextPrefix?: string,
 ) {
   const fullInstructions = contextPrefix
-    ? `${instructions}\n\n--- SESSION CONTEXT ---\n${contextPrefix}`
-    : instructions;
+    ? `${instructions}\n${CITATION_INSTRUCTIONS}\n--- SESSION CONTEXT ---\n${contextPrefix}`
+    : `${instructions}\n${CITATION_INSTRUCTIONS}`;
 
   const tools = getFilteredTools(enabledTools);
 
