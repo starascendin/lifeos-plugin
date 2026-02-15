@@ -63,11 +63,17 @@ export const IssueCard = React.memo(function IssueCard({
         isDragging && "rotate-3"
       )}
     >
-      {/* Identifier */}
-      <div className="mb-1 flex items-center justify-between">
+      {/* Identifier + meta */}
+      <div className="mb-1 flex items-center gap-1.5">
         <span className="text-muted-foreground text-xs font-medium">
           {issue.identifier}
         </span>
+        {issue.estimate != null && issue.estimate > 0 && (
+          <span className="rounded-sm bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary tabular-nums">
+            {issue.estimate}pt
+          </span>
+        )}
+        <div className="flex-1" />
         {issue.priority !== "none" && (
           <span className={cn("text-xs font-bold", priorityConfig.color)}>
             {priorityConfig.icon}
@@ -91,18 +97,11 @@ export const IssueCard = React.memo(function IssueCard({
           )}
         </div>
 
-        <div className="flex items-center gap-1">
-          <div
-            onClick={handleButtonWrapperClick}
-            onPointerDown={handleButtonWrapperPointerDown}
-          >
-            <StartPomodoroButton issueId={issue._id} size="sm" />
-          </div>
-          {issue.estimate && (
-            <div className="rounded bg-muted px-1.5 py-0.5 text-xs">
-              {issue.estimate}pt
-            </div>
-          )}
+        <div
+          onClick={handleButtonWrapperClick}
+          onPointerDown={handleButtonWrapperPointerDown}
+        >
+          <StartPomodoroButton issueId={issue._id} size="sm" />
         </div>
       </div>
 

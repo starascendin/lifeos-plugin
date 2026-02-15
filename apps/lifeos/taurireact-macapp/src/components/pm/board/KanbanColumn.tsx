@@ -9,7 +9,7 @@ import {
 import { IssueCard } from "./IssueCard";
 import { QuickAddIssue } from "./QuickAddIssue";
 import { cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, Hexagon } from "lucide-react";
 
 interface KanbanColumnProps {
   status: IssueStatus;
@@ -43,6 +43,11 @@ export const KanbanColumn = React.memo(function KanbanColumn({
   // Memoize sortable items to prevent unnecessary re-renders
   const sortableItems = useMemo(() => issues.map((i) => i._id), [issues]);
 
+  const totalPoints = useMemo(
+    () => issues.reduce((sum, i) => sum + (i.estimate ?? 0), 0),
+    [issues],
+  );
+
   return (
     <div
       ref={setNodeRef}
@@ -62,6 +67,12 @@ export const KanbanColumn = React.memo(function KanbanColumn({
           />
           <span className="font-medium text-sm">{config.label}</span>
           <span className="text-muted-foreground text-xs">{issues.length}</span>
+          {totalPoints > 0 && (
+            <span className="flex items-center gap-0.5 text-muted-foreground text-[10px]">
+              <Hexagon className="h-2.5 w-2.5" />
+              {totalPoints}
+            </span>
+          )}
         </div>
         <button
           onClick={handleAddClick}

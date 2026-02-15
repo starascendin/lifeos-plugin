@@ -19,9 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Save, Trash2, X } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 
 interface CoachProfileEditorProps {
   profileId: Id<"lifeos_coachingProfiles"> | null;
@@ -303,31 +302,26 @@ export function CoachProfileEditor({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      {/* Sticky action bar (desktop) */}
-      <div className="mb-4 hidden items-center justify-between md:flex">
-        <h2 className="text-lg font-semibold">
-          {profileId ? "Edit Coach" : "New Coach"}
-        </h2>
-        <div className="flex gap-2">
-          {profileId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive"
-              onClick={handleDelete}
-            >
-              <Trash2 className="mr-1.5 h-4 w-4" />
-              Delete
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            Cancel
+      {/* Action bar */}
+      <div className="mb-4 flex items-center justify-end gap-2">
+        {profileId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            onClick={handleDelete}
+          >
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            Delete
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            <Save className="mr-1.5 h-4 w-4" />
-            {isSaving ? "Saving..." : "Save"}
-          </Button>
-        </div>
+        )}
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={isSaving}>
+          <Save className="mr-1.5 h-4 w-4" />
+          {isSaving ? "Saving..." : "Save"}
+        </Button>
       </div>
 
       {/* Templates (new profile only) */}
@@ -437,7 +431,7 @@ export function CoachProfileEditor({
           </div>
         </div>
 
-        <Separator />
+        <hr className="border-border" />
 
         {/* Instructions */}
         <div className="space-y-1.5">
@@ -462,28 +456,7 @@ export function CoachProfileEditor({
         </div>
       </div>
 
-      {/* Mobile bottom action bar */}
-      <div className="mt-6 flex gap-2 pb-[calc(env(safe-area-inset-bottom,0px))] md:hidden">
-        {profileId && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive"
-            onClick={handleDelete}
-          >
-            <Trash2 className="mr-1.5 h-4 w-4" />
-            Delete
-          </Button>
-        )}
-        <div className="flex-1" />
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button size="sm" onClick={handleSave} disabled={isSaving}>
-          <Save className="mr-1.5 h-4 w-4" />
-          {isSaving ? "Saving..." : "Save"}
-        </Button>
-      </div>
+      <div className="h-6" />
     </div>
   );
 }

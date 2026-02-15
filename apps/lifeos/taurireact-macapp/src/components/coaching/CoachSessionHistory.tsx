@@ -13,7 +13,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { Calendar, ChevronDown, Clock, Lightbulb, Loader2 } from "lucide-react";
+import { Calendar, ChevronDown, Lightbulb, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 interface CoachSessionHistoryProps {
@@ -48,14 +48,16 @@ export function CoachSessionHistory({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-3 md:px-4">
-      <p className="mb-2 text-xs text-muted-foreground">
-        {sessions.length} session{sessions.length !== 1 ? "s" : ""}
-      </p>
-      <div className="space-y-1">
-        {sessions.map((session) => (
-          <SessionCard key={session._id} session={session} />
-        ))}
+    <div className="flex-1 overflow-y-auto px-3 py-2 md:px-6 md:py-4">
+      <div className="mx-auto max-w-3xl">
+        <p className="mb-3 text-xs text-muted-foreground">
+          {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+        </p>
+        <div className="space-y-1">
+          {sessions.map((session) => (
+            <SessionCard key={session._id} session={session} />
+          ))}
+        </div>
       </div>
     </div>
   );

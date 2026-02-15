@@ -187,8 +187,8 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
   return (
     <div className="flex flex-1 flex-col">
       {/* ─── Messages area ─── */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 md:px-4 md:py-3">
-        <div className="mx-auto max-w-2xl space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 py-2 md:px-6 md:py-4">
+        <div className="mx-auto max-w-3xl space-y-4">
           {/* Empty state — just a subtle hint, not a gate */}
           {localMessages.length === 0 && !isLoading && (
             <div className="flex flex-col items-center justify-center py-16">
@@ -241,8 +241,8 @@ export function CoachChat({ coachProfile }: CoachChatProps) {
       </div>
 
       {/* ─── Input area — ALWAYS visible ─── */}
-      <div className="border-t bg-background px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2 md:px-4 md:pb-3 md:pt-3">
-        <div className="mx-auto flex max-w-2xl gap-2">
+      <div className="border-t bg-background px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2 md:px-6 md:pb-4 md:pt-3">
+        <div className="mx-auto flex max-w-3xl gap-2">
           {/* End session button — visible only during active session */}
           {hasActiveSession && (
             <Button
@@ -308,7 +308,7 @@ function MessageBubble({ message }: { message: LocalMessage }) {
       )}
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl px-3.5 py-2.5 md:max-w-[75%]",
+          "max-w-[85%] rounded-2xl px-3.5 py-2.5 md:max-w-[80%]",
           isUser
             ? "rounded-tr-sm bg-primary text-primary-foreground"
             : "rounded-tl-sm bg-muted",
