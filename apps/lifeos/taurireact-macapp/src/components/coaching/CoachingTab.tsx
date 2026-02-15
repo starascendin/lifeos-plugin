@@ -6,8 +6,8 @@
  * Desktop: Left sidebar (coach list) + center content area.
  */
 
-import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@holaai/convex";
 import { Id } from "@holaai/convex/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -29,10 +29,26 @@ import { CoachActionItems } from "./CoachActionItems";
 
 type View = "chat" | "history" | "actions";
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 768px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isDesktop;
+}
+
 export function CoachingTab() {
   const profiles = useQuery(api.lifeos.coaching.getCoachProfiles) ?? [];
   const actionItemCounts =
     useQuery(api.lifeos.coaching.getActionItemCounts) ?? {};
+  const isDesktop = useIsDesktop();
 
   const [selectedProfileId, setSelectedProfileId] =
     useState<Id<"lifeos_coachingProfiles"> | null>(null);
@@ -40,23 +56,57 @@ export function CoachingTab() {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfileId, setEditingProfileId] =
     useState<Id<"lifeos_coachingProfiles"> | null>(null);
+  // Key to force CoachChat remount (new session)
+  const [chatKey, setChatKey] = useState(0);
+  const endSessionAction = useAction(api.lifeos.coaching.endSession);
 
   const selectedProfile = profiles.find((p) => p._id === selectedProfileId);
 
-  // Auto-select first profile on desktop (don't auto-select on mobile — let user tap)
-  if (!selectedProfileId && profiles.length > 0 && !showProfileEditor) {
-    setSelectedProfileId(profiles[0]._id);
-  }
+  // Auto-select first profile on DESKTOP only, and only if nothing selected yet
+  const hasAutoSelected = useRef(false);
+  useEffect(() => {
+    if (
+      isDesktop &&
+      !selectedProfileId &&
+      profiles.length > 0 &&
+      !showProfileEditor &&
+      !hasAutoSelected.current
+    ) {
+      setSelectedProfileId(profiles[0]._id);
+      hasAutoSelected.current = true;
+    }
+  }, [isDesktop, selectedProfileId, profiles, showProfileEditor]);
 
   const handleSelectCoach = (id: Id<"lifeos_coachingProfiles">) => {
     setSelectedProfileId(id);
     setShowProfileEditor(false);
     setView("chat");
+    setChatKey((k) => k + 1);
   };
 
   const handleBack = () => {
     setSelectedProfileId(null);
     setShowProfileEditor(false);
+    hasAutoSelected.current = true; // prevent re-auto-select on mobile
+  };
+
+  // Query active session for the selected coach (so we can end it on "New Chat")
+  const activeSession = useQuery(
+    api.lifeos.coaching.getActiveSession,
+    selectedProfileId ? { coachProfileId: selectedProfileId } : "skip",
+  );
+
+  const handleNewChat = async () => {
+    // End the current session if one is active
+    if (activeSession && activeSession.status === "active") {
+      try {
+        await endSessionAction({ sessionId: activeSession._id });
+      } catch (e) {
+        console.error("Failed to end session for new chat:", e);
+      }
+    }
+    // Bump key to remount CoachChat with fresh state
+    setChatKey((k) => k + 1);
   };
 
   // ─── MOBILE: Full-screen profile editor ───
@@ -153,6 +203,7 @@ export function CoachingTab() {
             <ViewTabs
               view={view}
               onViewChange={setView}
+              onNewChat={handleNewChat}
               onSettings={() => {
                 setEditingProfileId(selectedProfileId);
                 setShowProfileEditor(true);
@@ -165,6 +216,7 @@ export function CoachingTab() {
             <ViewTabs
               view={view}
               onViewChange={setView}
+              onNewChat={handleNewChat}
               onSettings={() => {
                 setEditingProfileId(selectedProfileId);
                 setShowProfileEditor(true);
@@ -175,7 +227,9 @@ export function CoachingTab() {
 
           {/* View content */}
           <div className="flex min-h-0 flex-1 flex-col">
-            {view === "chat" && <CoachChat coachProfile={selectedProfile} />}
+            {view === "chat" && (
+              <CoachChat key={chatKey} coachProfile={selectedProfile} />
+            )}
             {view === "history" && (
               <CoachSessionHistory
                 coachProfileId={selectedProfile._id}
@@ -405,11 +459,13 @@ function CoachSidebar({
 function ViewTabs({
   view,
   onViewChange,
+  onNewChat,
   onSettings,
   showLabels = false,
 }: {
   view: View;
   onViewChange: (v: View) => void;
+  onNewChat: () => void;
   onSettings: () => void;
   showLabels?: boolean;
 }) {
@@ -433,6 +489,19 @@ function ViewTabs({
           {showLabels && label}
         </Button>
       ))}
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn("h-8", showLabels ? "px-3" : "w-8 px-0")}
+        onClick={() => {
+          onNewChat();
+          onViewChange("chat");
+        }}
+        title="New chat"
+      >
+        <Plus className={cn("h-4 w-4", showLabels && "mr-1.5")} />
+        {showLabels && "New"}
+      </Button>
       <Button
         variant="ghost"
         size="sm"
