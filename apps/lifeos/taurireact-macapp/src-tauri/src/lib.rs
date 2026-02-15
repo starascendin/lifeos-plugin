@@ -6,6 +6,7 @@ mod beeper;
 mod claudecode;
 mod coder;
 mod council_server;
+mod empower;
 mod granola;
 mod notes;
 mod screentime;
@@ -27,6 +28,10 @@ use claudecode::{
     start_container, stop_container,
 };
 use coder::{delegate_to_coder, get_coder_presets, get_coder_templates};
+use empower::{
+    get_empower_schedule, read_empower_data, read_net_worth_history, run_empower_scraper,
+    save_empower_schedule,
+};
 use council_server::{get_council_server_status, start_council_server, stop_council_server};
 use granola::{check_granola_available, check_granola_token_status, get_granola_meetings, get_granola_sync_settings, run_granola_auth, sync_granola};
 use notes::{
@@ -268,6 +273,12 @@ pub fn run() {
                 }
             });
 
+            // Start Empower finance cron scheduler
+            let empower_app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                empower::run_cron_loop(empower_app_handle).await;
+            });
+
             // Council server auto-start disabled - can be started manually via start_council_server command
             // tauri::async_runtime::spawn(async {
             //     // Short delay to let the app fully initialize
@@ -351,6 +362,12 @@ pub fn run() {
             create_claude_session,
             list_claude_sessions,
             delete_claude_session,
+            // Empower Finance Integration
+            read_empower_data,
+            read_net_worth_history,
+            run_empower_scraper,
+            get_empower_schedule,
+            save_empower_schedule,
             // Granola Integration
             check_granola_available,
             check_granola_token_status,

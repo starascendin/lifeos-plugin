@@ -35,6 +35,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/lifeos/llmcouncil": "LLM Council",
   "/lifeos/claudecode": "ClaudeCode",
   "/lifeos/custom-agents": "Custom Agents",
+  "/lifeos/finance": "Personal Finance",
+  "/lifeos/health": "Health",
   "/lifeos/coaching": "AI Coach",
   "/lifeos/catgirl": "CatGirl",
   "/lifeos/settings": "Settings",

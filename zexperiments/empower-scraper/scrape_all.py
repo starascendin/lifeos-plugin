@@ -4,6 +4,9 @@ Empower Retirement Scraper using Patchright (no CDP, no extra args).
 Usage:
   # Launch browser, log in, scrape — all in one script
   PYENV_VERSION=3.12.10 uv run python scrape_all.py
+
+  # Scrape without syncing to Convex
+  PYENV_VERSION=3.12.10 uv run python scrape_all.py --no-sync
 """
 import asyncio
 import csv
@@ -11,6 +14,8 @@ import json
 import re
 import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 from patchright.async_api import async_playwright
 
@@ -19,6 +24,17 @@ USER_DATA_DIR = str(SCRIPT_DIR / "user_data")
 OUTPUT_DIR = SCRIPT_DIR / "output"
 EMPOWER_LOGIN = "https://participant.empower-retirement.com/participant/#/login"
 EMPOWER_HOME = "https://participant.empower-retirement.com/dashboard/#/user/home"
+
+# Possible net-worth analysis pages on Empower dashboard
+NET_WORTH_URLS = [
+    "https://participant.empower-retirement.com/dashboard/#/analysis/net-worth",
+    "https://participant.empower-retirement.com/dashboard/#/net-worth",
+    "https://participant.empower-retirement.com/dashboard/#/user/net-worth",
+    "https://participant.empower-retirement.com/dashboard/#/networth",
+]
+
+# Collect API responses that might contain historical data
+_api_captures: list[dict] = []
 
 
 async def wait_for_text(page, text, timeout=30):
@@ -215,6 +231,160 @@ def save_csv(transactions, filepath, is_investment=False):
         writer.writerows(transactions)
 
 
+def setup_response_interceptor(page):
+    """Intercept API responses that might contain net worth / history data."""
+
+    async def on_response(response):
+        url = response.url.lower()
+        # Look for API calls containing history, networth, aggregate, or chart data
+        keywords = [
+            "history", "networth", "net_worth", "net-worth",
+            "aggregate", "chart", "timeline", "balance",
+            "gethistorical", "getnetworth", "getsnapshot",
+            "performance", "portfolio",
+        ]
+        if not any(kw in url for kw in keywords):
+            return
+        if response.status != 200:
+            return
+        content_type = response.headers.get("content-type", "")
+        if "json" not in content_type and "javascript" not in content_type:
+            return
+        try:
+            body = await response.json()
+            _api_captures.append({
+                "url": response.url,
+                "status": response.status,
+                "data": body,
+                "capturedAt": time.time(),
+            })
+            print(f"  [API Capture] {response.url[:100]}")
+        except Exception:
+            pass
+
+    page.on("response", on_response)
+
+
+async def extract_net_worth_from_page(page) -> dict:
+    """Extract the current net worth value from the dashboard page text."""
+    return await page.evaluate("""
+        () => {
+            const text = document.body.innerText;
+            const nwIdx = text.indexOf('NET WORTH');
+            if (nwIdx === -1) return { found: false };
+            const section = text.substring(nwIdx, nwIdx + 300);
+            const match = section.match(/\\$([\\ \\d,]+(?:\\.\\d{2})?)/);
+            return {
+                found: true,
+                netWorthText: match ? match[0] : null,
+                section: section.substring(0, 200),
+            };
+        }
+    """)
+
+
+async def scrape_net_worth_history(page) -> dict:
+    """Try to navigate to net worth analysis pages and extract historical data."""
+    result = {
+        "currentNetWorth": await extract_net_worth_from_page(page),
+        "apiCaptures": list(_api_captures),
+        "historyPoints": [],
+        "scrapedAt": int(time.time() * 1000),
+    }
+
+    # Extract history from any captured API responses
+    for capture in _api_captures:
+        data = capture.get("data")
+        if not isinstance(data, (dict, list)):
+            continue
+
+        # Recursively look for arrays that look like time series
+        candidates = []
+        if isinstance(data, list):
+            candidates.append(("root", data))
+        elif isinstance(data, dict):
+            for key, val in data.items():
+                if isinstance(val, list) and len(val) >= 3:
+                    candidates.append((key, val))
+
+        for key, arr in candidates:
+            # Check if items look like date/value pairs
+            if not all(isinstance(item, dict) for item in arr[:5]):
+                continue
+            sample = arr[0]
+            # Common field names for date/value in finance APIs
+            date_keys = {"date", "dateTime", "timestamp", "time", "x", "period", "day"}
+            value_keys = {"value", "amount", "balance", "netWorth", "y", "total"}
+            has_date = any(k in sample for k in date_keys)
+            has_value = any(k in sample for k in value_keys)
+            if has_date and has_value:
+                result["historyPoints"] = arr
+                print(f"  [Net Worth History] Found {len(arr)} data points from key '{key}'")
+                break
+        if result["historyPoints"]:
+            break
+
+    # Try navigating to net worth analysis pages
+    home_url = page.url
+    for url in NET_WORTH_URLS:
+        try:
+            print(f"  Trying net worth page: {url}")
+            await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            await asyncio.sleep(5)
+
+            # Check if we landed on a useful page
+            has_content = await page.evaluate(
+                "document.body && (document.body.innerText.includes('NET WORTH') || document.body.innerText.includes('Net Worth'))"
+            )
+            if not has_content:
+                continue
+
+            print(f"  [Net Worth Page] Found content at {url}")
+
+            # Wait a bit more for chart data API calls to fire
+            await asyncio.sleep(3)
+
+            # Try to extract any chart/table data from this page
+            page_data = await page.evaluate("""
+                () => {
+                    const text = document.body.innerText;
+
+                    // Look for tabular data: dates and dollar amounts
+                    const datePattern = /\\d{1,2}\\/\\d{1,2}\\/\\d{4}/g;
+                    const dates = text.match(datePattern) || [];
+
+                    // Look for dollar values near the dates
+                    const moneyPattern = /\\$[\\d,]+(?:\\.\\d{2})?/g;
+                    const values = text.match(moneyPattern) || [];
+
+                    return {
+                        url: window.location.href,
+                        textSnippet: text.substring(0, 2000),
+                        datesFound: dates.slice(0, 20),
+                        valuesFound: values.slice(0, 20),
+                    };
+                }
+            """)
+            result["netWorthPage"] = page_data
+
+            # Check for new API captures that fired on this page
+            result["apiCaptures"] = list(_api_captures)
+            break
+
+        except Exception as e:
+            print(f"  [Net Worth Page] Failed: {e}")
+            continue
+
+    # Navigate back to home for account scraping continuity
+    try:
+        await page.goto(home_url, wait_until="domcontentloaded", timeout=30000)
+        await asyncio.sleep(3)
+    except Exception:
+        pass
+
+    return result
+
+
 async def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -231,6 +401,9 @@ async def main():
         )
 
         page = browser.pages[0] if browser.pages else await browser.new_page()
+
+        # Set up API response interceptor to capture net worth history data
+        setup_response_interceptor(page)
 
         # Hide Chrome immediately (macOS) — hidden apps still render
         await asyncio.sleep(1)
@@ -325,6 +498,26 @@ async def main():
 
         print("Dashboard loaded!\n")
 
+        # Wait a moment for any chart API calls to complete
+        await asyncio.sleep(3)
+
+        # Scrape net worth history before clicking into accounts
+        print("Scraping net worth history...")
+        nw_history = await scrape_net_worth_history(page)
+        nw_history_path = OUTPUT_DIR / "net_worth_history.json"
+        with open(nw_history_path, "w") as f:
+            json.dump(nw_history, f, indent=2, default=str)
+        n_points = len(nw_history.get("historyPoints", []))
+        n_captures = len(nw_history.get("apiCaptures", []))
+        print(f"  History: {n_points} data points, {n_captures} API captures")
+        print(f"  Saved: {nw_history_path.name}\n")
+
+        # Make sure we're back on the dashboard for account scraping
+        loaded = await wait_for_text(page, "NET WORTH", timeout=15)
+        if not loaded:
+            await page.goto(EMPOWER_HOME, wait_until="domcontentloaded", timeout=60000)
+            await wait_for_text(page, "NET WORTH", timeout=15)
+
         # Scrape accounts
         accounts = await get_accounts(page)
         print(f"Found {len(accounts)} accounts:")
@@ -376,6 +569,19 @@ async def main():
         print(f"\nDone! {len(all_data)} accounts, {total_txns} total transactions.")
 
         await browser.close()
+
+        # Sync to Convex unless --no-sync flag is passed
+        if "--no-sync" not in sys.argv:
+            try:
+                from sync_to_convex import sync_to_convex, clean_account
+
+                cleaned = [clean_account(a) for a in all_data]
+                sync_to_convex(cleaned)
+            except Exception as e:
+                print(f"\nConvex sync failed: {e}")
+                print("Data was saved locally. Run sync_to_convex.py manually.")
+        else:
+            print("\nSkipping Convex sync (--no-sync flag).")
 
 
 if __name__ == "__main__":

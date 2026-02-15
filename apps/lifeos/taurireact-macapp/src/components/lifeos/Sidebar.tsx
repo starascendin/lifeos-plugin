@@ -28,6 +28,7 @@ import {
   Circle,
   Clock,
   Cpu,
+  DollarSign,
   FileAudio,
   GraduationCap,
   FlaskConical,
@@ -129,6 +130,8 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
           { name: "Voice Notes", href: "/lifeos/voicenotes", icon: FileAudio },
           { name: "Voice AI", href: "/lifeos/voiceagent", icon: Headphones },
           { name: "AI Agent", href: "/lifeos/aiagent", icon: Cpu },
+          { name: "Finance", href: "/lifeos/finance", icon: DollarSign },
+          { name: "Health", href: "/lifeos/health", icon: Heart },
         ],
       },
       {

@@ -358,8 +358,6 @@ export const pmTables = {
     userNote: v.optional(v.string()),
     // Custom prompt for weekly summary (user editable, persistent)
     customPrompt: v.optional(v.string()),
-    // User's personal notes for the week
-    userNote: v.optional(v.string()),
     // AI-generated summary
     aiSummary: v.optional(v.string()),
     generatedAt: v.optional(v.number()),

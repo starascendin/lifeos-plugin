@@ -19,4 +19,13 @@ crons.daily(
   internal.lifeos.pm_crons.recordCycleSnapshotsJob
 );
 
+// ==================== OURA RING CRONS ====================
+
+// Sync Oura Ring health data daily at 7 AM UTC (after Oura processes overnight data)
+crons.daily(
+  "lifeos-oura-daily-sync",
+  { hourUTC: 7, minuteUTC: 0 },
+  internal.lifeos.oura_actions.cronSyncAllUsers
+);
+
 export default crons;

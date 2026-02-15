@@ -32,6 +32,34 @@ if (!import.meta.env.VITE_CONVEX_URL) {
   throw new Error("Missing VITE_CONVEX_URL environment variable");
 }
 
+// Oura OAuth implicit flow redirects with hash fragment: #access_token=XXX&expires_in=NNN
+// Since we use HashRouter, the hash normally holds the route. Detect the token before
+// HashRouter consumes the fragment, and rewrite to a route the app can handle.
+const _rawHash = window.location.hash;
+if (_rawHash.includes("access_token=") && !_rawHash.includes("/lifeos")) {
+  // Parse the implicit grant fragment (e.g. #access_token=X&token_type=bearer&expires_in=86400)
+  const fragment = _rawHash.startsWith("#") ? _rawHash.slice(1) : _rawHash;
+  const params = new URLSearchParams(fragment);
+  const accessToken = params.get("access_token");
+  const expiresIn = params.get("expires_in");
+  if (accessToken) {
+    // Stash in sessionStorage so the LifeOS app can pick it up after mount
+    sessionStorage.setItem("oura_implicit_token", JSON.stringify({
+      accessToken,
+      expiresIn: expiresIn ? parseInt(expiresIn, 10) : 86400,
+      scope: params.get("scope") ?? undefined,
+    }));
+    // Redirect into the LifeOS health page
+    window.history.replaceState({}, "", "/#/lifeos/health");
+  }
+}
+// Also handle server-side code flow (fallback)
+const _searchParams = new URLSearchParams(window.location.search);
+if (_searchParams.has("code") && !window.location.hash.includes("/lifeos")) {
+  const code = _searchParams.get("code")!;
+  window.history.replaceState({}, "", `/#/lifeos/health?code=${encodeURIComponent(code)}`);
+}
+
 async function initializeApp() {
   // Initialize Capacitor OTA updater if running in Capacitor
   if (isCapacitor) {

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { SignedIn, SignedOut } from "@/lib/auth/platformClerk";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { SignInEntry } from "./components/auth/SignInEntry";
 import { AuthGate } from "./components/auth/AuthGate";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
@@ -35,15 +35,109 @@ import { LifeOSFathomAI } from "./components/lifeos/FathomAI";
 import { LifeOSCatGirl } from "./components/lifeos/CatGirl";
 import { LifeOSCoaching } from "./components/lifeos/Coaching";
 import { LifeOSCustomAgents } from "./components/lifeos/CustomAgents";
+import { LifeOSFinance } from "./components/lifeos/Finance";
+import { LifeOSPersonalHealth } from "./components/lifeos/PersonalHealth";
 import { CommandPalette } from "./components/lifeos/CommandPalette";
 import { useVoiceMemoAutoSync } from "./lib/hooks/useVoiceMemoAutoSync";
 import { VoiceMemoAutoSyncProvider } from "./lib/contexts/VoiceMemoAutoSyncContext";
+import { useAction } from "convex/react";
+import { useConvex } from "convex/react";
+import { api } from "@holaai/convex";
+import { useNavigate } from "react-router-dom";
+import { syncEmpowerToConvex } from "./lib/services/empower";
+import type { ConvexClient } from "convex/browser";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
 /** Runs the voice memo auto-sync pipeline in the background (no UI). */
 function VoiceMemoAutoSyncRunner() {
   useVoiceMemoAutoSync();
+  return null;
+}
+
+/** Auto-detect Oura OAuth token/code from redirect and save it. */
+function OuraOAuthCodeHandler() {
+  const saveImplicitToken = useAction(api.lifeos.oura_actions.saveImplicitToken);
+  const exchangeToken = useAction(api.lifeos.oura_actions.exchangeToken);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // 1. Check for implicit flow token stashed in sessionStorage by main.tsx
+    const stashed = sessionStorage.getItem("oura_implicit_token");
+    if (stashed) {
+      sessionStorage.removeItem("oura_implicit_token");
+      const { accessToken, expiresIn, scope } = JSON.parse(stashed);
+      saveImplicitToken({ accessToken, expiresIn, scope })
+        .then(() => {
+          toast.success("Oura Ring connected!");
+          navigate("/lifeos/health");
+        })
+        .catch((err: any) => toast.error(`Oura OAuth failed: ${err.message}`));
+      return;
+    }
+
+    // 2. Fallback: server-side code flow
+    const params = new URLSearchParams(location.search || window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash.split("?")[0]);
+
+    exchangeToken({ code })
+      .then(() => {
+        toast.success("Oura Ring connected!");
+        navigate("/lifeos/health");
+      })
+      .catch((err: any) => toast.error(`Oura OAuth failed: ${err.message}`));
+  }, [saveImplicitToken, exchangeToken, navigate, location.search]);
+
+  return null;
+}
+
+/** Listens for Rust cron-triggered scrape events and syncs data to Convex. */
+function EmpowerCronSyncListener() {
+  const convex = useConvex();
+
+  useEffect(() => {
+    if (!isTauri) return;
+
+    let unlisten: (() => void) | undefined;
+
+    const setup = async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      unlisten = await listen("empower-cron-triggered", async () => {
+        console.log("[Empower Cron] Background scrape completed, syncing to Convex...");
+        toast.info("Empower scrape completed", {
+          description: "Syncing data to Convex...",
+        });
+        try {
+          const result = await syncEmpowerToConvex(
+            convex as unknown as ConvexClient,
+          );
+          if (result.success) {
+            toast.success("Empower cron sync complete", {
+              description: result.message,
+            });
+          } else {
+            toast.error("Empower cron sync failed", {
+              description: result.message,
+            });
+          }
+        } catch (e) {
+          toast.error("Empower cron sync error", {
+            description: String(e),
+          });
+        }
+      });
+    };
+
+    setup();
+    return () => {
+      unlisten?.();
+    };
+  }, [convex]);
+
   return null;
 }
 
@@ -104,9 +198,11 @@ export default function LifeOSApp() {
           <AuthGate>
             <VoiceMemoAutoSyncProvider>
             <VoiceMemoAutoSyncRunner />
+            <EmpowerCronSyncListener />
             <VoiceAgentProvider>
               <PomodoroProvider>
                 <CommandPalette />
+                <OuraOAuthCodeHandler />
                 <Routes>
                   <Route index element={<LifeOSDashboard />} />
                   <Route path="atlas" element={<LifeOSAtlas />} />
@@ -151,6 +247,8 @@ export default function LifeOSApp() {
                     path="custom-agents"
                     element={<LifeOSCustomAgents />}
                   />
+                  <Route path="finance" element={<LifeOSFinance />} />
+                  <Route path="health" element={<LifeOSPersonalHealth />} />
                   <Route path="catgirl" element={<LifeOSCatGirl />} />
                   <Route path="settings" element={<LifeOSSettings />} />
                   <Route path="*" element={<Navigate to="/lifeos" replace />} />

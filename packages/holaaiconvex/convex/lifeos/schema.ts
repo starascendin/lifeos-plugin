@@ -8,6 +8,7 @@ import { calendarTables } from "./calendar_schema";
 import { catgirlAgentTables } from "./catgirl_agent_schema";
 import { chatnexusTables } from "./chatnexus_schema";
 import { contactTables } from "./contact_schema";
+import { financeTables } from "./finance_schema";
 import { controlplaneTables } from "./controlplane_schema";
 import { dailyFieldsTables } from "./daily_fields_schema";
 import { demoAgentTables } from "./demo_agent_schema";
@@ -18,6 +19,7 @@ import { habitsTables } from "./habits_schema";
 import { initiativesTables } from "./initiatives_schema";
 import { llmcouncilTables } from "./llmcouncil_schema";
 import { otaTables } from "./ota_schema";
+import { ouraTables } from "./oura_schema";
 import { pmTables } from "./pm_schema";
 import { proxyCouncilTables } from "./proxy_council_schema";
 import { voiceAgentTables } from "./voiceagent_schema";
@@ -53,6 +55,8 @@ export const lifeosTables = {
   ...demoAgentTables,
   // Fathom AI (Meeting Notes via API) tables
   ...fathomTables,
+  // Personal Finance tables (Empower Retirement scraper)
+  ...financeTables,
   // FRM (Friend Relationship Management) tables
   ...frmTables,
   // Granola (Meeting Notes) tables
@@ -65,6 +69,8 @@ export const lifeosTables = {
   ...llmcouncilTables,
   // OTA Update tables
   ...otaTables,
+  // Oura Ring health data tables
+  ...ouraTables,
   // Project Management tables (Linear-like personal PM, includes Clients, Phases, Notes)
   ...pmTables,
   // Proxy Council tables
