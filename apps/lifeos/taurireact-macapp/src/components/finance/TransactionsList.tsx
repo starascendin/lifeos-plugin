@@ -106,7 +106,7 @@ export function TransactionsList({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <CardTitle className="text-base">
             Transactions
             <span className="ml-2 text-sm font-normal text-muted-foreground">
@@ -119,7 +119,7 @@ export function TransactionsList({
           </CardTitle>
           <div className="flex items-center gap-2">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px] h-8">
+              <SelectTrigger className="w-full sm:w-[180px] h-8">
                 <SelectValue placeholder="All categories" />
               </SelectTrigger>
               <SelectContent>
@@ -134,84 +134,86 @@ export function TransactionsList({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">Date</TableHead>
-                {!selectedAccountId && (
-                  <TableHead className="w-[140px]">Account</TableHead>
-                )}
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[140px]">Category</TableHead>
-                <TableHead className="w-[120px] text-right">Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((txn) => {
-                const acct = accountMap.get(txn.accountId);
-                const isInvestment = !!txn.action;
-                return (
-                  <TableRow key={txn._id}>
-                    <TableCell className="tabular-nums text-sm">
-                      {txn.date}
-                    </TableCell>
-                    {!selectedAccountId && (
-                      <TableCell className="text-sm">
-                        <span className="text-muted-foreground">
-                          {acct
-                            ? `${acct.institution} ...${acct.accountNum}`
-                            : "—"}
-                        </span>
+      <CardContent className="px-0 sm:px-6">
+        <div className="overflow-x-auto">
+          <div className="rounded-md border mx-4 sm:mx-0 min-w-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[90px] sm:w-[100px]">Date</TableHead>
+                  {!selectedAccountId && (
+                    <TableHead className="hidden md:table-cell w-[140px]">Account</TableHead>
+                  )}
+                  <TableHead>Description</TableHead>
+                  <TableHead className="hidden sm:table-cell w-[140px]">Category</TableHead>
+                  <TableHead className="w-[100px] sm:w-[120px] text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((txn) => {
+                  const acct = accountMap.get(txn.accountId);
+                  const isInvestment = !!txn.action;
+                  return (
+                    <TableRow key={txn._id}>
+                      <TableCell className="tabular-nums text-sm">
+                        {txn.date}
                       </TableCell>
-                    )}
-                    <TableCell className="text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate max-w-[300px]">
-                          {txn.description}
-                        </span>
-                        {isInvestment && txn.action && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Badge
-                                variant="outline"
-                                className="text-xs flex-shrink-0"
-                              >
-                                {txn.action}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {txn.quantity != null && (
-                                <div>Qty: {txn.quantity}</div>
-                              )}
-                              {txn.priceCents != null && (
-                                <div>
-                                  Price: {formatCents(txn.priceCents)}
-                                </div>
-                              )}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {txn.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums font-medium ${
-                        txn.amountCents < 0 ? "text-red-500" : "text-green-600"
-                      }`}
-                    >
-                      {formatCents(txn.amountCents)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      {!selectedAccountId && (
+                        <TableCell className="hidden md:table-cell text-sm">
+                          <span className="text-muted-foreground">
+                            {acct
+                              ? `${acct.institution} ...${acct.accountNum}`
+                              : "—"}
+                          </span>
+                        </TableCell>
+                      )}
+                      <TableCell className="text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="truncate max-w-[150px] sm:max-w-[300px]">
+                            {txn.description}
+                          </span>
+                          {isInvestment && txn.action && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs flex-shrink-0"
+                                >
+                                  {txn.action}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {txn.quantity != null && (
+                                  <div>Qty: {txn.quantity}</div>
+                                )}
+                                {txn.priceCents != null && (
+                                  <div>
+                                    Price: {formatCents(txn.priceCents)}
+                                  </div>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Badge variant="secondary" className="text-xs">
+                          {txn.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums font-medium ${
+                          txn.amountCents < 0 ? "text-red-500" : "text-green-600"
+                        }`}
+                      >
+                        {formatCents(txn.amountCents)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </div>
         {transactions.length > limit && (
           <div className="mt-3 text-center">

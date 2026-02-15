@@ -120,11 +120,11 @@ export function AccountsList({
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs hidden sm:inline-flex">
                         {acct.accountSubtype.replace("_", " ")}
                       </Badge>
                       <span
-                        className={`font-medium tabular-nums ${
+                        className={`font-medium tabular-nums text-sm ${
                           acct.isDebt ? "text-red-500" : ""
                         }`}
                       >

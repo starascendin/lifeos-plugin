@@ -100,17 +100,17 @@ export function SpendingByCategory() {
             );
             const color = BAR_COLORS[i % BAR_COLORS.length];
             return (
-              <div key={item.category} className="flex items-center gap-3">
-                <div className="w-[140px] text-sm truncate text-right text-muted-foreground">
+              <div key={item.category} className="flex items-center gap-2 sm:gap-3">
+                <div className="w-[80px] sm:w-[140px] text-xs sm:text-sm truncate text-right text-muted-foreground">
                   {item.category}
                 </div>
-                <div className="flex-1 h-6 bg-muted rounded-sm overflow-hidden">
+                <div className="flex-1 h-5 sm:h-6 bg-muted rounded-sm overflow-hidden">
                   <div
                     className={`h-full ${color} rounded-sm transition-all`}
                     style={{ width: `${widthPct}%` }}
                   />
                 </div>
-                <div className="w-[90px] text-sm tabular-nums text-right font-medium">
+                <div className="w-[70px] sm:w-[90px] text-xs sm:text-sm tabular-nums text-right font-medium">
                   {formatCents(item.totalCents)}
                 </div>
               </div>

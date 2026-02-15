@@ -111,7 +111,7 @@ export function DailySpendingChart() {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="text-green-500">
             +{formatCents(totals.income)} in
           </span>

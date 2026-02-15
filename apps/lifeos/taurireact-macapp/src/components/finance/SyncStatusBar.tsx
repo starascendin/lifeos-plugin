@@ -194,8 +194,8 @@ export function SyncStatusBar() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0 flex-wrap">
           {progress && busy ? (
             <span className="text-sm text-muted-foreground">
               {progress.currentStep}
@@ -222,7 +222,7 @@ export function SyncStatusBar() {
             </>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Cron schedule indicator */}
           {isTauri && cronLoaded && (
             <button
@@ -250,7 +250,8 @@ export function SyncStatusBar() {
                 <Play
                   className={`h-4 w-4 mr-2 ${scraping ? "animate-pulse" : ""}`}
                 />
-                {scraping ? "Scraping..." : "Full Scrape"}
+                <span className="hidden xs:inline">{scraping ? "Scraping..." : "Full Scrape"}</span>
+                <span className="xs:hidden">{scraping ? "..." : "Scrape"}</span>
               </Button>
               <Button
                 variant="outline"
@@ -261,7 +262,8 @@ export function SyncStatusBar() {
                 <RefreshCw
                   className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`}
                 />
-                {syncing ? "Syncing..." : "Sync to Convex"}
+                <span className="hidden xs:inline">{syncing ? "Syncing..." : "Sync to Convex"}</span>
+                <span className="xs:hidden">{syncing ? "..." : "Sync"}</span>
               </Button>
             </>
           )}
