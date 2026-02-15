@@ -5,18 +5,18 @@ description: Quickly load context for a client or project for fast mental contex
 
 Quickly load context for a client or project. $ARGUMENTS should be the client or project name.
 
-Use the Bash tool to run lifeos CLI commands:
+Use the LifeOS MCP tools:
 
 **If $ARGUMENTS looks like a client name:**
-1. Run: `lifeos get_clients` and find the matching client
-2. Run: `lifeos get_client clientId=...` for details
-3. Run: `lifeos get_projects_for_client clientId=...` to see their projects
-4. Run: `lifeos get_beeper_threads_for_client clientId=...` for recent communications
+1. Call get_clients and find the matching client
+2. Call get_client with the client ID for details
+3. Call get_projects_for_client to see their projects
+4. Call get_beeper_threads_for_client for recent communications
 
 **If $ARGUMENTS looks like a project name/key:**
-1. Run: `lifeos get_project projectIdOrKey=...` with the project key/name
-2. Run: `lifeos get_phases projectId=...` to see project phases
-3. Run: `lifeos get_tasks projectId=...` to see active work
+1. Call get_project with the project key/name
+2. Call get_phases for the project phases
+3. Call get_tasks filtered by the project to see active work
 4. If project has a client, load client context too
 
 Present a quick context brief:
@@ -30,5 +30,3 @@ Present a quick context brief:
 Keep it scannable - this is for fast context loading, not deep analysis.
 
 If $ARGUMENTS is empty, ask which client or project to load.
-
-Each lifeos command outputs JSON. Parse the results accordingly.

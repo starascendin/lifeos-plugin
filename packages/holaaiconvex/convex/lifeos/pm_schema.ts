@@ -354,6 +354,8 @@ export const pmTables = {
     userId: v.id("users"),
     weekStartDate: v.string(), // YYYY-MM-DD format (Monday of the week)
     weekEndDate: v.string(), // YYYY-MM-DD format (Sunday of the week)
+    // User's weekly note (free-form text)
+    userNote: v.optional(v.string()),
     // Custom prompt for weekly summary (user editable, persistent)
     customPrompt: v.optional(v.string()),
     // AI-generated summary

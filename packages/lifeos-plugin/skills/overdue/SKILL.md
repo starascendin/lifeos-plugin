@@ -3,11 +3,11 @@ name: overdue
 description: Show what's overdue or slipping - tasks, projects, and sprint items
 ---
 
-Show what's overdue or slipping. Use the Bash tool to run lifeos CLI commands:
+Show what's overdue or slipping. Use the LifeOS MCP tools:
 
-1. Run: `lifeos get_tasks` to get all tasks
-2. Run: `lifeos get_projects` to get all projects with health status
-3. Run: `lifeos get_current_cycle` to see sprint status
+1. Call get_tasks to get all tasks
+2. Call get_projects to get all projects with health status
+3. Call get_current_cycle to see sprint status
 
 Analyze and identify:
 - **Overdue tasks**: Tasks past their due date (compare dueDate to today)
@@ -24,5 +24,3 @@ Present as:
 For each item, suggest: reschedule, delegate, or drop.
 
 If $ARGUMENTS contains "critical" or "urgent", only show critical items.
-
-Each lifeos command outputs JSON. Parse the results accordingly.

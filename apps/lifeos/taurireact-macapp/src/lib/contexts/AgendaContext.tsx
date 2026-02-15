@@ -79,6 +79,11 @@ interface AgendaContextValue {
   todaysCheckIns: Record<string, Doc<"lifeos_habitCheckIns">> | undefined;
   isLoadingHabits: boolean;
 
+  // Weekly habits data (only fetched when viewMode === "weekly")
+  weeklyHabits: Doc<"lifeos_habits">[] | undefined;
+  weeklyCheckIns: Record<string, Doc<"lifeos_habitCheckIns">> | undefined;
+  isLoadingWeeklyHabits: boolean;
+
   // Tasks data
   todaysTasks: Doc<"lifeos_pmIssues">[] | undefined;
   topPriorityTasks: Doc<"lifeos_pmIssues">[] | undefined;
@@ -115,6 +120,7 @@ interface AgendaContextValue {
   isGeneratingWeeklySummary: boolean;
   generateWeeklySummary: () => Promise<void>;
   updateWeeklyPrompt: ReturnType<typeof useMutation>;
+  saveWeeklyUserNote: ReturnType<typeof useMutation>;
 
   // Monthly data (only fetched when viewMode === "monthly")
   monthStartDate: string; // YYYY-MM-DD (1st of month)
@@ -319,6 +325,19 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
       : "skip",
   );
 
+  // Weekly habits queries (only fetch when in weekly view mode)
+  const weeklyHabits = useQuery(
+    api.lifeos.habits.getHabits,
+    viewMode === "weekly" ? {} : "skip",
+  );
+
+  const weeklyCheckIns = useQuery(
+    api.lifeos.habits_checkins.getCheckInsForDateRange,
+    viewMode === "weekly"
+      ? { startDate: weekStartDate, endDate: weekEndDate }
+      : "skip",
+  );
+
   // Weekly data queries (only fetch when in weekly view mode)
   const weeklyTasks = useQuery(
     api.lifeos.pm_issues.getTasksForDateRange,
@@ -425,6 +444,9 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
   // Weekly summary mutations and action
   const updateWeeklyPromptMutation = useMutation(
     api.lifeos.agenda.updateWeeklyPrompt,
+  );
+  const saveWeeklyUserNoteMutation = useMutation(
+    api.lifeos.agenda.saveWeeklyUserNote,
   );
   const generateWeeklySummaryAction = useAction(
     api.lifeos.agenda.generateWeeklySummary,
@@ -661,6 +683,13 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     todaysCheckIns,
     isLoadingHabits: todaysHabits === undefined,
 
+    // Weekly habits data
+    weeklyHabits,
+    weeklyCheckIns,
+    isLoadingWeeklyHabits:
+      viewMode === "weekly" &&
+      (weeklyHabits === undefined || weeklyCheckIns === undefined),
+
     // Tasks data
     todaysTasks,
     topPriorityTasks,
@@ -703,6 +732,7 @@ export function AgendaProvider({ children }: { children: React.ReactNode }) {
     isGeneratingWeeklySummary,
     generateWeeklySummary,
     updateWeeklyPrompt: updateWeeklyPromptMutation,
+    saveWeeklyUserNote: saveWeeklyUserNoteMutation,
 
     // Monthly data
     monthStartDate,

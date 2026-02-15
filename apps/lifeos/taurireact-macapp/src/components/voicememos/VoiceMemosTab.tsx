@@ -82,6 +82,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExtractionDialog } from "./extraction";
+import { useAutoSyncStatus } from "../../lib/contexts/VoiceMemoAutoSyncContext";
 
 type ViewFilter = "all" | "transcribed" | "not_transcribed" | "cloud_only";
 
@@ -132,7 +133,7 @@ export function VoiceMemosTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isRunningAllSteps, setIsRunningAllSteps] = useState(false);
-  const hasAutoRunRef = useRef(false);
+
   const [allStepsProgress, setAllStepsProgress] = useState<{
     step: "transcribe" | "sync" | "extract";
     extractCurrent: number;
@@ -381,41 +382,6 @@ export function VoiceMemosTab() {
     }
   };
 
-  // Auto-run "Run all steps" on the latest 10 unprocessed memos when the tab loads
-  const MAX_AUTO_RUN = 10;
-  useEffect(() => {
-    if (hasAutoRunRef.current) return;
-    if (isLoading || !syncedMemos || memos.length === 0) return;
-    if (!isTauri) return;
-    if (!groqApiKey) return;
-
-    // Find memos with incomplete pipeline steps
-    const incomplete = memos
-      .filter((memo) => {
-        // Needs transcription
-        if (memo.local_path && !memo.transcription && !exceedsGroqLimit(memo.file_size)) return true;
-        // Has transcript but not synced to cloud
-        if (memo.transcription && !syncedUuidSet.has(memo.uuid)) return true;
-        // Synced but no AI extraction
-        const synced = syncedMemoMap.get(memo.uuid);
-        if (synced && !synced.hasExtraction) return true;
-        return false;
-      })
-      .sort((a, b) => b.date - a.date)
-      .slice(0, MAX_AUTO_RUN);
-
-    if (incomplete.length === 0) return;
-
-    hasAutoRunRef.current = true;
-    const autoIds = new Set(incomplete.map((m) => m.id));
-    setSelectedIds(autoIds);
-
-    // Small delay so the UI reflects the selection before the pipeline starts
-    const timer = setTimeout(() => {
-      handleRunAllSteps(autoIds);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [isLoading, memos, syncedMemos, isTauri, groqApiKey]);
 
   // Toggle selection
   const toggleSelection = (id: number) => {
@@ -501,6 +467,8 @@ export function VoiceMemosTab() {
   // Check if a memo can be selected (has any incomplete step)
   const canSelect = (memo: VoiceMemo) => hasIncompleteSteps(memo);
 
+  const autoSyncStatus = useAutoSyncStatus();
+
   const isSyncing = syncProgress.status === "syncing";
 
   // Calculate counts
@@ -557,6 +525,30 @@ export function VoiceMemosTab() {
                   <Badge variant="default">{selectedIds.size} selected</Badge>
                 )}
               </div>
+              {/* Auto-sync status */}
+              {isTauri && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  {autoSyncStatus.isRunning ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Auto-sync running...</span>
+                    </>
+                  ) : autoSyncStatus.lastRunAt ? (
+                    <>
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      <span>
+                        Last auto-sync: {autoSyncStatus.lastRunAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {autoSyncStatus.lastRunResult && ` — ${autoSyncStatus.lastRunResult}`}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3 w-3" />
+                      <span>Auto-sync: waiting for first run...</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right side - Action buttons */}

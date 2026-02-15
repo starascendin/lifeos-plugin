@@ -5,12 +5,12 @@ description: Prepare for a meeting with contact dossier, past meetings, recent m
 
 Prepare for a meeting with someone. $ARGUMENTS should be the person's name.
 
-Use the Bash tool to run lifeos CLI commands:
+Use the LifeOS MCP tools:
 
-1. Run: `lifeos get_contact_dossier nameQuery="$ARGUMENTS"` for full context
-2. Run: `lifeos get_granola_meetings_for_person personId=<ID>` for past meeting notes (use the personId from the dossier)
-3. If person is linked to a client, run: `lifeos get_projects_for_client clientId=<ID>` for project status
-4. Run: `lifeos get_beeper_threads_for_person personId=<ID>` and for the most recent thread, run: `lifeos get_beeper_thread_messages threadId=<ID>` to see latest messages
+1. Call get_contact_dossier with nameQuery set to $ARGUMENTS for full context
+2. Call get_granola_meetings_for_person with the personId from the dossier for past meeting notes
+3. If person is linked to a client, call get_projects_for_client for project status
+4. Call get_beeper_threads_for_person and for the most recent thread, call get_beeper_thread_messages to see latest messages
 
 Compile a meeting prep brief:
 - **About**: Who they are, relationship type, communication style (from AI profile)
@@ -21,5 +21,3 @@ Compile a meeting prep brief:
 - **Suggested Talking Points**: Based on open items and recent context
 
 If no name is provided in $ARGUMENTS, ask for one.
-
-Each lifeos command outputs JSON. Parse the results accordingly.

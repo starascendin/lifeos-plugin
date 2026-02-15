@@ -2,6 +2,8 @@ import { ChatMessage as ChatMessageType } from "@/lib/services/livekit";
 import { formatMessageTime } from "@/lib/services/livekit";
 import { cn } from "@/lib/utils";
 import { User, Bot } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -43,7 +45,25 @@ export function ChatMessage({ message, showSender = true }: ChatMessageProps) {
             : "bg-muted text-foreground"
         )}
       >
-        <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
+        <div
+          className={cn(
+            "text-sm break-words",
+            "prose prose-sm dark:prose-invert max-w-none",
+            "prose-p:my-1 prose-p:leading-relaxed",
+            "prose-ul:my-1 prose-ol:my-1 prose-li:my-0",
+            "prose-headings:my-1.5 prose-headings:text-sm prose-headings:font-semibold",
+            "prose-code:text-xs prose-code:bg-black/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
+            "prose-pre:my-1 prose-pre:text-xs",
+            "prose-a:underline",
+            isUser
+              ? "prose-p:text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-a:text-primary-foreground prose-code:text-primary-foreground"
+              : "prose-p:text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-a:text-primary"
+          )}
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.text}
+          </ReactMarkdown>
+        </div>
         <p
           className={cn(
             "text-xs mt-1",

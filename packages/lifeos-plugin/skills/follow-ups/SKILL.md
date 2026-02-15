@@ -3,13 +3,12 @@ name: follow-ups
 description: Track follow-ups needed with people and clients
 ---
 
-Track follow-ups needed with people and clients. Use the Bash tool to run lifeos CLI commands:
+Track follow-ups needed with people and clients. Use the LifeOS MCP tools:
 
-1. Run: `lifeos get_people` to get all contacts
-2. Run: `lifeos get_clients` to get all clients
-3. Run: `lifeos get_person_timeline` to see recent interactions
-4. Run: `lifeos get_beeper_threads` to see recent message activity
-5. Run: `lifeos get_granola_meetings` to see recent meetings
+1. Call get_people to get all contacts
+2. Call get_clients to get all clients
+3. Call get_beeper_threads to see recent message activity
+4. Call get_granola_meetings to see recent meetings
 
 Analyze and identify:
 - **People needing follow-up**: Contacts with no interaction in 7+ days who have open items or recent meetings
@@ -22,5 +21,3 @@ Present as:
 - **Suggested actions**: Specific follow-up actions for each
 
 If $ARGUMENTS contains a person or client name, focus on just that entity.
-
-Each lifeos command outputs JSON. Parse the results accordingly.

@@ -5,9 +5,9 @@ description: Full contact dossier with profile, AI insights, meetings, messages,
 
 Look up everything about a contact. $ARGUMENTS should be a person's name.
 
-Use the Bash tool to run lifeos CLI commands:
+Use the LifeOS MCP tools:
 
-1. Run: `lifeos get_contact_dossier nameQuery="$ARGUMENTS"` to get the full profile
+1. Call get_contact_dossier with nameQuery set to $ARGUMENTS to get the full profile
    - This returns: person info, AI profile, Beeper threads, Granola meetings (with AI notes and calendar events), and voice memos
 
 Present the dossier in a structured format:
@@ -18,5 +18,3 @@ Present the dossier in a structured format:
 - **Chat Threads**: Beeper conversation threads linked to this person
 
 If no name is provided in $ARGUMENTS, ask for one.
-
-Each lifeos command outputs JSON. Parse the results accordingly.

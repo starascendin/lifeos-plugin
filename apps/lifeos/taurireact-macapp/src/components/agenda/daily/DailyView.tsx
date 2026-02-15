@@ -19,13 +19,10 @@ export function DailyView() {
         {/* Center column - cards */}
         <div className="flex-1 min-w-0 space-y-4">
           <Card>
-            <DailyNoteSection />
-          </Card>
-          <Card>
             <AISummarySection />
           </Card>
           <Card>
-            <CalendarEventsSection />
+            <DailyNoteSection />
           </Card>
           <Card>
             <TasksSection />
@@ -38,6 +35,7 @@ export function DailyView() {
         {/* Right panel - compact, no cards */}
         <div className="w-full lg:w-72 xl:w-80 space-y-4">
           <DailyFieldsSection />
+          <CalendarEventsSection />
           <VoiceMemoRecorder date={dateString} />
           <ScreenTimeSummary />
         </div>

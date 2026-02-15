@@ -36,6 +36,30 @@ export const getDailySummary = query({
   },
 });
 
+export const getDailyNotesForRange = query({
+  args: {
+    startDate: v.string(), // YYYY-MM-DD
+    endDate: v.string(), // YYYY-MM-DD
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const summaries = await ctx.db
+      .query("lifeos_dailySummaries")
+      .withIndex("by_user_date", (q) =>
+        q
+          .eq("userId", user._id)
+          .gte("date", args.startDate)
+          .lte("date", args.endDate)
+      )
+      .collect();
+
+    return summaries
+      .filter((s) => s.userNote && s.userNote.trim().length > 0)
+      .map((s) => ({ date: s.date, userNote: s.userNote! }));
+  },
+});
+
 // ==================== MUTATIONS ====================
 
 // Supported models for AI Gateway
@@ -600,6 +624,49 @@ export const updateWeeklyPrompt = mutation({
         weekStartDate: args.weekStartDate,
         weekEndDate: weekEndStr,
         customPrompt: args.customPrompt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+/**
+ * Save or update user's weekly note
+ */
+export const saveWeeklyUserNote = mutation({
+  args: {
+    weekStartDate: v.string(), // YYYY-MM-DD (Monday)
+    userNote: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("lifeos_weeklySummaries")
+      .withIndex("by_user_week", (q) =>
+        q.eq("userId", user._id).eq("weekStartDate", args.weekStartDate)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        userNote: args.userNote,
+        updatedAt: now,
+      });
+      return existing._id;
+    } else {
+      // Calculate week end date
+      const weekEnd = new Date(args.weekStartDate);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const weekEndStr = formatDateString(weekEnd);
+
+      return await ctx.db.insert("lifeos_weeklySummaries", {
+        userId: user._id,
+        weekStartDate: args.weekStartDate,
+        weekEndDate: weekEndStr,
+        userNote: args.userNote,
         createdAt: now,
         updatedAt: now,
       });

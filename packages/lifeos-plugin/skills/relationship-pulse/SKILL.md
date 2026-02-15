@@ -3,12 +3,11 @@ name: relationship-pulse
 description: Check on neglected relationships and suggest reconnection actions
 ---
 
-Check on neglected relationships. Use the Bash tool to run lifeos CLI commands:
+Check on neglected relationships. Use the LifeOS MCP tools:
 
-1. Run: `lifeos get_people` to get all contacts
-2. Run: `lifeos get_person_timeline` to see interaction history
-3. Run: `lifeos get_beeper_threads` to check message activity
-4. Run: `lifeos get_granola_meetings` to see meeting history
+1. Call get_people to get all contacts
+2. Call get_beeper_threads to check message activity
+3. Call get_granola_meetings to see meeting history
 
 Analyze each contact for:
 - **Last interaction**: When did you last talk/meet?
@@ -26,6 +25,4 @@ Present as:
 - **Consider reconnecting**: People you might want to re-engage
 - **Suggested touchpoints**: Quick ways to reconnect (reply to old thread, schedule catch-up, etc.)
 
-If $ARGUMENTS contains a relationship type (e.g., "family", "friends"), filter to just that type (e.g. `lifeos get_people relationshipType=family`).
-
-Each lifeos command outputs JSON. Parse the results accordingly.
+If $ARGUMENTS contains a relationship type (e.g., "family", "friends"), filter to just that type.

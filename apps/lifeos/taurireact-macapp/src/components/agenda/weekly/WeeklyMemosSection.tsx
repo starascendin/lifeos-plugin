@@ -2,7 +2,7 @@ import { useAgenda } from "@/lib/contexts/AgendaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Clock, FileText, HardDrive, Cloud, Check } from "lucide-react";
+import { Mic, Clock, FileText, HardDrive, Cloud, Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -13,6 +13,11 @@ import {
   getVoiceMemos,
   type VoiceMemo as ExportedVoiceMemo,
 } from "@/lib/services/voicememos";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Check if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -51,7 +56,7 @@ function formatMemoTime(timestamp: number): string {
 function displayMemoName(name: string, createdAt: number): string {
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(name)) {
     const date = new Date(createdAt);
-    return `Recording - ${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}`;
+    return `Recording - ${date.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
   }
   return name;
 }
@@ -67,19 +72,15 @@ interface MergedWeeklyMemo {
   syncStatus: SyncStatus;
 }
 
-interface MemoItemProps {
-  memo: MergedWeeklyMemo;
-}
-
 function SyncStatusBadge({ status }: { status: SyncStatus }) {
   switch (status) {
     case "local":
       return (
         <Badge
           variant="outline"
-          className="text-xs gap-1 text-gray-500 border-gray-300"
+          className="text-[10px] gap-0.5 text-gray-500 border-gray-300 h-4 px-1"
         >
-          <HardDrive className="h-3 w-3" />
+          <HardDrive className="h-2.5 w-2.5" />
           Local
         </Badge>
       );
@@ -87,9 +88,9 @@ function SyncStatusBadge({ status }: { status: SyncStatus }) {
       return (
         <Badge
           variant="outline"
-          className="text-xs gap-1 text-blue-500 border-blue-300"
+          className="text-[10px] gap-0.5 text-blue-500 border-blue-300 h-4 px-1"
         >
-          <Cloud className="h-3 w-3" />
+          <Cloud className="h-2.5 w-2.5" />
           Cloud
         </Badge>
       );
@@ -97,9 +98,9 @@ function SyncStatusBadge({ status }: { status: SyncStatus }) {
       return (
         <Badge
           variant="outline"
-          className="text-xs gap-1 text-green-500 border-green-300"
+          className="text-[10px] gap-0.5 text-green-500 border-green-300 h-4 px-1"
         >
-          <Check className="h-3 w-3" />
+          <Check className="h-2.5 w-2.5" />
           Synced
         </Badge>
       );
@@ -107,10 +108,10 @@ function SyncStatusBadge({ status }: { status: SyncStatus }) {
       return (
         <Badge
           variant="outline"
-          className="text-xs gap-1 text-violet-500 border-violet-300"
+          className="text-[10px] gap-0.5 text-violet-500 border-violet-300 h-4 px-1"
         >
-          <Mic className="h-3 w-3" />
-          Voice Memo
+          <Mic className="h-2.5 w-2.5" />
+          VM
         </Badge>
       );
     default:
@@ -118,38 +119,37 @@ function SyncStatusBadge({ status }: { status: SyncStatus }) {
   }
 }
 
-function MemoItem({ memo }: MemoItemProps) {
+function MemoItem({ memo }: { memo: MergedWeeklyMemo }) {
   const hasTranscript =
     memo.transcript && memo.transcriptionStatus === "completed";
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Mic className="h-4 w-4 text-violet-500 flex-shrink-0" />
-          <span className="font-medium text-sm truncate">{displayMemoName(memo.name, memo.clientCreatedAt)}</span>
+    <div className="border rounded-md p-2 space-y-1.5">
+      <div className="flex items-start justify-between gap-1">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Mic className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
+          <span className="font-medium text-xs truncate">
+            {displayMemoName(memo.name, memo.clientCreatedAt)}
+          </span>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge variant="outline" className="text-xs">
-            {formatDuration(memo.duration)}
-          </Badge>
-        </div>
+        <Badge variant="outline" className="text-[10px] h-4 px-1 flex-shrink-0">
+          {formatDuration(memo.duration)}
+        </Badge>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Clock className="h-3 w-3" />
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <Clock className="h-2.5 w-2.5" />
         <span>
-          {formatMemoDate(memo.clientCreatedAt)} at{" "}
-          {formatMemoTime(memo.clientCreatedAt)}
+          {formatMemoDate(memo.clientCreatedAt)} {formatMemoTime(memo.clientCreatedAt)}
         </span>
         <SyncStatusBadge status={memo.syncStatus} />
       </div>
 
       {hasTranscript && (
-        <div className="pt-2 border-t">
-          <div className="flex items-start gap-2">
-            <FileText className="h-3 w-3 text-muted-foreground mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+        <div className="pt-1 border-t">
+          <div className="flex items-start gap-1.5">
+            <FileText className="h-2.5 w-2.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
               {memo.transcript}
             </p>
           </div>
@@ -157,19 +157,9 @@ function MemoItem({ memo }: MemoItemProps) {
       )}
 
       {memo.transcriptionStatus === "processing" && (
-        <div className="pt-2 border-t">
-          <p className="text-xs text-muted-foreground italic">
-            Transcribing...
-          </p>
-        </div>
-      )}
-
-      {memo.transcriptionStatus === "pending" && (
-        <div className="pt-2 border-t">
-          <p className="text-xs text-muted-foreground italic">
-            Awaiting transcription
-          </p>
-        </div>
+        <p className="text-[10px] text-muted-foreground italic pt-1 border-t">
+          Transcribing...
+        </p>
       )}
     </div>
   );
@@ -181,6 +171,7 @@ export function WeeklyMemosSection() {
   const [localMemos, setLocalMemos] = useState<StoredVoiceMemo[]>([]);
   const [exportedMemos, setExportedMemos] = useState<ExportedVoiceMemo[]>([]);
   const [isLoadingLocal, setIsLoadingLocal] = useState(true);
+  const [isOpen, setIsOpen] = useState(true);
 
   // Load local memos from IndexedDB for the week range
   const loadLocalMemos = useCallback(async () => {
@@ -214,7 +205,7 @@ export function WeeklyMemosSection() {
         0,
         0,
         0,
-        0
+        0,
       ).getTime();
       const rangeEnd = new Date(
         endYear,
@@ -223,12 +214,12 @@ export function WeeklyMemosSection() {
         23,
         59,
         59,
-        999
+        999,
       ).getTime();
 
       // Filter to the week range
       const filtered = allExported.filter(
-        (m) => m.date >= rangeStart && m.date <= rangeEnd
+        (m) => m.date >= rangeStart && m.date <= rangeEnd,
       );
       setExportedMemos(filtered);
     } catch (error) {
@@ -240,7 +231,7 @@ export function WeeklyMemosSection() {
   useEffect(() => {
     setIsLoadingLocal(true);
     Promise.all([loadLocalMemos(), loadExportedMemos()]).finally(() =>
-      setIsLoadingLocal(false)
+      setIsLoadingLocal(false),
     );
   }, [loadLocalMemos, loadExportedMemos]);
 
@@ -321,20 +312,16 @@ export function WeeklyMemosSection() {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Mic className="h-5 w-5 text-violet-500" />
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Mic className="h-4 w-4 text-violet-500" />
             Voice Memos
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+        <CardContent className="pt-0">
+          <div className="space-y-2">
             {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="border rounded-lg p-3 space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-12 w-full" />
-              </div>
+              <Skeleton key={i} className="h-16 w-full rounded-md" />
             ))}
           </div>
         </CardContent>
@@ -343,51 +330,51 @@ export function WeeklyMemosSection() {
   }
 
   const totalDuration = mergedMemos.reduce((sum, m) => sum + m.duration, 0);
-  const transcribedCount = mergedMemos.filter(
-    (m) => m.transcriptionStatus === "completed" && m.transcript
-  ).length;
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Mic className="h-5 w-5 text-violet-500" />
-            Voice Memos
-          </CardTitle>
-          {mergedMemos.length > 0 && (
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span>
-                {mergedMemos.length} memo{mergedMemos.length !== 1 ? "s" : ""}
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className="pb-2">
+          <CollapsibleTrigger className="flex items-center justify-between w-full hover:opacity-80 transition-opacity">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 text-muted-foreground transition-transform",
+                  !isOpen && "-rotate-90",
+                )}
+              />
+              <Mic className="h-4 w-4 text-violet-500" />
+              Voice Memos
+              {mergedMemos.length > 0 && (
+                <span className="text-xs text-muted-foreground font-normal">
+                  ({mergedMemos.length})
+                </span>
+              )}
+            </CardTitle>
+            {mergedMemos.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {formatDuration(totalDuration)}
               </span>
-              <span>{formatDuration(totalDuration)} total</span>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {mergedMemos.length === 0 ? (
-          <div className="text-center py-8">
-            <Mic className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-            <p className="text-muted-foreground">
-              No voice memos recorded this week
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {mergedMemos.map((memo) => (
-              <MemoItem key={memo.id} memo={memo} />
-            ))}
-
-            {transcribedCount > 0 && (
-              <p className="text-xs text-muted-foreground text-center pt-2">
-                {transcribedCount} of {mergedMemos.length} memo
-                {mergedMemos.length !== 1 ? "s" : ""} transcribed
-              </p>
             )}
-          </div>
-        )}
-      </CardContent>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            {mergedMemos.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <Mic className="h-6 w-6 mx-auto mb-1 opacity-40" />
+                <p className="text-xs">No voice memos this week</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {mergedMemos.map((memo) => (
+                  <MemoItem key={memo.id} memo={memo} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }

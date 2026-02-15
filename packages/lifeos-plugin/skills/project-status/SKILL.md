@@ -5,11 +5,11 @@ description: Project status report with phases, task breakdown, blockers, and ur
 
 Get project status. $ARGUMENTS should be a project key like "ACME" or project name.
 
-Use the Bash tool to run lifeos CLI commands:
+Use the LifeOS MCP tools:
 
-1. Run: `lifeos get_project projectIdOrKey=$ARGUMENTS` with the project key/ID from $ARGUMENTS
-2. Run: `lifeos get_phases projectId=<ID>` for the project to see phase breakdown
-3. Run: `lifeos get_tasks projectId=<ID>` filtered by the project ID to see all issues
+1. Call get_project with the project key/ID from $ARGUMENTS
+2. Call get_phases for the project to see phase breakdown
+3. Call get_tasks filtered by the project ID to see all issues
 
 Present a project status report:
 - **Overview**: Name, status, health, priority, client (if linked)
@@ -19,6 +19,4 @@ Present a project status report:
 - **In Progress**: What's actively being worked on
 - **Blockers**: Anything that looks stuck
 
-If no project is specified in $ARGUMENTS, run `lifeos get_projects` and list all active projects, then ask which one.
-
-Each lifeos command outputs JSON. Parse the results accordingly.
+If no project is specified in $ARGUMENTS, call get_projects and list all active projects, then ask which one.

@@ -4,6 +4,8 @@ import { useVoiceAgent, ChatMessage as ChatMessageType } from "@/lib/contexts/Vo
 import { formatMessageTime } from "@/lib/services/livekit";
 import { cn } from "@/lib/utils";
 import { User, Bot, MessageSquare } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface CompactMessageProps {
   message: ChatMessageType;
@@ -45,7 +47,25 @@ function CompactMessage({ message, showSender = true }: CompactMessageProps) {
             : "bg-muted text-foreground"
         )}
       >
-        <p className="text-xs whitespace-pre-wrap break-words">{message.text}</p>
+        <div
+          className={cn(
+            "text-xs break-words",
+            "prose prose-xs dark:prose-invert max-w-none",
+            "prose-p:my-0.5 prose-p:leading-relaxed",
+            "prose-ul:my-0.5 prose-ol:my-0.5 prose-li:my-0",
+            "prose-headings:my-1 prose-headings:text-xs prose-headings:font-semibold",
+            "prose-code:text-[11px] prose-code:bg-black/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
+            "prose-pre:my-1 prose-pre:text-[11px]",
+            "prose-a:underline",
+            isUser
+              ? "prose-p:text-primary-foreground prose-headings:text-primary-foreground prose-strong:text-primary-foreground prose-a:text-primary-foreground prose-code:text-primary-foreground"
+              : "prose-p:text-foreground prose-headings:text-foreground prose-strong:text-foreground prose-a:text-primary"
+          )}
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.text}
+          </ReactMarkdown>
+        </div>
         <p
           className={cn(
             "text-[10px] mt-0.5 opacity-70",
@@ -85,7 +105,7 @@ export function FloatingChatPanel({ maxMessages = 50 }: FloatingChatPanelProps) 
             <MessageSquare className="h-6 w-6 mb-1 opacity-50" />
             <p className="text-xs">No messages yet</p>
             <p className="text-[10px] mt-0.5 opacity-70">
-              Start speaking to chat
+              Speak or type to chat
             </p>
           </div>
         ) : (

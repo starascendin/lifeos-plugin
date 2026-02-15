@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { useVoiceAgent } from "@/lib/contexts/VoiceAgentContext";
 import { Send, Loader2 } from "lucide-react";
 
-export function ChatInput() {
+interface ChatInputProps {
+  compact?: boolean;
+}
+
+export function ChatInput({ compact }: ChatInputProps) {
   const { sendMessage, connectionState } = useVoiceAgent();
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -34,7 +38,7 @@ export function ChatInput() {
   );
 
   return (
-    <div className="flex gap-2 p-4 border-t">
+    <div className={compact ? "flex gap-1.5 p-2 border-t" : "flex gap-2 p-4 border-t"}>
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -45,17 +49,18 @@ export function ChatInput() {
             : "Connect to send messages"
         }
         disabled={isDisabled}
-        className="flex-1"
+        className={compact ? "flex-1 h-8 text-xs" : "flex-1"}
       />
       <Button
         onClick={handleSend}
         disabled={isDisabled || !text.trim()}
         size="icon"
+        className={compact ? "h-8 w-8" : undefined}
       >
         {isSending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className={compact ? "h-3.5 w-3.5 animate-spin" : "h-4 w-4 animate-spin"} />
         ) : (
-          <Send className="h-4 w-4" />
+          <Send className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         )}
       </Button>
     </div>

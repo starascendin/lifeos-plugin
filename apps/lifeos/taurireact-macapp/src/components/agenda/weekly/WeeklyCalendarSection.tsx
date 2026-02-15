@@ -13,15 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Doc } from "@holaai/convex";
 
-const DAY_NAMES = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
+const SHORT_DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function formatEventTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], {
@@ -37,58 +29,43 @@ function EventItem({
   event: Doc<"lifeos_calendarEvents">;
   isAllDay?: boolean;
 }) {
-  // Get external attendees (not self)
   const externalAttendees = event.attendees?.filter((a) => !a.self) ?? [];
   const isOneOnOne = externalAttendees.length === 1;
   const isGroupMeeting = externalAttendees.length > 1;
 
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      <div className="flex-shrink-0 w-14 text-xs text-muted-foreground pt-0.5">
+    <div className="flex items-start gap-1.5 py-1">
+      <div className="flex-shrink-0 w-12 text-[10px] text-muted-foreground pt-0.5">
         {isAllDay ? (
           <span className="text-purple-500 font-medium">All day</span>
         ) : (
           <div className="flex items-center gap-0.5">
-            <Clock className="h-3 w-3" />
+            <Clock className="h-2.5 w-2.5" />
             {formatEventTime(event.startTime)}
           </div>
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-sm leading-tight truncate">{event.title}</span>
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-xs leading-tight truncate">{event.title}</span>
           {isOneOnOne && (
-            <Badge variant="secondary" className="h-4 text-[9px] bg-blue-500/10 text-blue-700 px-1 flex items-center gap-0.5">
-              <User className="h-2.5 w-2.5" />
-              1-on-1
+            <Badge variant="secondary" className="h-3.5 text-[8px] bg-blue-500/10 text-blue-700 px-0.5 flex items-center gap-0.5">
+              <User className="h-2 w-2" />
+              1:1
             </Badge>
           )}
           {isGroupMeeting && (
-            <Badge variant="secondary" className="h-4 text-[9px] bg-orange-500/10 text-orange-700 px-1 flex items-center gap-0.5">
-              <Users className="h-2.5 w-2.5" />
+            <Badge variant="secondary" className="h-3.5 text-[8px] bg-orange-500/10 text-orange-700 px-0.5 flex items-center gap-0.5">
+              <Users className="h-2 w-2" />
               {externalAttendees.length + 1}
             </Badge>
           )}
         </div>
         {event.location && (
-          <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
+          <span className="text-[10px] text-muted-foreground truncate flex items-center gap-0.5">
+            <MapPin className="h-2.5 w-2.5" />
             {event.location}
           </span>
-        )}
-        {/* Show attendees for 1-on-1 or small groups */}
-        {externalAttendees.length > 0 && externalAttendees.length <= 3 && (
-          <div className="flex flex-wrap gap-1 mt-0.5">
-            {externalAttendees.map((a, idx) => (
-              <span
-                key={a.email || idx}
-                className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground"
-                title={a.email}
-              >
-                {a.displayName || a.email.split("@")[0]}
-              </span>
-            ))}
-          </div>
         )}
       </div>
     </div>
@@ -106,9 +83,7 @@ function DayEventsGroup({
 }) {
   const dayDate = new Date(date);
   const dayNum = dayDate.getDate();
-  const monthName = dayDate.toLocaleDateString("en-US", { month: "short" });
 
-  // Separate all-day events from timed events
   const allDayEvents = events.filter((e) => e.isAllDay);
   const timedEvents = events.filter((e) => !e.isAllDay);
 
@@ -117,13 +92,12 @@ function DayEventsGroup({
   }
 
   return (
-    <div className="flex gap-3 py-2">
-      <div className="flex-shrink-0 w-16 text-right pr-2 border-r">
-        <div className="text-xs text-muted-foreground">{DAY_NAMES[dayIndex]}</div>
-        <div className="text-lg font-semibold">{dayNum}</div>
-        <div className="text-xs text-muted-foreground">{monthName}</div>
+    <div className="flex gap-2 py-1.5">
+      <div className="flex-shrink-0 w-10 text-right pr-1.5 border-r">
+        <div className="text-[10px] text-muted-foreground">{SHORT_DAY_NAMES[dayIndex]}</div>
+        <div className="text-sm font-semibold">{dayNum}</div>
       </div>
-      <div className="flex-1 min-w-0 space-y-0.5">
+      <div className="flex-1 min-w-0 space-y-0">
         {allDayEvents.map((event) => (
           <EventItem key={event._id} event={event} isAllDay />
         ))}
@@ -160,25 +134,24 @@ export function WeeklyCalendarSection() {
     return sum + (weeklyEvents?.[date]?.length ?? 0);
   }, 0);
 
-  // Check if user has never synced
   const hasNeverSynced = calendarSyncStatus === null;
 
   return (
     <Card>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <ChevronDown
                 className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform",
-                  !isOpen && "-rotate-90"
+                  "h-3.5 w-3.5 text-muted-foreground transition-transform",
+                  !isOpen && "-rotate-90",
                 )}
               />
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarDays className="h-5 w-5" />
-                Calendar Events
-                <span className="text-sm font-normal text-muted-foreground">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <CalendarDays className="h-4 w-4" />
+                Calendar
+                <span className="text-xs font-normal text-muted-foreground">
                   ({totalEvents})
                 </span>
               </CardTitle>
@@ -186,7 +159,7 @@ export function WeeklyCalendarSection() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-6 w-6"
               onClick={(e) => {
                 e.stopPropagation();
                 syncCalendar();
@@ -195,7 +168,7 @@ export function WeeklyCalendarSection() {
               title="Sync calendar"
             >
               <RefreshCw
-                className={cn("h-4 w-4", isSyncingCalendar && "animate-spin")}
+                className={cn("h-3.5 w-3.5", isSyncingCalendar && "animate-spin")}
               />
             </Button>
           </div>
@@ -203,9 +176,9 @@ export function WeeklyCalendarSection() {
         <CollapsibleContent>
           <CardContent className="pt-0">
             {isLoadingWeeklyData ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
+                  <Skeleton key={i} className="h-10 w-full" />
                 ))}
               </div>
             ) : totalEvents > 0 ? (
@@ -220,42 +193,39 @@ export function WeeklyCalendarSection() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <div className="text-center py-4 text-muted-foreground">
+                <CalendarDays className="h-6 w-6 mx-auto mb-1 opacity-50" />
                 {hasNeverSynced ? (
                   <>
-                    <p className="text-sm">Sync your Google Calendar</p>
-                    <p className="text-xs mt-1 mb-3">
-                      Connect to see your events here
-                    </p>
+                    <p className="text-xs">Sync your Google Calendar</p>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={syncCalendar}
                       disabled={isSyncingCalendar}
+                      className="mt-2 h-7 text-xs"
                     >
                       {isSyncingCalendar ? (
                         <>
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
                           Syncing...
                         </>
                       ) : (
                         <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Sync Calendar
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Sync
                         </>
                       )}
                     </Button>
                   </>
                 ) : (
-                  <p className="text-sm">No calendar events this week</p>
+                  <p className="text-xs">No events this week</p>
                 )}
               </div>
             )}
 
-            {/* Show sync error if any */}
             {calendarSyncStatus?.lastSyncError && (
-              <div className="mt-3 p-2 rounded-md bg-red-500/10 text-red-500 text-xs">
+              <div className="mt-2 p-1.5 rounded-md bg-red-500/10 text-red-500 text-[10px]">
                 {calendarSyncStatus.lastSyncError}
               </div>
             )}

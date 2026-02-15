@@ -3,13 +3,13 @@ name: end-of-day
 description: Run end-of-day wrap-up with completion summary and tomorrow planning
 ---
 
-Run my end-of-day wrap-up. Use the Bash tool to run lifeos CLI commands:
+Run my end-of-day wrap-up. Use the LifeOS MCP tools:
 
-1. Run: `lifeos get_daily_agenda` for today's agenda
-2. Run: `lifeos get_tasks status=done` to see what was completed today
-3. Run: `lifeos get_tasks status=in_progress` to see what's still in flight
-4. Run: `lifeos get_todays_tasks` to see what was planned vs actual
-5. Run: `lifeos get_recent_notes limit=5` for any thoughts captured today
+1. Call get_daily_agenda for today's agenda
+2. Call get_tasks with status "done" to see what was completed today
+3. Call get_tasks with status "in_progress" to see what's still in flight
+4. Call get_todays_tasks to see what was planned vs actual
+5. Call get_recent_notes with limit 5 for any thoughts captured today
 
 Present an end-of-day summary:
 - **Completed today**: What got done (celebrate wins!)
@@ -28,6 +28,4 @@ Offer to:
 - Create tasks for tomorrow based on reflection
 - Capture any final thoughts as a note
 
-If $ARGUMENTS contains a date, run EOD for that date instead of today (e.g. `lifeos get_daily_agenda date=2025-01-15`).
-
-Each lifeos command outputs JSON. Parse the results accordingly.
+If $ARGUMENTS contains a date, run EOD for that date instead of today.

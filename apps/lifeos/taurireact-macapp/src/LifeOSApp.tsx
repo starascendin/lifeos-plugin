@@ -34,8 +34,17 @@ import { LifeOSGranolaAI } from "./components/lifeos/GranolaAI";
 import { LifeOSFathomAI } from "./components/lifeos/FathomAI";
 import { LifeOSCatGirl } from "./components/lifeos/CatGirl";
 import { LifeOSCustomAgents } from "./components/lifeos/CustomAgents";
+import { CommandPalette } from "./components/lifeos/CommandPalette";
+import { useVoiceMemoAutoSync } from "./lib/hooks/useVoiceMemoAutoSync";
+import { VoiceMemoAutoSyncProvider } from "./lib/contexts/VoiceMemoAutoSyncContext";
 
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+
+/** Runs the voice memo auto-sync pipeline in the background (no UI). */
+function VoiceMemoAutoSyncRunner() {
+  useVoiceMemoAutoSync();
+  return null;
+}
 
 export default function LifeOSApp() {
   useEffect(() => {
@@ -92,8 +101,11 @@ export default function LifeOSApp() {
         </SignedOut>
         <SignedIn>
           <AuthGate>
+            <VoiceMemoAutoSyncProvider>
+            <VoiceMemoAutoSyncRunner />
             <VoiceAgentProvider>
               <PomodoroProvider>
+                <CommandPalette />
                 <Routes>
                   <Route index element={<LifeOSDashboard />} />
                   <Route path="atlas" element={<LifeOSAtlas />} />
@@ -137,6 +149,7 @@ export default function LifeOSApp() {
                 </Routes>
               </PomodoroProvider>
             </VoiceAgentProvider>
+            </VoiceMemoAutoSyncProvider>
           </AuthGate>
         </SignedIn>
       </TooltipProvider>

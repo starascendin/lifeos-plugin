@@ -1,5 +1,4 @@
 import { useAgenda } from "@/lib/contexts/AgendaContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Star, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,91 +50,70 @@ export function WeeklyRollupSection() {
 
   if (isLoadingWeeklyData) {
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Star className="h-5 w-5 text-yellow-500" />
-            End Day Scores
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="text-center">
-                <Skeleton className="h-4 w-8 mx-auto mb-2" />
-                <Skeleton className="h-12 w-full rounded-lg" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border bg-card/50 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Star className="h-4 w-4 text-yellow-500" />
+          <h3 className="text-sm font-medium">End Day Scores</h3>
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full rounded" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   const valuesByDate = weeklyFieldValues?.valuesByDate ?? {};
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Star className="h-5 w-5 text-yellow-500" />
-            End Day Scores
-          </CardTitle>
-          {average !== null && (
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Weekly Avg:{" "}
-                <span className={getScoreColor(average)}>
-                  {average.toFixed(1)}/10
-                </span>
-              </span>
-            </div>
-          )}
+    <div className="rounded-lg border bg-card/50 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Star className="h-4 w-4 text-yellow-500" />
+          <h3 className="text-sm font-medium">End Day Scores</h3>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-7 gap-2">
-          {dates.map((date, i) => {
-            const score = valuesByDate[date] ?? null;
-            const dayDate = new Date(date);
-            const dayNum = dayDate.getDate();
-
-            return (
-              <div key={date} className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">
-                  {DAY_NAMES[i]}
-                </div>
+        {average !== null && (
+          <div className="flex items-center gap-1">
+            <TrendingUp className="h-3 w-3 text-muted-foreground" />
+            <span className={cn("text-xs font-medium", getScoreColor(average))}>
+              {average.toFixed(1)}
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {dates.map((date, i) => {
+          const score = valuesByDate[date] ?? null;
+          return (
+            <div key={date} className="text-center">
+              <div className="text-[10px] text-muted-foreground mb-0.5">
+                {DAY_NAMES[i]}
+              </div>
+              <div
+                className={cn(
+                  "rounded py-1.5 px-0.5 transition-colors",
+                  getScoreBg(score),
+                )}
+              >
                 <div
                   className={cn(
-                    "rounded-lg py-3 px-1 transition-colors",
-                    getScoreBg(score)
+                    "text-sm font-semibold tabular-nums",
+                    getScoreColor(score),
                   )}
                 >
-                  <div
-                    className={cn(
-                      "text-xl font-semibold",
-                      getScoreColor(score)
-                    )}
-                  >
-                    {score ?? "-"}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    {dayNum}
-                  </div>
+                  {score ?? "-"}
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {average === null && (
-          <p className="text-sm text-muted-foreground text-center mt-4">
-            No scores recorded for this week yet
-          </p>
-        )}
-      </CardContent>
-    </Card>
+            </div>
+          );
+        })}
+      </div>
+      {average === null && (
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          No scores recorded
+        </p>
+      )}
+    </div>
   );
 }

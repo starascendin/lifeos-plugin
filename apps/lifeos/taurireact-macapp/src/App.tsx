@@ -7,6 +7,7 @@ import { SyncProvider } from "./lib/contexts/SyncContext";
 import { PomodoroProvider } from "./lib/contexts/PomodoroContext";
 import { ThemeProvider } from "./lib/contexts/ThemeContext";
 import { useVoiceMemoAutoSync } from "./lib/hooks/useVoiceMemoAutoSync";
+import { VoiceMemoAutoSyncProvider } from "./lib/contexts/VoiceMemoAutoSyncContext";
 import "./App.css";
 
 // Check if running in Tauri
@@ -48,12 +49,14 @@ function App() {
       </SignedOut>
       <SignedIn>
         <AuthGate>
+          <VoiceMemoAutoSyncProvider>
           <VoiceMemoAutoSyncRunner />
           <PomodoroProvider>
             <SyncProvider>
               <MainContent />
             </SyncProvider>
           </PomodoroProvider>
+          </VoiceMemoAutoSyncProvider>
         </AuthGate>
       </SignedIn>
     </ThemeProvider>
