@@ -63,6 +63,9 @@ import type * as lifeos_catgirl_agent_schema from "../lifeos/catgirl_agent_schem
 import type * as lifeos_chatnexus from "../lifeos/chatnexus.js";
 import type * as lifeos_chatnexus_http from "../lifeos/chatnexus_http.js";
 import type * as lifeos_chatnexus_schema from "../lifeos/chatnexus_schema.js";
+import type * as lifeos_coaching from "../lifeos/coaching.js";
+import type * as lifeos_coaching_runner from "../lifeos/coaching_runner.js";
+import type * as lifeos_coaching_schema from "../lifeos/coaching_schema.js";
 import type * as lifeos_contact_matching from "../lifeos/contact_matching.js";
 import type * as lifeos_contact_migration from "../lifeos/contact_migration.js";
 import type * as lifeos_contact_schema from "../lifeos/contact_schema.js";
@@ -197,6 +200,9 @@ declare const fullApi: ApiFromModules<{
   "lifeos/chatnexus": typeof lifeos_chatnexus;
   "lifeos/chatnexus_http": typeof lifeos_chatnexus_http;
   "lifeos/chatnexus_schema": typeof lifeos_chatnexus_schema;
+  "lifeos/coaching": typeof lifeos_coaching;
+  "lifeos/coaching_runner": typeof lifeos_coaching_runner;
+  "lifeos/coaching_schema": typeof lifeos_coaching_schema;
   "lifeos/contact_matching": typeof lifeos_contact_matching;
   "lifeos/contact_migration": typeof lifeos_contact_migration;
   "lifeos/contact_schema": typeof lifeos_contact_schema;

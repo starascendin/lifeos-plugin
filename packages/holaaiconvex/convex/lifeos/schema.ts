@@ -1,5 +1,6 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
+import { coachingTables } from "./coaching_schema";
 import { customAgentTables } from "./agents_schema";
 import { avatarTables } from "./avatar_schema";
 import { beeperTables } from "./beeper_schema";
@@ -28,6 +29,8 @@ import { voiceAgentTables } from "./voiceagent_schema";
  * All table names are prefixed with `life_` or `lifeos_chatnexus` or `lifeos_pm` to avoid conflicts.
  */
 export const lifeosTables = {
+  // AI Coaching tables
+  ...coachingTables,
   // Custom AI Agent tables
   ...customAgentTables,
   // Avatar Stats tables
@@ -375,7 +378,7 @@ export const lifeosTables = {
       v.object({
         start: v.number(),
         end: v.number(),
-      })
+      }),
     ),
     // Type of summary: reflection, planning, brainstorm, journal_review, etc.
     summaryType: v.optional(v.string()),

@@ -33,6 +33,7 @@ import { LifeOSClaudeCode } from "./components/lifeos/ClaudeCode";
 import { LifeOSGranolaAI } from "./components/lifeos/GranolaAI";
 import { LifeOSFathomAI } from "./components/lifeos/FathomAI";
 import { LifeOSCatGirl } from "./components/lifeos/CatGirl";
+import { LifeOSCoaching } from "./components/lifeos/Coaching";
 import { LifeOSCustomAgents } from "./components/lifeos/CustomAgents";
 import { CommandPalette } from "./components/lifeos/CommandPalette";
 import { useVoiceMemoAutoSync } from "./lib/hooks/useVoiceMemoAutoSync";
@@ -128,7 +129,10 @@ export default function LifeOSApp() {
                   <Route path="pm/:view/:id" element={<LifeOSPM />} />
                   <Route path="pm-ai" element={<LifeOSPMAI />} />
                   <Route path="pm/clients" element={<LifeOSClientProjects />} />
-                  <Route path="pm/clients/:view" element={<LifeOSClientProjects />} />
+                  <Route
+                    path="pm/clients/:view"
+                    element={<LifeOSClientProjects />}
+                  />
                   <Route path="habits" element={<LifeOSHabits />} />
                   <Route path="focus" element={<LifeOSFocus />} />
                   <Route path="frm" element={<LifeOSFRM />} />
@@ -142,7 +146,11 @@ export default function LifeOSApp() {
                   <Route path="voiceagent" element={<LifeOSVoiceAgent />} />
                   <Route path="voicenotes" element={<LifeOSVoiceNotes />} />
                   <Route path="aiagent" element={<LifeOSAIAgent />} />
-                  <Route path="custom-agents" element={<LifeOSCustomAgents />} />
+                  <Route path="coaching" element={<LifeOSCoaching />} />
+                  <Route
+                    path="custom-agents"
+                    element={<LifeOSCustomAgents />}
+                  />
                   <Route path="catgirl" element={<LifeOSCatGirl />} />
                   <Route path="settings" element={<LifeOSSettings />} />
                   <Route path="*" element={<Navigate to="/lifeos" replace />} />
