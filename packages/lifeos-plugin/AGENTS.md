@@ -32,7 +32,7 @@ export LIFEOS_API_KEY=your-api-key
 
 The agent now has:
 - 24 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, etc.)
-- 106 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, etc.)
+- 107 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, etc.)
 - 25 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
@@ -142,7 +142,7 @@ Add to the agent's MCP config (see `.mcp.json.example`):
 }
 ```
 
-This gives the agent 106 tools + 25 prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-standup` via the MCP prompt.
+This gives the agent 107 tools + 25 prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-standup` via the MCP prompt.
 
 Alternatively, use env vars instead of CLI args:
 
