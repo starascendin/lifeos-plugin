@@ -618,6 +618,103 @@ export const TOOL_DEFINITIONS = {
     },
   },
   // Initiative Management tools
+  // Coaching Management tools
+  get_coaching_profiles: {
+    description: "List all coaching profiles (AI coach personas)",
+    params: {},
+  },
+  get_coaching_profile: {
+    description: "Get a single coaching profile by ID or slug",
+    params: {
+      profileIdOrSlug: "required - profile ID or slug (e.g., 'executive-coach')",
+    },
+  },
+  create_coaching_profile: {
+    description: "Create a new AI coaching profile",
+    params: {
+      name: "required - coach display name",
+      slug: "required - unique slug (e.g., 'executive-coach')",
+      instructions: "required - system prompt / coaching methodology",
+      focusAreas: "required - array of focus areas (e.g., ['career', 'leadership'])",
+      enabledTools: "required - array of LifeOS tool names this coach can use",
+      model: "required - LLM model ID (e.g., 'anthropic/claude-sonnet-4-5-20250929')",
+      greeting: "optional - opening greeting for new sessions",
+      sessionCadence: "optional - daily, weekly, biweekly, monthly, ad_hoc",
+      color: "optional - hex color for UI",
+      icon: "optional - emoji icon",
+    },
+  },
+  update_coaching_profile: {
+    description: "Update a coaching profile's settings",
+    params: {
+      profileId: "required - coaching profile ID",
+      name: "optional - updated name",
+      instructions: "optional - updated system prompt",
+      focusAreas: "optional - updated focus areas",
+      enabledTools: "optional - updated enabled tools",
+      model: "optional - updated model",
+      greeting: "optional - updated greeting",
+      sessionCadence: "optional - updated cadence",
+      color: "optional - updated color",
+      icon: "optional - updated icon",
+    },
+  },
+  delete_coaching_profile: {
+    description: "Delete a coaching profile and all related sessions/action items",
+    params: {
+      profileId: "required - coaching profile ID",
+    },
+  },
+  get_coaching_sessions: {
+    description: "List coaching sessions (all or filtered by coach/status)",
+    params: {
+      coachProfileId: "optional - filter by coaching profile ID",
+      status: "optional - filter by status (active, summarizing, completed)",
+      limit: "optional - max results (default 20, max 100)",
+    },
+  },
+  get_coaching_session: {
+    description: "Get a single coaching session with summary and action items",
+    params: {
+      sessionId: "required - coaching session ID",
+    },
+  },
+  get_coaching_action_items: {
+    description: "List coaching action items (by coach or all, with status filter)",
+    params: {
+      coachProfileId: "optional - filter by coaching profile ID",
+      status: "optional - filter by status (pending, in_progress, completed, cancelled)",
+      limit: "optional - max results (default 50, max 100)",
+    },
+  },
+  create_coaching_action_item: {
+    description: "Create a new coaching action item",
+    params: {
+      sessionId: "required - coaching session ID that created this item",
+      coachProfileId: "required - coaching profile ID",
+      text: "required - action item text",
+      priority: "optional - high, medium, low",
+      dueDate: "optional - ISO date string",
+    },
+  },
+  update_coaching_action_item: {
+    description: "Update a coaching action item's status, text, or priority",
+    params: {
+      actionItemId: "required - action item ID",
+      text: "optional - updated text",
+      status: "optional - pending, in_progress, completed, cancelled",
+      priority: "optional - high, medium, low",
+      dueDate: "optional - ISO date string",
+      notes: "optional - additional notes",
+    },
+  },
+  delete_coaching_action_item: {
+    description: "Delete a coaching action item",
+    params: {
+      actionItemId: "required - action item ID",
+    },
+  },
+  // Initiative Management tools
   get_initiatives: {
     description:
       "Get yearly initiatives with optional filters by year, status, or category",
@@ -9010,5 +9107,786 @@ export const getFinanceDailySpendingInternal = internalQuery({
     return Array.from(byDay.entries())
       .map(([date, data]) => ({ date, ...data }))
       .sort((a, b) => a.date.localeCompare(b.date));
+  },
+});
+
+// ==================== COACHING MANAGEMENT ====================
+
+/**
+ * List all coaching profiles for the user
+ */
+export const getCoachingProfilesInternal = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const profiles = await ctx.db
+      .query("lifeos_coachingProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    return {
+      success: true,
+      data: profiles.map((p) => ({
+        id: p._id,
+        name: p.name,
+        slug: p.slug,
+        focusAreas: p.focusAreas,
+        enabledTools: p.enabledTools,
+        model: p.model,
+        greeting: p.greeting,
+        sessionCadence: p.sessionCadence,
+        color: p.color,
+        icon: p.icon,
+        isDefault: p.isDefault,
+        createdAt: new Date(p.createdAt).toISOString(),
+        updatedAt: new Date(p.updatedAt).toISOString(),
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single coaching profile by ID or slug
+ */
+export const getCoachingProfileToolInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    profileIdOrSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Try by ID first
+    let profile;
+    try {
+      profile = await ctx.db.get(
+        args.profileIdOrSlug as Id<"lifeos_coachingProfiles">,
+      );
+    } catch {
+      // Not a valid ID, try by slug
+    }
+
+    if (!profile) {
+      profile = await ctx.db
+        .query("lifeos_coachingProfiles")
+        .withIndex("by_user_slug", (q) =>
+          q.eq("userId", user._id).eq("slug", args.profileIdOrSlug),
+        )
+        .unique();
+    }
+
+    if (!profile || profile.userId !== user._id) {
+      return {
+        success: false,
+        error: `Coaching profile "${args.profileIdOrSlug}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        id: profile._id,
+        name: profile.name,
+        slug: profile.slug,
+        instructions: profile.instructions,
+        focusAreas: profile.focusAreas,
+        enabledTools: profile.enabledTools,
+        model: profile.model,
+        greeting: profile.greeting,
+        sessionCadence: profile.sessionCadence,
+        color: profile.color,
+        icon: profile.icon,
+        isDefault: profile.isDefault,
+        createdAt: new Date(profile.createdAt).toISOString(),
+        updatedAt: new Date(profile.updatedAt).toISOString(),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a coaching profile
+ */
+export const createCoachingProfileInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    slug: v.string(),
+    instructions: v.string(),
+    focusAreas: v.array(v.string()),
+    enabledTools: v.array(v.string()),
+    model: v.string(),
+    greeting: v.optional(v.string()),
+    sessionCadence: v.optional(v.string()),
+    color: v.optional(v.string()),
+    icon: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Check slug uniqueness
+    const existing = await ctx.db
+      .query("lifeos_coachingProfiles")
+      .withIndex("by_user_slug", (q) =>
+        q.eq("userId", user._id).eq("slug", args.slug),
+      )
+      .unique();
+    if (existing) {
+      return {
+        success: false,
+        error: `Coach with slug "${args.slug}" already exists`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const validCadences = ["daily", "weekly", "biweekly", "monthly", "ad_hoc"] as const;
+    const cadence = args.sessionCadence && validCadences.includes(args.sessionCadence as typeof validCadences[number])
+      ? (args.sessionCadence as typeof validCadences[number])
+      : undefined;
+
+    const now = Date.now();
+    const id = await ctx.db.insert("lifeos_coachingProfiles", {
+      userId: user._id,
+      name: args.name,
+      slug: args.slug,
+      instructions: args.instructions,
+      focusAreas: args.focusAreas,
+      enabledTools: args.enabledTools,
+      model: args.model,
+      greeting: args.greeting,
+      sessionCadence: cadence,
+      color: args.color,
+      icon: args.icon,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      data: { id },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update a coaching profile
+ */
+export const updateCoachingProfileInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    profileId: v.string(),
+    name: v.optional(v.string()),
+    instructions: v.optional(v.string()),
+    focusAreas: v.optional(v.array(v.string())),
+    enabledTools: v.optional(v.array(v.string())),
+    model: v.optional(v.string()),
+    greeting: v.optional(v.string()),
+    sessionCadence: v.optional(v.string()),
+    color: v.optional(v.string()),
+    icon: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    let profile;
+    try {
+      profile = await ctx.db.get(
+        args.profileId as Id<"lifeos_coachingProfiles">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Coaching profile "${args.profileId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!profile || profile.userId !== user._id) {
+      return {
+        success: false,
+        error: `Coaching profile "${args.profileId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const patch: Record<string, unknown> = { updatedAt: Date.now() };
+    if (args.name !== undefined) patch.name = args.name;
+    if (args.instructions !== undefined) patch.instructions = args.instructions;
+    if (args.focusAreas !== undefined) patch.focusAreas = args.focusAreas;
+    if (args.enabledTools !== undefined) patch.enabledTools = args.enabledTools;
+    if (args.model !== undefined) patch.model = args.model;
+    if (args.greeting !== undefined) patch.greeting = args.greeting;
+    if (args.color !== undefined) patch.color = args.color;
+    if (args.icon !== undefined) patch.icon = args.icon;
+    if (args.sessionCadence !== undefined) {
+      const validCadences = ["daily", "weekly", "biweekly", "monthly", "ad_hoc"] as const;
+      if (validCadences.includes(args.sessionCadence as typeof validCadences[number])) {
+        patch.sessionCadence = args.sessionCadence;
+      }
+    }
+
+    await ctx.db.patch(profile._id, patch);
+
+    return {
+      success: true,
+      data: { id: profile._id },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete a coaching profile and cascade-delete sessions + action items
+ */
+export const deleteCoachingProfileInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    profileId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    let profile;
+    try {
+      profile = await ctx.db.get(
+        args.profileId as Id<"lifeos_coachingProfiles">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Coaching profile "${args.profileId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!profile || profile.userId !== user._id) {
+      return {
+        success: false,
+        error: `Coaching profile "${args.profileId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const profileId = profile._id;
+
+    // Delete action items
+    const actionItems = await ctx.db
+      .query("lifeos_coachingActionItems")
+      .withIndex("by_coach", (q) => q.eq("coachProfileId", profileId))
+      .collect();
+    for (const item of actionItems) {
+      await ctx.db.delete(item._id);
+    }
+
+    // Delete sessions
+    const sessions = await ctx.db
+      .query("lifeos_coachingSessions")
+      .withIndex("by_coach", (q) => q.eq("coachProfileId", profileId))
+      .collect();
+    for (const session of sessions) {
+      await ctx.db.delete(session._id);
+    }
+
+    await ctx.db.delete(profileId);
+
+    return {
+      success: true,
+      data: { deleted: true, deletedActionItems: actionItems.length, deletedSessions: sessions.length },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * List coaching sessions (all or filtered by coach/status)
+ */
+export const getCoachingSessionsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    coachProfileId: v.optional(v.string()),
+    status: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const limit = Math.min(args.limit || 20, 100);
+    let sessions;
+
+    if (args.coachProfileId) {
+      sessions = await ctx.db
+        .query("lifeos_coachingSessions")
+        .withIndex("by_coach_created", (q) =>
+          q.eq("coachProfileId", args.coachProfileId as Id<"lifeos_coachingProfiles">),
+        )
+        .order("desc")
+        .take(limit);
+    } else {
+      sessions = await ctx.db
+        .query("lifeos_coachingSessions")
+        .withIndex("by_user_created", (q) => q.eq("userId", user._id))
+        .order("desc")
+        .take(limit);
+    }
+
+    if (args.status) {
+      sessions = sessions.filter((s) => s.status === args.status);
+    }
+
+    return {
+      success: true,
+      data: sessions.map((s) => ({
+        id: s._id,
+        coachProfileId: s.coachProfileId,
+        status: s.status,
+        title: s.title,
+        summary: s.summary,
+        moodAtStart: s.moodAtStart,
+        startedAt: new Date(s.startedAt).toISOString(),
+        endedAt: s.endedAt ? new Date(s.endedAt).toISOString() : undefined,
+        createdAt: new Date(s.createdAt).toISOString(),
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Get a single coaching session with summary details
+ */
+export const getCoachingSessionInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    sessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    let session;
+    try {
+      session = await ctx.db.get(
+        args.sessionId as Id<"lifeos_coachingSessions">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Coaching session "${args.sessionId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!session || session.userId !== user._id) {
+      return {
+        success: false,
+        error: `Coaching session "${args.sessionId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Get action items for this session
+    const actionItems = await ctx.db
+      .query("lifeos_coachingActionItems")
+      .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+      .collect();
+
+    return {
+      success: true,
+      data: {
+        id: session._id,
+        coachProfileId: session.coachProfileId,
+        status: session.status,
+        title: session.title,
+        summary: session.summary,
+        keyInsights: session.keyInsights,
+        moodAtStart: session.moodAtStart,
+        startedAt: new Date(session.startedAt).toISOString(),
+        endedAt: session.endedAt ? new Date(session.endedAt).toISOString() : undefined,
+        createdAt: new Date(session.createdAt).toISOString(),
+        actionItems: actionItems.map((a) => ({
+          id: a._id,
+          text: a.text,
+          status: a.status,
+          priority: a.priority,
+          dueDate: a.dueDate ? new Date(a.dueDate).toISOString() : undefined,
+          notes: a.notes,
+        })),
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * List coaching action items (by coach or all, with status filter)
+ */
+export const getCoachingActionItemsInternal = internalQuery({
+  args: {
+    userId: v.string(),
+    coachProfileId: v.optional(v.string()),
+    status: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const limit = Math.min(args.limit || 50, 100);
+    let items;
+
+    if (args.coachProfileId && args.status) {
+      const validStatuses = ["pending", "in_progress", "completed", "cancelled"] as const;
+      const status = validStatuses.includes(args.status as typeof validStatuses[number])
+        ? (args.status as typeof validStatuses[number])
+        : undefined;
+
+      if (status) {
+        items = await ctx.db
+          .query("lifeos_coachingActionItems")
+          .withIndex("by_coach_status", (q) =>
+            q.eq("coachProfileId", args.coachProfileId as Id<"lifeos_coachingProfiles">).eq("status", status),
+          )
+          .order("desc")
+          .take(limit);
+      } else {
+        items = await ctx.db
+          .query("lifeos_coachingActionItems")
+          .withIndex("by_coach", (q) =>
+            q.eq("coachProfileId", args.coachProfileId as Id<"lifeos_coachingProfiles">),
+          )
+          .order("desc")
+          .take(limit);
+      }
+    } else if (args.coachProfileId) {
+      items = await ctx.db
+        .query("lifeos_coachingActionItems")
+        .withIndex("by_coach", (q) =>
+          q.eq("coachProfileId", args.coachProfileId as Id<"lifeos_coachingProfiles">),
+        )
+        .order("desc")
+        .take(limit);
+    } else if (args.status) {
+      const validStatuses = ["pending", "in_progress", "completed", "cancelled"] as const;
+      const status = validStatuses.includes(args.status as typeof validStatuses[number])
+        ? (args.status as typeof validStatuses[number])
+        : undefined;
+
+      if (status) {
+        items = await ctx.db
+          .query("lifeos_coachingActionItems")
+          .withIndex("by_user_status", (q) =>
+            q.eq("userId", user._id).eq("status", status),
+          )
+          .order("desc")
+          .take(limit);
+      } else {
+        items = await ctx.db
+          .query("lifeos_coachingActionItems")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .order("desc")
+          .take(limit);
+      }
+    } else {
+      items = await ctx.db
+        .query("lifeos_coachingActionItems")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .order("desc")
+        .take(limit);
+    }
+
+    return {
+      success: true,
+      data: items.map((a) => ({
+        id: a._id,
+        sessionId: a.sessionId,
+        coachProfileId: a.coachProfileId,
+        text: a.text,
+        status: a.status,
+        priority: a.priority,
+        dueDate: a.dueDate ? new Date(a.dueDate).toISOString() : undefined,
+        notes: a.notes,
+        completedAt: a.completedAt ? new Date(a.completedAt).toISOString() : undefined,
+        createdAt: new Date(a.createdAt).toISOString(),
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Create a coaching action item
+ */
+export const createCoachingActionItemToolInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    sessionId: v.string(),
+    coachProfileId: v.string(),
+    text: v.string(),
+    priority: v.optional(v.string()),
+    dueDate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const validPriorities = ["high", "medium", "low"] as const;
+    const priority = args.priority && validPriorities.includes(args.priority as typeof validPriorities[number])
+      ? (args.priority as typeof validPriorities[number])
+      : undefined;
+
+    const dueDate = args.dueDate ? new Date(args.dueDate).getTime() : undefined;
+
+    const now = Date.now();
+    const id = await ctx.db.insert("lifeos_coachingActionItems", {
+      userId: user._id,
+      sessionId: args.sessionId as Id<"lifeos_coachingSessions">,
+      coachProfileId: args.coachProfileId as Id<"lifeos_coachingProfiles">,
+      text: args.text,
+      status: "pending",
+      priority,
+      dueDate,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      data: { id },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Update a coaching action item
+ */
+export const updateCoachingActionItemInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    actionItemId: v.string(),
+    text: v.optional(v.string()),
+    status: v.optional(v.string()),
+    priority: v.optional(v.string()),
+    dueDate: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    let item;
+    try {
+      item = await ctx.db.get(
+        args.actionItemId as Id<"lifeos_coachingActionItems">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Action item "${args.actionItemId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!item || item.userId !== user._id) {
+      return {
+        success: false,
+        error: `Action item "${args.actionItemId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const patch: Record<string, unknown> = { updatedAt: Date.now() };
+    if (args.text !== undefined) patch.text = args.text;
+    if (args.notes !== undefined) patch.notes = args.notes;
+    if (args.dueDate !== undefined) patch.dueDate = new Date(args.dueDate).getTime();
+    if (args.status !== undefined) {
+      const validStatuses = ["pending", "in_progress", "completed", "cancelled"] as const;
+      if (validStatuses.includes(args.status as typeof validStatuses[number])) {
+        patch.status = args.status;
+        if (args.status === "completed") {
+          patch.completedAt = Date.now();
+        }
+      }
+    }
+    if (args.priority !== undefined) {
+      const validPriorities = ["high", "medium", "low"] as const;
+      if (validPriorities.includes(args.priority as typeof validPriorities[number])) {
+        patch.priority = args.priority;
+      }
+    }
+
+    await ctx.db.patch(item._id, patch);
+
+    return {
+      success: true,
+      data: { id: item._id },
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Delete a coaching action item
+ */
+export const deleteCoachingActionItemInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    actionItemId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("_id"), args.userId))
+      .first();
+
+    if (!user) {
+      return {
+        success: false,
+        error: "User not found",
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    let item;
+    try {
+      item = await ctx.db.get(
+        args.actionItemId as Id<"lifeos_coachingActionItems">,
+      );
+    } catch {
+      return {
+        success: false,
+        error: `Action item "${args.actionItemId}" not found`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    if (!item || item.userId !== user._id) {
+      return {
+        success: false,
+        error: `Action item "${args.actionItemId}" not found or access denied`,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    await ctx.db.delete(item._id);
+
+    return {
+      success: true,
+      data: { deleted: true },
+      generatedAt: new Date().toISOString(),
+    };
   },
 });

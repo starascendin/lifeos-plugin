@@ -2658,6 +2658,343 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // ==================== COACHING Tools ====================
+  {
+    name: "get_coaching_profiles",
+    description:
+      "List all AI coaching profiles (coach personas). Each profile defines a coaching methodology, focus areas, and which LifeOS tools the coach can use.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_coaching_profile",
+    description:
+      "Get a single coaching profile by ID or slug with full details including instructions and enabled tools.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        profileIdOrSlug: {
+          type: "string",
+          description: "Profile ID or slug like 'executive-coach' (required)",
+        },
+      },
+      required: ["profileIdOrSlug"],
+    },
+  },
+  {
+    name: "create_coaching_profile",
+    description:
+      "Create a new AI coaching profile with a unique slug, system prompt, focus areas, and tool access.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        name: {
+          type: "string",
+          description: "Coach display name (required)",
+        },
+        slug: {
+          type: "string",
+          description: "Unique slug like 'executive-coach' (required)",
+        },
+        instructions: {
+          type: "string",
+          description: "System prompt / coaching methodology (required)",
+        },
+        focusAreas: {
+          type: "array",
+          items: { type: "string" },
+          description: "Focus areas like ['career', 'leadership'] (required)",
+        },
+        enabledTools: {
+          type: "array",
+          items: { type: "string" },
+          description: "LifeOS tool names this coach can use (required)",
+        },
+        model: {
+          type: "string",
+          description: "LLM model ID, e.g. 'anthropic/claude-sonnet-4-5-20250929' (required)",
+        },
+        greeting: {
+          type: "string",
+          description: "Opening greeting for new sessions (optional)",
+        },
+        sessionCadence: {
+          type: "string",
+          enum: ["daily", "weekly", "biweekly", "monthly", "ad_hoc"],
+          description: "Suggested session cadence (optional)",
+        },
+        color: {
+          type: "string",
+          description: "Hex color for UI (optional)",
+        },
+        icon: {
+          type: "string",
+          description: "Emoji icon (optional)",
+        },
+      },
+      required: ["name", "slug", "instructions", "focusAreas", "enabledTools", "model"],
+    },
+  },
+  {
+    name: "update_coaching_profile",
+    description: "Update a coaching profile's settings.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        profileId: {
+          type: "string",
+          description: "Coaching profile ID (required)",
+        },
+        name: {
+          type: "string",
+          description: "Updated name (optional)",
+        },
+        instructions: {
+          type: "string",
+          description: "Updated system prompt (optional)",
+        },
+        focusAreas: {
+          type: "array",
+          items: { type: "string" },
+          description: "Updated focus areas (optional)",
+        },
+        enabledTools: {
+          type: "array",
+          items: { type: "string" },
+          description: "Updated enabled tools (optional)",
+        },
+        model: {
+          type: "string",
+          description: "Updated model (optional)",
+        },
+        greeting: {
+          type: "string",
+          description: "Updated greeting (optional)",
+        },
+        sessionCadence: {
+          type: "string",
+          enum: ["daily", "weekly", "biweekly", "monthly", "ad_hoc"],
+          description: "Updated cadence (optional)",
+        },
+        color: {
+          type: "string",
+          description: "Updated color (optional)",
+        },
+        icon: {
+          type: "string",
+          description: "Updated icon (optional)",
+        },
+      },
+      required: ["profileId"],
+    },
+  },
+  {
+    name: "delete_coaching_profile",
+    description:
+      "Delete a coaching profile and cascade-delete all related sessions and action items.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        profileId: {
+          type: "string",
+          description: "Coaching profile ID to delete (required)",
+        },
+      },
+      required: ["profileId"],
+    },
+  },
+  {
+    name: "get_coaching_sessions",
+    description:
+      "List coaching sessions, optionally filtered by coach profile or status. Returns session summaries, titles, and timing.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        coachProfileId: {
+          type: "string",
+          description: "Filter by coaching profile ID (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["active", "summarizing", "completed"],
+          description: "Filter by session status (optional)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 20, max 100)",
+        },
+      },
+    },
+  },
+  {
+    name: "get_coaching_session",
+    description:
+      "Get a single coaching session with full details: summary, key insights, and action items generated during the session.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        sessionId: {
+          type: "string",
+          description: "Coaching session ID (required)",
+        },
+      },
+      required: ["sessionId"],
+    },
+  },
+  {
+    name: "get_coaching_action_items",
+    description:
+      "List coaching action items across all coaches or filtered by coach/status. Shows text, priority, due dates, and completion status.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        coachProfileId: {
+          type: "string",
+          description: "Filter by coaching profile ID (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["pending", "in_progress", "completed", "cancelled"],
+          description: "Filter by status (optional)",
+        },
+        limit: {
+          type: "number",
+          description: "Max results (default 50, max 100)",
+        },
+      },
+    },
+  },
+  {
+    name: "create_coaching_action_item",
+    description:
+      "Create a new coaching action item linked to a session and coach profile.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        sessionId: {
+          type: "string",
+          description: "Coaching session ID that created this item (required)",
+        },
+        coachProfileId: {
+          type: "string",
+          description: "Coaching profile ID (required)",
+        },
+        text: {
+          type: "string",
+          description: "Action item text (required)",
+        },
+        priority: {
+          type: "string",
+          enum: ["high", "medium", "low"],
+          description: "Priority level (optional)",
+        },
+        dueDate: {
+          type: "string",
+          description: "Due date in ISO format (optional)",
+        },
+      },
+      required: ["sessionId", "coachProfileId", "text"],
+    },
+  },
+  {
+    name: "update_coaching_action_item",
+    description:
+      "Update a coaching action item's text, status, priority, due date, or notes.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        actionItemId: {
+          type: "string",
+          description: "Action item ID (required)",
+        },
+        text: {
+          type: "string",
+          description: "Updated text (optional)",
+        },
+        status: {
+          type: "string",
+          enum: ["pending", "in_progress", "completed", "cancelled"],
+          description: "Updated status (optional)",
+        },
+        priority: {
+          type: "string",
+          enum: ["high", "medium", "low"],
+          description: "Updated priority (optional)",
+        },
+        dueDate: {
+          type: "string",
+          description: "Updated due date in ISO format (optional)",
+        },
+        notes: {
+          type: "string",
+          description: "Additional notes (optional)",
+        },
+      },
+      required: ["actionItemId"],
+    },
+  },
+  {
+    name: "delete_coaching_action_item",
+    description: "Delete a coaching action item.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        actionItemId: {
+          type: "string",
+          description: "Action item ID to delete (required)",
+        },
+      },
+      required: ["actionItemId"],
+    },
+  },
+
   // MCP Server Info
   {
     name: "get_version",
@@ -2974,6 +3311,38 @@ const PROMPTS: Prompt[] = [
         name: "days",
         description:
           "Number of days to analyze (optional, defaults to 30)",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "coaching-overview",
+    description:
+      "Dashboard of coaching profiles, recent sessions, and pending action items across all coaches.",
+    arguments: [],
+  },
+  {
+    name: "coaching-action-items",
+    description:
+      "Review and manage coaching action items across all coaches. Can mark items complete.",
+    arguments: [
+      {
+        name: "action",
+        description:
+          "Optional: 'complete <item reference>' to mark an action item as done",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "coaching-session-review",
+    description:
+      "Deep-dive into a specific coaching session's summary, key insights, and action items.",
+    arguments: [
+      {
+        name: "session",
+        description:
+          "Session ID or coach slug to find the most recent session (optional, defaults to most recent)",
         required: false,
       },
     ],
@@ -3684,6 +4053,76 @@ Present a spending analysis:
 - **Insights**: Spending trends, any unusual activity, suggestions
 
 Convert all amounts from cents to dollars. Format as currency.`,
+        },
+      },
+    ];
+  },
+  "coaching-overview": () => {
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Show me a coaching dashboard. Use the LifeOS MCP tools:
+
+1. Call get_coaching_profiles to list all coach personas
+2. Call get_coaching_sessions with limit=10 for recent sessions across all coaches
+3. Call get_coaching_action_items with status "pending" for outstanding action items
+
+Present a coaching overview:
+- **Coaches**: List each coach profile with name, focus areas, and session cadence
+- **Recent Sessions**: Show recent sessions grouped by coach, with title, date, and status
+- **Pending Action Items**: Count of pending items per coach, with the top 3 most urgent items shown
+- **Insights**: Which coaches are most active, any overdue action items, suggested next sessions
+
+Keep it concise and actionable.`,
+        },
+      },
+    ];
+  },
+  "coaching-action-items": (args) => {
+    const actionClause = args.action
+      ? `\n\nThe user wants to: ${args.action}. If this references completing an item, call update_coaching_action_item with status "completed".`
+      : "";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Review my coaching action items. Use the LifeOS MCP tools:
+
+1. Call get_coaching_action_items to get all action items
+2. Call get_coaching_profiles to get coach names for grouping
+
+Present action items grouped by coach:
+- **Per Coach**: Show coach name, then list action items with status, priority, due date
+- **Overdue**: Highlight any items past their due date
+- **Summary**: Total pending, in-progress, completed counts
+- **Suggestions**: Which items to prioritize next${actionClause}`,
+        },
+      },
+    ];
+  },
+  "coaching-session-review": (args) => {
+    const sessionClause = args.session
+      ? `Look up session: "${args.session}". If it looks like an ID, call get_coaching_session directly. If it looks like a coach slug, call get_coaching_profile first, then get_coaching_sessions filtered by that coach to find the most recent one.`
+      : "Call get_coaching_sessions with limit=1 to get the most recent session.";
+    return [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Review a coaching session in depth. Use the LifeOS MCP tools:
+
+1. ${sessionClause}
+2. Call get_coaching_session with the session ID for full details including summary and action items
+
+Present a session review:
+- **Session Info**: Coach name, date, duration, mood at start
+- **Summary**: The session's AI-generated summary
+- **Key Insights**: List all key insights from the session
+- **Action Items**: All action items with their current status
+- **Follow-up**: Suggest what to discuss in the next session based on insights and pending items`,
         },
       },
     ];

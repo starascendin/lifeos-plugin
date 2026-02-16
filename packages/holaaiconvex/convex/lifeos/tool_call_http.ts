@@ -126,6 +126,18 @@ export const AVAILABLE_TOOLS = [
   "get_finance_transactions",
   "get_finance_snapshots",
   "get_finance_daily_spending",
+  // Coaching Management tools
+  "get_coaching_profiles",
+  "get_coaching_profile",
+  "create_coaching_profile",
+  "update_coaching_profile",
+  "delete_coaching_profile",
+  "get_coaching_sessions",
+  "get_coaching_session",
+  "get_coaching_action_items",
+  "create_coaching_action_item",
+  "update_coaching_action_item",
+  "delete_coaching_action_item",
   // Initiative Management tools
   "get_initiatives",
   "get_initiative",
@@ -1283,6 +1295,147 @@ export const toolCallHandler = httpAction(async (ctx, request) => {
             userId: auth.userId,
             days: params?.days as number | undefined,
             accountId: params?.accountId as string | undefined,
+          },
+        );
+        break;
+
+      // ==================== COACHING MANAGEMENT ====================
+      case "get_coaching_profiles":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getCoachingProfilesInternal,
+          {
+            userId: auth.userId,
+          },
+        );
+        break;
+
+      case "get_coaching_profile":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getCoachingProfileToolInternal,
+          {
+            userId: auth.userId,
+            profileIdOrSlug: params?.profileIdOrSlug as string,
+          },
+        );
+        break;
+
+      case "create_coaching_profile":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.createCoachingProfileInternal,
+          {
+            userId: auth.userId,
+            name: params?.name as string,
+            slug: params?.slug as string,
+            instructions: params?.instructions as string,
+            focusAreas: params?.focusAreas as string[],
+            enabledTools: params?.enabledTools as string[],
+            model: params?.model as string,
+            greeting: params?.greeting as string | undefined,
+            sessionCadence: params?.sessionCadence as string | undefined,
+            color: params?.color as string | undefined,
+            icon: params?.icon as string | undefined,
+          },
+        );
+        break;
+
+      case "update_coaching_profile":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.updateCoachingProfileInternal,
+          {
+            userId: auth.userId,
+            profileId: params?.profileId as string,
+            name: params?.name as string | undefined,
+            instructions: params?.instructions as string | undefined,
+            focusAreas: params?.focusAreas as string[] | undefined,
+            enabledTools: params?.enabledTools as string[] | undefined,
+            model: params?.model as string | undefined,
+            greeting: params?.greeting as string | undefined,
+            sessionCadence: params?.sessionCadence as string | undefined,
+            color: params?.color as string | undefined,
+            icon: params?.icon as string | undefined,
+          },
+        );
+        break;
+
+      case "delete_coaching_profile":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.deleteCoachingProfileInternal,
+          {
+            userId: auth.userId,
+            profileId: params?.profileId as string,
+          },
+        );
+        break;
+
+      case "get_coaching_sessions":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getCoachingSessionsInternal,
+          {
+            userId: auth.userId,
+            coachProfileId: params?.coachProfileId as string | undefined,
+            status: params?.status as string | undefined,
+            limit: params?.limit as number | undefined,
+          },
+        );
+        break;
+
+      case "get_coaching_session":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getCoachingSessionInternal,
+          {
+            userId: auth.userId,
+            sessionId: params?.sessionId as string,
+          },
+        );
+        break;
+
+      case "get_coaching_action_items":
+        result = await ctx.runQuery(
+          internal.lifeos.tool_call.getCoachingActionItemsInternal,
+          {
+            userId: auth.userId,
+            coachProfileId: params?.coachProfileId as string | undefined,
+            status: params?.status as string | undefined,
+            limit: params?.limit as number | undefined,
+          },
+        );
+        break;
+
+      case "create_coaching_action_item":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.createCoachingActionItemToolInternal,
+          {
+            userId: auth.userId,
+            sessionId: params?.sessionId as string,
+            coachProfileId: params?.coachProfileId as string,
+            text: params?.text as string,
+            priority: params?.priority as string | undefined,
+            dueDate: params?.dueDate as string | undefined,
+          },
+        );
+        break;
+
+      case "update_coaching_action_item":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.updateCoachingActionItemInternal,
+          {
+            userId: auth.userId,
+            actionItemId: params?.actionItemId as string,
+            text: params?.text as string | undefined,
+            status: params?.status as string | undefined,
+            priority: params?.priority as string | undefined,
+            dueDate: params?.dueDate as string | undefined,
+            notes: params?.notes as string | undefined,
+          },
+        );
+        break;
+
+      case "delete_coaching_action_item":
+        result = await ctx.runMutation(
+          internal.lifeos.tool_call.deleteCoachingActionItemInternal,
+          {
+            userId: auth.userId,
+            actionItemId: params?.actionItemId as string,
           },
         );
         break;
