@@ -1,8 +1,39 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { requireUser } from "../_lib/auth";
 import { Doc, Id } from "../_generated/dataModel";
 import { cycleStatusValidator, cycleRetrospectiveValidator } from "./pm_schema";
+
+/**
+ * Schedule exact-time transitions for a cycle using Convex scheduler.
+ * - Schedules _activateCycle at startDate (upcoming → active)
+ * - Schedules _autoCloseCycle at endDate (active → completed + rollover)
+ * Both scheduled functions are idempotent, so duplicate scheduling is harmless.
+ */
+async function scheduleCycleTransitions(
+  ctx: { scheduler: { runAt: (ts: number, fn: any, args: any) => Promise<any> } },
+  cycleId: Id<"lifeos_pmCycles">,
+  startDate: number,
+  endDate: number,
+) {
+  const now = Date.now();
+  if (now < startDate) {
+    await ctx.scheduler.runAt(
+      startDate,
+      internal.lifeos.pm_cycles._activateCycle,
+      { cycleId },
+    );
+  }
+  // Schedule auto-close 1ms after endDate
+  if (now <= endDate) {
+    await ctx.scheduler.runAt(
+      endDate + 1,
+      internal.lifeos.pm_cycles._autoCloseCycle,
+      { cycleId },
+    );
+  }
+}
 
 type IssueStatus =
   | "backlog"
@@ -412,6 +443,9 @@ export const createCycle = mutation({
       updatedAt: now,
     });
 
+    // Schedule exact-time transitions
+    await scheduleCycleTransitions(ctx, cycleId, args.startDate, args.endDate);
+
     return cycleId;
   },
 });
@@ -453,6 +487,14 @@ export const updateCycle = mutation({
       updates.retrospective = args.retrospective;
 
     await ctx.db.patch(args.cycleId, updates);
+
+    // If dates changed, reschedule transitions (old scheduled ones will be no-ops)
+    if (args.startDate !== undefined || args.endDate !== undefined) {
+      const updatedStartDate = args.startDate ?? cycle.startDate;
+      const updatedEndDate = args.endDate ?? cycle.endDate;
+      await scheduleCycleTransitions(ctx, args.cycleId, updatedStartDate, updatedEndDate);
+    }
+
     return args.cycleId;
   },
 });
@@ -657,6 +699,7 @@ export const generateCycles = mutation({
         createdAt: now,
         updatedAt: now,
       });
+      await scheduleCycleTransitions(ctx, cycleId, cycleStartDate, cycleEndDate);
       cycleIds.push(cycleId);
     }
 
@@ -783,6 +826,7 @@ export const ensureUpcomingCycles = mutation({
         createdAt: now,
         updatedAt: now,
       });
+      await scheduleCycleTransitions(ctx, cycleId, cycleStartDate, cycleEndDate);
       cycleIds.push(cycleId);
     }
 
@@ -919,6 +963,156 @@ export const closeCycle = mutation({
       rolledOverCount,
       targetCycleName,
     };
+  },
+});
+
+// ==================== SCHEDULED TRANSITION MUTATIONS ====================
+
+/**
+ * Internal: Activate a cycle at its exact start time.
+ * Scheduled via ctx.scheduler.runAt when a cycle is created.
+ * Idempotent — safe to call multiple times.
+ */
+export const _activateCycle = internalMutation({
+  args: {
+    cycleId: v.id("lifeos_pmCycles"),
+  },
+  handler: async (ctx, args) => {
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle) return; // Cycle was deleted
+
+    // Only activate if still upcoming
+    if (cycle.status !== "upcoming") return;
+
+    const now = Date.now();
+    if (now < cycle.startDate) return; // Not yet time
+
+    await ctx.db.patch(args.cycleId, {
+      status: "active",
+      updatedAt: now,
+    });
+    console.log(`[Cycle Scheduler] Activated cycle ${args.cycleId} (Cycle ${cycle.number})`);
+  },
+});
+
+/**
+ * Internal: Auto-close a cycle at its exact end time.
+ * Handles rollover of incomplete issues based on user settings.
+ * Scheduled via ctx.scheduler.runAt when a cycle is created.
+ * Idempotent — safe to call multiple times.
+ */
+export const _autoCloseCycle = internalMutation({
+  args: {
+    cycleId: v.id("lifeos_pmCycles"),
+  },
+  handler: async (ctx, args) => {
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle) return; // Cycle was deleted
+
+    // Only close if still active (or upcoming that was never activated)
+    if (cycle.status === "completed") return;
+
+    const now = Date.now();
+    if (now <= cycle.endDate) return; // Not yet time
+
+    // Get user settings for rollover preference
+    const userSettings = await ctx.db
+      .query("lifeos_pmUserSettings")
+      .withIndex("by_user", (q) => q.eq("userId", cycle.userId))
+      .first();
+
+    const shouldRollover =
+      userSettings?.cycleSettings?.autoRolloverIncompleteIssues ?? false;
+
+    // Get all issues in this cycle
+    const issues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .collect();
+
+    const incompleteIssues = issues.filter(
+      (i) => i.status !== "done" && i.status !== "cancelled",
+    );
+
+    let rolledOverCount = 0;
+
+    if (shouldRollover && incompleteIssues.length > 0) {
+      // Find next upcoming cycle to roll into
+      const upcomingCycles = await ctx.db
+        .query("lifeos_pmCycles")
+        .withIndex("by_user_status", (q) =>
+          q.eq("userId", cycle.userId).eq("status", "upcoming"),
+        )
+        .collect();
+
+      upcomingCycles.sort((a, b) => a.startDate - b.startDate);
+
+      let targetCycle: Doc<"lifeos_pmCycles"> | null =
+        upcomingCycles[0] ?? null;
+
+      // If no upcoming, check active (different from current)
+      if (!targetCycle) {
+        const activeCycles = await ctx.db
+          .query("lifeos_pmCycles")
+          .withIndex("by_user_status", (q) =>
+            q.eq("userId", cycle.userId).eq("status", "active"),
+          )
+          .collect();
+
+        targetCycle =
+          activeCycles.find((c) => c._id !== args.cycleId) ?? null;
+      }
+
+      if (targetCycle) {
+        for (const issue of incompleteIssues) {
+          await ctx.db.patch(issue._id, {
+            cycleId: targetCycle._id,
+            updatedAt: now,
+          });
+          rolledOverCount++;
+        }
+
+        // Update target cycle counts
+        const targetIssues = await ctx.db
+          .query("lifeos_pmIssues")
+          .withIndex("by_cycle", (q) => q.eq("cycleId", targetCycle._id))
+          .collect();
+
+        await ctx.db.patch(targetCycle._id, {
+          issueCount: targetIssues.length,
+          completedIssueCount: targetIssues.filter(
+            (i) => i.status === "done",
+          ).length,
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Mark cycle as completed
+    await ctx.db.patch(args.cycleId, {
+      status: "completed",
+      updatedAt: now,
+    });
+
+    // Update source cycle counts
+    const remainingIssues = await ctx.db
+      .query("lifeos_pmIssues")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .collect();
+
+    await ctx.db.patch(args.cycleId, {
+      issueCount: remainingIssues.length,
+      completedIssueCount: remainingIssues.filter(
+        (i) => i.status === "done",
+      ).length,
+    });
+
+    console.log(
+      `[Cycle Scheduler] Closed cycle ${args.cycleId} (Cycle ${cycle.number})` +
+        (rolledOverCount > 0
+          ? `, rolled over ${rolledOverCount} issues`
+          : ""),
+    );
   },
 });
 
@@ -1083,6 +1277,20 @@ export const _autoGenerateCyclesForUser = internalMutation({
           updatedAt: now,
         });
       }
+
+      // Schedule future transitions for existing cycles (idempotent, safe to duplicate)
+      if (newStatus === "upcoming") {
+        await scheduleCycleTransitions(ctx, cycle._id, cycle.startDate, cycle.endDate);
+      } else if (newStatus === "active") {
+        // Only need auto-close for active cycles
+        if (now <= cycle.endDate) {
+          await ctx.scheduler.runAt(
+            cycle.endDate + 1,
+            internal.lifeos.pm_cycles._autoCloseCycle,
+            { cycleId: cycle._id },
+          );
+        }
+      }
     }
 
     // Count upcoming cycles (after status update)
@@ -1160,7 +1368,7 @@ export const _autoGenerateCyclesForUser = internalMutation({
         status = "completed";
       }
 
-      await ctx.db.insert("lifeos_pmCycles", {
+      const cycleId = await ctx.db.insert("lifeos_pmCycles", {
         userId: args.userId,
         number: nextNumber++,
         startDate: cycleStartDate,
@@ -1171,6 +1379,7 @@ export const _autoGenerateCyclesForUser = internalMutation({
         createdAt: now,
         updatedAt: now,
       });
+      await scheduleCycleTransitions(ctx, cycleId, cycleStartDate, cycleEndDate);
       generated++;
     }
 
