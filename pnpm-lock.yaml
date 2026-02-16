@@ -385,6 +385,9 @@ importers:
       ai:
         specifier: ^5.0.115
         version: 5.0.115(zod@3.25.76)
+      ccxt:
+        specifier: ^4.5.38
+        version: 4.5.38
       convex:
         specifier: ^1.29.0
         version: 1.30.0(@clerk/clerk-react@5.58.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react@19.2.3)
@@ -4465,6 +4468,10 @@ packages:
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
+
+  ccxt@4.5.38:
+    resolution: {integrity: sha512-mLNwzq/GbSExA5QxVaIjud5AlhYxKY0q48dV4IHjBaUQNThbBzsGM1DdL60ofO/A4/xoRyBSjOy/YIsAFird7g==}
+    engines: {node: '>=15.0.0'}
 
   chalk@2.4.2:
     resolution: {integrity: sha512-Mti+f9lpJNcwF4tWV8/OrTTtF1gZi+f8FqlyAdouralcFWFQWF2+NgCHShjkCb+IFBLq9buZwE1xckQU4peSuQ==}
@@ -13599,6 +13606,13 @@ snapshots:
   caniuse-lite@1.0.30001759: {}
 
   ccount@2.0.1: {}
+
+  ccxt@4.5.38:
+    dependencies:
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   chalk@2.4.2:
     dependencies:

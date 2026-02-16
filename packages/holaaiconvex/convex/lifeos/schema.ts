@@ -8,6 +8,7 @@ import { calendarTables } from "./calendar_schema";
 import { catgirlAgentTables } from "./catgirl_agent_schema";
 import { chatnexusTables } from "./chatnexus_schema";
 import { contactTables } from "./contact_schema";
+import { cryptoTables } from "./crypto_schema";
 import { financeTables } from "./finance_schema";
 import { controlplaneTables } from "./controlplane_schema";
 import { dailyFieldsTables } from "./daily_fields_schema";
@@ -55,6 +56,8 @@ export const lifeosTables = {
   ...demoAgentTables,
   // Fathom AI (Meeting Notes via API) tables
   ...fathomTables,
+  // Crypto Portfolio tables (Binance, etc.)
+  ...cryptoTables,
   // Personal Finance tables (Empower Retirement scraper)
   ...financeTables,
   // FRM (Friend Relationship Management) tables

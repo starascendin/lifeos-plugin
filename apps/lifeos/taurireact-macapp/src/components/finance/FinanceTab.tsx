@@ -8,6 +8,7 @@ import { AccountsList } from "./AccountsList";
 import { TransactionsList } from "./TransactionsList";
 import { SpendingByCategory } from "./SpendingByCategory";
 import { DailySpendingChart } from "./DailySpendingChart";
+import { CryptoTab } from "./CryptoTab";
 
 export function FinanceTab() {
   const [selectedAccountId, setSelectedAccountId] =
@@ -19,15 +20,15 @@ export function FinanceTab() {
         <h1 className="text-xl sm:text-2xl font-bold">Personal Finance</h1>
       </div>
 
-      <SyncStatusBar />
-
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="crypto">Crypto</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          <SyncStatusBar />
           <NetWorthCard />
           <NetWorthChart />
           <DailySpendingChart />
@@ -41,6 +42,7 @@ export function FinanceTab() {
         </TabsContent>
 
         <TabsContent value="transactions" className="space-y-4">
+          <SyncStatusBar />
           <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
             <AccountsList
               selectedAccountId={selectedAccountId}
@@ -48,6 +50,10 @@ export function FinanceTab() {
             />
             <TransactionsList selectedAccountId={selectedAccountId} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="crypto" className="space-y-4">
+          <CryptoTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -28,4 +28,13 @@ crons.daily(
   internal.lifeos.oura_actions.cronSyncAllUsers
 );
 
+// ==================== CRYPTO PORTFOLIO CRONS ====================
+
+// Sync Binance crypto balances daily at 6 AM UTC to create daily snapshots
+crons.daily(
+  "lifeos-crypto-daily-sync",
+  { hourUTC: 6, minuteUTC: 0 },
+  internal.lifeos.crypto_actions.cronSyncAllUsers
+);
+
 export default crons;

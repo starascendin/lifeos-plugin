@@ -41,6 +41,7 @@
     "@clerk/backend": "^1.21.0",
     "@convex-dev/agent": "^0.3.2",
     "ai": "^5.0.115",
+    "ccxt": "^4.5.38",
     "convex": "^1.29.0",
     "croner": "^10.0.1",
     "jsonwebtoken": "^9.0.3",
