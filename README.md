@@ -55,7 +55,7 @@ export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 ```
 
-## Skills (29 total)
+## Skills (30 total)
 
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
@@ -92,6 +92,9 @@ export LIFEOS_API_KEY=your-api-key
 ### Health (Oura Ring)
 - **health-check** — Quick health overview: sleep, activity, readiness scores and trends
 - **health-weekly** — Weekly health review with workouts, recovery, and recommendations
+
+### Screen Time
+- **screentime-report** — Usage patterns, top time-sink apps, social media alerts, category breakdown
 
 ### Finance
 - **finance-overview** — Net worth summary, account balances, and trend analysis
