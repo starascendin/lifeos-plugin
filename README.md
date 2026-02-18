@@ -55,7 +55,7 @@ export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 ```
 
-## Skills (27 total)
+## Skills (29 total)
 
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
@@ -96,6 +96,10 @@ export LIFEOS_API_KEY=your-api-key
 ### Finance
 - **finance-overview** — Net worth summary, account balances, and trend analysis
 - **finance-spending** — Spending analysis with daily patterns and recent transactions
+
+### Habits & Accountability
+- **habit-check** — Daily habit check-in: review today's habits, mark completions, celebrate streaks, flag missed reps
+- **daily-training-report** — Comprehensive daily training report: yesterday's results, today's focus, habit compliance, health data, ADHD focus management
 
 ### Coaching
 - **coaching-overview** — Dashboard of coaching profiles, recent sessions, and pending action items
