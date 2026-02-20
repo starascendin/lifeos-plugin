@@ -31,9 +31,9 @@ export LIFEOS_API_KEY=your-api-key
 ```
 
 The agent now has:
-- 29 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, `/life-pillars`, `/curiosity-capture`, etc.)
-- 107 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, get_pillars, get_curiosities, etc.)
-- 25 MCP prompts (same workflows as skills, but via MCP protocol)
+- 36 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, `/life-pillars`, `/north-star`, `/life-compass`, etc.)
+- 112 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, get_pillars, get_north_stars, get_life_direction_summary, etc.)
+- 27 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
 
@@ -164,7 +164,7 @@ Alternatively, use env vars instead of CLI args:
 
 ## What the Agent Gets
 
-### 29 Skills (Claude Code / OpenCode)
+### 36 Skills (Claude Code / OpenCode)
 
 | Skill | Usage | What it does |
 |-------|-------|-------------|
@@ -190,19 +190,27 @@ Alternatively, use env vars instead of CLI args:
 | `voice-notes-crystallize` | `/voice-notes-crystallize` | Save conversation insights |
 | `health-check` | `/health-check` | Quick Oura health overview: scores, trends |
 | `health-weekly` | `/health-weekly` | Weekly health review with workouts |
+| `screentime-report` | `/screentime-report` | Screen time analysis and top apps |
 | `finance-overview` | `/finance-overview` | Net worth, accounts, trends |
 | `finance-spending` | `/finance-spending` | Spending analysis and patterns |
+| `habit-check` | `/habit-check` | Daily habit check-in, streaks, completions |
+| `daily-training-report` | `/daily-training-report` | Daily training report with health + habits |
+| `coaching-overview` | `/coaching-overview` | Coaching profiles, sessions, action items |
+| `coaching-action-items` | `/coaching-action-items` | Manage coaching action items |
+| `coaching-session-review` | `/coaching-session-review` | Review coaching session insights |
+| `north-star` | `/north-star` | View and manage North Star visions |
+| `life-compass` | `/life-compass` | Full life direction snapshot in one view |
 | `life-pillars` | `/life-pillars` | Life pillars dashboard with pulse ratings |
 | `pillar-pulse` | `/pillar-pulse` | Record pulse ratings for life pillars |
 | `curiosity-capture` | `/curiosity-capture "learn piano"` | Quick capture a curiosity, idea, or dream |
 | `curiosity-review` | `/curiosity-review` | Review curiosity queue and surface ideas |
 | `coach-memory` | `/coach-memory` | View AI coach's accumulated knowledge |
 
-### 106 MCP Tools
+### 112 MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), and finance (accounts, net worth, transactions, snapshots, daily spending).
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, and life direction (pillars, pulse, curiosities, North Stars, working memory).
 
-### 25 MCP Prompts
+### 27 MCP Prompts
 
 Same workflows as the skills above, exposed via MCP protocol. Any MCP client can invoke them.
 

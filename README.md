@@ -2,7 +2,7 @@
 
 Universal skills and MCP integration for LifeOS — your personal productivity OS powered by Convex.
 
-34 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, and more.
+36 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, and more.
 
 ## Installation
 
@@ -55,7 +55,7 @@ export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 ```
 
-## Skills (34 total)
+## Skills (36 total)
 
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
@@ -110,6 +110,8 @@ export LIFEOS_API_KEY=your-api-key
 - **coaching-session-review** — Review a coaching session's summary, key insights, and action items
 
 ### Life Direction
+- **north-star** — View and manage North Star visions: the big compelling life directions everything else organizes beneath
+- **life-compass** — Full life direction snapshot: North Stars, pillars, curiosities, coaching action items, and coach memory in one view
 - **life-pillars** — Dashboard of your core life areas with pulse ratings, vision narratives, and gaps
 - **pillar-pulse** — Guided pulse check-in: rate each pillar 1-5 with before/after comparison
 - **curiosity-capture** — Quick capture an idea, dream, hobby, or what-if into your curiosity queue
