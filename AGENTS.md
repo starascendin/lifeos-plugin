@@ -31,8 +31,8 @@ export LIFEOS_API_KEY=your-api-key
 ```
 
 The agent now has:
-- 24 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, etc.)
-- 107 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, etc.)
+- 29 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, `/life-pillars`, `/curiosity-capture`, etc.)
+- 107 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, get_pillars, get_curiosities, etc.)
 - 25 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
@@ -164,7 +164,7 @@ Alternatively, use env vars instead of CLI args:
 
 ## What the Agent Gets
 
-### 24 Skills (Claude Code / OpenCode)
+### 29 Skills (Claude Code / OpenCode)
 
 | Skill | Usage | What it does |
 |-------|-------|-------------|
@@ -192,6 +192,11 @@ Alternatively, use env vars instead of CLI args:
 | `health-weekly` | `/health-weekly` | Weekly health review with workouts |
 | `finance-overview` | `/finance-overview` | Net worth, accounts, trends |
 | `finance-spending` | `/finance-spending` | Spending analysis and patterns |
+| `life-pillars` | `/life-pillars` | Life pillars dashboard with pulse ratings |
+| `pillar-pulse` | `/pillar-pulse` | Record pulse ratings for life pillars |
+| `curiosity-capture` | `/curiosity-capture "learn piano"` | Quick capture a curiosity, idea, or dream |
+| `curiosity-review` | `/curiosity-review` | Review curiosity queue and surface ideas |
+| `coach-memory` | `/coach-memory` | View AI coach's accumulated knowledge |
 
 ### 106 MCP Tools
 
