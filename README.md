@@ -2,7 +2,7 @@
 
 Universal skills and MCP integration for LifeOS — your personal productivity OS powered by Convex.
 
-27 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, and more.
+34 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, and more.
 
 ## Installation
 
@@ -55,7 +55,7 @@ export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 ```
 
-## Skills (30 total)
+## Skills (34 total)
 
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
@@ -108,6 +108,34 @@ export LIFEOS_API_KEY=your-api-key
 - **coaching-overview** — Dashboard of coaching profiles, recent sessions, and pending action items
 - **coaching-action-items** — Review and manage coaching action items across all coaches
 - **coaching-session-review** — Review a coaching session's summary, key insights, and action items
+
+### Life Direction
+- **life-pillars** — Dashboard of your core life areas with pulse ratings, vision narratives, and gaps
+- **pillar-pulse** — Guided pulse check-in: rate each pillar 1-5 with before/after comparison
+- **curiosity-capture** — Quick capture an idea, dream, hobby, or what-if into your curiosity queue
+- **curiosity-review** — Review curiosity queue, surface stale items, promote to projects
+- **coach-memory** — View the AI coach's accumulated knowledge about you across 10 sections
+
+#### Recommended Pillar Workflow
+
+The pillar skills work best as a regular self-reflection practice:
+
+1. **Set up pillars once** — `/life-pillars` shows your current pillars. If empty, ask the agent to help you define 4-6 core life areas (e.g. Body, Social, Work, Growth, Money, Joy). Each pillar should have a `desiredFeeling` and `visionNarrative` describing what life feels like when that area is thriving.
+
+2. **Weekly pulse check-in** — Run `/pillar-pulse` once a week (Sunday evening or Monday morning works well). Rate each pillar 1-5:
+   - 1 = Dead/neglected
+   - 2 = Struggling
+   - 3 = Coasting/maintenance
+   - 4 = Growing
+   - 5 = Thriving
+
+   Add a short note explaining the rating. Over time this builds a trend of how each area of your life is evolving.
+
+3. **Capture curiosities as they come** — When you have a random idea, dream, or "what if", run `/curiosity-capture "learn to surf"`. Don't overthink it — the queue is intentionally low-friction. Curiosities can later be linked to pillars or promoted to real projects.
+
+4. **Monthly curiosity review** — Run `/curiosity-review` monthly to surface forgotten ideas, park things that no longer resonate, and promote anything that's calling to you into an initiative or project.
+
+5. **Coach memory evolves passively** — The coach memory sections get populated as you have AI coaching conversations. Run `/coach-memory` to see what the AI has learned about your patterns, values, triggers, and breakthroughs.
 
 ## MCP Server
 
