@@ -31,9 +31,9 @@ export LIFEOS_API_KEY=your-api-key
 ```
 
 The agent now has:
-- 36 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, `/life-pillars`, `/north-star`, `/life-compass`, etc.)
-- 112 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, get_pillars, get_north_stars, get_life_direction_summary, etc.)
-- 27 MCP prompts (same workflows as skills, but via MCP protocol)
+- 37 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, `/life-pillars`, `/north-star`, `/life-compass`, etc.)
+- 122 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, get_pillars, get_north_stars, get_life_direction_summary, etc.)
+- 28 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
 
@@ -142,7 +142,7 @@ Add to the agent's MCP config (see `.mcp.json.example`):
 }
 ```
 
-This gives the agent 107 tools + 25 prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-standup` via the MCP prompt.
+This gives the agent 122 tools + 28 prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-standup` via the MCP prompt.
 
 Alternatively, use env vars instead of CLI args:
 
@@ -178,6 +178,7 @@ Alternatively, use env vars instead of CLI args:
 | `project-status` | `/project-status ACME` | Phase breakdown, task stats |
 | `client-brief` | `/client-brief "Acme Corp"` | Client projects, comms, health |
 | `client-health` | `/client-health` | Dashboard across all clients |
+| `customer-success-triage` | `/customer-success-triage "Acme Corp"` | Triage requests using chats, meetings, notes, and open work |
 | `sprint-plan` | `/sprint-plan` | Review backlog, assign to cycle |
 | `contact-lookup` | `/contact-lookup "John"` | Full dossier with AI insights |
 | `meeting-prep` | `/meeting-prep "John"` | Context + talking points |
