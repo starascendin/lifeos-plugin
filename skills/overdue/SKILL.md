@@ -5,12 +5,13 @@ description: Show what's overdue or slipping - tasks, projects, and sprint items
 
 Show what's overdue or slipping. Use the LifeOS MCP tools:
 
-1. Call get_tasks to get all tasks
-2. Call get_projects to get all projects with health status
-3. Call get_current_cycle to see sprint status
+1. Call get_overdue_tasks to get overdue open tasks
+2. Call get_tasks with status "in_progress" to find stale active work
+3. Call get_projects to get all projects with health status
+4. Call get_current_cycle to see sprint status
 
 Analyze and identify:
-- **Overdue tasks**: Tasks past their due date (compare dueDate to today)
+- **Overdue tasks**: Tasks returned by get_overdue_tasks
 - **Off-track projects**: Projects with health = "off_track" or "at_risk"
 - **Stale in-progress**: Tasks marked "in_progress" for more than 7 days
 - **Sprint slippage**: If cycle completion % is behind expected pace
