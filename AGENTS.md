@@ -202,12 +202,13 @@ Alternatively, use env vars instead of CLI args:
 | `coaching-action-items` | `/coaching-action-items` | Manage coaching action items |
 | `coaching-session-review` | `/coaching-session-review` | Review coaching session insights |
 | `coach-memory` | `/coach-memory` | View AI coach's accumulated knowledge |
+| `ppv` | `/ppv` | Manage PPV vision, identity, pillars, project links, weekly actions, reflections, and adjustments |
 
-### 112 MCP Tools
+### 126 MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, and coaching.
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, and PPV life design.
 
-### 27 MCP Prompts
+### 28 MCP Prompts
 
 Same workflows as the skills above, exposed via MCP protocol. Any MCP client can invoke them.
 

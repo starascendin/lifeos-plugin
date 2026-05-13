@@ -2,7 +2,7 @@
 
 Universal skills and MCP integration for LifeOS — your personal productivity OS powered by Convex.
 
-36 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, and more.
+37 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, and more.
 
 ## Installation
 
@@ -111,8 +111,11 @@ export LIFEOS_API_KEY=your-api-key
 - **coaching-action-items** — Review and manage coaching action items across all coaches
 - **coaching-session-review** — Review a coaching session's summary, key insights, and action items
 
-### Coaching
+### Coaching Memory
 - **coach-memory** — View the AI coach's accumulated knowledge about you across 10 sections
+
+### Life Direction
+- **ppv** — Manage PPV vision, identity, pillars, existing project links, weekly actions, reflections, and adjustments
 
 ## MCP Server
 
