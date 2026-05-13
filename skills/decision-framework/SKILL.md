@@ -9,10 +9,8 @@ Help me think through a big life decision using structured deliberation and mult
 
 Ask me: "What decision are you wrestling with?"
 
-If I don't specify, check working memory and pillar data for known open decisions:
+If I don't specify, check working memory for known open decisions:
 - Call `get_working_memory` (context section)
-- Call `get_pillars` for current reality assessments
-- Call `get_curiosities` for what_if type items
 
 Suggest the most pressing open decision based on the data.
 
@@ -27,7 +25,6 @@ Once the decision is identified, help me map it:
 - Social connection potential
 - Financial impact (use `get_finance_net_worth` for current position)
 - Freedom/mobility impact
-- Alignment with pillar visions
 - Reversibility (can I undo this if it's wrong?)
 - Experimentation potential (can I test this cheaply?)
 
@@ -38,7 +35,7 @@ Present this as a clear decision map.
 ## Step 3: Multi-Model Perspectives
 
 Use zen `consensus` tool:
-"A person is deciding between these options: [options]. Their values are: [values from working memory]. Their current situation is: [context from working memory]. Their life pillar ratings are: [pulse data].
+"A person is deciding between these options: [options]. Their values are: [values from working memory]. Their current situation is: [context from working memory].
 
 For each option:
 1. What's the best realistic outcome in 6 months?
@@ -71,8 +68,6 @@ For each viable option, propose:
 Ask: "Which experiment are you willing to run? Not which decision to make forever — which experiment to start THIS WEEK?"
 
 Create a coaching action item with `create_coaching_action_item` for the chosen experiment.
-
-If this relates to a curiosity, update it with `update_curiosity` to status "exploring".
 
 Save key insights to `create_ai_convo_summary` and update `update_working_memory` context section with the decision status.
 

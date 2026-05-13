@@ -9,22 +9,17 @@ Use multiple AI models to find what I'm NOT seeing. This is about the unknown un
 
 Pull data in parallel using LifeOS MCP tools:
 1. `get_working_memory` — ALL sections
-2. `get_pillar_pulse_latest` — current ratings
-3. `get_pillars` — full vision narratives and current reality
-4. `get_curiosities` — what's captured but not acted on
-5. `get_coaching_action_items` with status "pending" — incomplete homework
-6. `get_habits` — habits and their completion rates
-7. `get_screentime_summary` for the last 3 days
-8. `get_health_sleep` for the last 14 days
-9. `get_finance_net_worth` — financial position
+2. `get_coaching_action_items` with status "pending" — incomplete homework
+3. `get_habits` — habits and their completion rates
+4. `get_screentime_summary` for the last 3 days
+5. `get_health_sleep` for the last 14 days
+6. `get_finance_net_worth` — financial position
 
 ## Step 2: Build the Blind Spot Brief
 
 Compile a comprehensive brief of my current situation including:
-- All pillar ratings with current reality vs desired feeling gaps
 - Working memory patterns and triggers
 - What I say I want vs what my data shows I actually do
-- Curiosities that have been sitting in "captured" for weeks
 - Action items I keep not completing
 - Screen time vs stated priorities
 - Any say-do gaps visible in the data

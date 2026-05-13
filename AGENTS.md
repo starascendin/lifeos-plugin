@@ -31,8 +31,8 @@ export LIFEOS_API_KEY=your-api-key
 ```
 
 The agent now has:
-- 37 skills (invoked via `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, `/life-pillars`, `/north-star`, `/life-compass`, etc.)
-- 122 MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, get_pillars, get_north_stars, get_life_direction_summary, etc.)
+- LifeOS skills (invoked via `/daily-plan`, `/weekly-plan`, `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, etc.)
+- 100+ MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, etc.)
 - 28 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
@@ -142,7 +142,7 @@ Add to the agent's MCP config (see `.mcp.json.example`):
 }
 ```
 
-This gives the agent 122 tools + 28 prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-standup` via the MCP prompt.
+This gives the agent LifeOS MCP tools + workflow prompts. The prompts contain the same workflow logic as the skills — so even without skills installed, the agent can run `/daily-plan`, `/weekly-plan`, or `/daily-standup` via the MCP prompt.
 
 Alternatively, use env vars instead of CLI args:
 
@@ -164,14 +164,16 @@ Alternatively, use env vars instead of CLI args:
 
 ## What the Agent Gets
 
-### 36 Skills (Claude Code / OpenCode)
+### Skills (Claude Code / OpenCode)
 
 | Skill | Usage | What it does |
 |-------|-------|-------------|
 | `daily-standup` | `/daily-standup` | Morning briefing: agenda, tasks, sprint |
+| `daily-plan` | `/daily-plan` | Mutating day plan: due dates, top priorities, current cycle, Daily Note |
 | `end-of-day` | `/end-of-day` | EOD wrap-up with reflection prompts |
 | `capture` | `/capture "buy milk"` | Auto-routes to task or note |
 | `weekly-review` | `/weekly-review` | Week's completed work, blockers |
+| `weekly-plan` | `/weekly-plan` | Mutating week plan: due dates, current cycle goals, priorities, notes |
 | `monthly-review` | `/monthly-review` | Monthly accomplishments and planning |
 | `cycle-review` | `/cycle-review` | Sprint review with rollover |
 | `initiative-review` | `/initiative-review 2026` | Yearly goals by category |
@@ -179,7 +181,7 @@ Alternatively, use env vars instead of CLI args:
 | `client-brief` | `/client-brief "Acme Corp"` | Client projects, comms, health |
 | `client-health` | `/client-health` | Dashboard across all clients |
 | `customer-success-triage` | `/customer-success-triage "Acme Corp"` | Triage requests using chats, meetings, notes, and open work |
-| `sprint-plan` | `/sprint-plan` | Review backlog, assign to cycle |
+| `sprint-plan` | `/sprint-plan` | Mutating current cycle plan: goals, backlog pull, due dates, priorities |
 | `contact-lookup` | `/contact-lookup "John"` | Full dossier with AI insights |
 | `meeting-prep` | `/meeting-prep "John"` | Context + talking points |
 | `follow-ups` | `/follow-ups` | Who needs a reply |
@@ -199,17 +201,11 @@ Alternatively, use env vars instead of CLI args:
 | `coaching-overview` | `/coaching-overview` | Coaching profiles, sessions, action items |
 | `coaching-action-items` | `/coaching-action-items` | Manage coaching action items |
 | `coaching-session-review` | `/coaching-session-review` | Review coaching session insights |
-| `north-star` | `/north-star` | View and manage North Star visions |
-| `life-compass` | `/life-compass` | Full life direction snapshot in one view |
-| `life-pillars` | `/life-pillars` | Life pillars dashboard with pulse ratings |
-| `pillar-pulse` | `/pillar-pulse` | Record pulse ratings for life pillars |
-| `curiosity-capture` | `/curiosity-capture "learn piano"` | Quick capture a curiosity, idea, or dream |
-| `curiosity-review` | `/curiosity-review` | Review curiosity queue and surface ideas |
 | `coach-memory` | `/coach-memory` | View AI coach's accumulated knowledge |
 
 ### 112 MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, and life direction (pillars, pulse, curiosities, North Stars, working memory).
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, and coaching.
 
 ### 27 MCP Prompts
 

@@ -55,15 +55,17 @@ export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 ```
 
-## Skills (36 total)
+## Skills
 
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
+- **daily-plan** — Plan today and apply due date, priority, cycle, and Daily Note changes
 - **end-of-day** — EOD wrap-up with completion summary and tomorrow planning
 - **capture** — Quick capture a thought, task, or note with auto-routing
 
 ### Reviews
 - **weekly-review** — Completed work, in-progress items, sprint health
+- **weekly-plan** — Plan the week and apply current cycle, due date, priority, and note changes
 - **monthly-review** — Accomplishments, project progress, next month planning
 - **cycle-review** — Sprint review with rollover options
 - **initiative-review** — Yearly initiative progress by category
@@ -72,7 +74,7 @@ export LIFEOS_API_KEY=your-api-key
 - **project-status** — Phase breakdown, task stats, blockers
 - **client-brief** — Full client briefing with projects and comms
 - **client-health** — Health dashboard across all clients
-- **sprint-plan** — Plan sprints by reviewing backlog and capacity
+- **sprint-plan** — Plan the current cycle and apply task/cycle mutations
 
 ### People & Relationships
 - **contact-lookup** — Full contact dossier with AI insights
@@ -109,35 +111,8 @@ export LIFEOS_API_KEY=your-api-key
 - **coaching-action-items** — Review and manage coaching action items across all coaches
 - **coaching-session-review** — Review a coaching session's summary, key insights, and action items
 
-### Life Direction
-- **north-star** — View and manage North Star visions: the big compelling life directions everything else organizes beneath
-- **life-compass** — Full life direction snapshot: North Stars, pillars, curiosities, coaching action items, and coach memory in one view
-- **life-pillars** — Dashboard of your core life areas with pulse ratings, vision narratives, and gaps
-- **pillar-pulse** — Guided pulse check-in: rate each pillar 1-5 with before/after comparison
-- **curiosity-capture** — Quick capture an idea, dream, hobby, or what-if into your curiosity queue
-- **curiosity-review** — Review curiosity queue, surface stale items, promote to projects
+### Coaching
 - **coach-memory** — View the AI coach's accumulated knowledge about you across 10 sections
-
-#### Recommended Pillar Workflow
-
-The pillar skills work best as a regular self-reflection practice:
-
-1. **Set up pillars once** — `/life-pillars` shows your current pillars. If empty, ask the agent to help you define 4-6 core life areas (e.g. Body, Social, Work, Growth, Money, Joy). Each pillar should have a `desiredFeeling` and `visionNarrative` describing what life feels like when that area is thriving.
-
-2. **Weekly pulse check-in** — Run `/pillar-pulse` once a week (Sunday evening or Monday morning works well). Rate each pillar 1-5:
-   - 1 = Dead/neglected
-   - 2 = Struggling
-   - 3 = Coasting/maintenance
-   - 4 = Growing
-   - 5 = Thriving
-
-   Add a short note explaining the rating. Over time this builds a trend of how each area of your life is evolving.
-
-3. **Capture curiosities as they come** — When you have a random idea, dream, or "what if", run `/curiosity-capture "learn to surf"`. Don't overthink it — the queue is intentionally low-friction. Curiosities can later be linked to pillars or promoted to real projects.
-
-4. **Monthly curiosity review** — Run `/curiosity-review` monthly to surface forgotten ideas, park things that no longer resonate, and promote anything that's calling to you into an initiative or project.
-
-5. **Coach memory evolves passively** — The coach memory sections get populated as you have AI coaching conversations. Run `/coach-memory` to see what the AI has learned about your patterns, values, triggers, and breakthroughs.
 
 ## MCP Server
 

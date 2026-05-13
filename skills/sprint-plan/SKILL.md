@@ -1,21 +1,37 @@
 ---
 name: sprint-plan
-description: Plan the current sprint by reviewing backlog, assigning tasks to cycle, and checking capacity
+description: Plan the current sprint/current cycle and apply mutations to cycle goals, task assignments, priorities, and due dates
 ---
 
-Help me plan my sprint. Use the LifeOS MCP tools:
+Help me plan my sprint/current cycle in LifeOS and apply the resulting changes. This is a mutating workflow.
 
-1. Call get_current_cycle to see the active sprint and its current state
-2. Call get_tasks with status "backlog" to see unplanned work
-3. Call get_tasks with status "todo" to see already planned work
-4. Call get_projects with status "in_progress" to see active projects
+Use the LifeOS MCP tools:
 
-Then help me plan:
-- Show current sprint capacity (what's already assigned vs. remaining)
-- List backlog items by priority, grouped by project
-- Suggest which backlog items to pull into the sprint based on priority
-- If I provide specific tasks or descriptions in $ARGUMENTS, create issues and assign them to the current cycle:
-  - Call create_issue to create the task
-  - Call assign_issue_to_cycle to assign it to the current sprint
+1. Call `get_planning_context` with:
+   - `include.currentCycle=true`
+   - `include.backlog=true`
+   - `include.weekly=true`
+   - `include.daily=true`
+2. Build a cycle plan:
+   - Update cycle goals when the focus needs to change.
+   - Pull appropriate backlog work into the current cycle.
+   - Schedule near-term work with `dueDate`.
+   - Set top priorities for immediate focus.
+   - Avoid overloading the active cycle.
+3. Call `apply_planning_patch` with `mode="cycle"` and `dryRun=false`.
 
-Ask me to confirm before creating or assigning any issues.
+Useful `apply_planning_patch` operations:
+- `create_issue` for new work.
+- `assign_issue_to_current_cycle` for selected cycle work.
+- `schedule_issue` or `update_issue` for due date, status, priority, estimate, and title changes.
+- `set_top_priority` for immediate focus.
+- `update_cycle_goals` for the active cycle.
+- `save_weekly_note` or `save_daily_note` when useful as the readable plan artifact.
+
+Do not ask for confirmation after this skill is invoked. The user expects this workflow to mutate LifeOS.
+
+After applying, report:
+- Current cycle goal and capacity.
+- Tasks assigned, created, or scheduled.
+- Top priorities.
+- Any risks or overload.
