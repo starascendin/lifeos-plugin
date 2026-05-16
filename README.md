@@ -2,7 +2,7 @@
 
 Universal skills and MCP integration for LifeOS — your personal productivity OS powered by Convex.
 
-37 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, and more.
+38 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, graph relationships, and more.
 
 ## Installation
 
@@ -41,7 +41,14 @@ ln -s /path/to/lifeos-plugin/skills .claude/skills/lifeos
         "--url", "YOUR_CONVEX_URL",
         "--user-id", "YOUR_USER_ID",
         "--api-key", "YOUR_API_KEY"
-      ]
+      ],
+      "env": {
+        "SURREAL_ENDPOINT": "https://YOUR_SURREAL_ENDPOINT",
+        "SURREAL_USER": "YOUR_SURREAL_USER",
+        "SURREAL_PASS": "YOUR_SURREAL_PASS",
+        "SURREAL_NS": "lifeos",
+        "SURREAL_DB": "graph"
+      }
     }
   }
 }
@@ -53,6 +60,16 @@ Or use environment variables:
 export LIFEOS_CONVEX_URL=https://your-app.convex.site
 export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
+```
+
+For SurrealDB sidecar graph tools, also set:
+
+```bash
+export SURREAL_ENDPOINT=https://your-surrealdb-endpoint
+export SURREAL_USER=your-surreal-user
+export SURREAL_PASS=your-surreal-password
+export SURREAL_NS=lifeos
+export SURREAL_DB=graph
 ```
 
 ## Skills
@@ -116,10 +133,11 @@ export LIFEOS_API_KEY=your-api-key
 
 ### Life Direction
 - **ppv** — Manage PPV vision, identity, pillars, existing project links, weekly actions, reflections, and adjustments
+- **surreal-graph** — Query and link LifeOS records through the SurrealDB sidecar graph
 
 ## MCP Server
 
-The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol.
+The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. The `surreal_graph_*` tools call the SurrealDB sidecar for graph traversal and agent-owned relationship links.
 
 Install standalone:
 

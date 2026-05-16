@@ -7,7 +7,14 @@
         "--url", "${LIFEOS_CONVEX_URL}",
         "--user-id", "${LIFEOS_USER_ID}",
         "--api-key", "${LIFEOS_API_KEY}"
-      ]
+      ],
+      "env": {
+        "SURREAL_ENDPOINT": "${SURREAL_ENDPOINT}",
+        "SURREAL_USER": "${SURREAL_USER}",
+        "SURREAL_PASS": "${SURREAL_PASS}",
+        "SURREAL_NS": "${SURREAL_NS}",
+        "SURREAL_DB": "${SURREAL_DB}"
+      }
     }
   }
 }

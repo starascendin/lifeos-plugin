@@ -7,7 +7,14 @@
         "--url", "https://YOUR_APP.convex.site",
         "--user-id", "YOUR_USER_ID",
         "--api-key", "YOUR_API_KEY"
-      ]
+      ],
+      "env": {
+        "SURREAL_ENDPOINT": "https://YOUR_SURREAL_ENDPOINT",
+        "SURREAL_USER": "YOUR_SURREAL_USER",
+        "SURREAL_PASS": "YOUR_SURREAL_PASS",
+        "SURREAL_NS": "lifeos",
+        "SURREAL_DB": "graph"
+      }
     }
   }
 }

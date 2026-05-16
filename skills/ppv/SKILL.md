@@ -29,23 +29,29 @@ Use the LifeOS MCP tools:
    - Valid link kinds are `contains`, `references`, `derived_from`, `supports`, and `related_to`.
    - Use `evidence` to explain why the link exists.
    - Call `delete_unified_graph_link` to remove a manual relationship.
-6. If there is no PPV vision:
+6. Use the SurrealDB sidecar graph when the user wants cross-domain graph traversal or richer relationship linking.
+   - Call `surreal_graph_schema` before Surreal work.
+   - Use `surreal_graph_query` to inspect PPV/project/person/chat/meeting/note relationships with SurrealQL.
+   - Use `surreal_graph_link` for agent-owned links that should not mutate Convex canonical records.
+   - Example: linking a PPV pillar to a chat thread, meeting, note, person, or project rationale.
+   - Every Surreal link needs a concrete `reason` and `confidence`.
+7. If there is no PPV vision:
    - If the user asks for the Beijing example, call `seed_ppv_beijing_workspace`.
    - Otherwise call `upsert_ppv_vision` with the new vision.
-7. For vision edits, call `upsert_ppv_vision`.
+8. For vision edits, call `upsert_ppv_vision`.
    - Vision should be vivid, emotional, directional, and experiential.
    - Do not turn vision into tasks.
-8. For identity edits, call `upsert_ppv_identity`.
+9. For identity edits, call `upsert_ppv_identity`.
    - `coreIdentities`: who naturally lives the vision.
    - `beliefs`: statements the identity acts from.
    - `behaviors`: repeated observable behaviors.
-9. For pillars, call `create_ppv_pillar`, `update_ppv_pillar`, or `delete_ppv_pillar`.
+10. For pillars, call `create_ppv_pillar`, `update_ppv_pillar`, or `delete_ppv_pillar`.
    - Pillars are ongoing systems, not temporary goals.
    - Link existing LifeOS projects through `projectIds`; do not create duplicate PPV projects.
-10. For execution, call `create_ppv_weekly_action`, `update_ppv_weekly_action`, or `delete_ppv_weekly_action`.
+11. For execution, call `create_ppv_weekly_action`, `update_ppv_weekly_action`, or `delete_ppv_weekly_action`.
    - Weekly actions should be small, concrete, and identity-aligned.
    - Link to `pillarId` and/or existing `projectId` when clear.
-11. For learning loops:
+12. For learning loops:
    - Call `create_ppv_reflection` to capture weekly energy, resistance, alignment, and momentum.
    - Call `create_ppv_adjustment` when reflection or lived evidence changes identity, pillars, projects, or actions.
 
@@ -61,4 +67,5 @@ After applying changes, report:
 - IDs for any created or updated PPV records.
 - Which existing LifeOS projects were linked.
 - If graph tools were used, report the key relationships or node IDs that matter.
+- If Surreal graph tools were used, report the relationship ids, reasons, and confidence values.
 - The next weekly action, if one is obvious.
