@@ -5,7 +5,7 @@ description: Run monthly review with accomplishments, project progress, and next
 
 Run my monthly review. Use the LifeOS MCP tools:
 
-1. Call get_monthly_agenda for this month's overview and AI summary
+1. Call get_monthly_agenda for this month's overview, AI summary, and Monthly AI Comments
 2. Call get_cycles to see all sprints this month and their completion rates
 3. Call get_tasks with status "done" to see everything completed this month
 4. Call get_projects to see project progress and health
@@ -18,6 +18,7 @@ Present a monthly review:
 - **Sprint Performance**: Average completion rate across cycles
 - **Client Health**: How each client relationship is doing
 - **Themes**: Patterns from notes and completed work
+- **AI Comments**: Existing Monthly AI Comments that matter for the review
 - **Carried Forward**: What's rolling into next month
 - **Reflections**: What worked, what didn't
 - **Next Month Focus**: Top 3 priorities for the coming month

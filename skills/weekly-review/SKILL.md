@@ -5,7 +5,7 @@ description: Run weekly review with completed work, in-progress items, sprint he
 
 Run my weekly review. Use the LifeOS MCP tools to gather:
 
-1. Call get_weekly_agenda for this week's agenda and AI summary
+1. Call get_weekly_agenda for this week's agenda, AI summary, and Weekly AI Comments
 2. Call get_current_cycle for sprint progress
 3. Call get_tasks with status "done" to see what was completed this week
 4. Call get_tasks with status "in_progress" to see what's still in flight
@@ -17,5 +17,6 @@ Then present a weekly review:
 - **Sprint Health**: Cycle progress, burndown status
 - **Blockers**: Anything overdue or stuck
 - **Next Week**: Key items to tackle
+- **AI Comments**: Existing Weekly AI Comments that matter for the review
 
 If $ARGUMENTS contains a date, use that as the week start date.

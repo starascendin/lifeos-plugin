@@ -34,6 +34,7 @@ Useful `apply_planning_patch` operations:
 - `save_weekly_note` for the readable weekly plan.
 - `save_daily_note` when today needs a concrete execution plan.
 - `add_issue_comment` for planning rationale that belongs on a task.
+- `add_weekly_ai_comment` for AI-only weekly observations, planning rationale, risks, or coaching notes that should appear in Weekly AI Comments.
 
 Do not ask for confirmation after this skill is invoked. The user expects this workflow to mutate LifeOS.
 
@@ -42,4 +43,5 @@ After applying, report:
 - The week-by-day task plan.
 - Tasks created, scheduled, or reassigned.
 - Notes saved or updated.
+- Weekly AI Comments added.
 - Risks, overload, or unresolved ambiguity.
