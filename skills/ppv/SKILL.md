@@ -8,13 +8,13 @@ Manage my PPV life design system. This is a mutating workflow when the request i
 Use the LifeOS MCP tools:
 
 1. Call `get_ppv_workspace` first.
-   - This returns the active vision, identity, pillars, linked projects, weekly actions, reflections, adjustments, and available existing LifeOS projects.
+   - This returns the selected/current vision, identity, pillars, linked projects, weekly actions, reflections, adjustments, and available existing LifeOS projects.
    - If the user asks to link projects, only use project IDs returned in `projects`.
    - Treat this as the canonical source for PPV record IDs before any PPV mutation.
 2. When the user asks how a vision connects to execution, what a vision is currently driving, where something belongs, or how PPV relates to projects/issues/memos, call `get_active_vision_graph`.
    - This is the best default graph read for PPV work.
-   - It returns a unified graph around the active or selected vision, including PPV nodes plus linked projects, issues, and recent voice memos.
-   - Prefer this over the full graph when the question is about one vision or active direction.
+   - It returns a unified graph around the current or selected vision, including PPV nodes plus linked projects, issues, and recent voice memos.
+   - Prefer this over the full graph when the question is about one vision or current direction.
 3. Use graph neighborhood tools when the user is anchored on a non-PPV object:
    - `get_project_graph` for a project-centered neighborhood.
    - `get_initiative_graph` for an initiative-centered neighborhood.
@@ -41,6 +41,8 @@ Use the LifeOS MCP tools:
 8. For vision edits, call `upsert_ppv_vision`.
    - Vision should be vivid, emotional, directional, and experiential.
    - Do not turn vision into tasks.
+   - Use `status` for lifecycle: `ideation`, `todo`, `planned`, `in_progress`, or `done`.
+   - To change only lifecycle, call `set_ppv_vision_status`.
 9. For identity edits, call `upsert_ppv_identity`.
    - `coreIdentities`: who naturally lives the vision.
    - `beliefs`: statements the identity acts from.
