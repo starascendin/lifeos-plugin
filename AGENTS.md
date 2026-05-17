@@ -215,11 +215,11 @@ Alternatively, use env vars instead of CLI args:
 | `coaching-session-review` | `/coaching-session-review` | Review coaching session insights |
 | `coach-memory` | `/coach-memory` | View AI coach's accumulated knowledge |
 | `ppv` | `/ppv` | Manage PPV vision, identity, pillars, and project links |
-| `falkor-graph` | `/falkor-graph` | Query and link PPV graph data through the FalkorDB sidecar graph |
+| `falkor-graph` | `/falkor-graph` | Query schema-aware PPV graph data and create agent-owned FalkorDB links |
 
 ### 130+ MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, and FalkorDB sidecar graph queries/links.
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, and FalkorDB sidecar graph schema/query/link tools.
 
 ### 29 MCP Prompts
 

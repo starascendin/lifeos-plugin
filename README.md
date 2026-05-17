@@ -129,11 +129,11 @@ export FALKOR_PASS=your-falkor-password
 
 ### Life Direction
 - **ppv** — Manage PPV vision, identity, pillars, and existing project links
-- **falkor-graph** — Query and link PPV graph records through the FalkorDB sidecar graph
+- **falkor-graph** — Query schema-aware PPV graph records and create agent-owned links through the FalkorDB sidecar graph
 
 ## MCP Server
 
-The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads and agent-owned PPV graph links.
+The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads, a schema/query recipe contract, and agent-owned PPV graph links.
 
 Install standalone:
 

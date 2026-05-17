@@ -30,9 +30,11 @@ Use the LifeOS MCP tools:
    - Use `evidence` to explain why the link exists.
    - Call `delete_unified_graph_link` to remove a manual relationship.
 6. Use the FalkorDB sidecar graph when the user wants Cypher traversal or richer PPV graph relationship linking.
-   - Call `falkor_graph_schema` before Falkor work.
+   - Call `falkor_graph_schema` before Falkor work and follow its labels, relationship directions, query recipes, and link flow.
    - Use `falkor_graph_query` for read-only Cypher over PPV visions, identities, pillars, and projects.
    - Use `falkor_graph_link` for agent-owned `AGENT_LINK` relationships that should not mutate Convex canonical records.
+   - Use `convexId` as the stable shared id between PPV Convex records and Falkor nodes.
+   - Check existing `AGENT_LINK` relationships before creating a new one.
    - Every Falkor link needs a concrete `reason` and `confidence`.
 7. If there is no PPV vision:
    - If the user asks for the Beijing example, call `seed_ppv_beijing_workspace`.
