@@ -4,18 +4,17 @@ How to give any AI agent access to your LifeOS data and workflows.
 
 ## Prerequisites
 
-You need three required Convex credentials. SurrealDB credentials are optional and enable the sidecar graph tools.
+You need three required Convex credentials. FalkorDB credentials are optional and enable the sidecar graph tools.
 
 | Variable | Description | Where to find |
 |----------|-------------|---------------|
 | `LIFEOS_CONVEX_URL` | Your Convex deployment URL (`.convex.site`) | Convex dashboard |
 | `LIFEOS_USER_ID` | Your LifeOS user ID | Convex dashboard > Users table |
 | `LIFEOS_API_KEY` | API key for authentication | Generated in LifeOS settings |
-| `SURREAL_ENDPOINT` | Optional SurrealDB sidecar HTTP endpoint | SurrealDB/Dokploy |
-| `SURREAL_USER` | Optional SurrealDB username | SurrealDB/Dokploy |
-| `SURREAL_PASS` | Optional SurrealDB password | SurrealDB/Dokploy |
-| `SURREAL_NS` | Optional SurrealDB namespace, usually `lifeos` | SurrealDB |
-| `SURREAL_DB` | Optional SurrealDB database, usually `graph` | SurrealDB |
+| `FALKOR_BROWSER_ENDPOINT` | Optional FalkorDB Browser HTTP endpoint | FalkorDB/Dokploy |
+| `FALKOR_GRAPH` | Optional Falkor graph name, usually `lifeos_ppv` | FalkorDB |
+| `FALKOR_PASS` | Optional FalkorDB password | FalkorDB/Dokploy |
+| `FALKOR_TOKEN` / `FALKOR_PAT` | Optional pre-provisioned Falkor browser token | FalkorDB |
 
 ## Quick Start by Agent Type
 
@@ -34,17 +33,15 @@ export LIFEOS_CONVEX_URL=https://your-app.convex.site
 export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 
-# Optional: enable SurrealDB sidecar graph tools
-export SURREAL_ENDPOINT=https://your-surrealdb-endpoint
-export SURREAL_USER=your-surreal-user
-export SURREAL_PASS=your-surreal-password
-export SURREAL_NS=lifeos
-export SURREAL_DB=graph
+# Optional: enable FalkorDB sidecar graph tools
+export FALKOR_BROWSER_ENDPOINT=https://falkordb.apps.rjlabs.dev
+export FALKOR_GRAPH=lifeos_ppv
+export FALKOR_PASS=your-falkor-password
 ```
 
 The agent now has:
 - LifeOS skills (invoked via `/daily-plan`, `/weekly-plan`, `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, etc.)
-- 100+ MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, surreal_graph_query, etc.)
+- 100+ MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, falkor_graph_query, etc.)
 - 29 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
@@ -168,11 +165,9 @@ Alternatively, use env vars instead of CLI args:
         "CONVEX_URL": "https://your-app.convex.site",
         "LIFEOS_USER_ID": "your-user-id",
         "LIFEOS_API_KEY": "your-api-key",
-        "SURREAL_ENDPOINT": "https://your-surrealdb-endpoint",
-        "SURREAL_USER": "your-surreal-user",
-        "SURREAL_PASS": "your-surreal-password",
-        "SURREAL_NS": "lifeos",
-        "SURREAL_DB": "graph"
+        "FALKOR_BROWSER_ENDPOINT": "https://falkordb.apps.rjlabs.dev",
+        "FALKOR_GRAPH": "lifeos_ppv",
+        "FALKOR_PASS": "your-falkor-password"
       }
     }
   }
@@ -219,12 +214,12 @@ Alternatively, use env vars instead of CLI args:
 | `coaching-action-items` | `/coaching-action-items` | Manage coaching action items |
 | `coaching-session-review` | `/coaching-session-review` | Review coaching session insights |
 | `coach-memory` | `/coach-memory` | View AI coach's accumulated knowledge |
-| `ppv` | `/ppv` | Manage PPV vision, identity, pillars, project links, weekly actions, reflections, and adjustments |
-| `surreal-graph` | `/surreal-graph` | Query and link LifeOS data through the SurrealDB sidecar graph |
+| `ppv` | `/ppv` | Manage PPV vision, identity, pillars, and project links |
+| `falkor-graph` | `/falkor-graph` | Query and link PPV graph data through the FalkorDB sidecar graph |
 
 ### 130+ MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, and SurrealDB sidecar graph queries/links.
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, and FalkorDB sidecar graph queries/links.
 
 ### 29 MCP Prompts
 

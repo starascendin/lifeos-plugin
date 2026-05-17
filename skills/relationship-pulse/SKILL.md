@@ -8,14 +8,14 @@ Check on neglected relationships. Use the LifeOS MCP tools:
 1. Call get_people to get all contacts
 2. Call get_beeper_threads to check message activity
 3. Call get_granola_meetings to see meeting history
-4. Call `surreal_graph_schema`, then use `surreal_graph_query` when the user wants relationship context across people, projects, clients, chats, meetings, notes, voice memos, or PPV.
-5. Use `surreal_graph_link` only to remember meaningful relationship context with `reason` and `confidence`; do not edit contact records through SurrealDB.
+4. Call `falkor_graph_schema`, then use `falkor_graph_query` when the user wants PPV/project graph context for a relationship.
+5. Use `falkor_graph_link` only to remember meaningful PPV/project context with `reason` and `confidence`; do not edit contact records through FalkorDB.
 
 Analyze each contact for:
 - **Last interaction**: When did you last talk/meet?
 - **Interaction frequency**: How often do you typically connect?
 - **Relationship type**: Family, friend, colleague, mentor, etc.
-- **Graph context**: Projects, clients, PPV themes, chats, meetings, or notes connected through the SurrealDB sidecar
+- **Graph context**: Projects and PPV themes connected through the FalkorDB sidecar
 
 Identify neglected relationships:
 - **Family/Close friends**: No contact in 14+ days

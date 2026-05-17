@@ -20,17 +20,17 @@ Use the LifeOS MCP tools:
 4. If project has a client, load client context too
 
 **For graph context:**
-1. Call `surreal_graph_schema` when the user needs cross-domain connections or the context feels incomplete.
-2. Use `surreal_graph_query` to inspect related PPV pillars, people, chats, meetings, notes, voice memos, and agent-created links.
-3. Use `surreal_graph_link` only when you discover a durable relationship worth remembering; include `reason` and `confidence`.
-4. Do not edit canonical records through SurrealDB.
+1. Call `falkor_graph_schema` when the user needs PPV/project connections or the context feels incomplete.
+2. Use `falkor_graph_query` to inspect related PPV pillars, projects, and agent-created links.
+3. Use `falkor_graph_link` only when you discover a durable relationship worth remembering and both endpoint nodes exist in Falkor; include `reason` and `confidence`.
+4. Do not edit canonical records through FalkorDB.
 
 Present a quick context brief:
 - **Overview**: What this client/project is about
 - **Current Status**: Active phase, health, completion %
 - **Open Items**: Tasks in progress or todo (top 5)
 - **Recent Activity**: Last meeting, last message (if available)
-- **Graph Links**: Relevant SurrealDB sidecar relationships that explain adjacent context
+- **Graph Links**: Relevant FalkorDB sidecar relationships that explain adjacent PPV/project context
 - **Blockers**: Anything stuck or overdue
 - **Quick Actions**: Suggested next steps
 

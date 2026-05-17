@@ -43,11 +43,9 @@ ln -s /path/to/lifeos-plugin/skills .claude/skills/lifeos
         "--api-key", "YOUR_API_KEY"
       ],
       "env": {
-        "SURREAL_ENDPOINT": "https://YOUR_SURREAL_ENDPOINT",
-        "SURREAL_USER": "YOUR_SURREAL_USER",
-        "SURREAL_PASS": "YOUR_SURREAL_PASS",
-        "SURREAL_NS": "lifeos",
-        "SURREAL_DB": "graph"
+        "FALKOR_BROWSER_ENDPOINT": "https://falkordb.apps.rjlabs.dev",
+        "FALKOR_GRAPH": "lifeos_ppv",
+        "FALKOR_PASS": "YOUR_FALKOR_PASSWORD"
       }
     }
   }
@@ -62,14 +60,12 @@ export LIFEOS_USER_ID=your-user-id
 export LIFEOS_API_KEY=your-api-key
 ```
 
-For SurrealDB sidecar graph tools, also set:
+For FalkorDB sidecar graph tools, also set:
 
 ```bash
-export SURREAL_ENDPOINT=https://your-surrealdb-endpoint
-export SURREAL_USER=your-surreal-user
-export SURREAL_PASS=your-surreal-password
-export SURREAL_NS=lifeos
-export SURREAL_DB=graph
+export FALKOR_BROWSER_ENDPOINT=https://falkordb.apps.rjlabs.dev
+export FALKOR_GRAPH=lifeos_ppv
+export FALKOR_PASS=your-falkor-password
 ```
 
 ## Skills
@@ -132,12 +128,12 @@ export SURREAL_DB=graph
 - **coach-memory** — View the AI coach's accumulated knowledge about you across 10 sections
 
 ### Life Direction
-- **ppv** — Manage PPV vision, identity, pillars, existing project links, weekly actions, reflections, and adjustments
-- **surreal-graph** — Query and link LifeOS records through the SurrealDB sidecar graph
+- **ppv** — Manage PPV vision, identity, pillars, and existing project links
+- **falkor-graph** — Query and link PPV graph records through the FalkorDB sidecar graph
 
 ## MCP Server
 
-The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. The `surreal_graph_*` tools call the SurrealDB sidecar for graph traversal and agent-owned relationship links.
+The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads and agent-owned PPV graph links.
 
 Install standalone:
 

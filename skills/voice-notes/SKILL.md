@@ -31,15 +31,15 @@ This is an interactive session to help you think through your voice notes, formu
 - Call get_voice_memo with the memoId for full details including AI extraction
 
 **For graph-aware exploration:**
-- Call `surreal_graph_schema`, then use `surreal_graph_query` when the user asks how voice notes connect to PPV, projects, people, clients, chats, meetings, or notes.
-- Use `surreal_graph_link` to remember durable relationships from a memo to another LifeOS record.
+- Call `falkor_graph_schema`, then use `falkor_graph_query` when the user asks how voice notes connect to PPV or projects in the Falkor sidecar.
+- Use `falkor_graph_link` only when the target nodes already exist in Falkor.
 - Every graph link needs `reason` and `confidence`.
-- Do not edit canonical memo/project/person records through SurrealDB.
+- Do not edit canonical memo/project/person records through FalkorDB.
 
 **During the conversation:**
 - Help the user think through their notes
 - Identify patterns and connections across memos
-- Surface SurrealDB sidecar graph connections when they clarify context
+- Surface FalkorDB sidecar graph connections when they clarify PPV/project context
 - Surface action items they may have forgotten
 - Help formulate new plans or refine existing ideas
 - Offer reflections on journal entries

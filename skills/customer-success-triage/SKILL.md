@@ -19,10 +19,10 @@ Use the LifeOS MCP tools in this order:
    - Fathom detail: `get_fathom_meeting`, `get_fathom_transcript`
    - Granola detail: `get_granola_meeting`, `get_granola_transcript`
    - existing note history: `get_client_notes`
-4. For cross-domain relationship work, call `surreal_graph_schema`, then use `surreal_graph_query`.
-   - Use this to see whether chats, meetings, notes, projects, people, and PPV context are already linked in the SurrealDB sidecar.
-   - Use `surreal_graph_link` only for durable agent-owned relationships with `reason` and `confidence`.
-   - Do not edit canonical client/project/chat/meeting/note records through SurrealDB.
+4. For PPV/project graph relationship work, call `falkor_graph_schema`, then use `falkor_graph_query`.
+   - Use this to see whether projects and PPV context are already linked in the FalkorDB sidecar.
+   - Use `falkor_graph_link` only for durable agent-owned relationships with `reason` and `confidence`.
+   - Do not edit canonical client/project/chat/meeting/note records through FalkorDB.
 
 Classify findings into:
 
@@ -43,7 +43,7 @@ Present the result as:
 - **Situation Summary**: what the client currently needs
 - **Evidence**: supporting messages, meetings, and notes
 - **Existing Tracking**: what is already captured
-- **Graph Links**: existing or newly created SurrealDB sidecar links that connect the request to projects, people, chats, meetings, or PPV
+- **Graph Links**: existing or newly created FalkorDB sidecar links that connect the request to projects or PPV
 - **Tracking Plan**: what should be a note vs. a task
 - **Next Actions**: owner, action, deadline
 

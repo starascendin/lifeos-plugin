@@ -10,8 +10,8 @@ Use the LifeOS MCP tools:
 1. Call get_project with the project key/ID from $ARGUMENTS
 2. Call get_phases for the project to see phase breakdown
 3. Call get_tasks filtered by the project ID to see all issues
-4. When the user asks how this project connects to PPV, people, chats, meetings, notes, or other LifeOS context, call `surreal_graph_schema`, then use `surreal_graph_query` for the sidecar graph neighborhood.
-5. If you identify an important missing cross-domain relationship, use `surreal_graph_link` with a clear reason and confidence. Do not mutate project fields through SurrealDB.
+4. When the user asks how this project connects to PPV, call `falkor_graph_schema`, then use `falkor_graph_query` for the sidecar graph neighborhood.
+5. If you identify an important missing PPV/project relationship, use `falkor_graph_link` with a clear reason and confidence. Do not mutate project fields through FalkorDB.
 
 Present a project status report:
 - **Overview**: Name, status, health, priority, client (if linked)
@@ -20,6 +20,6 @@ Present a project status report:
 - **Urgent/Overdue**: Any urgent or overdue tasks
 - **In Progress**: What's actively being worked on
 - **Blockers**: Anything that looks stuck
-- **Graph Context**: Any SurrealDB sidecar relationships that explain why this project matters or what it connects to
+- **Graph Context**: Any FalkorDB sidecar relationships that explain why this project matters or what it connects to
 
 If no project is specified in $ARGUMENTS, call get_projects and list all active projects, then ask which one.
