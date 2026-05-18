@@ -72,13 +72,13 @@ export FALKOR_PASS=your-falkor-password
 
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
-- **daily-plan** — Plan today and apply due date, priority, cycle, and Daily Note changes
+- **daily-plan** — Plan today and apply due date, calendar time-block, priority, cycle, and Daily Note changes
 - **end-of-day** — EOD wrap-up with completion summary and tomorrow planning
 - **capture** — Quick capture a thought, task, or note with auto-routing
 
 ### Reviews
 - **weekly-review** — Completed work, in-progress items, sprint health
-- **weekly-plan** — Plan the week and apply current cycle, due date, priority, and note changes
+- **weekly-plan** — Plan the week and apply current cycle, due date, calendar time-block, priority, and note changes
 - **monthly-review** — Accomplishments, project progress, next month planning
 - **cycle-review** — Sprint review with rollover options
 - **initiative-review** — Yearly initiative progress by category
@@ -87,7 +87,7 @@ export FALKOR_PASS=your-falkor-password
 - **project-status** — Phase breakdown, task stats, blockers
 - **client-brief** — Full client briefing with projects and comms
 - **client-health** — Health dashboard across all clients
-- **sprint-plan** — Plan the current cycle and apply task/cycle mutations
+- **sprint-plan** — Plan the current cycle and apply task/cycle mutations, including calendar time blocks
 
 ### People & Relationships
 - **contact-lookup** — Full contact dossier with AI insights

@@ -15,7 +15,8 @@ Use the LifeOS MCP tools:
 2. Build a cycle plan:
    - Update cycle goals when the focus needs to change.
    - Pull appropriate backlog work into the current cycle.
-   - Schedule near-term work with `dueDate`.
+   - Assign near-term work to days with `dueDate`.
+   - Time-block concrete work with `scheduledStartAt` and `scheduledEndAt` ISO datetimes, or `startTime` and `endTime` plus `scheduledDate` in `schedule_issue`.
    - Set top priorities for immediate focus.
    - Avoid overloading the active cycle.
 3. Call `apply_planning_patch` with `mode="cycle"` and `dryRun=false`.
@@ -23,7 +24,7 @@ Use the LifeOS MCP tools:
 Useful `apply_planning_patch` operations:
 - `create_issue` for new work.
 - `assign_issue_to_current_cycle` for selected cycle work.
-- `schedule_issue` or `update_issue` for due date, status, priority, estimate, and title changes.
+- `schedule_issue` or `update_issue` for due date, scheduled start/end time, status, priority, estimate, and title changes.
 - `set_top_priority` for immediate focus.
 - `update_cycle_goals` for the active cycle.
 - `save_weekly_note` or `save_daily_note` when useful as the readable plan artifact.

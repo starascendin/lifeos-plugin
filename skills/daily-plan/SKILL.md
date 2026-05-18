@@ -19,7 +19,8 @@ Use the LifeOS MCP tools:
    - `include.voiceMemos=true`
 2. Build a practical day plan:
    - Pick today's top 3.
-   - Schedule tasks by setting `dueDate`.
+   - Assign tasks to today by setting `dueDate`.
+   - Time-block tasks on the calendar by setting `scheduledStartAt` and `scheduledEndAt` as ISO datetimes, or by using `startTime` and `endTime` with the target date in `schedule_issue`.
    - Pull relevant backlog work into the current cycle.
    - Update current cycle goals if the plan changes the cycle focus.
    - Keep the plan realistic against today's calendar and current cycle load.
@@ -28,7 +29,7 @@ Use the LifeOS MCP tools:
 Useful `apply_planning_patch` operations:
 
 - `create_issue` for new tasks.
-- `schedule_issue` or `update_issue` for due date, status, priority, estimate, and title changes.
+- `schedule_issue` or `update_issue` for due date, scheduled start/end time, status, priority, estimate, and title changes.
 - `assign_issue_to_current_cycle` for work that belongs in the active cycle.
 - `set_top_priority` for today's top 3.
 - `update_cycle_goals` when the active cycle goal should change.

@@ -20,14 +20,15 @@ Use the LifeOS MCP tools:
 2. Build a week plan around the active current cycle:
    - Update the active cycle goals when needed.
    - Assign selected backlog tasks to the current cycle.
-   - Schedule work across the week using `dueDate`.
+   - Assign work to days across the week using `dueDate`.
+   - Time-block concrete work with `scheduledStartAt` and `scheduledEndAt` ISO datetimes, or `startTime` and `endTime` plus `scheduledDate` in `schedule_issue`.
    - Set near-term top priorities.
    - Keep today concrete enough to execute from the Agenda Daily view.
 3. Call `apply_planning_patch` with `mode="week"` and `dryRun=false`.
 
 Useful `apply_planning_patch` operations:
 - `create_issue` for new work.
-- `schedule_issue` or `update_issue` for due date, status, priority, estimate, and title changes.
+- `schedule_issue` or `update_issue` for due date, scheduled start/end time, status, priority, estimate, and title changes.
 - `assign_issue_to_current_cycle` for work included in the active cycle.
 - `set_top_priority` for immediate focus.
 - `update_cycle_goals` for the current cycle.

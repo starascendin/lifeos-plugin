@@ -12,6 +12,7 @@ Analyze the input in $ARGUMENTS and determine what type of capture this is:
 - Infer priority from urgency cues (e.g., "urgent", "ASAP" = urgent; "soon" = high; default = medium)
 - If a project is mentioned, look it up with get_projects and assign it via projectIdOrKey
 - If a due date is mentioned, parse and set it via dueDate
+- If a specific start and end time are mentioned, set `scheduledStartAt` and `scheduledEndAt` as ISO datetimes so the task appears in the Calendar day/week timeline
 
 **If it's a thought/note** (observations, ideas, reminders):
 - Call create_quick_note to save it
