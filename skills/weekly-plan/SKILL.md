@@ -1,6 +1,6 @@
 ---
 name: weekly-plan
-description: Plan the week in LifeOS and apply mutations to due dates, current cycle goals, cycle assignments, priorities, and weekly/daily notes
+description: Plan the week in LifeOS and apply mutations to due dates, issue calendar blocks, current cycle goals, cycle assignments, priorities, and weekly/daily notes
 ---
 
 Plan my week in LifeOS and apply the resulting changes. This is a mutating workflow.
@@ -20,14 +20,16 @@ Use the LifeOS MCP tools:
 2. Build a week plan around the active current cycle:
    - Update the active cycle goals when needed.
    - Assign selected backlog tasks to the current cycle.
-   - Schedule work across the week using `dueDate`.
+   - Assign work to days or set deadlines with `dueDate`.
+   - Add concrete work windows with `schedule_issue` calendar blocks.
    - Set near-term top priorities.
    - Keep today concrete enough to execute from the Agenda Daily view.
 3. Call `apply_planning_patch` with `mode="week"` and `dryRun=false`.
 
 Useful `apply_planning_patch` operations:
 - `create_issue` for new work.
-- `schedule_issue` or `update_issue` for due date, status, priority, estimate, and title changes.
+- `update_issue` for due date, status, priority, estimate, and title changes.
+- `schedule_issue` to add an issue calendar block using `issueIdOrIdentifier` plus `scheduledStartAt`/`scheduledEndAt`, or `date` plus `startTime`/`endTime`.
 - `assign_issue_to_current_cycle` for work included in the active cycle.
 - `set_top_priority` for immediate focus.
 - `update_cycle_goals` for the current cycle.

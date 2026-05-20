@@ -11,7 +11,8 @@ Analyze the input in $ARGUMENTS and determine what type of capture this is:
 - Call create_issue to create the task
 - Infer priority from urgency cues (e.g., "urgent", "ASAP" = urgent; "soon" = high; default = medium)
 - If a project is mentioned, look it up with get_projects and assign it via projectIdOrKey
-- If a due date is mentioned, parse and set it via dueDate
+- If a due date is mentioned, parse and set it via `dueDate`
+- If a concrete work window is mentioned, also pass `scheduledStartAt` and `scheduledEndAt` to create the first issue calendar block. Keep this separate from `dueDate`.
 
 **If it's a thought/note** (observations, ideas, reminders):
 - Call create_quick_note to save it

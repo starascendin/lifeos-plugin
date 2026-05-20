@@ -23,5 +23,6 @@ Present as:
 - **Projects Off Track**: Projects needing intervention
 
 For each item, suggest: reschedule, delegate, or drop.
+When rescheduling execution time, keep `dueDate` as the deadline/day marker and use `schedule_issue` to add a new issue calendar block. Do not overwrite existing calendar blocks unless the user explicitly asks.
 
 If $ARGUMENTS contains "critical" or "urgent", only show critical items.

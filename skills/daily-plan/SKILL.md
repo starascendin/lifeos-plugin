@@ -1,6 +1,6 @@
 ---
 name: daily-plan
-description: Plan the day in LifeOS and apply mutations to due dates, top priorities, current-cycle assignments, and the Daily Note
+description: Plan the day in LifeOS and apply mutations to due dates, issue calendar blocks, top priorities, current-cycle assignments, and the Daily Note
 ---
 
 Plan my day in LifeOS and apply the resulting changes. This is a mutating workflow.
@@ -19,7 +19,8 @@ Use the LifeOS MCP tools:
    - `include.voiceMemos=true`
 2. Build a practical day plan:
    - Pick today's top 3.
-   - Schedule tasks by setting `dueDate`.
+   - Assign tasks to today or set deadlines with `dueDate`.
+   - Add concrete work windows with `schedule_issue` calendar blocks.
    - Pull relevant backlog work into the current cycle.
    - Update current cycle goals if the plan changes the cycle focus.
    - Keep the plan realistic against today's calendar and current cycle load.
@@ -28,7 +29,8 @@ Use the LifeOS MCP tools:
 Useful `apply_planning_patch` operations:
 
 - `create_issue` for new tasks.
-- `schedule_issue` or `update_issue` for due date, status, priority, estimate, and title changes.
+- `update_issue` for due date, status, priority, estimate, and title changes.
+- `schedule_issue` to add an issue calendar block using `issueIdOrIdentifier` plus `scheduledStartAt`/`scheduledEndAt`, or `date` plus `startTime`/`endTime`.
 - `assign_issue_to_current_cycle` for work that belongs in the active cycle.
 - `set_top_priority` for today's top 3.
 - `update_cycle_goals` when the active cycle goal should change.
