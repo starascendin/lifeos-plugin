@@ -70,15 +70,31 @@ export FALKOR_PASS=your-falkor-password
 
 ## Skills
 
+### Planning Calendar Blocks
+
+The planning workflows treat non-ticket calendar time as a first-class LifeOS
+calendar block. Use `create_calendar_block` when the user wants protected time
+on the calendar but does not need a PM issue, such as dog walking, meals,
+errands, personal appointments, focus blocks, travel, or tentative holds. The
+payload requires `title`, `timezone`, and either `startAt`/`endAt` ISO datetimes
+or `date` plus local `startTime`/`endTime`; supported optional fields include
+`blockType`, `source`, and `isProtected`.
+
+Task-backed work should still use `create_issue` for new execution work and
+`schedule_issue` or `update_issue` for due dates and scheduled task time blocks.
+Do not create a task just to reserve protected personal time.
+
 ### Daily Workflows
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
-- **daily-plan** — Plan today and apply due date, priority, cycle, and Daily Note changes
+- **daily-plan** — Plan today and apply due date, task schedule, protected
+  calendar block, priority, cycle, and Daily Note changes
 - **end-of-day** — EOD wrap-up with completion summary and tomorrow planning
 - **capture** — Quick capture a thought, task, or note with auto-routing
 
 ### Reviews
 - **weekly-review** — Completed work, in-progress items, sprint health
-- **weekly-plan** — Plan the week and apply current cycle, due date, priority, and note changes
+- **weekly-plan** — Plan the week and apply current cycle, due date, task
+  schedule, protected calendar block, priority, and note changes
 - **monthly-review** — Accomplishments, project progress, next month planning
 - **cycle-review** — Sprint review with rollover options
 - **initiative-review** — Yearly initiative progress by category
@@ -87,7 +103,8 @@ export FALKOR_PASS=your-falkor-password
 - **project-status** — Phase breakdown, task stats, blockers
 - **client-brief** — Full client briefing with projects and comms
 - **client-health** — Health dashboard across all clients
-- **sprint-plan** — Plan the current cycle and apply task/cycle mutations
+- **sprint-plan** — Plan the current cycle and apply task/cycle mutations,
+  including scheduled tasks and protected calendar blocks
 
 ### People & Relationships
 - **contact-lookup** — Full contact dossier with AI insights
