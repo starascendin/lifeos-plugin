@@ -38,9 +38,12 @@ ln -s /path/to/lifeos-plugin/skills .claude/skills/lifeos
       "command": "npx",
       "args": [
         "@starascendin/lifeos-mcp@latest",
-        "--url", "YOUR_CONVEX_URL",
-        "--user-id", "YOUR_USER_ID",
-        "--api-key", "YOUR_API_KEY"
+        "--url",
+        "YOUR_CONVEX_URL",
+        "--user-id",
+        "YOUR_USER_ID",
+        "--api-key",
+        "YOUR_API_KEY"
       ],
       "env": {
         "FALKOR_BROWSER_ENDPOINT": "https://falkordb.apps.rjlabs.dev",
@@ -85,6 +88,7 @@ Task-backed work should still use `create_issue` for new execution work and
 Do not create a task just to reserve protected personal time.
 
 ### Daily Workflows
+
 - **daily-standup** — Morning briefing with agenda, tasks, and sprint progress
 - **daily-plan** — Plan today and apply due date, task schedule, protected
   calendar block, priority, cycle, and Daily Note changes
@@ -92,6 +96,7 @@ Do not create a task just to reserve protected personal time.
 - **capture** — Quick capture a thought, task, or note with auto-routing
 
 ### Reviews
+
 - **weekly-review** — Completed work, in-progress items, sprint health
 - **weekly-plan** — Plan the week and apply current cycle, due date, task
   schedule, protected calendar block, priority, and note changes
@@ -100,6 +105,7 @@ Do not create a task just to reserve protected personal time.
 - **initiative-review** — Yearly initiative progress by category
 
 ### Project & Client Management
+
 - **project-status** — Phase breakdown, task stats, blockers
 - **client-brief** — Full client briefing with projects and comms
 - **client-health** — Health dashboard across all clients
@@ -107,6 +113,7 @@ Do not create a task just to reserve protected personal time.
   including scheduled tasks and protected calendar blocks
 
 ### People & Relationships
+
 - **contact-lookup** — Full contact dossier with AI insights
 - **meeting-prep** — Prepare for meetings with full context
 - **follow-ups** — Track follow-ups needed with people and clients
@@ -114,43 +121,52 @@ Do not create a task just to reserve protected personal time.
 - **context-switch** — Fast context loading for a client or project
 
 ### Task Management
+
 - **inbox-triage** — Process notes into actionable tasks
 - **overdue** — Surface overdue and slipping items
 
 ### Voice Notes
+
 - **voice-notes** — Interactive voice memo exploration
 - **voice-notes-crystallize** — Save conversation insights as crystallized summaries
 
 ### Health (Oura Ring)
+
 - **health-check** — Quick health overview: sleep, activity, readiness scores and trends
 - **health-weekly** — Weekly health review with workouts, recovery, and recommendations
 
 ### Screen Time
+
 - **screentime-report** — Usage patterns, top time-sink apps, social media alerts, category breakdown
 
 ### Finance
+
 - **finance-overview** — Net worth summary, account balances, and trend analysis
 - **finance-spending** — Spending analysis with daily patterns and recent transactions
 
 ### Habits & Accountability
+
 - **habit-check** — Daily habit check-in: review today's habits, mark completions, celebrate streaks, flag missed reps
 - **daily-training-report** — Comprehensive daily training report: yesterday's results, today's focus, habit compliance, health data, ADHD focus management
 
 ### Coaching
+
 - **coaching-overview** — Dashboard of coaching profiles, recent sessions, and pending action items
 - **coaching-action-items** — Review and manage coaching action items across all coaches
 - **coaching-session-review** — Review a coaching session's summary, key insights, and action items
 
 ### Coaching Memory
+
 - **coach-memory** — View the AI coach's accumulated knowledge about you across 10 sections
 
 ### Life Direction
-- **ppv** — Manage PPV vision, identity, pillars, and existing project links
+
+- **ppv** — Manage PPV vision, identity, pillars, existing project links, fears, inversions, and limiting-belief friction records
 - **falkor-graph** — Query schema-aware PPV graph records and create agent-owned links through the FalkorDB sidecar graph
 
 ## MCP Server
 
-The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads, a schema/query recipe contract, and agent-owned PPV graph links.
+The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. PPV friction records use `get_belief_reframes`, `create_belief_reframe`, and `update_belief_reframe` with `type` values of `fear`, `inversion`, or `limiting_belief`, and can link to `visionIds`, `projectIds`, or `issueIds`. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads, a schema/query recipe contract, and agent-owned PPV graph links.
 
 Install standalone:
 

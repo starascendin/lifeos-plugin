@@ -25,6 +25,7 @@ Use the LifeOS MCP tools:
 4. Use `falkor_graph_unlink` only for relationships previously created by `falkor_graph_link`.
 
 Good uses:
+
 - Trace PPV vision -> pillars -> projects.
 - Inspect PPV graph neighborhoods with Cypher.
 - Link a pillar, project, identity, or vision with agent-owned rationale.
@@ -34,7 +35,10 @@ Good uses:
 - Inspect whether a relationship already exists before creating it.
 
 Rules:
+
 - Convex remains canonical for entity data.
+- Fears, inversions, and limiting-belief friction records are Convex `life_beliefReframes` records. Use `get_belief_reframes`, `create_belief_reframe`, and `update_belief_reframe` for those records; do not model them as Falkor `AGENT_LINK`s.
+- For unified graph questions that need friction records, prefer `get_active_vision_graph` or `get_project_graph` because those projections include `belief_reframe` nodes.
 - `convexId` is the stable id shared between Convex and Falkor nodes.
 - Do not use FalkorDB to edit canonical node fields.
 - Do not mutate inferred PPV relationships such as `HAS_IDENTITY`, `HAS_PILLAR`, or `PILLAR_SUPPORTS_PROJECT`.
@@ -43,6 +47,7 @@ Rules:
 - Keep graph writes narrow, explainable, and reversible.
 
 When reporting results:
+
 - Include the key nodes and relationships found.
 - Include any newly created `AGENT_LINK` relationship id.
 - Include the Cypher used when it helps future follow-up.

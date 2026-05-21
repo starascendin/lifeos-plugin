@@ -6,15 +6,15 @@ How to give any AI agent access to your LifeOS data and workflows.
 
 You need three required Convex credentials. FalkorDB credentials are optional and enable the sidecar graph tools.
 
-| Variable | Description | Where to find |
-|----------|-------------|---------------|
-| `LIFEOS_CONVEX_URL` | Your Convex deployment URL (`.convex.site`) | Convex dashboard |
-| `LIFEOS_USER_ID` | Your LifeOS user ID | Convex dashboard > Users table |
-| `LIFEOS_API_KEY` | API key for authentication | Generated in LifeOS settings |
-| `FALKOR_BROWSER_ENDPOINT` | Optional FalkorDB Browser HTTP endpoint | FalkorDB/Dokploy |
-| `FALKOR_GRAPH` | Optional Falkor graph name, usually `lifeos_ppv` | FalkorDB |
-| `FALKOR_PASS` | Optional FalkorDB password | FalkorDB/Dokploy |
-| `FALKOR_TOKEN` / `FALKOR_PAT` | Optional pre-provisioned Falkor browser token | FalkorDB |
+| Variable                      | Description                                      | Where to find                  |
+| ----------------------------- | ------------------------------------------------ | ------------------------------ |
+| `LIFEOS_CONVEX_URL`           | Your Convex deployment URL (`.convex.site`)      | Convex dashboard               |
+| `LIFEOS_USER_ID`              | Your LifeOS user ID                              | Convex dashboard > Users table |
+| `LIFEOS_API_KEY`              | API key for authentication                       | Generated in LifeOS settings   |
+| `FALKOR_BROWSER_ENDPOINT`     | Optional FalkorDB Browser HTTP endpoint          | FalkorDB/Dokploy               |
+| `FALKOR_GRAPH`                | Optional Falkor graph name, usually `lifeos_ppv` | FalkorDB                       |
+| `FALKOR_PASS`                 | Optional FalkorDB password                       | FalkorDB/Dokploy               |
+| `FALKOR_TOKEN` / `FALKOR_PAT` | Optional pre-provisioned Falkor browser token    | FalkorDB                       |
 
 ## Quick Start by Agent Type
 
@@ -40,6 +40,7 @@ export FALKOR_PASS=your-falkor-password
 ```
 
 The agent now has:
+
 - LifeOS skills (invoked via `/daily-plan`, `/weekly-plan`, `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, etc.)
 - 100+ MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, falkor_graph_query, etc.)
 - 29 MCP prompts (same workflows as skills, but via MCP protocol)
@@ -78,9 +79,12 @@ Or add to your existing `.mcp.json`:
       "command": "npx",
       "args": [
         "@starascendin/lifeos-mcp@latest",
-        "--url", "https://your-app.convex.site",
-        "--user-id", "your-user-id",
-        "--api-key", "your-api-key"
+        "--url",
+        "https://your-app.convex.site",
+        "--user-id",
+        "your-user-id",
+        "--api-key",
+        "your-api-key"
       ]
     }
   }
@@ -119,11 +123,13 @@ env:
 **Step 3 — Mount in agent config:**
 
 For Claude Code agents:
+
 ```bash
 claude plugin add /shared/lifeos-plugin
 ```
 
 For other agents, symlink the skills dir and copy `.mcp.json.example`:
+
 ```bash
 ln -s /shared/lifeos-plugin/skills .claude/skills/lifeos
 cp /shared/lifeos-plugin/.mcp.json.example .mcp.json
@@ -142,9 +148,12 @@ Add to the agent's MCP config (see `.mcp.json.example`):
       "command": "npx",
       "args": [
         "@starascendin/lifeos-mcp@latest",
-        "--url", "https://your-app.convex.site",
-        "--user-id", "your-user-id",
-        "--api-key", "your-api-key"
+        "--url",
+        "https://your-app.convex.site",
+        "--user-id",
+        "your-user-id",
+        "--api-key",
+        "your-api-key"
       ]
     }
   }
@@ -178,48 +187,48 @@ Alternatively, use env vars instead of CLI args:
 
 ### Skills (Claude Code / OpenCode)
 
-| Skill | Usage | What it does |
-|-------|-------|-------------|
-| `daily-standup` | `/daily-standup` | Morning briefing: agenda, tasks, sprint |
-| `daily-plan` | `/daily-plan` | Mutating day plan: due dates, top priorities, current cycle, Daily Note |
-| `end-of-day` | `/end-of-day` | EOD wrap-up with reflection prompts |
-| `capture` | `/capture "buy milk"` | Auto-routes to task or note |
-| `weekly-review` | `/weekly-review` | Week's completed work, blockers |
-| `weekly-plan` | `/weekly-plan` | Mutating week plan: due dates, current cycle goals, priorities, notes |
-| `monthly-review` | `/monthly-review` | Monthly accomplishments and planning |
-| `cycle-review` | `/cycle-review` | Sprint review with rollover |
-| `initiative-review` | `/initiative-review 2026` | Yearly goals by category |
-| `project-status` | `/project-status ACME` | Phase breakdown, task stats |
-| `client-brief` | `/client-brief "Acme Corp"` | Client projects, comms, health |
-| `client-health` | `/client-health` | Dashboard across all clients |
-| `customer-success-triage` | `/customer-success-triage "Acme Corp"` | Triage requests using chats, meetings, notes, and open work |
-| `sprint-plan` | `/sprint-plan` | Mutating current cycle plan: goals, backlog pull, due dates, priorities |
-| `contact-lookup` | `/contact-lookup "John"` | Full dossier with AI insights |
-| `meeting-prep` | `/meeting-prep "John"` | Context + talking points |
-| `follow-ups` | `/follow-ups` | Who needs a reply |
-| `relationship-pulse` | `/relationship-pulse` | Neglected relationships |
-| `context-switch` | `/context-switch "Acme"` | Fast context loading |
-| `inbox-triage` | `/inbox-triage` | Process notes into tasks |
-| `overdue` | `/overdue` | Overdue and slipping items |
-| `voice-notes` | `/voice-notes` | Interactive memo exploration |
-| `voice-notes-crystallize` | `/voice-notes-crystallize` | Save conversation insights |
-| `health-check` | `/health-check` | Quick Oura health overview: scores, trends |
-| `health-weekly` | `/health-weekly` | Weekly health review with workouts |
-| `screentime-report` | `/screentime-report` | Screen time analysis and top apps |
-| `finance-overview` | `/finance-overview` | Net worth, accounts, trends |
-| `finance-spending` | `/finance-spending` | Spending analysis and patterns |
-| `habit-check` | `/habit-check` | Daily habit check-in, streaks, completions |
-| `daily-training-report` | `/daily-training-report` | Daily training report with health + habits |
-| `coaching-overview` | `/coaching-overview` | Coaching profiles, sessions, action items |
-| `coaching-action-items` | `/coaching-action-items` | Manage coaching action items |
-| `coaching-session-review` | `/coaching-session-review` | Review coaching session insights |
-| `coach-memory` | `/coach-memory` | View AI coach's accumulated knowledge |
-| `ppv` | `/ppv` | Manage PPV vision, identity, pillars, and project links |
-| `falkor-graph` | `/falkor-graph` | Query schema-aware PPV graph data and create agent-owned FalkorDB links |
+| Skill                     | Usage                                  | What it does                                                                                                 |
+| ------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `daily-standup`           | `/daily-standup`                       | Morning briefing: agenda, tasks, sprint                                                                      |
+| `daily-plan`              | `/daily-plan`                          | Mutating day plan: due dates, top priorities, current cycle, Daily Note                                      |
+| `end-of-day`              | `/end-of-day`                          | EOD wrap-up with reflection prompts                                                                          |
+| `capture`                 | `/capture "buy milk"`                  | Auto-routes to task or note                                                                                  |
+| `weekly-review`           | `/weekly-review`                       | Week's completed work, blockers                                                                              |
+| `weekly-plan`             | `/weekly-plan`                         | Mutating week plan: due dates, current cycle goals, priorities, notes                                        |
+| `monthly-review`          | `/monthly-review`                      | Monthly accomplishments and planning                                                                         |
+| `cycle-review`            | `/cycle-review`                        | Sprint review with rollover                                                                                  |
+| `initiative-review`       | `/initiative-review 2026`              | Yearly goals by category                                                                                     |
+| `project-status`          | `/project-status ACME`                 | Phase breakdown, task stats                                                                                  |
+| `client-brief`            | `/client-brief "Acme Corp"`            | Client projects, comms, health                                                                               |
+| `client-health`           | `/client-health`                       | Dashboard across all clients                                                                                 |
+| `customer-success-triage` | `/customer-success-triage "Acme Corp"` | Triage requests using chats, meetings, notes, and open work                                                  |
+| `sprint-plan`             | `/sprint-plan`                         | Mutating current cycle plan: goals, backlog pull, due dates, priorities                                      |
+| `contact-lookup`          | `/contact-lookup "John"`               | Full dossier with AI insights                                                                                |
+| `meeting-prep`            | `/meeting-prep "John"`                 | Context + talking points                                                                                     |
+| `follow-ups`              | `/follow-ups`                          | Who needs a reply                                                                                            |
+| `relationship-pulse`      | `/relationship-pulse`                  | Neglected relationships                                                                                      |
+| `context-switch`          | `/context-switch "Acme"`               | Fast context loading                                                                                         |
+| `inbox-triage`            | `/inbox-triage`                        | Process notes into tasks                                                                                     |
+| `overdue`                 | `/overdue`                             | Overdue and slipping items                                                                                   |
+| `voice-notes`             | `/voice-notes`                         | Interactive memo exploration                                                                                 |
+| `voice-notes-crystallize` | `/voice-notes-crystallize`             | Save conversation insights                                                                                   |
+| `health-check`            | `/health-check`                        | Quick Oura health overview: scores, trends                                                                   |
+| `health-weekly`           | `/health-weekly`                       | Weekly health review with workouts                                                                           |
+| `screentime-report`       | `/screentime-report`                   | Screen time analysis and top apps                                                                            |
+| `finance-overview`        | `/finance-overview`                    | Net worth, accounts, trends                                                                                  |
+| `finance-spending`        | `/finance-spending`                    | Spending analysis and patterns                                                                               |
+| `habit-check`             | `/habit-check`                         | Daily habit check-in, streaks, completions                                                                   |
+| `daily-training-report`   | `/daily-training-report`               | Daily training report with health + habits                                                                   |
+| `coaching-overview`       | `/coaching-overview`                   | Coaching profiles, sessions, action items                                                                    |
+| `coaching-action-items`   | `/coaching-action-items`               | Manage coaching action items                                                                                 |
+| `coaching-session-review` | `/coaching-session-review`             | Review coaching session insights                                                                             |
+| `coach-memory`            | `/coach-memory`                        | View AI coach's accumulated knowledge                                                                        |
+| `ppv`                     | `/ppv`                                 | Manage PPV vision, identity, pillars, project links, fears, inversions, and limiting-belief friction records |
+| `falkor-graph`            | `/falkor-graph`                        | Query schema-aware PPV graph data and create agent-owned FalkorDB links                                      |
 
 ### 130+ MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, and FalkorDB sidecar graph schema/query/link tools.
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, PPV-linked fear/inversion/limiting-belief friction records, and FalkorDB sidecar graph schema/query/link tools.
 
 ### 29 MCP Prompts
 

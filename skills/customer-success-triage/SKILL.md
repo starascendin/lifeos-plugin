@@ -19,8 +19,9 @@ Use the LifeOS MCP tools in this order:
    - Fathom detail: `get_fathom_meeting`, `get_fathom_transcript`
    - Granola detail: `get_granola_meeting`, `get_granola_transcript`
    - existing note history: `get_client_notes`
-4. For PPV/project graph relationship work, call `falkor_graph_schema`, then use `falkor_graph_query`.
-   - Use this to see whether projects and PPV context are already linked in the FalkorDB sidecar.
+4. For relevant workspace projects, call `get_belief_reframes` with `projectIds` to surface linked fears, inversions, and limiting-belief friction records before deciding what is blocked or risky.
+5. For PPV/project graph relationship work, prefer `get_project_graph` for the relevant project because it includes PPV context and `belief_reframe` friction nodes. Use FalkorDB only for sidecar traversal or agent-owned relationship links.
+   - Use Falkor to see whether projects and PPV context are already linked in the FalkorDB sidecar.
    - Use `falkor_graph_link` only for durable agent-owned relationships with `reason` and `confidence`.
    - Do not edit canonical client/project/chat/meeting/note records through FalkorDB.
 
@@ -29,6 +30,7 @@ Classify findings into:
 - **New Requirements**: net-new asks or requested changes
 - **Follow-Ups**: things waiting on you or the team
 - **Risks / Blockers**: scope ambiguity, overdue work, delivery risk, churn risk
+- **Fears / Inversions**: linked friction records that explain avoidance, delivery risk, or operating constraints
 - **Already Tracked**: notes or tasks that already cover the request
 
 Use writes deliberately:
