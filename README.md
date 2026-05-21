@@ -155,6 +155,10 @@ Do not create a task just to reserve protected personal time.
 - **coaching-action-items** — Review and manage coaching action items across all coaches
 - **coaching-session-review** — Review a coaching session's summary, key insights, and action items
 
+### AI Councils
+
+- **llm-council** — Run a generic local OpenCode multi-model council with configurable Vercel AI Gateway members and save every stage as LifeOS artifacts
+
 ### Coaching Memory
 
 - **coach-memory** — View the AI coach's accumulated knowledge about you across 10 sections
