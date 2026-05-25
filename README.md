@@ -2,7 +2,7 @@
 
 Universal skills and MCP integration for LifeOS — your personal productivity OS powered by Convex.
 
-38 workflow skills for project management, contacts, agendas, voice notes, health (Oura Ring), finance, coaching, life direction, graph relationships, and more.
+39 workflow skills for project management, contacts, agendas, voice notes, personal records, health (Oura Ring), finance, coaching, life direction, graph relationships, and more.
 
 ## Installation
 
@@ -130,6 +130,10 @@ Do not create a task just to reserve protected personal time.
 - **voice-notes** — Interactive voice memo exploration
 - **voice-notes-crystallize** — Save conversation insights as crystallized summaries
 
+### Personal Records
+
+- **personal-records** — Retrieve atomic Personal Records and use them as private RAG context
+
 ### Health (Oura Ring)
 
 - **health-check** — Quick health overview: sleep, activity, readiness scores and trends
@@ -170,7 +174,7 @@ Do not create a task just to reserve protected personal time.
 
 ## MCP Server
 
-The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. PPV friction records use `get_belief_reframes`, `create_belief_reframe`, and `update_belief_reframe` with `type` values of `fear`, `inversion`, or `limiting_belief`, and can link to `visionIds`, `projectIds`, or `issueIds`. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads, a schema/query recipe contract, and agent-owned PPV graph links.
+The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. Personal Records are available through `retrieve_personal_records`, `get_personal_record`, `search_personal_records`, and `get_personal_records` for private RAG context. PPV friction records use `get_belief_reframes`, `create_belief_reframe`, and `update_belief_reframe` with `type` values of `fear`, `inversion`, or `limiting_belief`, and can link to `visionIds`, `projectIds`, or `issueIds`. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads, a schema/query recipe contract, and agent-owned PPV graph links.
 
 Install standalone:
 

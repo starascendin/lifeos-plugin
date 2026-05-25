@@ -42,8 +42,8 @@ export FALKOR_PASS=your-falkor-password
 The agent now has:
 
 - LifeOS skills (invoked via `/daily-plan`, `/weekly-plan`, `/daily-standup`, `/capture "idea"`, `/health-check`, `/finance-overview`, etc.)
-- 100+ MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, falkor_graph_query, etc.)
-- 29 MCP prompts (same workflows as skills, but via MCP protocol)
+- 100+ MCP tools (get_tasks, create_issue, get_health_sleep, get_finance_net_worth, retrieve_personal_records, falkor_graph_query, etc.)
+- 30 MCP prompts (same workflows as skills, but via MCP protocol)
 
 ### OpenCode
 
@@ -212,6 +212,7 @@ Alternatively, use env vars instead of CLI args:
 | `overdue`                 | `/overdue`                             | Overdue and slipping items                                                                                   |
 | `voice-notes`             | `/voice-notes`                         | Interactive memo exploration                                                                                 |
 | `voice-notes-crystallize` | `/voice-notes-crystallize`             | Save conversation insights                                                                                   |
+| `personal-records`        | `/personal-records`                    | Retrieve Personal Records as private RAG context                                                             |
 | `health-check`            | `/health-check`                        | Quick Oura health overview: scores, trends                                                                   |
 | `health-weekly`           | `/health-weekly`                       | Weekly health review with workouts                                                                           |
 | `screentime-report`       | `/screentime-report`                   | Screen time analysis and top apps                                                                            |
@@ -228,9 +229,9 @@ Alternatively, use env vars instead of CLI args:
 
 ### 130+ MCP Tools
 
-Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, PPV-linked fear/inversion/limiting-belief friction records, and FalkorDB sidecar graph schema/query/link tools.
+Full CRUD for: projects, tasks/issues, cycles, phases, clients, people/contacts, notes, Personal Records, voice memos, AI conversation summaries, Beeper threads, Granola meetings, initiatives, health (Oura Ring: sleep, activity, readiness, stress, SpO2, heart rate, workouts), finance (accounts, net worth, transactions, snapshots, daily spending), habits, screen time, coaching, PPV life design, PPV-linked fear/inversion/limiting-belief friction records, and FalkorDB sidecar graph schema/query/link tools.
 
-### 29 MCP Prompts
+### 30 MCP Prompts
 
 Same workflows as the skills above, exposed via MCP protocol. Any MCP client can invoke them.
 
