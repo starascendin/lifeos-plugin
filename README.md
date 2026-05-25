@@ -2,7 +2,7 @@
 
 Universal skills and MCP integration for LifeOS — your personal productivity OS powered by Convex.
 
-39 workflow skills for project management, contacts, agendas, voice notes, personal records, health (Oura Ring), finance, coaching, life direction, graph relationships, and more.
+40 workflow skills for project management, contacts, agendas, voice notes, personal records, health (Oura Ring), finance, coaching, life direction, graph relationships, direct Falkor access, and more.
 
 ## Installation
 
@@ -171,6 +171,7 @@ Do not create a task just to reserve protected personal time.
 
 - **ppv** — Manage PPV vision, identity, pillars, existing project links, fears, inversions, and limiting-belief friction records
 - **falkor-graph** — Query schema-aware PPV graph records and create agent-owned links through the FalkorDB sidecar graph
+- **direct-falkor-access** — Use the Falkor browser/API directly for graph creation, deletion, and unrestricted mutation outside MCP guardrails
 
 ## MCP Server
 

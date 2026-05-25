@@ -226,6 +226,7 @@ Alternatively, use env vars instead of CLI args:
 | `coach-memory`            | `/coach-memory`                        | View AI coach's accumulated knowledge                                                                        |
 | `ppv`                     | `/ppv`                                 | Manage PPV vision, identity, pillars, project links, fears, inversions, and limiting-belief friction records |
 | `falkor-graph`            | `/falkor-graph`                        | Query schema-aware PPV graph data and create agent-owned FalkorDB links                                      |
+| `direct-falkor-access`    | `/direct-falkor-access`                | Use direct Falkor browser/API access for graph admin and unrestricted Cypher                                  |
 
 ### 130+ MCP Tools
 
