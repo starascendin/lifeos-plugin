@@ -19,8 +19,11 @@ This is an interactive session to help you think through your voice notes, formu
 - Present summaries and offer to dive deeper into specific memos
 
 **If user wants to explore a topic:**
-- Call `get_voice_memos_by_labels` with the relevant labels/topics and pass `limit` (and `offset` if paging)
-- The label query now returns newest-first and also falls back to transcript/name text when AI label extraction lags
+- Call `get_voice_memos_by_labels` with the relevant `labels`/topics and pass `limit` (and `offset` if paging)
+- Add `tags` when the user wants memo-tag filtering; tag matching is case-insensitive exact matching and any requested tag can match
+- Add `isSummarized=true|false` when the user wants notes already used in AI summaries vs notes not yet summarized
+- The query now returns newest-first and also falls back to transcript/name text when AI label extraction lags
+- The summarized-status field is named `isSummarized` (not `usedInAiSummary`) and treats a memo as summarized if it appears either in an AI convo summary's `relatedMemoIds` or in an aggregate AI summary citation
 - If the user specifically cares about the *latest* memos on a topic, sanity-check against `get_recent_notes` or `search_notes`
 - Present findings and discuss patterns/themes
 
