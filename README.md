@@ -127,7 +127,7 @@ Do not create a task just to reserve protected personal time.
 
 ### Voice Notes
 
-- **voice-notes** — Interactive voice memo exploration
+- **voice-notes** — Interactive voice memo exploration. Topic lookup uses newest-first memo ordering, accepts `limit`/`offset`, and falls back to transcript/name text when AI label extraction lags.
 - **voice-notes-crystallize** — Save conversation insights as crystallized summaries
 
 ### Personal Records

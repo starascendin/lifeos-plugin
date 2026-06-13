@@ -19,8 +19,9 @@ This is an interactive session to help you think through your voice notes, formu
 - Present summaries and offer to dive deeper into specific memos
 
 **If user wants to explore a topic:**
-- Call get_voice_memos_by_labels with the relevant labels
-- Or call search_notes with a query
+- Call `get_voice_memos_by_labels` with the relevant labels/topics and pass `limit` (and `offset` if paging)
+- The label query now returns newest-first and also falls back to transcript/name text when AI label extraction lags
+- If the user specifically cares about the *latest* memos on a topic, sanity-check against `get_recent_notes` or `search_notes`
 - Present findings and discuss patterns/themes
 
 **If user wants to review a specific time period:**
