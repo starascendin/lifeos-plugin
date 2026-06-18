@@ -1,7 +1,7 @@
 {
   "name": "lifeos",
-  "description": "LifeOS productivity suite - project management, contacts, agendas, PPV life design, SurrealDB graph links, health (Oura), finance, and workflow automation via MCP",
-  "version": "1.2.0",
+  "description": "LifeOS productivity suite with agent skills, MCP tools, workflow prompts, CLI helpers, health, finance, PPV life design, and workflow automation",
+  "version": "1.3.0",
   "author": { "name": "starascendin" },
   "repository": "https://github.com/starascendin/lifeos-plugin",
   "keywords": ["lifeos", "productivity", "project-management", "life-design", "graph", "surrealdb", "mcp"]

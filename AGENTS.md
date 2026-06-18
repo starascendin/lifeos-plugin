@@ -78,7 +78,7 @@ Or add to your existing `.mcp.json`:
     "lifeos": {
       "command": "npx",
       "args": [
-        "@starascendin/lifeos-mcp@latest",
+        "@starascendin/lifeos-plugin@latest",
         "--url",
         "https://your-app.convex.site",
         "--user-id",
@@ -147,7 +147,7 @@ Add to the agent's MCP config (see `.mcp.json.example`):
     "lifeos": {
       "command": "npx",
       "args": [
-        "@starascendin/lifeos-mcp@latest",
+        "@starascendin/lifeos-plugin@latest",
         "--url",
         "https://your-app.convex.site",
         "--user-id",
@@ -169,7 +169,7 @@ Alternatively, use env vars instead of CLI args:
   "mcpServers": {
     "lifeos": {
       "command": "npx",
-      "args": ["@starascendin/lifeos-mcp@latest"],
+      "args": ["@starascendin/lifeos-plugin@latest"],
       "env": {
         "CONVEX_URL": "https://your-app.convex.site",
         "LIFEOS_USER_ID": "your-user-id",
@@ -242,6 +242,6 @@ Same workflows as the skills above, exposed via MCP protocol. Any MCP client can
 # Update the plugin repo
 cd /path/to/lifeos-plugin && git pull
 
-# Update the MCP server (auto-updates with npx @latest)
-# Or pin a version in .mcp.json: "@starascendin/lifeos-mcp@0.7.0"
+# Update the MCP server and CLI (auto-updates with npx @latest)
+# Or pin a version in .mcp.json: "@starascendin/lifeos-plugin@1.3.0"
 ```

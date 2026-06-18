@@ -37,7 +37,7 @@ ln -s /path/to/lifeos-plugin/skills .claude/skills/lifeos
     "lifeos": {
       "command": "npx",
       "args": [
-        "@starascendin/lifeos-mcp@latest",
+        "@starascendin/lifeos-plugin@latest",
         "--url",
         "YOUR_CONVEX_URL",
         "--user-id",
@@ -173,15 +173,25 @@ Do not create a task just to reserve protected personal time.
 - **falkor-graph** — Query schema-aware PPV graph records and create agent-owned links through the FalkorDB sidecar graph
 - **direct-falkor-access** — Use the Falkor browser/API directly for graph creation, deletion, and unrestricted mutation outside MCP guardrails
 
-## MCP Server
+## MCP Server And CLI
 
-The plugin uses `@starascendin/lifeos-mcp` — an npm package that exposes LifeOS tools and prompts via Model Context Protocol. Most tools call Convex. Personal Records are available through `retrieve_personal_records`, `get_personal_record`, `search_personal_records`, and `get_personal_records` for private RAG context. PPV friction records use `get_belief_reframes`, `create_belief_reframe`, and `update_belief_reframe` with `type` values of `fear`, `inversion`, or `limiting_belief`, and can link to `visionIds`, `projectIds`, or `issueIds`. The `falkor_graph_*` tools call the FalkorDB sidecar for guarded Cypher reads, a schema/query recipe contract, and agent-owned PPV graph links.
+`@starascendin/lifeos-plugin` is the canonical agent package. It contains the
+skills, MCP server, MCP workflow prompts, and the `lifeos` shell CLI. Most MCP
+tools call Convex. Personal Records are available through
+`retrieve_personal_records`, `get_personal_record`, `search_personal_records`,
+and `get_personal_records` for private RAG context. PPV friction records use
+`get_belief_reframes`, `create_belief_reframe`, and `update_belief_reframe`
+with `type` values of `fear`, `inversion`, or `limiting_belief`, and can link
+to `visionIds`, `projectIds`, or `issueIds`. The `falkor_graph_*` tools call
+the FalkorDB sidecar for guarded Cypher reads, a schema/query recipe contract,
+and agent-owned PPV graph links.
 
 Install standalone:
 
 ```bash
-npm install -g @starascendin/lifeos-mcp
+npm install -g @starascendin/lifeos-plugin
 lifeos-mcp --url https://your-app.convex.site --user-id xxx --api-key yyy
+lifeos get_tasks status=todo limit=10
 ```
 
 ## License

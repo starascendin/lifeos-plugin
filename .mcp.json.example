@@ -3,7 +3,7 @@
     "lifeos": {
       "command": "npx",
       "args": [
-        "@starascendin/lifeos-mcp@latest",
+        "@starascendin/lifeos-plugin@latest",
         "--url", "https://YOUR_APP.convex.site",
         "--user-id", "YOUR_USER_ID",
         "--api-key", "YOUR_API_KEY"
