@@ -5,8 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "lifeos-mcp": "./dist/index.js",
-    "lifeos": "./dist/cli.js"
+    "lifeos-mcp": "dist/index.js",
+    "lifeos": "dist/cli.js"
   },
   "files": [
     ".claude-plugin",
@@ -42,7 +42,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/starascendin/lifeos-plugin"
+    "url": "git+https://github.com/starascendin/lifeos-plugin.git"
   },
   "publishConfig": {
     "access": "public"
