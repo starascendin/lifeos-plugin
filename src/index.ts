@@ -4106,7 +4106,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_screentime_summary",
     description:
-      "Get daily Screen Time summaries with total usage time, per-app breakdown, and category usage. Returns an array of daily summaries sorted by date descending.",
+      "Get Screen Time summaries with total usage time, per-app breakdown, and category usage. Returns newest daily summaries sorted by date descending; falls back to worker script snapshots when raw daily summaries are not populated.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -4124,7 +4124,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_screentime_top_apps",
     description:
-      "Get top apps by usage time for a date range, aggregated from raw sessions. Useful for identifying biggest time sinks.",
+      "Get top apps by usage time for a date range. Useful for identifying biggest time sinks. Falls back to worker script snapshots when raw sessions are not populated.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -4146,7 +4146,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_screentime_sessions",
     description:
-      "Get raw Screen Time sessions for a specific date, including app name, bundle ID, category, duration, and timestamps.",
+      "Get Screen Time rows for a specific date, including app name, bundle ID, category, duration, and timestamps. Returns raw sessions when available, otherwise app-level rows from that date's worker script snapshot. Today's date can be empty if today's snapshot has not been captured yet.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -4165,7 +4165,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_screentime_categories",
     description:
-      "Get category-level Screen Time aggregation for a date range. Categories include Productivity, Social Networking, Entertainment, etc.",
+      "Get category-level Screen Time aggregation for a date range. Categories include Productivity, Social Networking, Entertainment, etc. Falls back to worker script snapshots when raw summaries are not populated.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -7465,6 +7465,8 @@ Keep it direct and no-BS. This is a personal trainer report, not a gentle sugges
 1. Call get_screentime_summary with days=${daysCount} for daily totals and app breakdowns
 2. Call get_screentime_top_apps with days=${daysCount} and limit=15 for top time-sink apps
 3. Call get_screentime_categories with days=${daysCount} for category-level aggregation
+
+Use get_screentime_summary, get_screentime_top_apps, and get_screentime_categories as the primary source of truth. Do not conclude Screen Time is missing just because get_screentime_sessions for today's date is empty; today's exact-date snapshot may not have been captured yet. If those three primary calls return data, produce the report from that data.
 
 Present a structured report:
 

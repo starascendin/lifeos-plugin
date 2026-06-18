@@ -9,6 +9,8 @@ Generate a screen time report. Use the LifeOS MCP tools to gather data:
 2. Call get_screentime_top_apps with days=7 and limit=15 for top time-sink apps
 3. Call get_screentime_categories with days=7 for category-level aggregation
 
+Use get_screentime_summary, get_screentime_top_apps, and get_screentime_categories as the primary source of truth. Do not conclude Screen Time is missing just because get_screentime_sessions for today's date is empty; today's exact-date snapshot may not have been captured yet. If the three primary calls return data, produce the report from that data.
+
 Present a structured report:
 
 **USAGE OVERVIEW**
