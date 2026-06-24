@@ -10,7 +10,8 @@ This is an interactive session to help you think through your voice notes, formu
 **Getting Started - Understand what's available:**
 1. Call get_voice_memo_labels to see all topics/labels in your voice notes
 2. Call get_recent_notes with limit 10 to see recent entries
-3. Ask the user what they want to explore or work on
+3. If the user is asking about conversations, relationships, or "who said what," plan to use `get_voice_memo_diarization`
+4. Ask the user what they want to explore or work on
 
 **Exploration based on user intent:**
 
@@ -33,6 +34,8 @@ This is an interactive session to help you think through your voice notes, formu
 
 **For deeper analysis of a single memo:**
 - Call get_voice_memo with the memoId for full details including AI extraction
+- If speaker separation matters, call `get_voice_memo_diarization` with the `memoId`
+- Add `includeSegments=true` only when you need raw turn-by-turn speaker segments; otherwise prefer the lighter default response
 
 **For graph-aware exploration:**
 - Call `falkor_graph_schema`, then use `falkor_graph_query` when the user asks how voice notes connect to PPV or projects in the Falkor sidecar.

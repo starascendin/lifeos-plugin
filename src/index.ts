@@ -1661,7 +1661,7 @@ const TOOLS: Tool[] = [
   {
     name: "get_voice_memo",
     description:
-      "Get a single voice memo with full details including transcript and AI extraction (summary, labels, action items, key points, sentiment).",
+      "Get a single voice memo with full details including transcript, AI extraction, and latest diarization summary when available.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -1675,6 +1675,34 @@ const TOOLS: Tool[] = [
         },
       },
       required: ["memoId"],
+    },
+  },
+  {
+    name: "get_voice_memo_diarization",
+    description:
+      "Get diarization details for a voice memo, including speaker-separated transcript, speaker labels, and diarization-based summary extractions.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        userId: {
+          type: "string",
+          description: "Override the default user ID (optional)",
+        },
+        memoId: {
+          type: "string",
+          description:
+            "The voice memo ID. Required unless diarizationId is provided.",
+        },
+        diarizationId: {
+          type: "string",
+          description:
+            "Optional specific diarization record ID to fetch instead of the latest one.",
+        },
+        includeSegments: {
+          type: "boolean",
+          description: "Include raw speaker segment list (default false)",
+        },
+      },
     },
   },
   {
@@ -7178,12 +7206,13 @@ This is an interactive session to help me think through my voice notes, formulat
 **Getting Started:**
 1. Call get_voice_memo_labels to see all topics/labels
 2. Call get_recent_notes with limit 10 to see recent entries
+3. If the user cares about who said what in a conversation, call get_voice_memo_diarization for the relevant memo
 
 **Based on what I want to explore:**
 - To review recent notes: Call get_recent_notes or get_voice_memos_by_date
 - To explore a topic: Call get_voice_memos_by_labels or search_notes
 - To review a time period: Call get_voice_memos_by_date with date range
-- For deeper analysis: Call get_voice_memo for full details
+- For deeper analysis: Call get_voice_memo for memo details, then get_voice_memo_diarization when speaker turns or named participants matter
 
 **During the conversation:**
 - Help me think through my notes
