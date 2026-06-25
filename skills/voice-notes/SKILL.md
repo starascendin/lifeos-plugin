@@ -10,7 +10,7 @@ This is an interactive session to help you think through your voice notes, formu
 **Getting Started - Understand what's available:**
 1. Call get_voice_memo_labels to see all topics/labels in your voice notes
 2. Call get_recent_notes with limit 10 to see recent entries
-3. If the user is asking about conversations, relationships, or "who said what," plan to use `get_voice_memo_diarization`
+3. If the user is asking about conversations, relationships, speaker attribution, or "who said what," plan to use `get_voice_memo_diarization`
 4. Ask the user what they want to explore or work on
 
 **Exploration based on user intent:**
@@ -34,7 +34,9 @@ This is an interactive session to help you think through your voice notes, formu
 
 **For deeper analysis of a single memo:**
 - Call get_voice_memo with the memoId for full details including AI extraction
-- If speaker separation matters, call `get_voice_memo_diarization` with the `memoId`
+- If speaker separation matters, call `get_voice_memo_diarization` with the `memoId`; use `diarizationId` only when a specific diarization record was already returned by `get_voice_memo`
+- The response includes `diarization.speakerTranscript`, `diarization.speakers`, `diarization.speakerLabels`, and diarization-based summary extraction fields when available
+- If `diarization` is `null`, say that no speaker diarization is available for that memo instead of inventing speaker turns
 - Add `includeSegments=true` only when you need raw turn-by-turn speaker segments; otherwise prefer the lighter default response
 
 **For graph-aware exploration:**

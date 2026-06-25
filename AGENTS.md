@@ -210,7 +210,7 @@ Alternatively, use env vars instead of CLI args:
 | `context-switch`          | `/context-switch "Acme"`               | Fast context loading                                                                                         |
 | `inbox-triage`            | `/inbox-triage`                        | Process notes into tasks                                                                                     |
 | `overdue`                 | `/overdue`                             | Overdue and slipping items                                                                                   |
-| `voice-notes`             | `/voice-notes`                         | Interactive memo exploration                                                                                 |
+| `voice-notes`             | `/voice-notes`                         | Interactive memo exploration, including speaker-diarized transcripts via `get_voice_memo_diarization`        |
 | `voice-notes-crystallize` | `/voice-notes-crystallize`             | Save conversation insights                                                                                   |
 | `personal-records`        | `/personal-records`                    | Retrieve Personal Records as private RAG context                                                             |
 | `health-check`            | `/health-check`                        | Quick Oura health overview: scores, trends                                                                   |

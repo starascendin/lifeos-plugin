@@ -7206,13 +7206,14 @@ This is an interactive session to help me think through my voice notes, formulat
 **Getting Started:**
 1. Call get_voice_memo_labels to see all topics/labels
 2. Call get_recent_notes with limit 10 to see recent entries
-3. If the user cares about who said what in a conversation, call get_voice_memo_diarization for the relevant memo
+3. If the user cares about who said what, speaker attribution, or conversation dynamics, call get_voice_memo_diarization for the relevant memo
 
 **Based on what I want to explore:**
 - To review recent notes: Call get_recent_notes or get_voice_memos_by_date
 - To explore a topic: Call get_voice_memos_by_labels or search_notes
 - To review a time period: Call get_voice_memos_by_date with date range
-- For deeper analysis: Call get_voice_memo for memo details, then get_voice_memo_diarization when speaker turns or named participants matter
+- For deeper analysis: Call get_voice_memo for memo details, then get_voice_memo_diarization when speaker turns or named participants matter. Use memoId by default, use diarizationId only when one was already returned, and set includeSegments=true only when raw turn-by-turn segments are needed.
+- If get_voice_memo_diarization returns diarization:null, say that no speaker diarization is available for that memo.
 
 **During the conversation:**
 - Help me think through my notes
